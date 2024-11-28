@@ -18,6 +18,34 @@ uses
 	utils;
 
 type
+	tCompressionProfile = record
+  	lookahead: byte; {2 for best quality, 0 for fastest}
+    maxBinSize: integer; {-1 for unlimited}
+  end;
+
+const
+  LZ96_FAST: tCompressionProfile = (
+  	lookahead:	0;
+    maxBinSize:	1;
+  	);
+	LZ96_STANDARD: tCompressionProfile = (
+  	lookahead:	0;
+    maxBinSize:	32;
+  	);
+	LZ96_HIGH: tCompressionProfile = (
+  	lookahead:	1;
+    maxBinSize:	128;
+  	);
+	LZ96_VERYHIGH: tCompressionProfile = (
+  	lookahead:	2;
+    maxBinSize:	1024;
+  	);
+  LZ96_MAXIMUM: tCompressionProfile = (
+  	lookahead:	2;
+    maxBinSize:	0;
+	  );
+
+type
 
   tLZ4Stream = class(tStream)
 	
@@ -29,10 +57,16 @@ type
     procedure writeEndSequence(const literals: array of byte);
   end;
 
-function LZ4Compress(data: tBytes): tBytes;
+function LZ4Compress(data: tBytes): tBytes; overload;
+function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes; overload;
 function LZ4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
 
+{stub: remove}
+function lz4Decompress_ref(bytes: tBytes;buffer:tBytes=nil;ref: tBytes=nil):tBytes;
+
 implementation
+
+{---------------------------------------------------------------}
 
 const
 	MIN_MATCH_LENGTH = 4;
@@ -43,49 +77,6 @@ type
     length: int32;
     pos: int32;
   end;
-
-
-{---------------------------------------------------------------}
-
-
-type
-	tCompressionProfile = record
-  	bpe: word; {maximum number of BPE substitutions (0 = off)}
-  	lookahead: byte; {2 for best quality, 0 for fastest}
-    maxBinSize: integer; {-1 for unlimited}
-  end;
-
-const
-
-  LZ96_FAST: tCompressionProfile = (
-  	bpe: 				0;
-  	lookahead:	0;
-    maxBinSize:	1;
-  	);
-	LZ96_STANDARD: tCompressionProfile = (
-  	bpe:				0;
-  	lookahead:	0;
-    maxBinSize:	32;
-  	);
-	LZ96_HIGH: tCompressionProfile = (
-  	bpe:				256;
-  	lookahead:	0;
-    maxBinSize:	32;
-  	);
-  LZ96_MAXIMUM: tCompressionProfile = (
-  	bpe:				256;
-  	lookahead:	2;
-    maxBinSize:	256;
-	  );
-
-var
-	{
-  number of bytes to lookahead when checking for matches
-  }
-
-	LOOKAHEAD: byte = 2; {set to 2 for best quality, but 3x slower for 2% gain.}
-  MAX_BIN_SIZE: int32 = 256;
-
 
 {---------------------------------------------------------------}
 
@@ -596,6 +587,11 @@ end;
 {---------------------------------------------------------------}
 
 function LZ4Compress(data: tBytes): tBytes;
+begin
+	result := LZ4Compress(data, LZ96_HIGH);
+end;
+
+function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes;
 var
   literalBuffer: tStream;
   pos, lastClean: int32;
@@ -638,7 +634,7 @@ begin
 
 	{todo: special case for short TBytes (i.e length <= 5)}
 
-  map := tHashMap.create(MAX_BIN_SIZE);
+  map := tHashMap.create(level.maxBinSize);
   srcLen := length(data);
 
 	{greedy approach}
@@ -659,7 +655,7 @@ begin
   while True do begin
 
   	{remove stale matches}
-    if (MAX_BIN_SIZE > 0) and (pos > 64*1024) and ((pos - lastClean) > 32*1024) then begin
+    if (level.maxBinSize > 0) and (pos > 64*1024) and ((pos - lastClean) > 32*1024) then begin
     	map.trim(pos-32*1024);
     	lastClean := pos;
     end;
@@ -680,7 +676,7 @@ begin
     fillchar(thisMatch, sizeof(thisMatch), 0);
     fillchar(bestMatch, sizeof(bestMatch), 0);
 
-    for i := 0 to LOOKAHEAD do begin
+    for i := 0 to level.lookahead do begin
 
     	{we're going to do a lookahead, to see if we get a better match
        if we delay a short amount}
@@ -764,11 +760,11 @@ begin
       (i.e. a greedy match precludes this better option)
       }
       doMatch := True;
-      if LOOKAHEAD > 0 then begin
+      if level.lookahead > 0 then begin
       	{calculte oportunity cost... which is quite complicated for long
          lookahead}
         {ok, just ignore if there's a better one}
-	      for i := 1 to LOOKAHEAD do begin
+	      for i := 1 to level.lookahead do begin
   	    	if (bestMatch[i].gain > bestMatch[0].gain) then
 						doMatch := False;
       	end;

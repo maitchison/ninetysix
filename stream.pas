@@ -50,7 +50,7 @@ type
     procedure writeWord(w: word); inline;
     procedure writeVLC(value: dword); inline;
     procedure writeVLCControlCode(value: dword); inline;
-    procedure writeVLCSegment(values: array of dword); inline;
+    procedure writeVLCSegment(values: array of dword;allowPacking:boolean=True); inline;
     function  VLCbits(value: dword): word; inline;
 
 		procedure writeChars(s: string);
@@ -74,6 +74,7 @@ type
 
     function  capacity: int32; inline;
     function  len: int32; inline;
+    function	getPos: int32; inline;
 
     procedure reset();
 		procedure softReset();
@@ -271,10 +272,19 @@ var
 begin
 	if midByte then
   	Error('Misaligned readBytes');
+  if n > (len-pos) then
+  	Error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (pos + n)]));
 	result := nil;
+  if n = 0 then
+  	exit;
   system.setLength(result, n);
-  move(bytes[pos], result[0], n);
-  pos += n;
+  {stub:}
+  for i := 0 to n-1 do begin
+  	result[i] := bytes[pos];
+  	inc(pos);
+  end;
+  {move(bytes[pos], result[0], n);
+  pos += n;}
 end;
 
 {writes memory stream to disk}
@@ -303,6 +313,11 @@ begin
   close(f);
   seek(0);
   midByte := False;
+end;
+
+function tStream.getPos(): int32; inline;
+begin
+	result := pos;
 end;
 
 function tStream.len(): int32; inline;
@@ -488,7 +503,7 @@ written, i.e. by first encoding a VLC length code
 This function can be useful to minimize the worst case, as we can
 make use of 8bit packing with very little loss in efficency.
 }
-procedure tStream.writeVLCSegment(values: array of dword);
+procedure tStream.writeVLCSegment(values: array of dword;allowPacking:boolean=True);
 var
 	i: int32;
   maxValue: int32;
@@ -511,17 +526,18 @@ begin
   end;
   *)
 
-  for n := 1 to 8 do begin
-  	if maxValue < (1 shl n) then begin
-	    packingCost := (length(values) * n)+16;
-	    if packingCost < unpackedBits then begin
-        {control-code}
-    		writeVLCControlCode(n-1);
-        packBits(values, n, self);
-	    	exit;
+  if allowPacking then
+    for n := 1 to 8 do begin
+    	if maxValue < (1 shl n) then begin
+  	    packingCost := (length(values) * n)+16;
+  	    if packingCost < unpackedBits then begin
+          {control-code}
+      		writeVLCControlCode(n-1);
+          packBits(values, n, self);
+  	    	exit;
+        end;
       end;
     end;
-  end;
 	{just write out the data}
 	for i := 0 to length(values)-1 do
   	writeVLC(values[i]);

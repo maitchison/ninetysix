@@ -120,6 +120,7 @@ type
 	end;
 
 function LoadBMP(const FileName: string): TPage;
+procedure makePageRandom(page: tPage);
 
 procedure assertEqual(a, b: RGBA); overload;
 procedure assertEqual(a, b: tPage); overload;
@@ -836,6 +837,16 @@ begin
 end;
 
 {-------------------------------------------------}
+
+procedure makePageRandom(page: tPage);
+var
+	x,y: int32;
+begin
+	for y := 0 to page.height-1 do
+  	for x := 0 to page.width-1 do
+    	page.putPixel(x,y,RGBA.random);
+end;
+
 
 procedure assertEqual(a, b: RGBA); overload;
 begin

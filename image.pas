@@ -15,9 +15,6 @@ uses
 	lz4;
 
 
-var
-	imgBMP: tPage;
-
 function deltaModulate24(bytes: tBytes): tBytes;
 var
 	i: integer;
@@ -37,28 +34,20 @@ begin
 
 end;
 
-procedure printStats(s: shortstring; nBytes:int32);
+procedure printStats(imgBMP: tPage; s: shortstring; nBytes:int32);
 begin
 	writeln(Format('%s    %f:1', [s,imgBMP.width*imgBMP.height*3/nBytes]));
 end;
 
-
-procedure makeImgRandom(page: tPage);
-var
-	x,y: int32;
-begin
-	for y := 0 to page.height-1 do
-  	for x := 0 to page.width-1 do
-    	page.putPixel(x,y,RGBA.random);
-end;
 
 procedure testImages();
 
 var	
 	imgBytes24: tBytes;
 	imgBytes32: tBytes;
-  lz: tBytes;
+  lcBytes: tBytes;
   s: tStream;
+  imgBMP, imgDecoded: tPage;
 
 
 begin
@@ -70,17 +59,17 @@ begin
 
 
   imgBytes24 := imgBMP.asRGBBytes;
-{
-  lz := LZ4Compress(imgBytes24);
-  printStats('LZ4', length(lz));
 
-  lz := LZ4Compress(deltaModulate24(imgBytes24));
-  printStats('LZ4-DM', length(lz));
- }
+  s := encodeLCBytes(imgBMP);
+  lcBytes := s.asBytes;
+  printStats(imgBMP, 'LZ4-LC', length(lcBytes));
+  writeln(length(lcBytes));
+  s.seek(0);
 
- 	lz := LZ4Compress(encodeLCBytes(imgBMP).asBytes);
-  printStats('LZ4-LC', length(lz));
-  writeln(length(lz));
+  {decode}
+  imgDecoded := decodeLCBytes(s);
+
+  assertEqual(imgBMP, imgDecoded);
 
 end;
 

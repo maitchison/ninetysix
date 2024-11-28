@@ -19,17 +19,15 @@ uses
 	stream,
 	graph32;
 
-procedure compressLC96(s: tStream; page: tPage);
-function  uncompressLC96(s: tStream): tPage;
-
 procedure saveLC96(filename: string; page: tPage);
 function loadLC96(filename: string): tPage;
 
-{stub: remove}
 function decodeLCBytes(s: tStream): tPage;
 function encodeLCBytes(page: tPage;s: tStream=nil): tStream;
 
 implementation
+
+uses lz4;
 
 {-------------------------------------------------------}
 { Private }
@@ -148,10 +146,10 @@ begin
       dr := deltas[dpos]; inc(dpos);
       dg := deltas[dpos]; inc(dpos);
       db := deltas[dpos]; inc(dpos);
-      if choiceCode < $8000 then
-      	src := o1
+      if choiceCode and $8000 = $8000 then
+      	src := o2
       else
-      	src := o2;
+      	src := o1;
       c.init(applyByteDelta(src.r, dr), applyByteDelta(src.g, dg), applyByteDelta(src.b, db));
 			page.putPixel(atX+x, atY+y, c);
 			choiceCode := choiceCode shl 1;
@@ -160,12 +158,13 @@ begin
   s.byteAlign();
 end;
 
-{todo: split into encode/decode header, payload}
-
 function decodeLCBytes(s: tStream): tPage;
 var
   BPP: word;
   i, px,py: int32;
+  bytes: tBytes;
+  data: tStream;
+  decompressedBytes: tBytes;
 const
 	CODE_4CC = 'LC96';
 
@@ -181,10 +180,24 @@ begin
   if BPP <> 24 then
   	Error('Only 24bit supported.');
 
+  {This is not great, it would be nice to be able decompress from
+   part way in a stream.
+   Note: having LZ4 work on streams rather than bytes would solve this.
+   }
+  data := tStream.create();
+  bytes := s.readBytes(s.len-s.getPos);
+  writeln('bytes len', length(bytes));
+  decompressedBytes := LZ4Decompress(bytes);
+  data.writeBytes(decompressedBytes);
+  data.seek(0);
+
 	for py := 0 to result.height div 4-1 do
   	for px := 0 to result.width div 4-1 do
-    	decodePatch(s, result, px*4, py*4);
-	
+    	decodePatch(data, result, px*4, py*4);
+
+  s.writeBytes(LZ4Compress(data.asBytes));
+
+  data.free;	
 end;
 
 {convert an image into 'lossless compression' format.}
@@ -196,6 +209,7 @@ var
   o1,o2: RGBA;
   choiceCode: dword;
   cnt: integer;
+  data: tStream;
 
 begin
 
@@ -208,9 +222,14 @@ begin
   s.writeWord(page.Height);
   s.writeWord(24); {only 24bit supported right now}
 
+  {todo: reserved}
+
+	data := tStream.create();
   for py := 0 to page.height div 4-1 do
   	for px := 0 to page.width div 4-1 do
-    	encodePatch(s, page, px*4, py*4);
+    	encodePatch(data, page, px*4, py*4);
+
+  s.writeBytes(LZ4Compress(data.asBytes));
 
   result := s;
 end;
@@ -221,36 +240,25 @@ end;
 
 {-------------------------------------------------------}
 
-procedure compressLC96(s: tStream; page: tPage);
-var
-	bytes: tBytes;
-begin
-  bytes := encodeLCBytes(page).asBytes;
-  s.writeBytes(bytes);   	
-end;
-
-function uncompressLC96(s: tStream): tPage;
-begin
-end;
-
 procedure saveLC96(filename: string; page: tPage);
 var
 	stream: tStream;
 begin
-	stream := tStream.create();
+	{stream := tStream.create();
   compressLC96(stream, page);
   stream.writeToDisk(filename);
-  stream.free;	
+  stream.free;}	
 end;
 
 function loadLC96(filename: string): tPage;
 var
 	stream: tStream;
 begin
-	stream := tStream.create();
+	{stream := tStream.create();
   stream.readFromDisk(filename);
   result := uncompressLC96(stream);
-  stream.free;
+  stream.free;}
+
 end;
 
 {-------------------------------------------------------}
@@ -282,10 +290,28 @@ begin
 	img1 := tPage.create(4,4);
   img1.clear(RGBA.create(255,0,128));
 	s := encodeLCBytes(img1);
-	writeln(bytesToStr(s.asBytes));
   s.seek(0);
   img2 := decodeLCBytes(s);
   assertEqual(img1, img2);
+  s.free;
+
+  {test on random bytes for larger page}
+	img1 := tPage.create(4,4);
+  makePageRandom(img1);
+	s := encodeLCBytes(img1);
+  s.seek(0);
+  img2 := decodeLCBytes(s);
+  assertEqual(img1, img2);
+  s.free;
+
+  {test on random bytes for larger page}
+	img1 := tPage.create(16,16);
+  makePageRandom(img1);
+	s := encodeLCBytes(img1);
+  s.seek(0);
+  img2 := decodeLCBytes(s);
+  assertEqual(img1, img2);
+  s.free;
 
 
 end;

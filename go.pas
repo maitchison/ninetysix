@@ -1,5 +1,5 @@
 {Super simple git replacement}
-program got;
+program go;
 
 {
 
