@@ -42,8 +42,15 @@ begin
   {$I-}
   mkDIR(destinationPath);
   {$I+}
-
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+
+  {it's handy to have a daily folder aswell}
+  destinationPath := 'got\'+time.YYMMDD('');
+  {$I-}
+  mkDIR(destinationPath);
+  {$I+}
+  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+
   			
 end;
 
