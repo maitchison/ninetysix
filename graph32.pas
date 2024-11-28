@@ -93,10 +93,14 @@ type
 	class operator explicit(this: RGBA16): RGBA32;
   end;
 
+const
+	ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
 
+type
 	TPage = record
   	Width, Height, BPP: Word;
     Pixels: pointer;
+    defaultColor: RGBA;
 
     constructor Create(AWidth, AHeight: word);
 		constructor CreateReference(AWidth, AHeight: word;PixelData: Pointer);
@@ -470,6 +474,7 @@ begin
   self.Height := AHeight;
   self.BPP := 32;
   self.Pixels := getMem(AWidth * AHeight * 4);
+  self.defaultColor := ERR_COL;
   self.Clear(RGBA.Create(0,0,0));
 end;
 
@@ -488,8 +493,8 @@ var
 	address: dword;
   col: RGBA;
 begin
-	col.init(255,0,255);
-	if (x < 0) or (y < 0) or (x >= self.width) or (y >= self.height) then exit;
+	if (x < 0) or (y < 0) or (x >= self.width) or (y >= self.height) then
+  	exit(self.defaultColor);
 	address := dword(pixels) + (y * Width + x) shl 2;
   asm
   	push edi
@@ -842,14 +847,15 @@ procedure assertEqual(a, b: tPage); overload;
 var
 	x,y: int32;
 begin
+
   if (a.width <> b.width) or (a.height <> b.height) then
   	assertError(Format('Images differ in their dimensions, expected (%d,%d) but found (%d,%d)', [a.width, a.height, b.width, b.height]));
 	if a.bpp <> b.bpp then begin
   	assertError(Format('Images differ in their bits per pixel, expected %d but found %d', [a.bpp, b.bpp]));
   end;
-  for x := 0 to a.width-1 do
-  	for y := 0 to a.height-1 do
-    	assertEqual(a.getPixel(x,y), b.getPixel(x,y));
+  for y := 0 to a.height-1 do
+  	for x := 0 to a.width-1 do
+      assertEqual(a.getPixel(x,y), b.getPixel(x,y));
 end;
 
 begin

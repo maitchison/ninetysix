@@ -622,9 +622,6 @@ begin
   s.writeVLCSegment(testData3);
   s.seek(0);
 	data := s.readVLCSegment(length(testData3));
-  for i := 0 to length(testData3)-1 do begin
-  	writeln(testData3[i],' >> ', data[i]);
-  end;
 
   s.free;
   for i := 0 to length(testData3)-1 do

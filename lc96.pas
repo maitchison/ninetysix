@@ -26,7 +26,7 @@ procedure saveLC96(filename: string; page: tPage);
 function loadLC96(filename: string): tPage;
 
 {stub: remove}
-function readLCBytes(s: tStream): tPage;
+function decodeLCBytes(s: tStream): tPage;
 function encodeLCBytes(page: tPage;s: tStream=nil): tStream;
 
 implementation
@@ -46,26 +46,26 @@ begin
 end;
 
 {interleave pos and negative numbers into a whole number}
-function funkyNeg(x: int32): int32;
-begin
-	result := abs(x)*2;
-  if x > 0 then dec(result);
-end;
-
-{interleave pos and negative numbers into a whole number}
 function invFunkyNeg(x: int32): int32;
 begin
 	result := ((x+1) shr 1);
   if x and $1 = 0 then result := -result;
 end;
 
-{generates code representing delta between two bytes}
+{interleave pos and negative numbers into a whole number}
+function funkyNeg(x: int32): int32;
+begin
+	result := abs(x)*2;
+  if x > 0 then dec(result);
+end;
+
+{generates code representing delta to go from a to b}
 function encodeByteDelta(a,b: byte): byte;
 var
 	delta: integer;
 begin
 	{take advantage of 256 wrap around on bytes}
-	delta := integer(a)-b;
+	delta := integer(b)-a;
 	if delta > 128 then
 		exit(funkyNeg(delta-256))
   else if delta < -127 then
@@ -95,6 +95,7 @@ var
   dPos: word;
 begin
   {output deltas}
+  page.defaultColor.init(0,0,0);
   choiceCode := 0;
   dPos := 0;
   for y := 0 to 3 do begin
@@ -105,13 +106,13 @@ begin
       cost1 := rms(c, o1);
       cost2 := rms(c, o2);
       if cost1 <= cost2 then begin
-      	deltas[dPos] := encodeByteDelta(c.r,o1.r); inc(dPos);
-        deltas[dPos] := encodeByteDelta(c.g,o1.g); inc(dPos);
-        deltas[dPos] := encodeByteDelta(c.b,o1.b); inc(dPos);
+      	deltas[dPos] := encodeByteDelta(o1.r, c.r); inc(dPos);
+        deltas[dPos] := encodeByteDelta(o1.g, c.g); inc(dPos);
+        deltas[dPos] := encodeByteDelta(o1.b, c.b); inc(dPos);
       end else begin
-      	deltas[dPos] := encodeByteDelta(c.r,o2.r); inc(dPos);
-        deltas[dPos] := encodeByteDelta(c.g,o2.g); inc(dPos);
-        deltas[dPos] := encodeByteDelta(c.b,o2.b); inc(dPos);
+      	deltas[dPos] := encodeByteDelta(o2.r, c.r); inc(dPos);
+        deltas[dPos] := encodeByteDelta(o2.g, c.g); inc(dPos);
+        deltas[dPos] := encodeByteDelta(o2.b, c.b); inc(dPos);
         inc(choiceCode);
       end;
       choiceCode := choiceCode shl 1;
@@ -136,6 +137,7 @@ var
   dPos: word;
 begin
   {output deltas}
+  page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
   deltas := s.readVLCSegment(4*4*3);
   dPos := 0;
@@ -146,19 +148,21 @@ begin
       dr := deltas[dpos]; inc(dpos);
       dg := deltas[dpos]; inc(dpos);
       db := deltas[dpos]; inc(dpos);
-      if choiceCode >= $8000 then
+      if choiceCode < $8000 then
       	src := o1
       else
       	src := o2;
       c.init(applyByteDelta(src.r, dr), applyByteDelta(src.g, dg), applyByteDelta(src.b, db));
-			choiceCode := choiceCode shr 1;
+			page.putPixel(atX+x, atY+y, c);
+			choiceCode := choiceCode shl 1;
     end;
   end;
   s.byteAlign();
 end;
 
+{todo: split into encode/decode header, payload}
 
-function readLCBytes(s: tStream): tPage;
+function decodeLCBytes(s: tStream): tPage;
 var
   BPP: word;
   i, px,py: int32;
@@ -184,7 +188,7 @@ begin
 end;
 
 {convert an image into 'lossless compression' format.}
-function writeLCBytes(page: tPage;s: tStream=nil): tStream;
+function encodeLCBytes(page: tPage;s: tStream=nil): tStream;
 var
 	c, prevc: rgba;
   px,py: integer;
@@ -197,9 +201,6 @@ begin
 
 	if not assigned(s) then	
 		s := tStream.Create();
-
-  {potential improvement, use control codes to activate packed
-   segments where they can be done. Perhaps on a patch level?}
 
   {write header}
   s.writeChars('LC96');
@@ -224,7 +225,7 @@ procedure compressLC96(s: tStream; page: tPage);
 var
 	bytes: tBytes;
 begin
-  bytes := writeLCBytes(page).asBytes;
+  bytes := encodeLCBytes(page).asBytes;
   s.writeBytes(bytes);   	
 end;
 
@@ -259,22 +260,33 @@ var
 	img1,img2: tPage;
   s: tStream;
   a, b, delta: int32;
-  testDeltas: array of integer = [-10, -1, 0, 1, 10];
   x,y: int32;
+  i: integer;
 begin
+
+  {test funky neg}
+  for i := -256 to +256 do
+	  AssertEqual(invFunkyNeg(funkyNeg(i)), i);
+
+  {byte deltas}
+	delta := encodeByteDelta(5,3);
+	assertEqual(applyByteDelta(5, delta), 3);
+  delta := encodeByteDelta(3,5);
+	assertEqual(applyByteDelta(3, delta), 5);
+  delta := encodeByteDelta(0,128);
+	assertEqual(applyByteDelta(0, delta), 128);
+  delta := encodeByteDelta(0,255);
+	assertEqual(applyByteDelta(0, delta), 255);
 
 	{make sure we can encode and decode a simple page}
 	img1 := tPage.create(4,4);
-  img1.clear(RGBA.create(255,0,255));
-	s := writeLCBytes(img1);
+  img1.clear(RGBA.create(255,0,128));
+	s := encodeLCBytes(img1);
 	writeln(bytesToStr(s.asBytes));
   s.seek(0);
-  img2 := readLCBytes(s);
+  img2 := decodeLCBytes(s);
   assertEqual(img1, img2);
 
-  {test funky neg}
-  for delta in testDeltas do
-	  AssertEqual(invFunkyNeg(funkyNeg(delta)), delta);
 
 end;
 

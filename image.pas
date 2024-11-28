@@ -78,7 +78,7 @@ begin
   printStats('LZ4-DM', length(lz));
  }
 
- 	lz := LZ4Compress(writeLCBytes(imgBMP).asBytes);
+ 	lz := LZ4Compress(encodeLCBytes(imgBMP).asBytes);
   printStats('LZ4-LC', length(lz));
   writeln(length(lz));
 
