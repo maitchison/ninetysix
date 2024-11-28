@@ -184,8 +184,6 @@ begin
 end;
 
 procedure tStream.writeBytes(aBytes: tBytes);
-var
-	i: dword;
 begin
 	if length(aBytes) = 0 then exit;
 	byteAlign();
@@ -336,17 +334,14 @@ begin
   	unpackedBits += VLCBits(values[i]);
   end;
 
-  {todo: support more packing modes, see if 2bit, 3bit etc work?}
-  for n in [8] do begin
+  for n in [4, 8] do begin
   	if maxValue < (1 shl n) then begin
 	    packingCost := (length(values) * n)+16;
 	    if packingCost < unpackedBits then begin
         {control-2}
-        writeln('->',n, ':',packingCost, ' ', unpackedBits);
     		writebyte($1); {todo}
 	      writeVLC(length(values));
         bytes := packBits(values, n);
-        writeln('added ',length(bytes));
         writeBytes(bytes);
 	    	exit;
       end;

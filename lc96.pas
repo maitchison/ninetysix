@@ -49,18 +49,22 @@ begin
   if x < 0 then dec(result);
 end;
 
-{writes a variable code length delta between two bytes}
-procedure writeDelta(s: tStream; a,b: byte); overload;
+{generates code representing delta between two bytes}
+function encodeByteDelta(a,b: byte): byte;
+var
+	delta: integer;
 begin
-  s.writeVLC(funkyNeg(integer(a)-b));
-end;
-
-{writes RGB delta (without alpha)}
-procedure writeDelta(s: tStream; c1, c2: RGBA); overload;
-begin
-	writeDelta(s, c1.r, c2.r);
-	writeDelta(s, c1.g, c2.g);
-  writeDelta(s, c1.b, c2.b);
+	{take advantage of 256 wrap around on bytes}
+  {note, the values we can represent in 8 bits are...
+  [-128...127], which is different from 2s complement
+  }
+	delta := integer(a)-b;
+	if delta > 127 then
+		exit(funkyNeg(delta-256))
+  else if delta < -128 then
+	  exit(funkyNeg(delta+256))
+  else
+  	exit(funkyNeg(delta));
 end;
 
 {Encode a 4x4 patch at given location.}
@@ -85,13 +89,13 @@ begin
       cost1 := rms(c, o1);
       cost2 := rms(c, o2);
       if cost1 <= cost2 then begin
-      	deltas[dPos] := funkyNeg(integer(c.r)-o1.r); inc(dPos);
-        deltas[dPos] := funkyNeg(integer(c.g)-o1.g); inc(dPos);
-        deltas[dPos] := funkyNeg(integer(c.b)-o1.b); inc(dPos);
+      	deltas[dPos] := encodeByteDelta(c.r,o1.r); inc(dPos);
+        deltas[dPos] := encodeByteDelta(c.g,o1.g); inc(dPos);
+        deltas[dPos] := encodeByteDelta(c.b,o1.b); inc(dPos);
       end else begin
-      	deltas[dPos] := funkyNeg(integer(c.r)-o2.r); inc(dPos);
-        deltas[dPos] := funkyNeg(integer(c.g)-o2.g); inc(dPos);
-        deltas[dPos] := funkyNeg(integer(c.b)-o2.b); inc(dPos);
+      	deltas[dPos] := encodeByteDelta(c.r,o2.r); inc(dPos);
+        deltas[dPos] := encodeByteDelta(c.g,o2.g); inc(dPos);
+        deltas[dPos] := encodeByteDelta(c.b,o2.b); inc(dPos);
         inc(choiceCode);
       end;
       choiceCode := choiceCode shl 1;
@@ -131,7 +135,8 @@ begin
   	for px := 0 to page.width div 4-1 do
     	encodePatch(s, page, px*4, py*4);
 
-  exit(s.asBytes);
+  result := s.asBytes;
+  s.free;
 end;
 
 

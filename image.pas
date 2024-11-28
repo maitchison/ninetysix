@@ -66,7 +66,7 @@ begin
   imgBMP := LoadBMP('video\frames_0001.bmp');
   info(Format('Image is %d x %d', [imgBMP.width, imgBMP.height]));
 
-  makeImgRandom(imgBMP);
+  {makeImgRandom(imgBMP);}
 
 
   imgBytes24 := imgBMP.asRGBBytes;
