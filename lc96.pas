@@ -1,6 +1,8 @@
 {lossless image compression}
 unit LC96;
 
+{$MODE Delphi}
+
 {
  	Super fast lossless image compression
 
@@ -11,6 +13,7 @@ unit LC96;
 interface
 
 uses
+	debug,
 	test,
   utils,
 	stream,
@@ -23,8 +26,7 @@ procedure saveLC96(filename: string; page: tPage);
 function loadLC96(filename: string): tPage;
 
 {stub: remove}
-function imageToLCBytes(page: tPage): tBytes;
-
+function writeLCBytes(page: tPage;s: tStream=nil): tStream;
 
 implementation
 
@@ -46,7 +48,14 @@ end;
 function funkyNeg(x: int32): int32;
 begin
 	result := abs(x)*2;
-  if x < 0 then dec(result);
+  if x > 0 then dec(result);
+end;
+
+{interleave pos and negative numbers into a whole number}
+function invFunkyNeg(x: int32): int32;
+begin
+	result := ((x+1) shr 1);
+  if x and $1 = 0 then result := -result;
 end;
 
 {generates code representing delta between two bytes}
@@ -55,16 +64,22 @@ var
 	delta: integer;
 begin
 	{take advantage of 256 wrap around on bytes}
-  {note, the values we can represent in 8 bits are...
-  [-128...127], which is different from 2s complement
-  }
 	delta := integer(a)-b;
-	if delta > 127 then
+	if delta > 128 then
 		exit(funkyNeg(delta-256))
-  else if delta < -128 then
+  else if delta < -127 then
 	  exit(funkyNeg(delta+256))
   else
   	exit(funkyNeg(delta));
+end;
+
+function applyByteDelta(a, code: byte): byte;
+var
+	delta: integer;
+begin
+	{$R-}
+  result := byte(a)+byte(invFunkyNeg(code));
+  {$R+}	
 end;
 
 {Encode a 4x4 patch at given location.}
@@ -108,11 +123,70 @@ begin
   s.byteAlign();
 end;
 
+{Encode a 4x4 patch at given location.}
+procedure decodePatch(s: tStream; page: tPage; atX,atY: integer);
+var
+	c: RGBA;
+  x,y: integer;
+  o1,o2,src: RGBA;
+  dr,dg,db: byte;
+  choiceCode: dword;
+  dPos: word;
+begin
+  {output deltas}
+  choiceCode := s.readWord;
+  dPos := 0;
+  for y := 0 to 3 do begin
+  	for x := 0 to 3 do begin
+      o1 := page.getPixel(atX+x-1, atY+y);
+      o2 := page.getPixel(atX+x, atY+y-1);
+      dr := s.readVLC;
+      dg := s.readVLC;
+      db := s.readVLC;
+      if choiceCode >= $8000 then
+      	src := o1
+      else
+      	src := o2;
+      c.init(applyByteDelta(src.r, dr), applyByteDelta(src.g, dg), applyByteDelta(src.b, db));
+    end;
+  end;
+  s.byteAlign();
+end;
+
+
+{todo: switch to stream}
+(*
+function readLCBytes(s: tStream): tPage;
+var
+	page: tPage;
+  BPP: word;
+  i: int32;
+const
+	CODE_4CC = 'LC96';
+
+begin
+
+	for i := 1 to 4 do
+  	if s.readByte <> ord(CODE_4CC[i]) then
+    	Error('Not a LC96 file.');	
+
+	page := tPage.create(s.readWord, s.readWord);
+  BPP := s.readWord;
+
+  if BPP <> 24 then
+  	Error('Only 24bit supported.');
+
+	for py := 0 to page.height div 4-1 do
+  	for px := 0 to page.width div 4-1 do
+    	decodePatch(s, page, px*4, py*4);
+	
+end; *)
+
+{todo: switch to write to stream}
 {convert an image into 'lossless compression' format.}
-function imageToLCBytes(page: tPage): tBytes;
+function writeLCBytes(page: tPage;s: tStream=nil): tStream;
 var
 	c, prevc: rgba;
-	s: tStream;
   px,py: integer;
   x,y: integer;
   o1,o2: RGBA;
@@ -120,7 +194,9 @@ var
   cnt: integer;
 
 begin
-	s := tStream.Create();
+
+	if not assigned(s) then	
+		s := tStream.Create();
 
   {potential improvement, use control codes to activate packed
    segments where they can be done. Perhaps on a patch level?}
@@ -129,14 +205,13 @@ begin
   s.writeChars('LC96');
   s.writeWord(page.Width);
   s.writeWord(page.Height);
-  s.writeWord(page.BPP);
+  s.writeWord(24); {only 24bit supported right now}
 
   for py := 0 to page.height div 4-1 do
   	for px := 0 to page.width div 4-1 do
     	encodePatch(s, page, px*4, py*4);
 
-  result := s.asBytes;
-  s.free;
+  result := s;
 end;
 
 
@@ -149,7 +224,7 @@ procedure compressLC96(s: tStream; page: tPage);
 var
 	bytes: tBytes;
 begin
-  bytes := imageToLCBytes(page);
+  bytes := writeLCBytes(page).asBytes;
   s.writeBytes(bytes);   	
 end;
 
@@ -183,11 +258,21 @@ procedure runTests();
 var	
 	img: tPage;
   bytes: tBytes;
+  a, b, delta: int32;
+  testDeltas: array of integer = [-10, -1, 0, 1, 10];
 begin
+
+	{make sure page works}
 	img := tPage.create(4,4);
   img.clear(RGBA.create(255,0,255));
-	bytes := imageToLCBytes(img);
+	bytes := writeLCBytes(img).asBytes;
 	writeln(bytesToStr(bytes));
+
+  {todo: encodeByteDelta}
+
+  {test funky neg}
+  for delta in testDeltas do
+	  AssertEqual(invFunkyNeg(funkyNeg(delta)), delta);
 end;
 
 begin

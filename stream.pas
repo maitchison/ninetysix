@@ -21,7 +21,7 @@ type
     valid bytes are considred to be [0..pos-1]
 
     capacity length(bytes) is always >= pos
-    setting pos := 0 is a 'soft clear', as in does not change the capacitiy.
+    using seek(pos) is a 'soft clear', as in does not change the capacitiy.
     }
 
   protected
@@ -56,9 +56,12 @@ type
     procedure writeBytes(aBytes: tBytes);
 
     function  readByte: byte; inline;
+		function  readNibble: byte; inline;
     function  readWord: word; inline;
+    function  readVLC: dword;
 
     procedure byteAlign(); inline;
+    procedure seek(aPos: dword; aMidByte: boolean=False);
 
 		procedure writeToDisk(fileName: string);
     procedure readFromDisk(fileName: string);
@@ -192,16 +195,53 @@ begin
   inc(pos, length(aBytes));
 end;
 
+function tStream.readNibble: byte; inline;
+begin
+	if midByte then begin
+  	result := bytes[pos] shr 4;
+  	midByte := false;
+    inc(pos);
+  end else begin
+	  result := bytes[pos] and $f;
+  	midByte := true;
+  end;	
+end;
+
 function tStream.readByte: byte; inline;
 begin
+	{todo: support halfbyte}
+  if midByte then
+  	Error('Reading missaligned bytes not yet supported');
   result := bytes[pos];
   inc(pos);
 end;
 
 function tStream.readWord: word; inline;
 begin
+  if midByte then
+  	Error('Reading missaligned bytes not yet supported');
   result := bytes[pos] + (bytes[pos+1] shl 8);
   inc(pos,2);
+end;
+
+function tStream.readVLC: dword;
+var
+	value: dword;
+  b: byte;
+  shift: byte;
+begin
+	value := 0;
+  shift := 0;
+  while True do begin
+  	b := readNibble;
+    value += (b and $7) shl shift;
+    if b < $8 then begin
+    	{todo: support control codes}
+    	exit(value);
+    end else begin
+    	inc(shift, 3);
+    end;
+  end;	
 end;
 
 {writes memory stream to disk}
@@ -228,7 +268,8 @@ begin
   bytesLen := length(bytes);
   blockread(f, bytes[0], length(bytes), bytesRead);
   close(f);
-  pos := 0;
+  seek(0);
+  midByte := False;
 end;
 
 function tStream.len(): int32; inline;
@@ -247,12 +288,19 @@ begin
 	if midByte then writeNibble(0);
 end;
 
+procedure tStream.seek(aPos: dword; aMidByte: boolean=False);
+begin
+	pos := aPos;
+  midByte := aMidByte;
+end;
+
 {write a variable length encoded token}
 procedure tStream.writeVLC(value: dword);
 begin
+	{stub: logging}
 	{this is the nibble aligned method}
   while True do begin
-    if value <= 7 then begin
+    if value < 8 then begin
     	writeNibble(value);
       exit;
     end else begin
@@ -309,14 +357,14 @@ end;
 {
 Writes a series of variable length codes, with optional packing.
 Generaly this just writes out a list of VLC codes.
-However, if the codes would benifit from fixed-length packing then
+However, if the codes would benefit from fixed-length packing then
 a special control character is sent, and the values are packed.
 
-The packing control code take two bytes, so this works best for
-longer data sequences.
+Note: It is the callers resposability to note how many values were
+written, i.e. by first encoding a VLC length code
 
-This can be useful to minimize the worst case, as often we can pack
-data into 8bits with very little efficency loss.
+This function can be useful to minimize the worst case, as we can
+make use of 8bit packing with very little loss in efficency.
 }
 procedure tStream.writeVLCSegment(values: array of dword);
 var
@@ -334,13 +382,14 @@ begin
   	unpackedBits += VLCBits(values[i]);
   end;
 
-  for n in [4, 8] do begin
+  for n := 0 to 8 do begin
   	if maxValue < (1 shl n) then begin
 	    packingCost := (length(values) * n)+16;
 	    if packingCost < unpackedBits then begin
         {control-2}
     		writebyte($1); {todo}
-	      writeVLC(length(values));
+        {length is implied}
+	      {writeVLC(length(values));}
         bytes := packBits(values, n);
         writeBytes(bytes);
 	    	exit;
@@ -372,14 +421,14 @@ procedure tStream.reset();
 begin
 	system.setLength(bytes, 0);
   bytesLen := 0;
-  pos := 0;
+  seek(0);
 end;
 
 {Reset stream, but keep previous capcity}
 procedure tStream.softReset();
 begin
   bytesLen := 0;
-  pos := 0;
+  seek(0);
 end;
 
 function tStream.asBytes(): tBytes;
@@ -412,7 +461,25 @@ procedure runTests();
 var	
 	s: tStream;
   i: integer;
+  w: word;
+const
+	testData: array of word = [1000, 0, 1000, 32, 15, 16, 17];
 begin
+
+	{check nibble}
+  s := tStream.Create();
+	for i := 0 to 15 do
+  	s.writeNibble(i);
+  assertEqual(s.len, 8);
+  s.writeToDisk('tmp.dat');
+  s.free;
+
+  s := tStream.Create();
+  s.readFromDisk('tmp.dat');
+  assertEqual(s.len, 8);
+	for i := 0 to 15 do
+  	assertEqual(s.readNibble, i);
+  s.free;
 
 	{check bytes}
   s := tStream.Create();
@@ -428,6 +495,8 @@ begin
 	for i := 1 to 16 do
   	assertEqual(s.readByte, i);
   s.free;
+
+
 
 	{check words}
   s := tStream.Create();
@@ -458,6 +527,15 @@ begin
 	s.writeBytes([2,3,4]);
 	s.writeByte(5);
   assertEqual(s.asBytes, [1,2,3,4,5]);
+  s.free;
+
+  {check vlc}
+  s := tStream.Create();
+  for i := 0 to length(testData)-1 do
+	  s.writeVLC(testData[i]);
+  s.seek(0);
+  for i := 0 to length(testData)-1 do
+  	assertEqual(s.readVLC, testData[i]);
   s.free;
 
 end;
