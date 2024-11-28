@@ -389,9 +389,10 @@ begin
 
   {special cases}
   case bits of
-  	0:
+  	0: begin
       {do nothing}
 	  	exit;
+    end;
     else begin
     	{generic bit packing}
     	bitBuffer := 0;
@@ -431,24 +432,23 @@ begin
 	result := nil;
   setLength(result, n);
 	
-  {special case for 0 bits}
-	if bits = 0 then begin
-  	filldword(result[0], n, 0);
-  	exit;
+  case bits of
+  	0: begin
+	  	filldword(result[0], n, 0);
+  		exit;
+	  end;
+    else begin
+			bitBuffer := s.readByte;
+		  bitsRemaining := 8;
+		  for i := 0 to n-1 do begin
+  			{this could be a lot faster, but atleast is supports bits > 8}
+		    value := 0;
+		    for j := 0 to bits-1 do
+	  			value += nextBit shl j;
+		    result[i] := value;
+      end;
+    end;
   end;
-
-	bitBuffer := s.readByte;
-  bitsRemaining := 8;
-
-  for i := 0 to n-1 do begin
-  	{this could be a lot faster, but atleast is supports bits > 8}
-    value := 0;
-    for j := 0 to bits-1 do
-	  	value += nextBit shl j;
-
-    result[i] := value;
-  end;
-
 end;
 
 function tStream.readVLCSegment(n: int32): tDWords;

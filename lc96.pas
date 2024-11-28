@@ -26,7 +26,8 @@ procedure saveLC96(filename: string; page: tPage);
 function loadLC96(filename: string): tPage;
 
 {stub: remove}
-function writeLCBytes(page: tPage;s: tStream=nil): tStream;
+function readLCBytes(s: tStream): tPage;
+function encodeLCBytes(page: tPage;s: tStream=nil): tStream;
 
 implementation
 
@@ -159,10 +160,8 @@ end;
 
 function readLCBytes(s: tStream): tPage;
 var
-	page: tPage;
   BPP: word;
-  i: int32;
-  px,py: int32;
+  i, px,py: int32;
 const
 	CODE_4CC = 'LC96';
 
@@ -172,15 +171,15 @@ begin
   	if s.readByte <> ord(CODE_4CC[i]) then
     	Error('Not a LC96 file.');	
 
-	page := tPage.create(s.readWord, s.readWord);
+	result := tPage.create(s.readWord, s.readWord);
   BPP := s.readWord;
 
   if BPP <> 24 then
   	Error('Only 24bit supported.');
 
-	for py := 0 to page.height div 4-1 do
-  	for px := 0 to page.width div 4-1 do
-    	decodePatch(s, page, px*4, py*4);
+	for py := 0 to result.height div 4-1 do
+  	for px := 0 to result.width div 4-1 do
+    	decodePatch(s, result, px*4, py*4);
 	
 end;
 
@@ -257,23 +256,26 @@ end;
 
 procedure runTests();
 var	
-	img: tPage;
-  bytes: tBytes;
+	img1,img2: tPage;
+  s: tStream;
   a, b, delta: int32;
   testDeltas: array of integer = [-10, -1, 0, 1, 10];
+  x,y: int32;
 begin
 
-	{make sure page works}
-	img := tPage.create(4,4);
-  img.clear(RGBA.create(255,0,255));
-	bytes := writeLCBytes(img).asBytes;
-	writeln(bytesToStr(bytes));
-
-  {todo: encodeByteDelta}
+	{make sure we can encode and decode a simple page}
+	img1 := tPage.create(4,4);
+  img1.clear(RGBA.create(255,0,255));
+	s := writeLCBytes(img1);
+	writeln(bytesToStr(s.asBytes));
+  s.seek(0);
+  img2 := readLCBytes(s);
+  assertEqual(img1, img2);
 
   {test funky neg}
   for delta in testDeltas do
 	  AssertEqual(invFunkyNeg(funkyNeg(delta)), delta);
+
 end;
 
 begin

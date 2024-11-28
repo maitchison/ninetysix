@@ -8,6 +8,7 @@ unit graph32;
 interface
 
 uses
+	test,
 	Debug,
   Screen,
   Utils,
@@ -51,6 +52,8 @@ type
 
 		class operator add(a,b: RGBA): RGBA;
     class operator multiply(a: RGBA; b: single): RGBA;
+
+    function toString: shortString;
 
     procedure init(r,g,b: integer;a: integer=255);
     procedure gammaAdjust(v: single);
@@ -114,9 +117,10 @@ type
 
 function LoadBMP(const FileName: string): TPage;
 
+procedure assertEqual(a, b: RGBA); overload;
+procedure assertEqual(a, b: tPage); overload;
 
 implementation
-
 
 {returns value v at brightness b [0..1] with gamma correction}
 function gammaCorrect(v: byte; b: single): byte;
@@ -202,6 +206,15 @@ class operator RGBA.multiply(a: RGBA; b: single): RGBA;
 begin
 	{ignore alpha for the moment}
 	result.init(round(a.r*b), round(a.g*b), round(a.b*b));
+end;
+
+function RGBA.toString: shortString;
+begin
+	if a = 255 then
+		result := format('(%d,%d,%d)', [r,g,b])
+  else
+  	result := format('(%d,%d,%d,%d)', [r,g,b,a]);
+  	
 end;
 
 procedure RGBA.blend(other: RGBA; factor: single);
@@ -815,6 +828,28 @@ begin
     result[i*3+1] := pRGBA(pixels+i*4)^.g;
     result[i*3+2] := pRGBA(pixels+i*4)^.b;
   end;
+end;
+
+{-------------------------------------------------}
+
+procedure assertEqual(a, b: RGBA); overload;
+begin
+	if (a.r <> b.r) or (a.g <> b.g) or (a.b <> b.b) or (a.a <> b.a) then
+  	assertError(Format('Colors do not match, expecting %s but found %s', [a.toString, b.toString]));
+end;
+
+procedure assertEqual(a, b: tPage); overload;
+var
+	x,y: int32;
+begin
+  if (a.width <> b.width) or (a.height <> b.height) then
+  	assertError(Format('Images differ in their dimensions, expected (%d,%d) but found (%d,%d)', [a.width, a.height, b.width, b.height]));
+	if a.bpp <> b.bpp then begin
+  	assertError(Format('Images differ in their bits per pixel, expected %d but found %d', [a.bpp, b.bpp]));
+  end;
+  for x := 0 to a.width-1 do
+  	for y := 0 to a.height-1 do
+    	assertEqual(a.getPixel(x,y), b.getPixel(x,y));
 end;
 
 begin
