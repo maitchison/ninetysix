@@ -49,8 +49,10 @@ type
     procedure writeByte(b: byte); inline;
     procedure writeWord(w: word); inline;
     procedure writeVLC(value: dword); inline;
-    function VLCbits(value: dword): word; inline;
+    procedure writeVLCSegment(values: array of dword); inline;
+    function  VLCbits(value: dword): word; inline;
 
+		procedure writeChars(s: string);
     procedure writeBytes(aBytes: tBytes);
 
     function  readByte: byte; inline;
@@ -173,13 +175,23 @@ begin
   inc(pos,2);
 end;
 
+procedure tStream.writeChars(s: string);
+var
+	i: integer;
+begin
+	for i := 1 to length(s) do
+  	writeByte(ord(s[i]));	
+end;
+
 procedure tStream.writeBytes(aBytes: tBytes);
 var
 	i: dword;
 begin
+	if length(aBytes) = 0 then exit;
 	byteAlign();
-  setLength(pos + length(bytes));
+  setLength(pos + length(aBytes));
   move(aBytes[0], self.bytes[pos], length(aBytes));
+  inc(pos, length(aBytes));
 end;
 
 function tStream.readByte: byte; inline;
@@ -250,6 +262,99 @@ begin
       value := value shr 3;
     end;	
   end;
+end;
+
+function packBits(values: array of dword;n: byte): tBytes;
+var
+	bitBuffer: dword;
+  bitCount: integer;
+  s: tStream;
+begin
+	
+  {todo: fast path for n=8}
+
+  {special case for 0 bits}
+	if n = 0 then begin
+	  for i := 0 to length(values)-1 do
+    	if values[i] <> 0 then
+	    	Error('Value too high');
+  	exit(nil);
+  end;
+
+	s := tStream.create();
+	bitBuffer := 0;
+  bitCount := 0;
+
+  for i := 0 to length(values)-1 do begin
+
+  	if values[i] >= (1 shl n) then
+    	Error('Value too high');
+
+  	bitBuffer := (bitBuffer shl n) or values[i];
+    bitCount += n;
+
+    while bitCount >= 8 do begin
+    	{check this line}
+    	s.writeByte((BitBuffer shr (BitCount-8)) and $ff);
+      dec(bitCount,8);
+    end;
+  end;
+
+  if bitCount > 0 then
+  	{again, check this}
+  	s.writeByte((BitBuffer shr (BitCount-8)) and $ff);
+
+  result := s.asBytes;
+  s.free;
+end;
+
+{
+Writes a series of variable length codes, with optional packing.
+Generaly this just writes out a list of VLC codes.
+However, if the codes would benifit from fixed-length packing then
+a special control character is sent, and the values are packed.
+
+The packing control code take two bytes, so this works best for
+longer data sequences.
+
+This can be useful to minimize the worst case, as often we can pack
+data into 8bits with very little efficency loss.
+}
+procedure tStream.writeVLCSegment(values: array of dword);
+var
+	i: int32;
+  maxValue: int32;
+  unpackedBits: int32;
+  packingCost: int32;
+  n: integer;
+  bytes: tBytes;
+begin
+	maxValue := 0;
+  unpackedBits := 0;
+	for i := 0 to length(values)-1 do begin
+  	maxValue := max(maxValue, values[i]);
+  	unpackedBits += VLCBits(values[i]);
+  end;
+
+  {todo: support more packing modes, see if 2bit, 3bit etc work?}
+  for n in [8] do begin
+  	if maxValue < (1 shl n) then begin
+	    packingCost := (length(values) * n)+16;
+	    if packingCost < unpackedBits then begin
+        {control-2}
+        writeln('->',n, ':',packingCost, ' ', unpackedBits);
+    		writebyte($1); {todo}
+	      writeVLC(length(values));
+        bytes := packBits(values, n);
+        writeln('added ',length(bytes));
+        writeBytes(bytes);
+	    	exit;
+      end;
+    end;
+  end;
+	{just write out the data}
+	for i := 0 to length(values)-1 do
+  	writeVLC(values[i]);
 end;
 
 {returns size of variable length encoded token}
@@ -350,6 +455,15 @@ begin
 	s.writeByte(9);
 	s.writeByte(2);
   assertEqual(s.asBytes, [5,9,2]);
+  s.free;
+
+  {check writeBytes}
+  s := tStream.Create();
+  s.writeByte(1);
+	s.writeBytes([2,3,4]);
+	s.writeByte(5);
+  assertEqual(s.asBytes, [1,2,3,4,5]);
+  s.free;
 
 end;
 

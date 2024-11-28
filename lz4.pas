@@ -83,8 +83,8 @@ var
   number of bytes to lookahead when checking for matches
   }
 
-	LOOKAHEAD: byte = 0; {set to 2 for best quality, but 3x slower for 2% gain.}
-  MAX_BIN_SIZE: int32 = 32;
+	LOOKAHEAD: byte = 2; {set to 2 for best quality, but 3x slower for 2% gain.}
+  MAX_BIN_SIZE: int32 = 256;
 
 
 {---------------------------------------------------------------}
