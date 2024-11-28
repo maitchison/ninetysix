@@ -21,6 +21,8 @@ uses go32;
 type
 
 	tBytes = array of byte;
+  tWords = array of word;
+  tDWords = array of dword;
 
 	TMyDateTime = record
 
@@ -67,6 +69,8 @@ function bytesToStr(bytes: tBytes): string;
 function bytesToSanStr(bytes: tBytes): string;
 function StrToInt(s: string): integer;
 function Trim(s: string): string;
+
+function bytesForBits(x: integer): integer;
 
 procedure Wait(ms: integer);
 function  RND(): byte; assembler; register;
@@ -330,6 +334,12 @@ begin
   while (s[j] in [' ', #9]) and (i >= i) do dec(j);
   result := copy(s, i, j - i + 1);
 	
+end;
+
+{Returns number of bytes required to encode this many bits}
+function bytesForBits(x: integer): integer;
+begin
+	result := (x + 7) div 8;
 end;
 
 {A more accurate version of sleep, espcially for short durations.

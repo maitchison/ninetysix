@@ -49,16 +49,22 @@ type
     procedure writeByte(b: byte); inline;
     procedure writeWord(w: word); inline;
     procedure writeVLC(value: dword); inline;
+    procedure writeVLCControlCode(value: dword); inline;
     procedure writeVLCSegment(values: array of dword); inline;
     function  VLCbits(value: dword): word; inline;
 
 		procedure writeChars(s: string);
     procedure writeBytes(aBytes: tBytes);
 
+    function  peekByte: byte; inline;
+    function  peekWord: word; inline;
+
     function  readByte: byte; inline;
 		function  readNibble: byte; inline;
     function  readWord: word; inline;
     function  readVLC: dword;
+		function  readVLCSegment(n: int32): tDWords;
+    function  readBytes(n: int32): tBytes;
 
     procedure byteAlign(); inline;
     procedure seek(aPos: dword; aMidByte: boolean=False);
@@ -224,6 +230,21 @@ begin
   inc(pos,2);
 end;
 
+function tStream.peekByte: byte; inline;
+begin
+	{todo: support halfbyte}
+  if midByte then
+  	Error('Reading missaligned bytes not yet supported');
+  result := bytes[pos];
+end;
+
+function tStream.peekWord: word; inline;
+begin
+  if midByte then
+  	Error('Reading missaligned bytes not yet supported');
+  result := bytes[pos] + (bytes[pos+1] shl 8);
+end;
+
 function tStream.readVLC: dword;
 var
 	value: dword;
@@ -242,6 +263,18 @@ begin
     	inc(shift, 3);
     end;
   end;	
+end;
+
+function tStream.readBytes(n: int32): tBytes;
+var
+	i: integer;
+begin
+	if midByte then
+  	Error('Misaligned readBytes');
+	result := nil;
+  system.setLength(result, n);
+  move(bytes[pos], result[0], n);
+  pos += n;
 end;
 
 {writes memory stream to disk}
@@ -310,34 +343,102 @@ begin
   end;
 end;
 
-function packBits(values: array of dword;n: byte): tBytes;
+{write a special out-of-band control code.}
+procedure tStream.writeVLCControlCode(value: dword);
+begin
+	{these codes will never appear in normal VLC encoding as they
+   would always be encoded using the smaller length.}
+  if value < 8 then
+	  writeByte($80+value)
+  else if value < 512 then
+  	writeWord($8000+value)
+  else
+  	Error('Invalid control code');
+
+end;
+
+function packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream;
+var
+	bitBuffer: dword;
+  bitPos: integer;
+  s: tStream;
+  i,j: int32;
+
+procedure writeBit(b: byte);
+begin
+	bitBuffer += b shl bitPos;
+  inc(bitPos);
+  if bitPos = 8 then begin
+  	s.writeByte(bitBuffer);
+    bitBuffer := 0;
+  	bitPos := 0;
+  end;
+end;
+
+begin
+  s := outStream;
+  if not assigned(s) then
+		s := tStream.create();
+  result := s;
+
+  {special case for 0 bits}
+	if bits = 0 then begin
+	  for i := 0 to length(values)-1 do
+    	if values[i] <> 0 then
+	    	Error('Value too high');
+  	exit;
+  end;
+
+	bitBuffer := 0;
+  bitPos := 0;
+
+  for i := 0 to length(values)-1 do begin
+
+  	if values[i] >= (1 shl bits) then
+    	Error('Value too high');
+
+    for j := 0 to bits-1 do begin
+    	writeBit((values[i] shr j) and $1);
+    end;
+
+  end;
+
+  if bitPos > 0 then
+  	s.writeByte(bitBuffer);
+
+end;
+
+(*
+function packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream;
 var
 	bitBuffer: dword;
   bitCount: integer;
   s: tStream;
 begin
-	
-  {todo: fast path for n=8}
+
+  s := outStream;
+  if not assigned(s) then
+		s := tStream.create();
+  result := s;
 
   {special case for 0 bits}
-	if n = 0 then begin
+	if bits = 0 then begin
 	  for i := 0 to length(values)-1 do
     	if values[i] <> 0 then
 	    	Error('Value too high');
-  	exit(nil);
+  	exit;
   end;
 
-	s := tStream.create();
 	bitBuffer := 0;
   bitCount := 0;
 
   for i := 0 to length(values)-1 do begin
 
-  	if values[i] >= (1 shl n) then
+  	if values[i] >= (1 shl bits) then
     	Error('Value too high');
 
-  	bitBuffer := (bitBuffer shl n) or values[i];
-    bitCount += n;
+  	bitBuffer := (bitBuffer shl bits) or values[i];
+    bitCount += bits;
 
     while bitCount >= 8 do begin
     	{check this line}
@@ -350,8 +451,76 @@ begin
   	{again, check this}
   	s.writeByte((BitBuffer shr (BitCount-8)) and $ff);
 
-  result := s.asBytes;
-  s.free;
+end; *)
+
+function unpackBits(s: tStream;bits: byte;n: integer): tDWords;
+var
+	bitBuffer: byte;
+  bitsRemaining: integer;
+  i,j: int32;
+  value: dword;
+
+function nextBit: byte;
+begin
+	if bitsRemaining = 0 then begin
+  	bitBuffer := s.readByte;
+    bitsRemaining := 8;
+  end;
+  result := bitBuffer and $1;
+  bitBuffer := bitBuffer shr 1;
+  dec(bitsRemaining);
+end;
+
+begin
+
+	result := nil;
+  setLength(result, n);
+	
+  {special case for 0 bits}
+	if bits = 0 then begin
+  	filldword(result[0], n, 0);
+  	exit;
+  end;
+
+	bitBuffer := s.readByte;
+  bitsRemaining := 8;
+
+  for i := 0 to n-1 do begin
+  	{this could be a lot faster, but atleast is supports bits > 8}
+    value := 0;
+    for j := 0 to bits-1 do
+	  	value += nextBit shl j;
+
+    result[i] := value;
+  end;
+
+end;
+
+function tStream.readVLCSegment(n: int32): tDWords;
+var
+	ctrlCode: word;
+  b: byte;
+  w: word;
+  i: int32;
+  bitsExpected: int32;
+  bytes: tBytes;
+begin
+
+	result := nil;
+  system.setLength(result, n);
+	
+  b := peekByte;
+  if (b and $80 = $80) and (b < 8) then begin
+  	{this is a control code}
+    readByte;
+    bitsExpected := n * (b and $F);
+  	result := unpackBits(self, b, n);
+    exit;
+  end;
+
+  for i := 0 to n-1 do
+  	result[i] := readVLC;	
+
 end;
 
 {
@@ -373,7 +542,6 @@ var
   unpackedBits: int32;
   packingCost: int32;
   n: integer;
-  bytes: tBytes;
 begin
 	maxValue := 0;
   unpackedBits := 0;
@@ -382,16 +550,21 @@ begin
   	unpackedBits += VLCBits(values[i]);
   end;
 
-  for n := 0 to 8 do begin
+  {special case for all zeroes}
+  if maxValue = 0 then begin
+		writeVLCControlCode(256);
+    exit;	
+  end;
+
+  for n := 1 to 8 do begin
   	if maxValue < (1 shl n) then begin
 	    packingCost := (length(values) * n)+16;
 	    if packingCost < unpackedBits then begin
         {control-2}
-    		writebyte($1); {todo}
+    		writeVLCControlCode(n-1);
         {length is implied}
 	      {writeVLC(length(values));}
-        bytes := packBits(values, n);
-        writeBytes(bytes);
+        packBits(values, n, self);
 	    	exit;
       end;
     end;
@@ -462,9 +635,23 @@ var
 	s: tStream;
   i: integer;
   w: word;
+  bitsStream: tStream;
+  data: tDWords;
+  bits: byte;
 const
-	testData: array of word = [1000, 0, 1000, 32, 15, 16, 17];
+	testData1: array of dword = [1000, 0, 1000, 32, 15, 16, 17];
+	testData2: array of dword = [100, 0, 127, 32, 15, 16, 17];
 begin
+
+	{check pack and unpack}
+  for bits := 7 to 15 do begin
+	  bitsStream := packBits(testData2, bits);
+	  AssertEqual(bitsStream.len, bytesForBits(bits*length(testData2)));
+	  bitsStream.seek(0);
+	  data := unpackBits(bitsStream, bits, length(testData2));
+	  for i := 0 to length(testData2)-1 do
+  	  AssertEqual(data[i], testData2[i]);
+  end;
 
 	{check nibble}
   s := tStream.Create();
@@ -495,8 +682,6 @@ begin
 	for i := 1 to 16 do
   	assertEqual(s.readByte, i);
   s.free;
-
-
 
 	{check words}
   s := tStream.Create();
@@ -531,11 +716,11 @@ begin
 
   {check vlc}
   s := tStream.Create();
-  for i := 0 to length(testData)-1 do
-	  s.writeVLC(testData[i]);
+  for i := 0 to length(testData1)-1 do
+	  s.writeVLC(testData1[i]);
   s.seek(0);
-  for i := 0 to length(testData)-1 do
-  	assertEqual(s.readVLC, testData[i]);
+  for i := 0 to length(testData1)-1 do
+  	assertEqual(s.readVLC, testData1[i]);
   s.free;
 
 end;
