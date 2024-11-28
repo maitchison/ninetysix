@@ -381,77 +381,32 @@ begin
 		s := tStream.create();
   result := s;
 
-  {special case for 0 bits}
-	if bits = 0 then begin
-	  for i := 0 to length(values)-1 do
-    	if values[i] <> 0 then
-	    	Error('Value too high');
-  	exit;
-  end;
+  {$IFDEF Debug}
+	for i := 0 to length(values)-1 do
+		if values[i] >= (1 shl bits) then
+	  	Error('Value too high');
+  {$ENDIF}
 
-	bitBuffer := 0;
-  bitPos := 0;
+  {special cases}
+  case bits of
+  	0:
+      {do nothing}
+	  	exit;
+    else begin
+    	{generic bit packing}
+    	bitBuffer := 0;
+      bitPos := 0;
 
-  for i := 0 to length(values)-1 do begin
+      for i := 0 to length(values)-1 do
+        for j := 0 to bits-1 do
+        	writeBit((values[i] shr j) and $1);
 
-  	if values[i] >= (1 shl bits) then
-    	Error('Value too high');
-
-    for j := 0 to bits-1 do begin
-    	writeBit((values[i] shr j) and $1);
+      if bitPos > 0 then
+      	s.writeByte(bitBuffer);
     end;
-
   end;
-
-  if bitPos > 0 then
-  	s.writeByte(bitBuffer);
 
 end;
-
-(*
-function packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream;
-var
-	bitBuffer: dword;
-  bitCount: integer;
-  s: tStream;
-begin
-
-  s := outStream;
-  if not assigned(s) then
-		s := tStream.create();
-  result := s;
-
-  {special case for 0 bits}
-	if bits = 0 then begin
-	  for i := 0 to length(values)-1 do
-    	if values[i] <> 0 then
-	    	Error('Value too high');
-  	exit;
-  end;
-
-	bitBuffer := 0;
-  bitCount := 0;
-
-  for i := 0 to length(values)-1 do begin
-
-  	if values[i] >= (1 shl bits) then
-    	Error('Value too high');
-
-  	bitBuffer := (bitBuffer shl bits) or values[i];
-    bitCount += bits;
-
-    while bitCount >= 8 do begin
-    	{check this line}
-    	s.writeByte((BitBuffer shr (BitCount-8)) and $ff);
-      dec(bitCount,8);
-    end;
-  end;
-
-  if bitCount > 0 then
-  	{again, check this}
-  	s.writeByte((BitBuffer shr (BitCount-8)) and $ff);
-
-end; *)
 
 function unpackBits(s: tStream;bits: byte;n: integer): tDWords;
 var
@@ -502,7 +457,6 @@ var
   b: byte;
   w: word;
   i: int32;
-  bitsExpected: int32;
   bytes: tBytes;
 begin
 
@@ -510,11 +464,10 @@ begin
   system.setLength(result, n);
 	
   b := peekByte;
-  if (b and $80 = $80) and (b < 8) then begin
+  if (b and $80 = $80) and ((b and $7f) < 8) then begin
   	{this is a control code}
     readByte;
-    bitsExpected := n * (b and $F);
-  	result := unpackBits(self, b, n);
+  	result := unpackBits(self, 1+(b and $7), n);
     exit;
   end;
 
@@ -551,19 +504,19 @@ begin
   end;
 
   {special case for all zeroes}
+  (*
   if maxValue = 0 then begin
 		writeVLCControlCode(256);
     exit;	
   end;
+  *)
 
   for n := 1 to 8 do begin
   	if maxValue < (1 shl n) then begin
 	    packingCost := (length(values) * n)+16;
 	    if packingCost < unpackedBits then begin
-        {control-2}
+        {control-code}
     		writeVLCControlCode(n-1);
-        {length is implied}
-	      {writeVLC(length(values));}
         packBits(values, n, self);
 	    	exit;
       end;
@@ -641,6 +594,8 @@ var
 const
 	testData1: array of dword = [1000, 0, 1000, 32, 15, 16, 17];
 	testData2: array of dword = [100, 0, 127, 32, 15, 16, 17];
+  {this will get packed}
+  testData3: array of dword = [15, 14, 0, 15, 15, 12, 11];
 begin
 
 	{check pack and unpack}
@@ -652,6 +607,28 @@ begin
 	  for i := 0 to length(testData2)-1 do
   	  AssertEqual(data[i], testData2[i]);
   end;
+
+  {check vlcsegment standard}
+  s := tStream.create;
+  s.writeVLCSegment(testData1);
+  s.seek(0);
+	data := s.readVLCSegment(length(testData1));
+  s.free;
+  for i := 0 to length(testData1)-1 do
+  	AssertEqual(data[i], testData1[i]);
+
+  {check vlcsegment packed}
+  s := tStream.create;
+  s.writeVLCSegment(testData3);
+  s.seek(0);
+	data := s.readVLCSegment(length(testData3));
+  for i := 0 to length(testData3)-1 do begin
+  	writeln(testData3[i],' >> ', data[i]);
+  end;
+
+  s.free;
+  for i := 0 to length(testData3)-1 do
+  	AssertEqual(data[i], testData3[i]);
 
 	{check nibble}
   s := tStream.Create();

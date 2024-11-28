@@ -131,36 +131,38 @@ var
   o1,o2,src: RGBA;
   dr,dg,db: byte;
   choiceCode: dword;
+	deltas: array of dword;
   dPos: word;
 begin
   {output deltas}
   choiceCode := s.readWord;
+  deltas := s.readVLCSegment(4*4*3);
   dPos := 0;
   for y := 0 to 3 do begin
   	for x := 0 to 3 do begin
       o1 := page.getPixel(atX+x-1, atY+y);
       o2 := page.getPixel(atX+x, atY+y-1);
-      dr := s.readVLC;
-      dg := s.readVLC;
-      db := s.readVLC;
+      dr := deltas[dpos]; inc(dpos);
+      dg := deltas[dpos]; inc(dpos);
+      db := deltas[dpos]; inc(dpos);
       if choiceCode >= $8000 then
       	src := o1
       else
       	src := o2;
       c.init(applyByteDelta(src.r, dr), applyByteDelta(src.g, dg), applyByteDelta(src.b, db));
+			choiceCode := choiceCode shr 1;
     end;
   end;
   s.byteAlign();
 end;
 
 
-{todo: switch to stream}
-(*
 function readLCBytes(s: tStream): tPage;
 var
 	page: tPage;
   BPP: word;
   i: int32;
+  px,py: int32;
 const
 	CODE_4CC = 'LC96';
 
@@ -180,9 +182,8 @@ begin
   	for px := 0 to page.width div 4-1 do
     	decodePatch(s, page, px*4, py*4);
 	
-end; *)
+end;
 
-{todo: switch to write to stream}
 {convert an image into 'lossless compression' format.}
 function writeLCBytes(page: tPage;s: tStream=nil): tStream;
 var
