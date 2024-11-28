@@ -27,9 +27,10 @@ uses
   dos;
 
 
-procedure commit();
+procedure commit(msg: string);
 var
   sourcePath, destinationPath, command, folderName: string;
+  t: text;
   time: tMyDateTime;
 begin
 	sourcePath := getENV('CWD');
@@ -44,6 +45,11 @@ begin
   {$I+}
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
 
+  assign(t,destinationPath+'/message.txt');
+  rewrite(t);
+  writeln(t, msg);
+  close(t);
+
   {it's handy to have a daily folder aswell}
   destinationPath := 'got\'+time.YYMMDD('');
   {$I-}
@@ -51,11 +57,17 @@ begin
   {$I+}
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
 
-  			
+
 end;
 
+var
+	msg: string;
+
 begin
-	commit();
+	{todo: show changes}
+  write('Message:');
+  readln(msg);
+  commit(msg);
 end.
 
 
