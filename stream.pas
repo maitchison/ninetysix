@@ -258,7 +258,6 @@ begin
   	b := readNibble;
     value += (b and $7) shl shift;
     if b < $8 then begin
-    	{todo: support control codes}
     	exit(value);
     end else begin
     	inc(shift, 3);
@@ -342,7 +341,25 @@ begin
   midByte := aMidByte;
 end;
 
-{write a variable length encoded token}
+{write a variable length encoded token
+
+Encoding is as follows
+
+with most signficant nibbles on the right.
+
+xxx0 							(0-7)
+xxx1xxx0 					(8-63)
+xxx1xxx1xxx0 			(64-511)
+xxx1xxx1xxx1xxx0	(512-4095)
+
+Note: codes in the form
+
+xxx10000
+...
+
+are out of band, and used for control codes  				
+
+}
 procedure tStream.writeVLC(value: dword);
 begin
 	{stub: logging}
@@ -364,9 +381,7 @@ begin
 	{these codes will never appear in normal VLC encoding as they
    would always be encoded using the smaller length.}
   if value < 8 then
-	  writeByte($80+value)
-  else if value < 512 then
-  	writeWord($8000+value)
+	  writeByte($8+value)
   else
   	Error('Invalid control code');
 
@@ -431,7 +446,7 @@ var
   i,j: int32;
   value: dword;
 
-function nextBit: byte;
+function nextBit: byte; inline;
 begin
 	if bitsRemaining = 0 then begin
   	bitBuffer := s.readByte;
@@ -446,7 +461,7 @@ begin
 
 	result := nil;
   setLength(result, n);
-	
+
   case bits of
   	0: begin
 	  	filldword(result[0], n, 0);
@@ -456,7 +471,7 @@ begin
 			bitBuffer := s.readByte;
 		  bitsRemaining := 8;
 		  for i := 0 to n-1 do begin
-  			{this could be a lot faster, but atleast is supports bits > 8}
+  			{this could be a lot faster, but atleast it supports bits > 8}
 		    value := 0;
 		    for j := 0 to bits-1 do
 	  			value += nextBit shl j;
@@ -464,6 +479,11 @@ begin
       end;
     end;
   end;
+end;
+
+function isControlCode(b: byte): boolean;
+begin
+	result := (b >= 8) and (b < 16);
 end;
 
 function tStream.readVLCSegment(n: int32): tDWords;
@@ -479,10 +499,10 @@ begin
   system.setLength(result, n);
 	
   b := peekByte;
-  if (b and $80 = $80) and ((b and $7f) < 8) then begin
+  if isControlCode(b) then begin
   	{this is a control code}
     readByte;
-  	result := unpackBits(self, 1+(b and $7), n);
+  	result := unpackBits(self, (b-8)+1, n);
     exit;
   end;
 
@@ -529,7 +549,7 @@ begin
   if allowPacking then
     for n := 1 to 8 do begin
     	if maxValue < (1 shl n) then begin
-  	    packingCost := (length(values) * n)+16;
+  	    packingCost := (length(values) * n)+8;
   	    if packingCost < unpackedBits then begin
           {control-code}
       		writeVLCControlCode(n-1);
@@ -538,6 +558,7 @@ begin
         end;
       end;
     end;
+
 	{just write out the data}
 	for i := 0 to length(values)-1 do
   	writeVLC(values[i]);

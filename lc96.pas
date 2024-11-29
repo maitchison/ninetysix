@@ -22,8 +22,8 @@ uses
 procedure saveLC96(filename: string; page: tPage);
 function loadLC96(filename: string): tPage;
 
-function decodeLCBytes(s: tStream): tPage;
-function encodeLCBytes(page: tPage;s: tStream=nil): tStream;
+function decodeLC96(s: tStream): tPage;
+function encodeLC96(page: tPage;s: tStream=nil): tStream;
 
 implementation
 
@@ -84,6 +84,7 @@ end;
 {Encode a 4x4 patch at given location.}
 procedure encodePatch(s: tStream; page: tPage; atX,atY: integer);
 var
+	i: integer;
 	c: RGBA;
   x,y: integer;
   o1,o2: RGBA;
@@ -116,7 +117,6 @@ begin
       choiceCode := choiceCode shl 1;
     end;
   end;
-  AssertEqual(dPos, 4*4*3);
   {write choice word}
   s.writeWord(choiceCode shr 1);
   s.writeVLCSegment(deltas);
@@ -126,6 +126,7 @@ end;
 {Encode a 4x4 patch at given location.}
 procedure decodePatch(s: tStream; page: tPage; atX,atY: integer);
 var
+	i: integer;
 	c: RGBA;
   x,y: integer;
   o1,o2,src: RGBA;
@@ -137,7 +138,9 @@ begin
   {output deltas}
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
-  deltas := s.readVLCSegment(4*4*3);
+  deltas := s.readVLCSegment(16*3);
+  s.byteAlign();
+
   dPos := 0;
   for y := 0 to 3 do begin
   	for x := 0 to 3 do begin
@@ -155,16 +158,16 @@ begin
 			choiceCode := choiceCode shl 1;
     end;
   end;
-  s.byteAlign();
 end;
 
-function decodeLCBytes(s: tStream): tPage;
+function decodeLC96(s: tStream): tPage;
 var
-  BPP: word;
+  width, height, BPP: word;
   i, px,py: int32;
   bytes: tBytes;
   data: tStream;
   decompressedBytes: tBytes;
+  numPatches: int32;
 const
 	CODE_4CC = 'LC96';
 
@@ -174,19 +177,28 @@ begin
   	if s.readByte <> ord(CODE_4CC[i]) then
     	Error('Not a LC96 file.');	
 
-	result := tPage.create(s.readWord, s.readWord);
+  width := s.readWord;
+  height := s.readWord;
+
+	result := tPage.create(width, height);
   BPP := s.readWord;
+
+  {read reserved bytes}
+  s.readBytes(32-10);
 
   if BPP <> 24 then
   	Error('Only 24bit supported.');
+
+  numPatches := (width div 4) * (height div 4);
 
   {This is not great, it would be nice to be able decompress from
    part way in a stream.
    Note: having LZ4 work on streams rather than bytes would solve this.
    }
+  decompressedBytes := nil;
+  setLength(decompressedBytes, numPatches * (16*3+2));
   data := tStream.create();
   bytes := s.readBytes(s.len-s.getPos);
-  writeln('bytes len', length(bytes));
   decompressedBytes := LZ4Decompress(bytes);
   data.writeBytes(decompressedBytes);
   data.seek(0);
@@ -201,8 +213,9 @@ begin
 end;
 
 {convert an image into 'lossless compression' format.}
-function encodeLCBytes(page: tPage;s: tStream=nil): tStream;
+function encodeLC96(page: tPage;s: tStream=nil): tStream;
 var
+	i: integer;
 	c, prevc: rgba;
   px,py: integer;
   x,y: integer;
@@ -222,7 +235,9 @@ begin
   s.writeWord(page.Height);
   s.writeWord(24); {only 24bit supported right now}
 
-  {todo: reserved}
+  {write reserved space}
+  for i := 1 to (32-10) do
+  	s.writeByte(0);
 
 	data := tStream.create();
   for py := 0 to page.height div 4-1 do
@@ -242,23 +257,21 @@ end;
 
 procedure saveLC96(filename: string; page: tPage);
 var
-	stream: tStream;
+	s: tStream;
 begin
-	{stream := tStream.create();
-  compressLC96(stream, page);
-  stream.writeToDisk(filename);
-  stream.free;}	
+  s := encodeLC96(page);
+  s.writeToDisk(filename);
+  s.free;
 end;
 
 function loadLC96(filename: string): tPage;
 var
-	stream: tStream;
+	s: tStream;
 begin
-	{stream := tStream.create();
-  stream.readFromDisk(filename);
-  result := uncompressLC96(stream);
-  stream.free;}
-
+	s := tStream.create();
+  s.readFromDisk(filename);
+  result := decodeLC96(s);
+  s.free;
 end;
 
 {-------------------------------------------------------}
@@ -289,30 +302,29 @@ begin
 	{make sure we can encode and decode a simple page}
 	img1 := tPage.create(4,4);
   img1.clear(RGBA.create(255,0,128));
-	s := encodeLCBytes(img1);
+	s := encodeLC96(img1);
   s.seek(0);
-  img2 := decodeLCBytes(s);
+  img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
 
   {test on random bytes for larger page}
 	img1 := tPage.create(4,4);
   makePageRandom(img1);
-	s := encodeLCBytes(img1);
+	s := encodeLC96(img1);
   s.seek(0);
-  img2 := decodeLCBytes(s);
+  img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
 
   {test on random bytes for larger page}
 	img1 := tPage.create(16,16);
   makePageRandom(img1);
-	s := encodeLCBytes(img1);
+	s := encodeLC96(img1);
   s.seek(0);
-  img2 := decodeLCBytes(s);
+  img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
-
 
 end;
 

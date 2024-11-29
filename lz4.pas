@@ -61,15 +61,13 @@ function LZ4Compress(data: tBytes): tBytes; overload;
 function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes; overload;
 function LZ4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
 
-{stub: remove}
-function lz4Decompress_ref(bytes: tBytes;buffer:tBytes=nil;ref: tBytes=nil):tBytes;
-
 implementation
 
 {---------------------------------------------------------------}
 
 const
 	MIN_MATCH_LENGTH = 4;
+  MAX_BLOCK_SIZE = 256*1024;
 
 type
 	TMatchRecord = record
@@ -630,6 +628,9 @@ end;
 
 begin
 
+	if length(data) > MAX_BLOCK_SIZE then
+  	Error(Format('Maximum blocksize is %d, but tried to write %d', [MAX_BLOCK_SIZE, length(data)]));
+
 	{note: assume 5 <= blocksize <= 64k}
 
 	{todo: special case for short TBytes (i.e length <= 5)}
@@ -935,7 +936,7 @@ begin
 
 	{ignore buffer}
 	buffer := nil;
-  setLength(buffer, 65536);
+  setLength(buffer, MAX_BLOCK_SIZE);
   bufferPtr := @buffer[0];
 
 	inPos := 0;
@@ -987,7 +988,7 @@ begin
     	
   end;	
 
-  {copy data to output}
+  {trim unused space}
   setLength(buffer, outPos);
   result := buffer;
 end;
@@ -1010,7 +1011,7 @@ begin
   bytesEnd := bytesPtr + bytesLen;
   hadBuffer := assigned(buffer);
   if not hadBuffer then
-	  setLength(buffer, 65536);
+	  setLength(buffer, MAX_BLOCK_SIZE);
   bufferPtr := @buffer[0];
   asm
   	{
@@ -1105,6 +1106,9 @@ begin
 
 		jmp @DECODE_LOOP
 
+    (*
+
+    {this is not used anymore}
   @MOVE:
 
   	{fast move function, can be used instead of rep movsb
@@ -1117,9 +1121,11 @@ begin
      edi=dest
     }
 
+    {short if <4 remain}
     cmp ecx, 4
     jb @MOVE_SHORT
 
+    {short if close overlap}
     mov eax, edi
     sub eax, esi
     cmp eax, 4
@@ -1138,8 +1144,7 @@ begin
   @MOVE_SHORT:
 
     rep movsb
-    ret
-
+    ret *)
 
   @DONE:
 
@@ -1150,6 +1155,12 @@ begin
     popad
 
   end;
+
+  if bufferLen > length(buffer) then
+  	Error(Format('Supplied buffer did not have enough bytes, wanted %d but only had %d', [bufferLen, length(buffer)]));
+  if hadBuffer and (bufferLen < length(buffer)) then
+    Error(Format('Supplied buffer did not match decode length, expected %d but only had %d', [length(buffer), bufferLen]));
+
   if not hadBuffer then
 	  setLength(buffer, bufferLen);
   result := buffer;
