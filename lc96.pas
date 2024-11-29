@@ -333,7 +333,6 @@ var
 begin
 	withAlpha := forceAlpha or page.checkForAlpha;
   s := encodeLC96(page, nil, withAlpha);
-  1234567890
 
   s.writeToDisk(filename);
   s.free;
