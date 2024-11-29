@@ -40,14 +40,16 @@ var
 
 begin
 
-  setMode(640,480,32);
+  setMode(1024,768,8);
   initMouse();
 
   s3 := tS3Driver.create();
 
+  s3.fgColor.init(0,0,0);
+
 	for i := 0 to 100 do begin
-    s3.fgColor.r := rnd;
-  	s3.fillRect(10,10,100,100);
+    s3.fgColor.b := rnd;
+  	s3.fillRect(10,10,600,600);
     delay(20);
   end;
 

@@ -118,28 +118,7 @@ procedure UpdateHardwareCursor(mouse_x, mouse_y: word);
 var
 	counter: dword;
 begin
-
 	s3Video.S3SetHardwareCursorLocation(mouse_x, mouse_y);
-	(*
-	{todo: use S3 unit for this}
-
-  {busy wait...}
-  counter := 0;
-  while (Port[$42e8] and $2 = $2) and (counter < 64*1024) do
-  	inc(counter);
-
-  Port[$3D4] := $46;
-  Port[$3D5] := (mouse_x shr 8) and $FF;
-  Port[$3D4] := $47;
-  Port[$3D5] := mouse_x and $FF;
-
-  Port[$3D4] := $49;
-  Port[$3D5] := mouse_y and $FF;
-  {high order bits should be last, as this forces the update}
-  Port[$3D4] := $48;
-  Port[$3D5] := (mouse_y shr 8) and $FF;
-  *)
-
 end;
 
 procedure WriteBit(x,y: integer; value: boolean; plane: byte);

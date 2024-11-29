@@ -720,6 +720,8 @@ constructor tS3Driver.create();
 begin
 	if not S3Detect() then
   	Error('No S3 detected');
+  fgColor.init(255,255,255);
+  bgColor.init(0,0,0);
 end;
 
 (*
