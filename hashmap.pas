@@ -72,6 +72,41 @@ asm
   {ax is result}
   end;
 
+function hashStr(s: string): dword;
+var	
+	strPointer: pointer;
+  strLen: int32;
+  hash: dword;
+begin
+	if length(s) = 0 then exit(0);
+  strPointer := @s[1];
+	strLen := length(s);
+	asm
+		pushad
+
+	  mov esi, [strPointer]
+	  mov ecx, strLen
+
+    mov eax, 0
+
+  @LOOP:
+  	
+    ror eax, 3
+    xor al, [esi]
+    inc esi
+
+  	loop @LOOP
+
+    mov [hash], eax
+
+	  popad
+
+  end;
+
+  result := hash;
+
+end;
+
 {----------------------------------------}
 
 
@@ -219,7 +254,8 @@ end;
 procedure runTests();
 var
 	map: tSparseMap;
-begin	
+begin
+	
   map := tSparseMap.create();
   assertEqual(map.getValue(97), 0);
   map.setValue(97, 1);
@@ -227,6 +263,12 @@ begin
   map.setValue(1, 5);
   map.setValue(1, map.getValue(1) + 5);
   assertEqual(map.getvalue(1), 10);
+
+  {check hash atleast works}
+  hashStr('hello');
+  hashStr('fish');
+  hashStr('');
+
 end;
 
 

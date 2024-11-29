@@ -1,6 +1,10 @@
 {Super simple git replacement}
 program go;
 
+{todo: support ansi strings I guess...
+	well atleast make sure long strings work, or perhaps just ignore?
+}
+
 {$MODE delphi}
 
 {
@@ -26,8 +30,10 @@ Block header
 
 uses
 	test,
+  crt, {remove this?}
   debug,
   utils,
+  hashMap,
   dos;
 
 
@@ -69,6 +75,11 @@ type
 		line: string;
   end;
 
+  tLines = array of string;
+
+var
+	{todo: use my sparse map}
+	CACHE: array[0..1024-1,0..1024-1] of tDWords;
 
 {----------------------------------------------------}
 { tSlice }
@@ -100,6 +111,10 @@ type
     function deref(index: int32): int32;
 
   end;
+
+{todo: remove global}
+var
+  newLines, oldLines: array of string;
 
 function tSlice.toString: string;
 var
@@ -136,7 +151,6 @@ end;
 
 function tSlice.getItem(index: int32): dword;
 begin
-
   result := data[deref(index)];
 end;
 
@@ -203,87 +217,190 @@ begin
 end;
 
 
-{output the longest common subsequence.
-e.g. ABCD, ABXXEDA -> ABD
+type
+	tCompareFunction = function(a,b: dword): boolean;
 
-strings are a[a1:a2], b[b1:b2]}
-function lcs(a,b: tSlice): tSlice;
+function cmpStandard(a, b: dword): boolean;
+begin
+	result := a = b;
+end;
+
+function cmpLines(a,b: dword): boolean;
+begin
+	result := newLines[a-1] = oldLines[b-1];
+end;
+
+
+{
+	a is new
+  b is old (ref)
+}
+{strings are a[a1:a2], b[b1:b2]}
+function lcs(a,b: tSlice;cmp: tCompareFunction): tSlice;
 var
 	option1, option2: tSlice;
 begin
-	{todo: implement DP cache}
+
+  if (@cmp = @cmpLines) then
+  	if assigned(CACHE[a.len, b.len]) then begin
+    	result.startPos := 0;
+      result.data := CACHE[a.len, b.len];
+      result.endPos := length(result.data);
+    	exit;
+    end;
 	
   {abcde, e is head, abcd is tail}
 
   if (a.len = 0) or (b.len = 0) then
-  	exit(tSlice.create([]));
+  	result := tSlice.create([])
+  else if cmp(a.head, b.head) then
+  	result := LCS(a.tail,b.tail, cmp) + b.head
+  else begin
+	  option1 := LCS(a, b.tail, cmp);
+	  option2 := LCS(a.tail, b, cmp);
+	  if option1.len > option2.len then
+  		result := option1
+	  else
+  		result := option2;
+  end;
 
-	{case 1}
-	if (a.head = b.head) then
-  	exit(LCS(a.tail,b.tail) + a.head);
-  {case 2}
-  option1 := LCS(a, b.tail);
-  option2 := LCS(a.tail, b);
-  if option1.len > option2.len then
-  	exit(option1)
-  else
-  	exit(option2);
+  if (@cmp = @cmpLines) then
+	  CACHE[a.len, b.len] := result.data;
 
 end;
 
+function readFile(filename: string): tLines;
+var
+	t: text;
+  line: string;
+  lines: array of string;
+begin
+	assign(t, filename);
+  reset(t);
+  while not EOF(t) do begin
+    readln(t, line);
+    setLength(lines, length(lines)+1);
+    lines[length(lines)-1] := line;
+  end;
+  close(t);
+  result := lines;
+end;
+
+{output the longest common subsequence.
+e.g. ABCD <- ABXXEDA -> ABD
+
+This should then be written as
+
+A
+B
+-X
+-X
+-E
++C
+D
+-A
+
+Expect matching to be [1,2,6]
+}
 
 {compare files
 filename1 is new
 filename2 is original
 }
-procedure fileDif(filename1,filename2: string);
+procedure fileDif(newFileName,oldFilename: string);
 var
-	t1,t2: Text;
-  line1, line2: string;
-  lineNumber: int32;
-  eof1,eof2: boolean;
+	i,j,k: int32;
+  map: tHashMap;
+  hash: word;
+  oldS,newS: tSlice;
+  matching: tSlice;
+  new,old,cur: string;
+  linesRemoved: int32;
+  linesAdded: int32;
+  isFirst: boolean;
+  netLines: int32;
+  plus: string;
+
 begin
-	assign(t1, filename1);
-  reset(t1);
-  assign(t2, filename2);
-  reset(t2);
 
-  lineNumber := 0;
-  eof1 := false;
-  eof2 := false;
+	oldLines := readFile(oldFilename);
+  newLines := readFile(newFilename);
 
-  while not (eof1 and eof2) do begin
+  oldS := tSlice.create([]);
+  for i := 1 to length(oldLines) do
+  	oldS.append(i);
 
-  	line1 := '';
-    line2 := '';
+  newS := tSlice.create([]);
+  for i := 1 to length(newLines) do
+  	newS.append(i);
 
-  	if not EOF(t1) then
-    	readln(t1, line1)
-    else
-    	eof1 := true;
+  matching := LCS(newS, oldS, cmpLines);
 
-    if not EOF(t2) then
-    	readln(t2, line2)
-    else
-    	eof2 := true;
+  {fast path for identical files}
 
-    inc(lineNumber);
+  if matching.len = oldS.len then begin
+  	writeln('Files are identical.');
+    exit;
+  end;
 
-    if (not eof1) and (not eof2) then begin
-    	if line1 <> line2 then
-      	writeln('-', line1);
-        writeln('+', line2);
-    end else if (not eof1) then begin
-    	writeln('+', line1);
-    end else if (not eof2) then begin
-    	writeln('-', line2);
+  i := 0;
+  j := 0;
+  k := 0;
+
+  linesAdded := 0;
+  linesRemoved := 0;
+
+  writeln();
+
+  while k < matching.len do begin
+
+    cur := oldLines[matching[k]-1];
+    isFirst := true;	
+
+    while (newLines[i] = cur) and (oldLines[j] = cur) do begin
+    	if isFirst then begin
+	    	textAttr := 7; // light gray
+      	writeln('-------');
+        isFirst := false;
+      end;
+    	{writeln('   ',cur);}
+      inc(i);
+	    inc(j);
+	    inc(k);
+    	if k < matching.len then begin      		
+	    	cur := oldLines[matching[k]-1]
+      end	else begin
+  	  	{this will cause trailing blank lines to be ignored.}
+    		cur := '';
+        break;
+      end;
+    end;
+
+    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
+    	textAttr := 12; // light red
+    	writeln('[-]', oldLines[j]);
+      inc(j);
+      inc(linesRemoved);
+    end;
+
+    while (i < length(newLines)) and (newLines[i] <> cur) do begin
+    	textAttr := 10; // light green
+    	writeln('[+]', newLines[i]);
+      inc(i);
+      inc(linesAdded);
     end;
 
   end;
 
-  close(t1);
-  close(t2);
-        	
+  netLines := linesAdded-linesRemoved;
+  if netLines > 0 then plus := '+' else plus := '';
+
+  writeln();
+  textAttr := 15; // white
+  writeln('Added ', linesAdded, ' lines.');
+  writeln('Removed ', linesRemoved, ' lines.');
+  writeln('Net ', plus, netLines,' lines.');
+
 end;	
 
 procedure testSlice();
@@ -323,14 +440,13 @@ begin
 	
   s1 := tSlice.create(data1);
   s2 := tSlice.create(data2);
-  sln := LCS(s1, s1);
+  sln := LCS(s1, s1, cmpStandard);
   assertEqual(sln.toString, '[1,2,3,4,5]');
 
-  sln := LCS(s1, s2);
+  sln := LCS(s1, s2, cmpStandard);
   assertEqual(sln.toString, '[3,5]');
 	
 end;
-
 
 procedure runTests();
 begin		
@@ -349,11 +465,15 @@ var
 
 
 begin
+
+	fillchar(CACHE, sizeof(CACHE), 0);
+
 	runTests;
   write('Message:');
   readln(msg);
   commit(msg);
-{  fileDif('./lc96.pas', './got/20241129/lc96.pas');}
+  {fileDif('b.txt', 'a.txt');}
+  {fileDif('go.pas', 'got/20241129/go.pas');}
 end.
 
 
