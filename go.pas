@@ -230,7 +230,6 @@ begin
 	result := newLines[a-1] = oldLines[b-1];
 end;
 
-
 {
 	a is new
   b is old (ref)
@@ -240,6 +239,8 @@ function lcs(a,b: tSlice;cmp: tCompareFunction): tSlice;
 var
 	option1, option2: tSlice;
 begin
+
+	{writeln(a.len, b.len);}
 
   if (@cmp = @cmpLines) then
   	if assigned(CACHE[a.len, b.len]) then begin
@@ -286,6 +287,16 @@ begin
   result := lines;
 end;
 
+{
+AACAA <- AAAA -> AAAAA
+
+A
+A
++C <important line
+A
+A
+}
+
 {output the longest common subsequence.
 e.g. ABCD <- ABXXEDA -> ABD
 
@@ -309,7 +320,7 @@ filename2 is original
 }
 procedure fileDif(newFileName,oldFilename: string);
 var
-	i,j,k: int32;
+	i,j,k,z: int32;
   map: tHashMap;
   hash: word;
   oldS,newS: tSlice;
@@ -320,8 +331,47 @@ var
   isFirst: boolean;
   netLines: int32;
   plus: string;
+  clock: int32;
+
+var
+	importantLines: array[0..1024-1] of boolean;
+
+procedure markImportant(pos: int32);
+var
+	i: int32;
+begin
+	
+	for i := pos-2 to pos+2 do
+  	if (i > 0) and (i < 1024) then
+    	importantLines[i] := true;
+end;
+
+function fix(s: string): string;
+var
+	i: integer;
+  c: byte;
+begin
+	result := '';
+  for i := 1 to length(s) do begin
+  	c := ord(s[i]);
+    if c = 9 then
+    	result += '  '
+    else if (c < 32) or (c >= 128) then
+    	result += '#('+intToStr(c)+')'
+    else
+    	result += chr(c);
+  end;
+
+  if length(result) > 60 then begin
+  	setLength(result,60);
+	  result += '...';
+  end;
+end;
 
 begin
+
+	{which lines in old file should be shown for context}
+	fillchar(importantLines, sizeof(importantLines), false);
 
 	oldLines := readFile(oldFilename);
   newLines := readFile(newFilename);
@@ -343,9 +393,48 @@ begin
     exit;
   end;
 
+  {------------------------------------}
+  { first pass to get important lines }
+
+	i := 0;
+  j := 0;
+  k := 0;
+  clock := 0;
+
+  while k < matching.len do begin
+  	inc(clock);
+    if clock > 1000 then exit;
+    cur := oldLines[matching[k]-1];
+    while (newLines[i] = cur) and (oldLines[j] = cur) do begin
+      inc(i);
+	    inc(j);
+	    inc(k);
+    	if k < matching.len then begin      		
+	    	cur := oldLines[matching[k]-1]
+      end	else begin
+    		cur := '';
+        break;
+      end;
+    end;
+
+    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
+      markImportant(j);
+      inc(j);
+    end;
+
+    while (i < length(newLines)) and (newLines[i] <> cur) do begin
+      markImportant(j);
+      inc(i);
+    end;
+  end;
+
+
+  {------------------------------------}
+
   i := 0;
   j := 0;
   k := 0;
+  clock := 0;
 
   linesAdded := 0;
   linesRemoved := 0;
@@ -353,17 +442,31 @@ begin
   writeln();
 
   while k < matching.len do begin
+  	inc(clock);
+    if clock > 1000 then exit;
 
     cur := oldLines[matching[k]-1];
     isFirst := true;	
 
+	  textAttr := 7; // light gray
+
     while (newLines[i] = cur) and (oldLines[j] = cur) do begin
     	if isFirst then begin
-	    	textAttr := 7; // light gray
-      	writeln('-------');
         isFirst := false;
       end;
-    	{writeln('   ',cur);}
+
+    	if (j > 0) and (not importantLines[j-1]) and (importantLines[j]) then begin
+      	textAttr := 8;
+        for z := 1 to 14 do
+	      	write(' ');
+        for z := 1 to 55 do
+	      	write(chr(196));
+        writeln();
+      	textAttr := 7; //cyan}
+      end;
+      if importantLines[j] then
+	    	writeln(intToStr(j, 4, '0')+'     ',fix(cur));
+
       inc(i);
 	    inc(j);
 	    inc(k);
@@ -378,14 +481,14 @@ begin
 
     while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
     	textAttr := 12; // light red
-    	writeln('[-]', oldLines[j]);
+    	writeln(intToStr(j, 4, '0')+' [-] ', fix(oldLines[j]));
       inc(j);
       inc(linesRemoved);
     end;
 
     while (i < length(newLines)) and (newLines[i] <> cur) do begin
     	textAttr := 10; // light green
-    	writeln('[+]', newLines[i]);
+    	writeln('     [+] ', fix(newLines[i]));
       inc(i);
       inc(linesAdded);
     end;
@@ -463,7 +566,6 @@ var
   todo: stats
 }
 
-
 begin
 
 	fillchar(CACHE, sizeof(CACHE), 0);
@@ -472,10 +574,6 @@ begin
   write('Message:');
   readln(msg);
   commit(msg);
-  {fileDif('b.txt', 'a.txt');}
-  {fileDif('go.pas', 'got/20241129/go.pas');}
+{  fileDif('b.txt', 'a.txt');}	
+{  fileDif('go.pas', 'got/20241129/go.pas');}
 end.
-
-
-
-
