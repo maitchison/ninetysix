@@ -117,6 +117,8 @@ type
     function asBytes: tBytes;
     function asRGBBytes: tBytes;
 
+    function checkForAlpha: boolean;
+
 	end;
 
 function LoadBMP(const FileName: string): TPage;
@@ -834,6 +836,17 @@ begin
     result[i*3+1] := pRGBA(pixels+i*4)^.g;
     result[i*3+2] := pRGBA(pixels+i*4)^.b;
   end;
+end;
+
+{returns true if any of the pixels have any transparency.}
+function tPage.checkForAlpha: boolean;
+var
+	x,y: int32;
+begin
+	for y := 0 to height-1 do
+  	for x := 0 to width-1 do
+    	if getPixel(x,y).a <> 255 then exit(True);
+  exit(False);
 end;
 
 {-------------------------------------------------}
