@@ -64,7 +64,8 @@ procedure GetTime(var hour, minute, second, sec100: word);
 {------------------------------------------------}
 { My custom routines }
 
-function IntToStr(value: int64; width: word=0; padding: char='0'): string;
+function intToStr(value: int64; width: word=0; padding: char='0'): string;
+function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: tBytes): string;
 function bytesToSanStr(bytes: tBytes): string;
 function StrToInt(s: string): integer;
@@ -304,11 +305,28 @@ begin
   end;
 end;
 
-function IntToStr(value: int64; width: word; padding: char='0'): string;
+function intToStr(value: int64; width: word; padding: char='0'): string;
 begin
-	Str(value, result);
+	str(value, result);
 	while length(result) < width do
   	result := padding + result;	
+end;
+
+function binToStr(value: int64; width: word; padding: char='0'): string;
+begin
+	if (value < 0) then
+  	{todo: support this}
+  	Error('value for binary was negative');
+	if value = 0 then result := '0' else result := '';
+	while value > 0 do begin
+    if value and 1 = 1 then
+    	result += '1'
+    else
+    	result += '0';
+  	value := value shr 1;
+  end;
+	while length(result) < width do
+  	result := padding + result;  	
 end;
 
 function StrToInt(s: string): integer;
@@ -562,7 +580,11 @@ begin
   AssertEqual(Trim(' Fish    '), 'Fish');
   AssertEqual(Trim('Fish'), 'Fish');
 
-  AssertEqual(Format('%s', [5]), '5');	
+  AssertEqual(Format('%s', [5]), '5');
+
+  AssertEqual(binToStr(5, 8), '00000101');
+  AssertEqual(binToStr(0), '0');
+  AssertEqual(binToStr(1), '1');  	
 end;
 
 begin

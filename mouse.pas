@@ -25,13 +25,16 @@ var
 
 procedure InitMouse();
 procedure CloseMouse();
+{this should not need to be called}
+procedure UpdateMouse;
 
 implementation
+
+uses s3Video;
 
 procedure installMouseProc(userproc : pointer; userproclen : longint); forward;
 procedure removeMouseProc; forward;
 procedure userproc; forward;
-procedure UpdateMouse; forward;
 
 var
 	{ supplied register structure to the callback }
@@ -112,7 +115,19 @@ begin
 end;
 
 procedure UpdateHardwareCursor(mouse_x, mouse_y: word);
+var
+	counter: dword;
 begin
+
+	s3Video.S3SetHardwareCursorLocation(mouse_x, mouse_y);
+	(*
+	{todo: use S3 unit for this}
+
+  {busy wait...}
+  counter := 0;
+  while (Port[$42e8] and $2 = $2) and (counter < 64*1024) do
+  	inc(counter);
+
   Port[$3D4] := $46;
   Port[$3D5] := (mouse_x shr 8) and $FF;
   Port[$3D4] := $47;
@@ -123,6 +138,7 @@ begin
   {high order bits should be last, as this forces the update}
   Port[$3D4] := $48;
   Port[$3D5] := (mouse_y shr 8) and $FF;
+  *)
 
 end;
 

@@ -1,7 +1,7 @@
 {Unit for handling S3 Acceleration}
-unit s3;
+unit s3video;
 
-{$MODE delphi}
+{$MODE objfpc}
 
 interface
 
@@ -15,21 +15,18 @@ uses
 	screen;
 
 type
-	tS3Driver = object
+	tS3Driver = class
   	
     fgColor: RGBA;
-    bgCOlor: RGBA;
+    bgColor: RGBA;
 
-  private
-  	function detectS3(): boolean;
   public
     constructor create();
 
-  	procedure fillRect(x1, y1, x2, y2: int16);
+  	procedure fillRect(x, y, width, height: int16);
   end;
 
-
-procedure S3SetHardwareCursorLocation(x,y: int16);
+procedure S3SetHardwareCursorLocation(x,y: word);
 
 implementation
 
@@ -102,6 +99,7 @@ begin
     	result := True;
   end;
 end;
+
 
 procedure S3UnlockRegs();
 begin
@@ -697,34 +695,31 @@ begin
 	set_segment_limit(MMIO_SEG, 65536-1);
 end;
 
-procedure S3SetHardwareCursorLocation(x,y: int16);
+procedure S3SetHardwareCursorLocation(x,y: word);
 begin
 	S3UnlockRegs();
   S3Wait;
 
   Port[$3D4] := $46;
-  Port[$3D5] := (mouse_x shr 8) and $FF;
+  Port[$3D5] := (x shr 8) and $FF;
   Port[$3D4] := $47;
-  Port[$3D5] := mouse_x and $FF;
+  Port[$3D5] := x and $FF;
 
   Port[$3D4] := $49;
-  Port[$3D5] := mouse_y and $FF;
+  Port[$3D5] := y and $FF;
   {high order bits should be last, as this forces the update}
   Port[$3D4] := $48;
-  Port[$3D5] := (mouse_y shr 8) and $FF;
+  Port[$3D5] := (y shr 8) and $FF;
 
   S3LockRegs();
 end;
-
 
 {-------------------------------------------------------------}
 
 constructor tS3Driver.create();
 begin
-	if not detectS3() then
+	if not S3Detect() then
   	Error('No S3 detected');
-  fgColor.init(255,255,255);
-  bgColor.init(0,0,0);
 end;
 
 (*
@@ -735,7 +730,7 @@ end;
   writew($BEE8, SCISSORS_R SHL 12 + 640);
 *)
 
-procedure tS3Driver.fillRect(x1,y1,width,height:int16);
+procedure tS3Driver.fillRect(x,y,width,height:int16);
 begin
 
 	S3UnlockRegs();
@@ -743,8 +738,8 @@ begin
 	writew(FRGD_MIX, MIX_NEW + MIX_FG);
 	writed(FRGD_COLOR, fgColor.to32);
   writew($BEE8, $A000); {PIXEL_CNTL}
-  writew(CUR_X, x1);
-  writew(CUR_Y, y1);
+  writew(CUR_X, x);
+  writew(CUR_Y, y);
   writew(MAJ_AXIS_PCNT, width);
   writew($BEE8, height + (MIN_AXIS_PCNT shl 12));
   S3Wait;

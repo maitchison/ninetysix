@@ -23,17 +23,10 @@ interface
 
 uses
 	debug,
+  {todo: remove crt?}
 	crt,
 	dos,
   go32;
-
-var
-    oldint9h: tseginfo;
-    newint9h: tseginfo;
-
-
-type
-    TAllKeys = array[0..225] of bytebool;
 
 const
 	Key_ESC	= 1;
@@ -125,14 +118,22 @@ const
 	Key_pause	= 126;
 
 
-
-function keyPressed: boolean;
+procedure initKeyboard;
+procedure closeKeyboard;
+function keyDown(code: byte): boolean;
 function readkey: char;
+function keyPressed: boolean;
+
+
+implementation
+
+type
+    TAllKeys = array[0..225] of bytebool;
 
 var
 	KeyPress: TAllkeys;
-
-implementation
+  oldint9h: tseginfo;
+  newint9h: tseginfo;
 
 {some bios keys}
 const BIOS_CONTROL = #255;
@@ -171,11 +172,13 @@ var
   key_loop1   : integer;
 	key_read	:	char;
 	DosKey : boolean;
-  EmergancyExit: boolean;
+  EmergencyExit: boolean;
 
-
-procedure InitKeyboard; forward;
-procedure CloseKeyboard; forward;
+function keyDown(code: byte): boolean;
+begin
+	if dosKey then Error('Key query without keyboard init.');
+  exit(keyPress[code]);
+end;
 
 {$F+}
 procedure int9h_handler; assembler;
@@ -325,7 +328,5 @@ begin
 
   keyPress[0] := False;	
 
-  InitKeyboard();
   addExitProc(@CloseKeyboard);
-
 end.

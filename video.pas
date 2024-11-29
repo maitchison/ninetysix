@@ -472,7 +472,7 @@ begin
   PrintLog(30);
 
   repeat
-  	until KeyPress[key_q];
+  	until keyDown(key_q);
 
   	
 end;
@@ -545,11 +545,11 @@ begin
     GUILabel(canvas, 10, 10, Format('MSE %f PSNR %f @%f:1', [currentMSE, currentPSNR, currentCompression]));
     GUILabel(canvas, 10, 40, Format('Selected MSE %f (%d steps)', [SelectedMSE, SelectedRounds]));
 
-    if keyPress[key_1] then
+    if keyDown(key_1) then
     	VIEW_MODE := 1;
-    if keyPress[key_2] then
+    if keyDown(key_2) then
     	VIEW_MODE := 2;
-    if keyPress[key_3] then
+    if keyDown(key_3) then
     	VIEW_MODE := 3;
 
     case VIEW_MODE of
@@ -585,7 +585,7 @@ begin
       popa
       end;
 
-  	until keyPress[Key_Q] or keyPress[Key_ESC];
+  	until keyDown(Key_Q) or keyDown(Key_ESC);
 
   Info(Format('PSNR was %fdb', [currentPSNR]));
   Info(Format('MSE was %f', [currentMSE]));
@@ -601,6 +601,7 @@ begin
 end;
 
 begin
+	InitKeyboard();
 	Init();
   {RunBenchmark();}
   RunMainLoop();
