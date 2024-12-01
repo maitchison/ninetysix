@@ -65,6 +65,9 @@ procedure GetTime(var hour, minute, second, sec100: word);
 {------------------------------------------------}
 { My custom routines }
 
+function toLowerCase(const s: string): string;
+function getExtension(const filename: string): string;
+
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: tBytes): string;
@@ -309,6 +312,29 @@ begin
     else
     	result += '#('+intToStr(b)+')';
   end;
+end;
+
+function toLowerCase(const s: string): string;
+var
+	i: integer;
+begin
+	result := s;
+	for i := 1 to length(s) do
+  	if (s[i] >= 'A') and (s[i] <= 'Z') then
+    	result[i] := chr(ord(s[i])+32);
+end;
+
+{return a filename extension}
+function getExtension(const filename: string): string;
+var
+	dotPos: integer;
+begin
+	dotPos := pos(filename, '.');
+  if dotPos > 0 then
+  	result := copy(filename, dotPos+1, length(filename) - dotPos)
+  else
+  	result := '';
+  result := toLowerCase(result);
 end;
 
 function intToStr(value: int64; width: word; padding: char='0'): string;

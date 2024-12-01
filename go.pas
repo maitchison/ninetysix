@@ -341,8 +341,9 @@ begin
 
   {fast path for identical files}
 
-  if matching.len = oldS.len then begin
-  	output('Files are identical.');
+  if matching.len = max(oldS.len, newS.len) then begin
+  	textAttr := 15;
+  	outputLn('Files are identical.');
     exit;
   end;
 
@@ -632,6 +633,7 @@ var
   filename: string;
   added,removed,changed: int32;
 begin
+	writeln();
 	workingSpaceFiles := listFiles('*.pas');
 	headFiles := listFiles('$rep\head\*.pas');
   added := 0;
@@ -659,9 +661,11 @@ begin
       inc(removed);
 		end;
   end;
+
   textattr := 15;
   if (added = 0) and (removed = 0) and (changed = 0) then
   	writeln('No changes.');
+  writeln();
 end;
 
 {show all diff on all modified files}
