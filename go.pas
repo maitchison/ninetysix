@@ -85,14 +85,6 @@ type
   tScores = array of int16;
   tLines = array of string;
 
-var
-  {switch to cost and backtrack}
-	CACHE: array[0..1024-1,0..1024-1] of tDWords;
-  SCORES: array of word;
-
-  STAT_STR_COMP: dword = 0;
-  STAT_CACHE_SIZE: dword = 0;
-
 {----------------------------------------------------}
 { tSlice }
 {----------------------------------------------------}
@@ -226,24 +218,6 @@ begin
   for i := 0 to len-1 do
   	result.data[i] := self.data[startPos+i];
 end;
-
-
-type
-	tCompareFunction = function(a,b: dword): boolean;
-
-function cmpStandard(a, b: dword): boolean;
-begin
-	result := a = b;
-end;
-
-function cmpLines(a,b: dword): boolean;
-begin
-  inc(STAT_STR_COMP);
-	result := newLines[a-1] = oldLines[b-1];
-end;
-
-
-{-----------------------------------------------------}
 
 
 {-----------------------------------------------------}
@@ -521,9 +495,6 @@ begin
   writeln('new        ',length(new));
   writeln('old        ',length(old));
   writeln('NM         ',length(new)*length(old));
-  writeln('str_cmp    ',STAT_STR_COMP);
-  writeln('cache_size ',STAT_CACHE_SIZE);
-
 end;
 
 
@@ -547,18 +518,31 @@ begin
   printDif(new, old, merge);
 end;
 
+procedure promptAndCommit();
+begin
+	write('Message:');
+	readln(msg);
+	commit(msg);
+end;
+
+var
+	command: string;
 
 begin
-	fillchar(CACHE, sizeof(CACHE), 0);
+	
 
 	runTests();
 
+  if (paramCount = 0) then
+		command := 'diff'
+  else
+	  command := paramSTR(1);
 
-  write('Message:');
-  readln(msg);
-  commit(msg);
-
-
-  {diff;}
+  if command = 'diff' then
+		diff
+  else if command = 'commit' then
+  	promptAndCommit()
+  else
+  	Error('Invalid command "'+command+'"');
 
 end.
