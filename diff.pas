@@ -239,7 +239,6 @@ begin
   assertEqual(toBytes(sln),[1,2,3]);
 
   sln := diff.diff(testLines('ABCD'), testLines('ABXXEDA'));
-  diff.debugPrintPaths();
   assertEqual(toBytes(sln),[1,2,6]);
 
 end;

@@ -665,7 +665,7 @@ begin
 	  command := paramSTR(1);
 
   if command = 'diff' then
-		diff('go.pas')
+		diffOnModified()
   else if command = 'commit' then
   	promptAndCommit()
   else if command = 'status' then
