@@ -248,45 +248,6 @@ end;
 
 {-----------------------------------------------------}
 
-
-{strings are a[a1:a2], b[b1:b2]}
-function lcs(a,b: tSlice;cmp: tCompareFunction): tSlice;
-var
-	option1, option2: tSlice;
-begin
-
-	{writeln(a.len, b.len);}
-
-  if (@cmp = @cmpLines) then
-  	if assigned(CACHE[a.len, b.len]) then begin
-    	result.startPos := 0;
-      result.data := CACHE[a.len, b.len];
-       result.endPos := length(result.data);
-    	exit;
-    end;
-	
-  {abcde, e is head, abcd is tail}
-
-  if (a.len = 0) or (b.len = 0) then
-  	result := tSlice.create([])
-  else if cmp(a.head, b.head) then
-  	result := LCS(a.tail,b.tail, cmp) + b.head
-  else begin
-	  option1 := LCS(a, b.tail, cmp);
-	  option2 := LCS(a.tail, b, cmp);
-	  if option1.len > option2.len then
-  		result := option1
-	  else
-  		result := option2;
-  end;
-
-  if (@cmp = @cmpLines) then begin
-	  CACHE[a.len, b.len] := result.data;
-  	inc(STAT_CACHE_SIZE);
-	end;
-
-end;
-
 function readFile(filename: string): tLines;
 var
 	t: text;
@@ -517,38 +478,13 @@ begin
 	
 end;
 
-procedure testLCS();
-var
-	data1: array of dword = [1,2,3,4,5];
-  data2: array of dword = [3,7,5,1];
-  s1,s2: tSlice;
-  sln: tSlice;
-begin
-	
-  s1 := tSlice.create(data1);
-  s2 := tSlice.create(data2);
-  sln := LCS(s1, s1, cmpStandard);
-  assertEqual(sln.toString, '[1,2,3,4,5]');
-
-  sln := LCS(s1, s2, cmpStandard);
-  assertEqual(sln.toString, '[3,5]');
-	
-end;
-
 procedure runTests();
 begin		
 	testSlice();
-	testLCS();
 end;
 
 var
 	msg: string;
-
-{
-	todo: status
-  todo: diff
-  todo: stats
-}
 
 procedure benchmark();
 var
@@ -558,18 +494,15 @@ var
   new,old: tLines;
   diff: tDiff;
 begin
-	{new, old (ref)}
   {
   	sln seems to be +140 / -13 = total of 153 lines
   	start: 14.2
     no writeln: 12.4
+    sln from backtrace: 1.6
   }	
   new := readFile('sample_new.txt');
   old := readFile('sample_old.txt');
 
-  //new := testLines('ADEBC');
-  //old := testLines('ABCDE');
-  {sln is 145}
 
   diff := tDiff.create();
 
@@ -582,8 +515,6 @@ begin
 
   printDif(new, old, merge);
 
-  {merge := fileDif(new, old);}
-
   elapsed := getSec-startTime;
   writeln(format('Took %f seconds', [elapsed]));
   writeln(merge.len);
@@ -593,35 +524,41 @@ begin
   writeln('str_cmp    ',STAT_STR_COMP);
   writeln('cache_size ',STAT_CACHE_SIZE);
 
-  {fileDif(testLines('ABCDE'), testLines('ADEBC'));}
+end;
+
+
+procedure diff();
+var
+  merge: tSlice;
+  sln: tLineRefs;
+  new,old: tLines;
+  diff: tDiff;
+begin
+	{for the moment just show diff on go.pas}
+  new := readFile('go.pas');
+  old := readFile('$rep/head/go.pas');
+
+  diff := tDiff.create();
+
+  sln := diff.diff(new, old);
+  merge := tSlice.create([]);
+  for i := 0 to length(sln)-1 do
+  	merge.append(sln[i]);
+  printDif(new, old, merge);
 end;
 
 
 begin
 	fillchar(CACHE, sizeof(CACHE), 0);
-(*
-	x := nil;
-  setLength(x,1);
-  x[0] := 'fish';
-
-
-  td := System.TypeInfo(x[0]);
-  writeln(td^.kind);
-
-  exit;*)
-
 
 	runTests();
-  {
-  benchmark();
-  }
-
 
 
   write('Message:');
   readln(msg);
   commit(msg);
 
-{  fileDif('b.txt', 'a.txt');}	
-{  fileDif('go.pas', 'got/20241129/go.pas');}
+
+  {diff;}
+
 end.
