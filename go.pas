@@ -498,7 +498,7 @@ begin
 end;
 
 
-procedure diff();
+procedure diff(filename: string);
 var
   merge: tSlice;
   sln: tLineRefs;
@@ -506,8 +506,8 @@ var
   diff: tDiff;
 begin
 	{for the moment just show diff on go.pas}
-  new := readFile('go.pas');
-  old := readFile('$rep/head/go.pas');
+  new := readFile(filename);
+  old := readFile('$rep/head/'+filename);
 
   diff := tDiff.create();
 
@@ -525,23 +525,151 @@ begin
 	commit(msg);
 end;
 
+{todo: change to string list}
+function listFiles(path: string): tLines;
+var
+	sr: SearchRec;
+begin
+	result := nil;
+	findFirst(path, AnyFile, sr);
+  while DosError = 0 do begin
+  	if sr.size > 0 then begin
+	    setLength(result, length(result)+1);
+	    result[length(result)-1] := sr.name;
+    end;
+    findNext(sr);
+  end;
+  findClose(sr);
+end;
+
+function listContains(l: array of string;item: string): boolean;
+var
+	s: string;
+begin
+	for s in l do
+  	if s = item then exit(true);
+  exit(false);
+end;
+
+(*
+function filesMatch(file1, file2: string): boolean;
+var
+	a,b: tLines;
+  i: int32;
+begin
+	a := readLines(file1);
+	b := readLines(file2);
+	if length(a) <> length(b) exit(false);
+	for i := 0 to length(a)-1 do
+		if a[i] <> b[i] then
+ 			exit(false);
+	exit(true);
+end;
+*)
+
+function wasModified(file1, file2: string): boolean;
+var
+	t1,t2: longint;
+  f1,f2: file;
+begin
+	assign(f1, file1);
+  assign(f2, file2);
+  reset(f1);
+  reset(f2);
+  getFTime(f1, t1);
+  getFTime(f2, t2);
+  close(f1);
+  close(f2);
+	result := t1 <> t2;
+end;
+
+{show all changed / added / deleted files}
+procedure status();
+var
+	workingSpaceFiles: array of string;
+  headFiles: array of string;
+  filename: string;
+  added,removed,changed: int32;
+begin
+	workingSpaceFiles := listFiles('*.pas');
+	headFiles := listFiles('$rep\head\*.pas');
+  added := 0;
+  removed := 0;
+  changed := 0;
+
+  for filename in workingSpaceFiles do begin
+		if not listContains(headFiles, filename) then begin
+    	textattr := 10;
+    	writeln('[+] added ', filename);
+      inc(added);
+    end else begin
+    	if wasModified(filename, '$rep\head\'+filename) then begin
+      	textattr := 15;
+      	writeln('[~] modified ', filename);
+        inc(changed);
+      end;
+    end;
+  end;
+
+  for filename in headFiles do begin
+		if not listContains(workingSpaceFiles, filename) then begin
+    	textattr := 12;
+    	writeln('removed ', filename);
+      inc(removed);
+		end;
+  end;
+  textattr := 15;
+  if (added = 0) and (removed = 0) and (changed = 0) then
+  	writeln('No changes.');
+end;
+
+{show all diff on all modified files}
+procedure diffOnModified();
+var
+	workingSpaceFiles: array of string;
+  headFiles: array of string;
+  filename: string;
+  changed: int32;
+begin
+	workingSpaceFiles := listFiles('*.pas');
+	headFiles := listFiles('$rep\head\*.pas');
+  changed := 0;
+
+  for filename in workingSpaceFiles do begin
+		if not listContains(headFiles, filename) then begin
+    end else begin
+    	if wasModified(filename, '$rep\head\'+filename) then begin
+      	writeln('----------------------------------------');
+      	writeln('Modifications to '+filename);
+        diff(filename);
+      end;
+    end;
+  end;
+
+  textattr := 15;
+end;
+
+
+{--------------------------------------------------}
+
 var
 	command: string;
 
 begin
-	
 
 	runTests();
 
   if (paramCount = 0) then
-		command := 'diff'
+		command := 'status'
   else
 	  command := paramSTR(1);
 
   if command = 'diff' then
-		diff
+		diff('go.pas')
   else if command = 'commit' then
   	promptAndCommit()
+  else if command = 'status' then
+  	status()
   else
   	Error('Invalid command "'+command+'"');
 
