@@ -31,11 +31,11 @@ Block header
 uses
 	test,
   crt, {remove this?}
+  diff,
   debug,
   utils,
   hashMap,
   dos;
-
 
 procedure commit(msg: string);
 var
@@ -49,7 +49,7 @@ begin
 
   time := now;
 
-  destinationPath := 'got\'+time.YYMMDD('')+'_'+time.HHMMSS('');
+  destinationPath := '$rep\'+time.YYMMDD('')+'_'+time.HHMMSS('');
   {$I-}
   mkDIR(destinationPath);
   {$I+}
@@ -61,7 +61,14 @@ begin
   close(t);
 
   {it's handy to have a daily folder aswell}
-  destinationPath := 'got\'+time.YYMMDD('');
+  destinationPath := '$rep\'+time.YYMMDD('');
+  {$I-}
+  mkDIR(destinationPath);
+  {$I+}
+  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+
+  {and head...}
+  destinationPath := '$rep\head';
   {$I-}
   mkDIR(destinationPath);
   {$I+}
@@ -75,11 +82,16 @@ type
 		line: string;
   end;
 
+  tScores = array of int16;
   tLines = array of string;
 
 var
-	{todo: use my sparse map}
+  {switch to cost and backtrack}
 	CACHE: array[0..1024-1,0..1024-1] of tDWords;
+  SCORES: array of word;
+
+  STAT_STR_COMP: dword = 0;
+  STAT_CACHE_SIZE: dword = 0;
 
 {----------------------------------------------------}
 { tSlice }
@@ -112,9 +124,8 @@ type
 
   end;
 
-{todo: remove global}
 var
-  newLines, oldLines: array of string;
+  newLines, oldLines: tLines;
 
 function tSlice.toString: string;
 var
@@ -227,13 +238,17 @@ end;
 
 function cmpLines(a,b: dword): boolean;
 begin
+  inc(STAT_STR_COMP);
 	result := newLines[a-1] = oldLines[b-1];
 end;
 
-{
-	a is new
-  b is old (ref)
-}
+
+{-----------------------------------------------------}
+
+
+{-----------------------------------------------------}
+
+
 {strings are a[a1:a2], b[b1:b2]}
 function lcs(a,b: tSlice;cmp: tCompareFunction): tSlice;
 var
@@ -246,7 +261,7 @@ begin
   	if assigned(CACHE[a.len, b.len]) then begin
     	result.startPos := 0;
       result.data := CACHE[a.len, b.len];
-      result.endPos := length(result.data);
+       result.endPos := length(result.data);
     	exit;
     end;
 	
@@ -265,8 +280,10 @@ begin
   		result := option2;
   end;
 
-  if (@cmp = @cmpLines) then
+  if (@cmp = @cmpLines) then begin
 	  CACHE[a.len, b.len] := result.data;
+  	inc(STAT_CACHE_SIZE);
+	end;
 
 end;
 
@@ -274,10 +291,11 @@ function readFile(filename: string): tLines;
 var
 	t: text;
   line: string;
-  lines: array of string;
+  lines: tLines;
 begin
 	assign(t, filename);
   reset(t);
+  lines := nil;
   while not EOF(t) do begin
     readln(t, line);
     setLength(lines, length(lines)+1);
@@ -287,44 +305,13 @@ begin
   result := lines;
 end;
 
-{
-AACAA <- AAAA -> AAAAA
-
-A
-A
-+C <important line
-A
-A
-}
-
-{output the longest common subsequence.
-e.g. ABCD <- ABXXEDA -> ABD
-
-This should then be written as
-
-A
-B
--X
--X
--E
-+C
-D
--A
-
-Expect matching to be [1,2,6]
-}
-
-{compare files
-filename1 is new
-filename2 is original
-}
-procedure fileDif(newFileName,oldFilename: string);
+{output the longest common subsequence.}
+procedure printDif(newLines,oldLines: tLines;matching: tSlice);
 var
 	i,j,k,z: int32;
   map: tHashMap;
   hash: word;
   oldS,newS: tSlice;
-  matching: tSlice;
   new,old,cur: string;
   linesRemoved: int32;
   linesAdded: int32;
@@ -342,7 +329,7 @@ var
 begin
 	
 	for i := pos-2 to pos+2 do
-  	if (i > 0) and (i < 1024) then
+  	if (i >= 0) and (i < 1024) then
     	importantLines[i] := true;
 end;
 
@@ -373,9 +360,6 @@ begin
 	{which lines in old file should be shown for context}
 	fillchar(importantLines, sizeof(importantLines), false);
 
-	oldLines := readFile(oldFilename);
-  newLines := readFile(newFilename);
-
   oldS := tSlice.create([]);
   for i := 1 to length(oldLines) do
   	oldS.append(i);
@@ -383,8 +367,6 @@ begin
   newS := tSlice.create([]);
   for i := 1 to length(newLines) do
   	newS.append(i);
-
-  matching := LCS(newS, oldS, cmpLines);
 
   {fast path for identical files}
 
@@ -456,6 +438,7 @@ begin
       end;
 
     	if (j > 0) and (not importantLines[j-1]) and (importantLines[j]) then begin
+      	{chunk header}
       	textAttr := 8;
         for z := 1 to 14 do
 	      	write(' ');
@@ -503,6 +486,7 @@ begin
   writeln('Added ', linesAdded, ' lines.');
   writeln('Removed ', linesRemoved, ' lines.');
   writeln('Net ', plus, netLines,' lines.');
+  writeln('Total lines changed ', linesAdded+linesRemoved,' lines.');
 
 end;	
 
@@ -566,14 +550,78 @@ var
   todo: stats
 }
 
+procedure benchmark();
+var
+	startTime, elapsed: double;
+  merge: tSlice;
+  sln: tLineRefs;
+  new,old: tLines;
+  diff: tDiff;
 begin
+	{new, old (ref)}
+  {
+  	sln seems to be +140 / -13 = total of 153 lines
+  	start: 14.2
+    no writeln: 12.4
+  }	
+  new := readFile('sample_new.txt');
+  old := readFile('sample_old.txt');
 
+  //new := testLines('ADEBC');
+  //old := testLines('ABCDE');
+  {sln is 145}
+
+  diff := tDiff.create();
+
+  startTime := getSec;
+  sln := diff.diff(new, old);
+  merge := tSlice.create([]);
+  for i := 0 to length(sln)-1 do
+  	merge.append(sln[i]);
+  writeln(merge.toString);
+
+  printDif(new, old, merge);
+
+  {merge := fileDif(new, old);}
+
+  elapsed := getSec-startTime;
+  writeln(format('Took %f seconds', [elapsed]));
+  writeln(merge.len);
+  writeln('new        ',length(new));
+  writeln('old        ',length(old));
+  writeln('NM         ',length(new)*length(old));
+  writeln('str_cmp    ',STAT_STR_COMP);
+  writeln('cache_size ',STAT_CACHE_SIZE);
+
+  {fileDif(testLines('ABCDE'), testLines('ADEBC'));}
+end;
+
+
+begin
 	fillchar(CACHE, sizeof(CACHE), 0);
+(*
+	x := nil;
+  setLength(x,1);
+  x[0] := 'fish';
 
-	runTests;
+
+  td := System.TypeInfo(x[0]);
+  writeln(td^.kind);
+
+  exit;*)
+
+
+	runTests();
+  {
+  benchmark();
+  }
+
+
+
   write('Message:');
   readln(msg);
   commit(msg);
+
 {  fileDif('b.txt', 'a.txt');}	
 {  fileDif('go.pas', 'got/20241129/go.pas');}
 end.

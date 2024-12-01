@@ -47,7 +47,8 @@ type
 { Math replacements}
 
 function min(a,b: integer): integer;
-function max(a,b: integer): integer;
+function max(a,b: integer): integer; overload;
+function max(a,b,c: integer): integer; overload;
 function Power(Base, Exponent: double): double; inline;
 function Log10(x: double): double;
 
@@ -100,10 +101,15 @@ const
 
 {----------------------------------------------------------}
 
-function max(a,b: integer): integer;
+function max(a,b: integer): integer; overload;
 begin
 	if a > b then exit(a);
   exit(b);
+end;
+
+function max(a,b,c: integer): integer; overload;
+begin
+	result := max(max(a,b), c);
 end;
 
 function min(a,b: integer): integer;
@@ -350,8 +356,7 @@ begin
   j := l;
   while (s[i] in [' ', #9]) and (i <= l) do inc(i);
   while (s[j] in [' ', #9]) and (i >= i) do dec(j);
-  result := copy(s, i, j - i + 1);
-	
+  result := copy(s, i, j - i + 1);	
 end;
 
 {Returns number of bytes required to encode this many bits}
