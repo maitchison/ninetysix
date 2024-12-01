@@ -54,7 +54,6 @@ asm
   {output = al}
   end;
 
-
 function hashD2W(key: dword): word; register; inline; assembler;
 asm
 	push bx

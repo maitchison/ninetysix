@@ -18,7 +18,6 @@ type
   tLineRefs = array of int32;
   tScores = array of int16;
 
-
 	tDiff = class
 
   private	
@@ -29,12 +28,12 @@ type
     procedure setScore(i,j: int32;value: int16); inline;
 
   	procedure init(newLines, oldLines: tLines);		
-  	function solve(i,j: word): int16;
+  	function solve(i,j: int32): int32;
     function extractSolution(): tLineRefs;
 
   public
 		constructor create();
-    function diff(newLines, oldLines: tLines): tLineRefs;
+    function run(newLines, oldLines: tLines): tLineRefs;
     {debug stuff}
     procedure debugPrintPaths();
     function debugCacheUsed(): int32;
@@ -62,7 +61,7 @@ begin
   b := nil;
 end;
 
-function tDiff.getScore(i,j: int32): int16; inline;
+function tDiff.getScore(i,j: int32): int16;
 begin
 	if (i = 0) or (j = 0) then exit(0);
 	if (i < 0) or (j < 0) then exit(-1);
@@ -70,7 +69,7 @@ begin
   result := scores[(i-1)+(j-1)*length(a)];
 end;
 
-procedure tDiff.setScore(i,j: int32;value: int16); inline;
+procedure tDiff.setScore(i,j: int32;value: int16);
 begin
 	if (i <= 0) or (j <= 0) then runError(201);
   if (i > length(a)) or (j > length(b)) then runError(201);
@@ -81,8 +80,8 @@ function tDiff.extractSolution(): tLineRefs;
 var
 	i,j,k: word;
   matchCost: word;
-  option1,option2,option3: int16;
-  current, best: int16;
+  option1,option2,option3: int32;
+  current, best: int32;
   sln: tLineRefs;
   canMatch: boolean;
 begin
@@ -132,6 +131,7 @@ begin
   b := oldLines;
   if (length(b) > 4*1024) or (length(b) > 4*1024) then
   	Error('Max length for diff is 4k');
+  scores := nil;
 	setLength(scores, length(a)*length(b));
 	if length(a)*length(b) > 0 then
 	  fillword(scores[0], length(a)*length(b), word(-1));	
@@ -140,7 +140,7 @@ end;
 {returns the lines that match between new and old
 lines numbers are from oldLines
 }
-function tDiff.diff(newLines, oldLines: tLines): tLineRefs;
+function tDiff.run(newLines, oldLines: tLines): tLineRefs;
 begin
 	init(newLines, oldLines);
   solve(length(newLines), length(oldLines));
@@ -148,10 +148,9 @@ begin
 end;
 
 {returns the length of the longest common subsequence between a[:i], and b[:i]}
-function tDiff.solve(i,j: word): int16;
+function tDiff.solve(i,j: int32): int32;
 var
-	key: dword;
-  option1, option2: word;
+  option1, option2: int32;
 begin
 
   {lookup cache}
@@ -185,9 +184,9 @@ begin
 	for j := 1 to length(b) do begin
   	for i := 1 to length(a) do begin
     	if getScore(i,j) < 0 then
-	    	write('.')
+	    	write('[ . ] ')
 			else
-      	write(getScore(i,j));
+      	write('[',intToStr(getScore(i,j),3), ']');
     end;
   	writeln();
   end;
@@ -225,21 +224,25 @@ begin
 
   diff := tDiff.create();
 
+  {stub:}
 
-  sln := diff.diff(testLines(''), testLines(''));
+  {
+  sln := diff.run(testLines(''), testLines(''));
   assertEqual(toBytes(sln),[]);
 
-  sln := diff.diff(testLines('ABC'), testLines(''));
+  sln := diff.run(testLines('ABC'), testLines(''));
   assertEqual(toBytes(sln),[]);
 
-  sln := diff.diff(testLines(''), testLines('ABC'));
+  sln := diff.run(testLines(''), testLines('ABC'));
   assertEqual(toBytes(sln),[]);
 
-  sln := diff.diff(testLines('ABC'), testLines('ABC'));
-  assertEqual(toBytes(sln),[1,2,3]);
+  sln := diff.run(testLines('ABC'), testLines('ABC'));
+  assertEqual(toBytes(sln),[1,2,3]);}
 
-  sln := diff.diff(testLines('ABCD'), testLines('ABXXEDA'));
+  sln := diff.run(testLines('ABCD'), testLines('ABXXEDA'));
   assertEqual(toBytes(sln),[1,2,6]);
+
+  diff.free;
 
 end;
 

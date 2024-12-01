@@ -46,9 +46,9 @@ type
 {------------------------------------------------}
 { Math replacements}
 
-function min(a,b: integer): integer;
-function max(a,b: integer): integer; overload;
-function max(a,b,c: integer): integer; overload;
+function min(a,b: integer): int32;
+function max(a,b: int32): int32; overload;
+function max(a,b,c: int32): int32; overload;
 function Power(Base, Exponent: double): double; inline;
 function Log10(x: double): double;
 
@@ -101,13 +101,13 @@ const
 
 {----------------------------------------------------------}
 
-function max(a,b: integer): integer; overload;
+function max(a,b: int32): int32; overload;
 begin
 	if a > b then exit(a);
   exit(b);
 end;
 
-function max(a,b,c: integer): integer; overload;
+function max(a,b,c: int32): int32; overload;
 begin
 	result := max(max(a,b), c);
 end;
@@ -570,7 +570,7 @@ function TMyDateTime.HHMMSS(sep: string=':'): string;
 var
 	h,m,s,ss: word;
 begin
-	DecodeTime(h,m,s, ss);
+	DecodeTime(h,m,s,ss);
 	result := IntToStr(h, 2) + sep + IntToStr(m, 2) + sep + IntToStr(s, 2);
 end;
 

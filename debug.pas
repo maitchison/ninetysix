@@ -51,7 +51,7 @@ procedure Warn(s: string);
 procedure Error(s: string;code: byte=100);
 
 procedure BasicPrintLog();
-procedure PrintLog(maxEntries: integer=10; withColor: boolean=True);
+procedure PrintLog(maxEntries: integer=10);
 
 function GetIOError(code: word): string;
 
@@ -125,7 +125,7 @@ begin
   	Error('Assertion failure:' + msg);
 end;
 
-procedure PrintLog(MaxEntries: integer = 10; withColor: boolean=True);
+procedure PrintLog(MaxEntries: integer = 10);
 var
 	i: integer;
   OldTextColor: byte;
@@ -239,14 +239,11 @@ var
   Frame: Pointer;
 begin
 	asm
-  {$PUSH}
-  {$WARNINGS OFF}
   // FPC will complain that this is not a valid way to access parameters,
   // but I'm instead looking at the stack frame.
 
   // [MA] Actually this might be wrong.. need to check this out.
 	mov  eax, [ebp+4]		// get current frame pointer
-  {$POP}
   mov  [Address], eax
 
   // get callers return address

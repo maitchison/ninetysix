@@ -76,15 +76,6 @@ begin
 
 end;
 
-type
-	tLineDif = record
-  	difType: char;
-		line: string;
-  end;
-
-  tScores = array of int16;
-  tLines = array of string;
-
 {----------------------------------------------------}
 { tSlice }
 {----------------------------------------------------}
@@ -481,7 +472,7 @@ begin
   diff := tDiff.create();
 
   startTime := getSec;
-  sln := diff.diff(new, old);
+  sln := diff.run(new, old);
   merge := tSlice.create([]);
   for i := 0 to length(sln)-1 do
   	merge.append(sln[i]);
@@ -511,7 +502,7 @@ begin
 
   diff := tDiff.create();
 
-  sln := diff.diff(new, old);
+  sln := diff.run(new, old);
   merge := tSlice.create([]);
   for i := 0 to length(sln)-1 do
   	merge.append(sln[i]);
@@ -542,7 +533,7 @@ begin
   findClose(sr);
 end;
 
-function listContains(l: array of string;item: string): boolean;
+function listContains(l: tLines;item: string): boolean;
 var
 	s: string;
 begin
@@ -572,6 +563,8 @@ var
 	t1,t2: longint;
   f1,f2: file;
 begin
+	t1 := 0;
+  t2 := 0;
 	assign(f1, file1);
   assign(f2, file2);
   reset(f1);
@@ -586,8 +579,8 @@ end;
 {show all changed / added / deleted files}
 procedure status();
 var
-	workingSpaceFiles: array of string;
-  headFiles: array of string;
+	workingSpaceFiles: tLines;
+  headFiles: tLines;
   filename: string;
   added,removed,changed: int32;
 begin
@@ -626,8 +619,8 @@ end;
 {show all diff on all modified files}
 procedure diffOnModified();
 var
-	workingSpaceFiles: array of string;
-  headFiles: array of string;
+	workingSpaceFiles: tLines;
+  headFiles: tLines;
   filename: string;
   changed: int32;
 begin
