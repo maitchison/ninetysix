@@ -22,6 +22,9 @@ type
 
   private	
   	a, b: tLines;
+
+  {stub}
+  public
     scores: tScores;
 
     function getScore(i,j: int32): int16; inline;
@@ -36,6 +39,7 @@ type
     function run(newLines, oldLines: tLines): tLineRefs;
     {debug stuff}
     procedure debugPrintPaths();
+		procedure debugLogPaths();
     function debugCacheUsed(): int32;
   end;
 
@@ -61,7 +65,7 @@ begin
   b := nil;
 end;
 
-function tDiff.getScore(i,j: int32): int16;
+function tDiff.getScore(i,j: int32): int16; inline;
 begin
 	if (i = 0) or (j = 0) then exit(0);
 	if (i < 0) or (j < 0) then exit(-1);
@@ -69,7 +73,7 @@ begin
   result := scores[(i-1)+(j-1)*length(a)];
 end;
 
-procedure tDiff.setScore(i,j: int32;value: int16);
+procedure tDiff.setScore(i,j: int32;value: int16); inline;
 begin
 	if (i <= 0) or (j <= 0) then runError(201);
   if (i > length(a)) or (j > length(b)) then runError(201);
@@ -83,6 +87,7 @@ var
   option1,option2,option3: int32;
   current, best: int32;
   sln: tLineRefs;
+  slnLen: int32;
   canMatch: boolean;
 begin
   {we start the end and go backwards}
@@ -90,11 +95,12 @@ begin
   j := length(b);
   k := 0;
 
-  sln := nil;
-  setLength(sln, max(length(a), length(b)));
-
-  if getScore(i,j) = -1 then
+  slnLen := getScore(i,j);
+  if slnLen < 0 then
   	Error('Call solve first');
+
+  sln := nil;
+  setLength(sln, slnLen);
 
   while (i>0) and (j>0) do begin
 
@@ -134,28 +140,29 @@ begin
   scores := nil;
 	setLength(scores, length(a)*length(b));
 	if length(a)*length(b) > 0 then
-	  fillword(scores[0], length(a)*length(b), word(-1));	
+	  fillword(scores[0], length(a)*length(b), word(-1));
 end;
 
 {returns the lines that match between new and old
 lines numbers are from oldLines
 }
 function tDiff.run(newLines, oldLines: tLines): tLineRefs;
+var
+  m,n: int32;
 begin
 	init(newLines, oldLines);
-  solve(length(newLines), length(oldLines));
+  solve(length(a), length(b));
   result := extractSolution();
 end;
 
 {returns the length of the longest common subsequence between a[:i], and b[:i]}
 function tDiff.solve(i,j: int32): int32;
-var
-  option1, option2: int32;
 begin
 
   {lookup cache}
-  if getScore(i,j) >= 0 then
-  	exit(getScore(i,j));
+  result := getScore(i,j);
+  if result >= 0 then
+  	exit(result);
 
   {trivial cases}
   if (i = 0) or (j = 0) then begin
@@ -165,15 +172,13 @@ begin
 
   {check our cases...}
   if a[i-1] = b[j-1] then begin
-  	result := solve(i-1,j-1)+1
+  	result := solve(i-1,j-1)+1;
   end else begin
-  	option1 := solve(i, j-1);
-    option2 := solve(i-1, j);
-    result := max(option1, option2);
+    result := max(solve(i, j-1), solve(i-1, j));
   end;
 
   {...and store the result}
-  setScore(i, j ,result);  	
+	setScore(i, j ,result);  	
 end;
 
 
@@ -184,11 +189,29 @@ begin
 	for j := 1 to length(b) do begin
   	for i := 1 to length(a) do begin
     	if getScore(i,j) < 0 then
-	    	write('[ . ] ')
+	    	write('[ . ]')
 			else
       	write('[',intToStr(getScore(i,j),3), ']');
     end;
   	writeln();
+  end;
+end;
+
+
+procedure tDiff.debugLogPaths();
+var
+	i,j: int32;
+  s: string;
+begin
+	for j := 1 to length(b) do begin
+  	s := '';
+  	for i := 1 to length(a) do begin
+    	if getScore(i,j) = -1 then
+	    	s += ('[ . ]')
+			else
+      	s += '['+intToStr(getScore(i,j),3)+']';
+    end;
+  	info(s);
   end;
 end;
 
@@ -224,9 +247,6 @@ begin
 
   diff := tDiff.create();
 
-  {stub:}
-
-  {
   sln := diff.run(testLines(''), testLines(''));
   assertEqual(toBytes(sln),[]);
 
@@ -237,7 +257,7 @@ begin
   assertEqual(toBytes(sln),[]);
 
   sln := diff.run(testLines('ABC'), testLines('ABC'));
-  assertEqual(toBytes(sln),[1,2,3]);}
+  assertEqual(toBytes(sln),[1,2,3]);
 
   sln := diff.run(testLines('ABCD'), testLines('ABXXEDA'));
   assertEqual(toBytes(sln),[1,2,6]);

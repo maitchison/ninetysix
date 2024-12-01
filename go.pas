@@ -213,6 +213,51 @@ end;
 
 {-----------------------------------------------------}
 
+var
+	LINES_SINCE_PAGE: byte = 0;
+
+function textRows: byte;
+begin
+(*
+	asm
+  	pushad
+  	mov ax, $0300
+    mov bh, 0
+    int $10
+    inc dl
+    mov [result], dl
+    popad
+  	end;
+  *)
+  result := mem[$0040:$0084]+1;
+end;
+	
+
+procedure output(s: string);
+begin
+	{todo: detect line wrap}
+	write(s);
+end;
+
+{outputs a line of text, with support for paging}
+procedure outputLn(s: string);
+begin
+	writeln(s);
+	inc(LINES_SINCE_PAGE);
+  if LINES_SINCE_PAGE+2 >= textRows() then begin
+  	textAttr := 15;
+  	write('---- Continue -----');
+    case readkey of
+    	#27: halt;
+      'q': halt;
+    end;
+    LINES_SINCE_PAGE := 0;
+    writeln();
+  end;  	
+end;
+
+{-----------------------------------------------------}
+
 function readFile(filename: string): tLines;
 var
 	t: text;
@@ -297,7 +342,7 @@ begin
   {fast path for identical files}
 
   if matching.len = oldS.len then begin
-  	writeln('Files are identical.');
+  	output('Files are identical.');
     exit;
   end;
 
@@ -347,7 +392,7 @@ begin
   linesAdded := 0;
   linesRemoved := 0;
 
-  writeln();
+  outputLn('');
 
   while k < matching.len do begin
   	inc(clock);
@@ -367,14 +412,14 @@ begin
       	{chunk header}
       	textAttr := 8;
         for z := 1 to 14 do
-	      	write(' ');
+	      	output(' ');
         for z := 1 to 55 do
-	      	write(chr(196));
-        writeln();
+	      	output(chr(196));
+        outputLn('');
       	textAttr := 7; //cyan}
       end;
       if importantLines[j] then
-	    	writeln(intToStr(j, 4, '0')+'     ',fix(cur));
+	    	outputLn(intToStr(j, 4, '0')+'     '+fix(cur));
 
       inc(i);
 	    inc(j);
@@ -390,14 +435,14 @@ begin
 
     while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
     	textAttr := 12; // light red
-    	writeln(intToStr(j, 4, '0')+' [-] ', fix(oldLines[j]));
+    	outputLn(intToStr(j, 4, '0')+' [-] '+fix(oldLines[j]));
       inc(j);
       inc(linesRemoved);
     end;
 
     while (i < length(newLines)) and (newLines[i] <> cur) do begin
     	textAttr := 10; // light green
-    	writeln('     [+] ', fix(newLines[i]));
+    	outputLn('     [+] '+fix(newLines[i]));
       inc(i);
       inc(linesAdded);
     end;
@@ -407,12 +452,12 @@ begin
   netLines := linesAdded-linesRemoved;
   if netLines > 0 then plus := '+' else plus := '';
 
-  writeln();
+  outputLn('');
   textAttr := 15; // white
-  writeln('Added ', linesAdded, ' lines.');
-  writeln('Removed ', linesRemoved, ' lines.');
-  writeln('Net ', plus, netLines,' lines.');
-  writeln('Total lines changed ', linesAdded+linesRemoved,' lines.');
+  outputLn('Added '+intToStr(linesAdded)+' lines.');
+  outputLn('Removed '+intToStr(linesRemoved)+' lines.');
+  outputLn('Net '+plus+intToStr(netLines)+' lines.');
+  outputLn('Total lines changed '+intToStr(linesAdded+linesRemoved)+' lines.');
 
 end;	
 
@@ -461,6 +506,7 @@ var
 begin
   {
   	sln seems to be +140 / -13 = total of 153 lines
+    464 lines match
   	start: 14.2
     no writeln: 12.4
     sln from backtrace: 1.6
@@ -468,19 +514,21 @@ begin
   new := readFile('sample_new.txt');
   old := readFile('sample_old.txt');
 
-
   diff := tDiff.create();
 
   startTime := getSec;
   sln := diff.run(new, old);
+  elapsed := getSec-startTime;
+
   merge := tSlice.create([]);
   for i := 0 to length(sln)-1 do
   	merge.append(sln[i]);
   writeln(merge.toString);
 
-  printDif(new, old, merge);
+  {printDif(new, old, merge);}
 
-  elapsed := getSec-startTime;
+  writeln('final score -> ',diff.scores[(length(new)*length(old))-1]);
+
   writeln(format('Took %f seconds', [elapsed]));
   writeln(merge.len);
   writeln('new        ',length(new));
@@ -628,12 +676,14 @@ begin
 	headFiles := listFiles('$rep\head\*.pas');
   changed := 0;
 
+  outputLn('');
+
   for filename in workingSpaceFiles do begin
 		if not listContains(headFiles, filename) then begin
     end else begin
     	if wasModified(filename, '$rep\head\'+filename) then begin
-      	writeln('----------------------------------------');
-      	writeln('Modifications to '+filename);
+      	outputLn('----------------------------------------');
+      	outputLn('Modifications to '+filename);
         diff(filename);
       end;
     end;
@@ -661,6 +711,8 @@ begin
 		diffOnModified()
   else if command = 'commit' then
   	promptAndCommit()
+  else if command = 'benchmark' then
+  	benchmark()
   else if command = 'status' then
   	status()
   else

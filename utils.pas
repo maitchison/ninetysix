@@ -46,8 +46,8 @@ type
 {------------------------------------------------}
 { Math replacements}
 
-function min(a,b: integer): int32;
-function max(a,b: int32): int32; overload;
+function min(a,b: int32): int32;
+function max(a,b: int32): int32; inline; overload;
 function max(a,b,c: int32): int32; overload;
 function Power(Base, Exponent: double): double; inline;
 function Log10(x: double): double;
@@ -101,7 +101,7 @@ const
 
 {----------------------------------------------------------}
 
-function max(a,b: int32): int32; overload;
+function max(a,b: int32): int32; inline; overload;
 begin
 	if a > b then exit(a);
   exit(b);
@@ -112,7 +112,7 @@ begin
 	result := max(max(a,b), c);
 end;
 
-function min(a,b: integer): integer;
+function min(a,b: int32): int32; inline;
 begin
 	if a < b then exit(a);
   exit(b);
