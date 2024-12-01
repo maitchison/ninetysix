@@ -329,8 +329,8 @@ function getExtension(const filename: string): string;
 var
 	dotPos: integer;
 begin
-	dotPos := pos(filename, '.');
-  if dotPos > 0 then
+	dotPos := pos('.', filename);
+  if dotPos >= 0 then
   	result := copy(filename, dotPos+1, length(filename) - dotPos)
   else
   	result := '';

@@ -11,5 +11,5 @@ var
 	sfx: tSoundFile;
 
 begin
-	sfx := tSoundFile.create('music\music1.wav');
+	sfx := tSoundFile.create('music\music2.wav');
 end.
