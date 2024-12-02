@@ -1,5 +1,5 @@
-{used to prototype music}
-program music;
+{Airtime game}
+program airtime;
 
 uses
 	screen,
@@ -14,7 +14,7 @@ uses
 	sound;
 
 var
-	sfx: tSoundFile;
+	music: tSoundFile;
 
   background: tSprite;
   canvas: tPage;
@@ -24,7 +24,7 @@ begin
 	note('Loading graphics');
   background := tSprite.create(loadBMP('e:\airtime\title_640.bmp'));
   note('Loading music');
-	sfx := tSoundFile.create('music\music2.wav');
+	music := tSoundFile.create('music\music2.wav');
 end;
 
 procedure flipCanvas();
@@ -45,28 +45,28 @@ end;
 
 procedure mainLoop();
 begin
+
 	note('Main loop started');
 
   background.draw(canvas, 0, 0);
 
-      {flip page}
-    asm
-    	pusha
-    	push es
-      mov es,  LFB_SEG
-      mov edi,  0
-      mov esi, canvas.pixels
-      mov ecx, 640*480
-      rep movsd
-      pop es
-      popa
-      end;
+  music.play();
 
+  {flip page}
+  asm
+  	pushad
+  	push es
+    mov es,  LFB_SEG
+    mov edi,  0
+    mov esi, canvas.pixels
+    mov ecx, 640*480
+    rep movsd
+    pop es
+    popad
+    end;
 
   while True do begin
-
-  	if keyDown(key_q) or keyDown(key_esc) then break;
-  	
+  	if keyDown(key_q) or keyDown(key_esc) then break;  	
   end;
 end;
 

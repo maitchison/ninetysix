@@ -19,7 +19,7 @@ type
 
   public
 
-  	channel: array [1..2] of tWaveform;
+  	data: tWaveform;
 
   public
 
@@ -29,6 +29,8 @@ type
     procedure loadFromLA96(filename: string);
     procedure saveToLA96(filename: string);
     procedure saveToWave(filename: string);
+
+    procedure play();
 
   end;
 
@@ -63,8 +65,7 @@ var
 	extension: string;
 begin
 
-	channel[1] := nil;
-  channel[2] := nil;
+	data := nil;
 
 	extension := getExtension(filename);
   if extension = 'wav' then
@@ -80,6 +81,8 @@ var
   chunkHeader: tChunkHeader;
   samples: int32;
   i,j: integer;
+  wordsToRead: dword;
+  chunkWords: dword;
 
 function wordAlign(x: int32): int32;
   begin
@@ -122,39 +125,13 @@ begin
         	seek(f, wordAlign(filePos(f) + chunkSize));
           continue;
         end;
-
-        samples := chunkSize div 4;
-        samples := 30*44100*2;
-  			channel[1] := nil;
-        setLength(channel[1], samples);
-        blockRead(f, channel[1][0], samples*2);
-
-        backgroundPCMData(channel[1]);
-        for i := 1 to 10 do begin
-	        writeln('go:',didWeGo);  	
-	        delay(1000);
-        end;
-
-        DSPWrite($D9); // end playback
-
-        (*
-        for i := 0 to 250 do begin
-          samples := 6400;
-  				channel[1] := nil;
-          setLength(channel[1], samples);
-          blockRead(f, channel[1][0], samples*2);
-
-  				{mix down from stero to mono}
-          {
-					for j := 0 to (samples div 2)-1 do
-          	channel[1][j] := dword(channel[1][j*2]);
-          setLength(channel[1], samples div 2);
-          }				
-
-          playPCMData(channel[1]);
-			  end;
-        *)
-
+        chunkWords := chunkSize div 2;
+        wordsToRead := min(chunkWords, 32*1024*1024);
+        if (wordsToRead < chunkWords) then
+        	warn(format('Wave file too large to read (%f MB), reading partial file.', [chunkSize/1024/1024]));
+  			data := nil;
+        setLength(data, wordsToRead);
+        blockRead(f, data[0], wordsToRead*2);
         break;
       end;
     end;
@@ -175,6 +152,12 @@ end;
 
 procedure tSoundFile.saveToWave(filename: string);
 begin
+end;
+
+procedure tSoundFile.play();
+begin
+	{for the moment just play as 'music'}
+  sbDriver.backgroundPCMData(self.data);
 end;
 
 {------------------------------------------------------}

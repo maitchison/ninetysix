@@ -413,7 +413,8 @@ begin
 	backgroundBuffer := buffer;
   audioDataPosition := 0;
 
-  note('initial play');
+  note(format('Playing new audio, with %d bytes', [length(buffer)*2]));
+  note('Setting up initial transfer.');
 
   DSPReset();
 
