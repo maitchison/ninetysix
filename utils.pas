@@ -62,6 +62,11 @@ procedure Sleep(ms: integer);
 procedure GetDate(var year, month, mday, wday: word);
 procedure GetTime(var hour, minute, second, sec100: word);
 
+
+{------------------------------------------------}
+{ crt replacements}
+procedure delay(ms: double);
+
 {------------------------------------------------}
 { My custom routines }
 
@@ -224,6 +229,8 @@ begin
   	Inc(result);	
 end;
 
+{--------------------------------------------------------------------}
+
 function Now(): TDateTime;
 var
 	year, month, mday, wday: word;
@@ -240,8 +247,18 @@ begin
     TMyDateTime.EncodeTime(hour, minute, second, sec100*10);
 end;
 
+{Busy wait for given number of ms.}
+procedure delay(ms: double);
+var
+	targetSec: double;
+begin
+	targetSec := getSec + ms/1000;
+  while getSec < targetSec do;  	
+end;
+
+
 {Put CPU into idle for give number of ms}
-procedure Sleep(ms: integer);
+procedure sleep(ms: integer);
 var
 	targetMS: int64;
   safety: integer;

@@ -8,7 +8,8 @@ interface
 uses
 	test,
   debug,
-	utils;
+	utils,
+  sbDriver;
 
 type
 
@@ -61,6 +62,10 @@ constructor tSoundFile.create(filename: string='');
 var
 	extension: string;
 begin
+
+	channel[1] := nil;
+  channel[2] := nil;
+
 	extension := getExtension(filename);
   if extension = 'wav' then
   	loadFromWave(filename)
@@ -74,6 +79,7 @@ var
   fileHeader: tWaveFileHeader;
   chunkHeader: tChunkHeader;
   samples: int32;
+  i,j: integer;
 
 function wordAlign(x: int32): int32;
   begin
@@ -118,12 +124,23 @@ begin
         end;
 
         samples := chunkSize div 4;
-				channel[1] := nil;
-				channel[2] := nil;
-        setLength(channel[1], samples);
-        setLength(channel[2], samples);
-        blockRead(f, channel[1], samples * 2);
-        blockRead(f, channel[2], samples * 2);
+
+        for i := 0 to 250 do begin
+          samples := 6400;
+  				channel[1] := nil;
+          setLength(channel[1], samples);
+          blockRead(f, channel[1][0], samples*2);
+
+  				{mix down from stero to mono}
+          (*
+					for j := 0 to (samples div 2)-1 do
+          	channel[1][j] := dword(channel[1][j*2]);
+          setLength(channel[1], samples div 2);
+          *)				
+
+          playPCMData(channel[1]);
+			  end;
+
         break;
       end;
     end;

@@ -5,6 +5,7 @@ uses
 	debug,
   test,
   utils,
+  sbDriver,
 	sound;
 
 var
