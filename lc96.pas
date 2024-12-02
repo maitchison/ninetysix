@@ -29,6 +29,9 @@ implementation
 
 uses lz4;
 
+const
+	VERSION: word = $0001;
+
 {-------------------------------------------------------}
 { Private }
 {-------------------------------------------------------}
@@ -227,6 +230,7 @@ var
   decompressedBytes: tBytes;
   numPatches: int32;
   hasAlpha: boolean;
+  verBig,verSmall: byte;
 const
 	CODE_4CC = 'LC96';
 
@@ -242,8 +246,14 @@ begin
 	result := tPage.create(width, height);
   BPP := s.readWord;
 
+  verSmall := s.readByte;
+  verBig := s.readByte;
+
+  if (verBig <> 0) and (verSmall <> 1) then
+  	error(format('Invalid version, expecting 0.1, but found %d.%d',[verBig, verSmall]));
+
   {read reserved bytes}
-  s.readBytes(32-10);
+  s.readBytes(32-12);
 
   if not (BPP in [24,32]) then
   	Error('Invalid BitPerPixel '+intToStr(BPP));
@@ -299,9 +309,10 @@ begin
   s.writeWord(page.Width);
   s.writeWord(page.Height);
   s.writeWord(bpp);
+  s.writeWord(VERSION);
 
   {write reserved space}
-  for i := 1 to (32-10) do
+  for i := 1 to (32-12) do
   	s.writeByte(0);
 
 	data := tStream.create();
