@@ -12,16 +12,34 @@ uses
   utils,
   go32;
 
-procedure directPCMData(buffer: array of word);
-procedure playPCMData(buffer: array of word);
+type
+	tWords = array of word;
+
+procedure directNoise(s: double);
+procedure directPCMData(buffer: tWords);
+procedure playPCMData(buffer: tWords);
+procedure backgroundPCMData(buffer: tWords);
+
+procedure DSPWrite(command: byte);
+
+var
+	didWeGo: int32 = 0;
 
 implementation
+
+
+const
+{72?}
+	SB_IRQ = $72; {INT10 in protected mode is $70+IRQ-8}
 
 var
 	sbGood: boolean = false;
   DSPVersion: byte = 0;
   dosSegment: word;
   dosSelector: word;
+
+  backgroundBuffer: tWords;
+  backgroundPos: dword;
 
 const
 	SB_BASE = $220;
@@ -31,6 +49,10 @@ const
   DSP_WRITE_STATUS = SB_BASE + $C;
   DSP_DATA_AVAIL = SB_BASE + $E;
 
+  BUF_SIZE = 16*1024; // max is 32k, as we double this for double buffering
+
+{----------------------------------------------------------}
+{ DSP stuff}
 {----------------------------------------------------------}
 
 function DSPReadyToWrite(): boolean;
@@ -86,32 +108,10 @@ begin
   dspVersion := DSPRead()
 end;
 
-procedure setSampleRate(sampleRate: word);
-begin
-	DSPWrite($40); {time constant}
-  {44.1hz}
-  DSPWrite($AC);
-  DSPWRITE($44);
-end;
 
-{play noise directly (blocking) for s seconds.}
-procedure directNoise(s: double);
-var
-	timeLimit: double;
-  counter: int32;
-  x: word;
-begin
-	timeLimit := getSec + s;
-  DSPWrite($D1); // turn on speaker
-  setSampleRate(8000);
-  counter := 0;
-  while getSec < timeLimit do begin
-	  DSPWrite($10); // direct 8bit mino 'pc speaker'
-	  DSPWrite(rnd);
-  end;
-  DSPWrite($D3); // end playback
-end;
-
+{----------------------------------------------------------}
+{ DMA Stuff }
+{----------------------------------------------------------}
 
 CONST
 	{for channel 5}
@@ -126,9 +126,131 @@ CONST
 	ISA_SINGLE_CHANNEL_MASK = $D4;
 	ISA_CH5_PAGE = $8B;
 
+const
+	SB_OUTPUT = $41;
+	SB_INPUT 	= $42;
+
+	SB_OUTPUT_8BIT = $C0;
+	SB_OUTPUT_16BIT = $B0;
+
+  SB_MONO_16BIT_SIGNED_PCM = $10;
+  SB_STEREO_16BIT_SIGNED_PCM = $30;
+
+{length is samples? or words?}
+procedure startPlayback(length: word);
+begin
+	DSPWrite(SB_OUTPUT);
+  DSPWrite($AC);              // 44.1 HZ (according to manual)
+  DSPWrite($44);
+  DSPWrite(SB_OUTPUT_16BIT); 	
+  DSPWrite(SB_STEREO_16BIT_SIGNED_PCM);
+  DSPWrite(lo(word(length-1)));
+  DSPWrite(hi(word(length-1)));	
+end;
+
+{$F+,S-,W-}
+procedure soundBlaster_ISR; interrupt;
+var
+	bytes: dword;
+  readAck: byte;
+  bytesRemaining: dword;
+begin
+	// acknowledge the DSP interupt.
+  // $F for 16bit, $E for 8bit
+	readAck := port[SB_BASE + $F];
+
+  // refill the buffer
+  bytesRemaining := (length(backgroundBuffer) - backgroundPos)*2;
+  bytes := min(bytesRemaining, BUF_SIZE);
+  if bytes > 1 then begin
+	  dosMemPut(dosSegment, 0, backgroundBuffer[backgroundPos], bytes);
+  	backgroundPos += (bytes shr 1);
+  end;
+
+  inc(didWeGo);
+
+{  directNoise(0.1);}
+
+  // end of interupt
+  // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
+  port[$A0] := $20;
+  port[$20] := $20;
+end;
+{$F-,S+}
+
+var
+	oldIntVec: tSegInfo;
+  newIntVec: tSegInfo;
+
+
+{$F+}
+procedure int10h_handler; assembler;
+asm
+    push eax
+
+    mov eax, [didWeGo]
+    inc eax
+    mov [didWeGo], eax
+
+    pop eax
+    iret
+end;
+{$F-}
+
+var
+	irqStartMask,
+  irqStopMask: byte;
+
+var
+	hasInstalledInt: boolean=False;
+
+procedure install_ISR();
+begin
+	note('Installing music interupt');	
+	newIntVec.offset := @soundBlaster_ISR;
+  newIntVec.segment := get_cs;
+
+  irqStopMask := 1 shl (10 mod 8);
+  irqStartMask := not IRQStopMask;
+
+	get_pm_interrupt(SB_IRQ, oldIntVec);
+  set_pm_interrupt(SB_IRQ, newIntVec);
+
+  {why do we do this?}
+  writeln(port[$A1]);
+  writeln('then');
+  port[$A1] := port[$A1] and IRQStartMask;
+  writeln(port[$A1]);
+
+  hasInstalledInt := true;
+
+
+end;
+
+procedure uninstall_ISR;
+begin
+	if not hasInstalledInt then exit;
+	note('Removing music interupt');
+  port[$A1] := port[$A1] or IRQStopMask;
+	set_pm_interrupt(SB_IRQ, oldIntVec);
+  hasInstalledInt := false;
+end;
+
+
+procedure startAutoPlayback(length: word);
+begin
+	DSPWrite(SB_OUTPUT);
+  DSPWrite($AC);              // 44.1 HZ (according to manual)
+  DSPWrite($44);
+  DSPWrite(SB_OUTPUT_16BIT); 	
+  DSPWrite(SB_STEREO_16BIT_SIGNED_PCM);
+  DSPWrite(lo(word(length-1)));
+  DSPWrite(hi(word(length-1)));
+end;
+
 {program DMA channel 5 for 16-bit DMA
 	length: Number of words to transfer}
-procedure programDMA(length:word);
+procedure programDMA(length:dword);
 var
   len: word;
   addr: dword;
@@ -140,50 +262,97 @@ begin
 	addr := (dosSegment shl 3);
 
 	port[$D4] := $04+channel_number;	// mask DMA channel
-  port[$D8] := $01;									// any value
-  port[$D6] := $58+channel_number;	// mode (was $48, but now $59 as channel_number=1
+  port[$D8] := $00;									// any value
+  port[$D6] := $48+channel_number;	// mode (was $48, but now $59 as channel_number=1
 
   port[$8B] := byte(addr shr 16);	// page address, high bits of address, probably 0
 
   port[$C4] := lo(word(addr));	
   port[$C4] := hi(word(addr));
 
-  port[$C6] := lo(length);
-  port[$C6] := hi(length);
+  port[$C6] := lo(word(length-1));	// length is words -1
+  port[$C6] := hi(word(length-1));
 
   port[$D4] := $01;		// unmask DMA channel 5}
   	
 end;
 
-const
-	SB_OUTPUT = $41;
-	SB_INPUT 	= $42;
+{----------------------------------------------------------}
 
-	SB_OUTPUT_8BIT = $C0;
-	SB_OUTPUT_16BIT = $B0;
+var userproc: pointer;
 
-  SB_MONO_16BIT_SIGNED_PCM = $10;
-  SB_STEREO_16BIT_SIGNED_PCM = $30;
-
-{length is samples?}
-procedure startPlayback(length: word);
+(*
+{kind of dodgy real-mode DMA}
+procedure installRMProc(userproc : pointer; userproclen : longint);
+var r : trealregs;
 begin
-	DSPWrite(SB_OUTPUT);
-{  DSPWrite(lo(44100));
-  DSPWrite(hi(44100));}
-  DSPWrite($AC);
-  DSPWrite($44);	{for 44.1hz}
+  get_rm_callback(@callback_handler, mouse_regs, mouse_seginfo);
+  { install callback }
+  r.eax := $0c; r.ecx := $7f;
+  r.edx := longint(mouse_seginfo.offset);
+  r.es := mouse_seginfo.segment;
+  realintr(mouseint, r);
+  { show mouse cursor }
+  r.eax := $01;
+  realintr(mouseint, r);
+end;*)
 
-  DSPWrite(SB_OUTPUT_16BIT); 	// Command: 16-bit stereo
-  DSPWrite(SB_STEREO_16BIT_SIGNED_PCM);  // Mode: $30 signed PCM.
-  dec(length);
-  DSPWrite(lo(length));
-  DSPWrite(hi(length));	
+
+{----------------------------------------------------------}
+
+{play noise directly (blocking) for s seconds.}
+procedure directNoise(s: double);
+var
+	timeLimit: double;
+  x: word;
+begin
+	timeLimit := getSec + s;
+  DSPWrite($D1); // turn on speaker
+  while getSec < timeLimit do begin
+	  DSPWrite($10); // direct 8bit mino 'pc speaker'
+	  DSPWrite(rnd);
+  end;
+  DSPWrite($D3); // end playback
+end;
+
+{play PCM audio using direct writes.
+Input should be mono, 16-bit, and 44.1khz, however when played
+will be converted to 8bit.
+This will sound quite bad, a bit like 'pc speaker'.
+}
+procedure directPCMData(buffer: tWords);
+var
+  i: int32;
+  j: int32;
+  startTime: double;
+	{used for 16-8bit dithering}
+  sample: int32;
+  hiSample,loSample: int32;
+
+begin
+  startTime := getSec;
+  for i := 0 to length(buffer)-1 do begin
+  	DSPWrite($10); // direct 8bit mono 'pc speaker'}
+    sample := int16(buffer[i]);
+    //write(sample, ' ');
+    sample := sample + (32*1024);
+    hiSample := sample shr 8;
+    loSample := sample and $ff;
+
+    if loSample > rnd then inc(hiSample);
+
+    if hiSample > 255 then hiSample := 255;
+    if hiSample < 0 then hiSample := 0;
+
+    DSPWrite(hiSample);
+
+    while getSec < startTime + (i / 44100) do;
+  end;
 end;
 
 {play PCM audio using DMA.
 Input should be stero 16-bit, and 44.1kh.}
-procedure playPCMData(buffer: array of word);
+procedure playPCMData(buffer: tWords);
 var
 	bytes: dword;
   samples: dword;
@@ -202,62 +371,107 @@ begin
   startPlayback(bytes shr 1);
 
   delay(samples*1000/44100);
-
 end;
 
-
-{play PCM audio using direct writes.
-Input should be mono, 16-bit, and 44.1khz, however when played
-will be converted to 8bit.
-This will sound quite bad, a bit like 'pc speaker'.
-}
-procedure directPCMData(buffer: array of word);
+{Play audio in background using IRQ.
+Input should be stero 16-bit, and 44.1kh.}
+procedure backgroundPCMData(buffer: tWords);
 var
-  i: int32;
-  j: int32;
-  startTime: double;
-	{used for 16-8bit dithering}
-  sample: int32;
-  hiSample,loSample: int32;
+	bytes: dword;
+  samples: dword;
+  len: word;
+  addr: dword;
+  words: word;
+  blockSize: word;
+
+  tmp: byte;
 
 begin
-  startTime := getSec;
-  setSampleRate(8000);
-  for i := 0 to length(buffer)-1 do begin
-  	DSPWrite($10); // direct 8bit mino 'pc speaker'}
 
 
-    sample := int16(buffer[i]);
-    //write(sample, ' ');
-    sample := sample + (32*1024);
-    hiSample := sample shr 8;
-    loSample := sample and $ff;
+	{check we're on int10}
+  asm
+  	pusha
+  	mov dx, $220
+    add dx, 4
+    mov al, $80
+    out dx, al
+    inc dx
 
-    if loSample > rnd then inc(hiSample);
+    {read interupt}
+    in	al, dx
+    mov [tmp], al
+    popa
+    end;
 
-    if hiSample > 255 then hiSample := 255;
-    if hiSample < 0 then hiSample := 0;
+  writeln('IRQ register is ', tmp);
 
-    DSPWrite(hiSample);
+	backgroundBuffer := buffer;
+  backgroundPos := 0;
 
-    while getSec < startTime + (i / 44100) do;
-  end;
+  note('initial play');
+
+  {first transfer}
+  bytes := min(BUF_SIZE, length(buffer)*2);
+  dosMemPut(dosSegment, 0, backgroundBuffer[0], bytes);
+  backgroundPos += (bytes shr 1);
+
+  words := bytes div 2;
+
+  {ok.. now the steps}
+
+  {1. reset}
+	DSPReset;
+  {2. load sound}
+  {aleady done}
+  {3. master}
+  {skip}
+  {4. speaker on}
+  {skip}
+  {5. program ISA DMA}
+	addr := (dosSegment shl 3);
+	port[$D4] := $05;	// mask DMA channel
+  port[$D8] := $01;	// any value
+  port[$D6] := $59; // single mode, auto-initialize, write
+  port[$8B] := byte(addr shr 16);	// page address, high bits of address, probably 0
+  port[$C4] := lo(word(addr));	
+  port[$C4] := hi(word(addr));
+  port[$C6] := lo(word(words-1));	// length is words -1
+  port[$C6] := hi(word(words-1));
+  port[$D4] := $01;		// unmask DMA channel 5}
+  {6. time constant}
+  DSPWrite($41); 		
+  DSPWrite(hi(44100));              // 44.1 HZ (according to manual)
+  DSPWrite(lo(44100));
+
+  blockSize := (words div 2)-1;					// should be half.
+
+  DSPWrite($B6);	// 16-bit output mode.
+  DSPWrite($30);	// 16-bit stereo signed PCM input.
+  DSPWrite(lo(blocksize));
+  DSPWrite(hi(blocksize));
+
+  {we should now expect an interupt}
+
+  	
 end;
 
-{----------------------------------------------------------}
+
+  (*
+  writeln('dma');
+
+  programDMA(bytes shr 1);
+
+  writeln('start');
+  startAutoPlayback(bytes shr 1);
+
+  writeln('done');*)
+
 
 {----------------------------------------------------------}
 
 procedure runTests();
-var
-	buffer: array of byte;
 begin
-	buffer := nil;
-  setLength(buffer, 40000);
-  for i := 0 to length(buffer)-1 do
-  	buffer[i] := rnd;
-	setSampleRate(44100);
-
 end;
 
 procedure initSound();
@@ -276,18 +490,30 @@ begin
   writeln('Writeln DSP version ',DSPVersion);
 
 
-	res := Global_Dos_Alloc(64*1024);
+	res := Global_Dos_Alloc(BUF_SIZE*2);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
   	Error('Failed to allocate dos memory');
   note('Sucessfully allocated dos memory for DMA');
 
+  install_ISR();
+
 end;
+
+procedure closeSound();
+begin
+	note('[done] sound');
+  uninstall_ISR();
+end;
+
+{----------------------------------------------------------}
 
 begin
 
 	runTests();
   initSound;
+
+  addExitProc(closeSound);
 
 end.

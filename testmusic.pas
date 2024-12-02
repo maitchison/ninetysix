@@ -13,4 +13,5 @@ var
 
 begin
 	sfx := tSoundFile.create('music\music2.wav');
+  printLog();
 end.

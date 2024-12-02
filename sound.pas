@@ -124,7 +124,28 @@ begin
         end;
 
         samples := chunkSize div 4;
+        samples := 30*44100*2;
+  			channel[1] := nil;
+        setLength(channel[1], samples);
+        blockRead(f, channel[1][0], samples*2);
 
+        writeln('go:',didWeGo);
+
+        {check}
+        (*
+        asm
+        	int $0A
+        end; *)
+
+        backgroundPCMData(channel[1]);
+        for i := 1 to 10 do begin
+	        writeln('go:',didWeGo);  	
+	        sleep(1000);
+        end;
+
+        DSPWrite($D9); // end playback
+
+        (*
         for i := 0 to 250 do begin
           samples := 6400;
   				channel[1] := nil;
@@ -132,14 +153,15 @@ begin
           blockRead(f, channel[1][0], samples*2);
 
   				{mix down from stero to mono}
-          (*
+          {
 					for j := 0 to (samples div 2)-1 do
           	channel[1][j] := dword(channel[1][j*2]);
           setLength(channel[1], samples div 2);
-          *)				
+          }				
 
           playPCMData(channel[1]);
 			  end;
+        *)
 
         break;
       end;
