@@ -269,6 +269,9 @@ begin
   targetMs := getMSCount + ms;
   safety := (ms div 40); {use 40 as a buffer instead of 55}
 
+  {note: this is bugged if we press keys, but that's kind of good
+   as we can keypress our way through it}
+
   while (getMSCount < targetMs) and ( safety > 0) do begin
 		{Give up timeslices in ~55ms blocks}    	
     asm

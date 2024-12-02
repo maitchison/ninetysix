@@ -129,18 +129,10 @@ begin
         setLength(channel[1], samples);
         blockRead(f, channel[1][0], samples*2);
 
-        writeln('go:',didWeGo);
-
-        {check}
-        (*
-        asm
-        	int $0A
-        end; *)
-
         backgroundPCMData(channel[1]);
         for i := 1 to 10 do begin
 	        writeln('go:',didWeGo);  	
-	        sleep(1000);
+	        delay(1000);
         end;
 
         DSPWrite($D9); // end playback

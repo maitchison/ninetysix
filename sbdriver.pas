@@ -39,7 +39,8 @@ var
   dosSelector: word;
 
   backgroundBuffer: tWords;
-  backgroundPos: dword;
+  audioDataPosition: dword;
+  currentBuffer: boolean;			// True = BufferA, False = BufferB
 
 const
 	SB_BASE = $220;
@@ -49,7 +50,9 @@ const
   DSP_WRITE_STATUS = SB_BASE + $C;
   DSP_DATA_AVAIL = SB_BASE + $E;
 
-  BUF_SIZE = 16*1024; // max is 32k, as we double this for double buffering
+  //half buffer size in bytes
+  BUFFER_SIZE = 64*1024;
+  HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 {----------------------------------------------------------}
 { DSP stuff}
@@ -63,6 +66,11 @@ end;
 function DSPDataAvailable(): boolean;
 begin
 	result := (port[DSP_DATA_AVAIL] and $80) <> 0;
+end;
+
+function DSPStop(): boolean;
+begin	
+	DSPWrite($D9);
 end;
 
 procedure DSPWaitForWrite(timeout: double=1);
@@ -148,35 +156,48 @@ begin
   DSPWrite(hi(word(length-1)));	
 end;
 
-{$F+,S-,W-}
+{$F+,S-,R-,Q-}
+{note: this could all be in asm if we wanted}
+{also... should set up a read from file}
 procedure soundBlaster_ISR; interrupt;
 var
-	bytes: dword;
+	bytesToCopy: int32;
   readAck: byte;
+  bufOfs: word;
   bytesRemaining: dword;
-begin
-	// acknowledge the DSP interupt.
-  // $F for 16bit, $E for 8bit
-	readAck := port[SB_BASE + $F];
-
-  // refill the buffer
-  bytesRemaining := (length(backgroundBuffer) - backgroundPos)*2;
-  bytes := min(bytesRemaining, BUF_SIZE);
-  if bytes > 1 then begin
-	  dosMemPut(dosSegment, 0, backgroundBuffer[backgroundPos], bytes);
-  	backgroundPos += (bytes shr 1);
-  end;
+ begin
 
   inc(didWeGo);
 
-{  directNoise(0.1);}
+  currentBuffer := not currentBuffer;
+
+  // refill the buffer
+  bytesRemaining := (length(backgroundBuffer) - audioDataPosition)*2;
+  bytesToCopy := min(bytesRemaining, HALF_BUFFER_SIZE);
+  if bytesToCopy > 1 then begin
+  	if currentBuffer then
+    	bufOfs := HALF_BUFFER_SIZE
+    else
+    	bufOfs := 0;
+    	
+    // update the non-active buffer
+	  dosMemPut(dosSegment, bufOfs, backgroundBuffer[audioDataPosition], bytesToCopy);
+  	audioDataPosition += (bytesToCopy shr 1);
+    // acknowledge the DSP interupt.
+	  // $F for 16bit, $E for 8bit
+		readAck := port[SB_BASE + $F];
+  end else begin
+  	{stop the audio}
+    DSPStop();
+    {not sure if we should ack or not}
+  end;
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
   port[$A0] := $20;
   port[$20] := $20;
 end;
-{$F-,S+}
+{$F-,S+,R+,Q+}
 
 var
 	oldIntVec: tSegInfo;
@@ -377,46 +398,41 @@ end;
 Input should be stero 16-bit, and 44.1kh.}
 procedure backgroundPCMData(buffer: tWords);
 var
-	bytes: dword;
+	bytestoCopy: dword;
   samples: dword;
   len: word;
   addr: dword;
   words: word;
+  halfWords: word;
   blockSize: word;
 
   tmp: byte;
 
 begin
 
-
-	{check we're on int10}
-  asm
-  	pusha
-  	mov dx, $220
-    add dx, 4
-    mov al, $80
-    out dx, al
-    inc dx
-
-    {read interupt}
-    in	al, dx
-    mov [tmp], al
-    popa
-    end;
-
-  writeln('IRQ register is ', tmp);
-
 	backgroundBuffer := buffer;
-  backgroundPos := 0;
+  audioDataPosition := 0;
 
   note('initial play');
 
-  {first transfer}
-  bytes := min(BUF_SIZE, length(buffer)*2);
-  dosMemPut(dosSegment, 0, backgroundBuffer[0], bytes);
-  backgroundPos += (bytes shr 1);
+  DSPReset();
 
-  words := bytes div 2;
+  {first transfer}
+  {note: full buffer transfer}
+  bytesToCopy := min(BUFFER_SIZE, length(buffer)*2);
+  dosMemPut(dosSegment, 0, backgroundBuffer[0], bytesToCopy);
+  audioDataPosition += (bytesToCopy shr 1);
+
+  currentBuffer := True;
+
+  {this took a long time to get right...
+
+  DMA should the setup to transfer the entire buffer.
+  SB should be told to use half the buffer as the blocksize, this way
+  we get an interupt halfway through the block}
+
+  words := BUFFER_SIZE div 2; 					// number of words in buffer.
+  halfWords := HALF_BUFFER_SIZE div 2;	// number of words in halfbuffer.
 
   {ok.. now the steps}
 
@@ -444,12 +460,14 @@ begin
   DSPWrite(hi(44100));              // 44.1 HZ (according to manual)
   DSPWrite(lo(44100));
 
-  blockSize := (words div 2)-1;					// should be half.
-
   DSPWrite($B6);	// 16-bit output mode.
   DSPWrite($30);	// 16-bit stereo signed PCM input.
-  DSPWrite(lo(blocksize));
-  DSPWrite(hi(blocksize));
+
+  // according to manual, this must be half the DMA size.
+  // since we using 16-bit audio, these are words
+
+  DSPWrite(lo(word(halfWords-1)));
+  DSPWrite(hi(word(halfWords-1)));
 
   {we should now expect an interupt}
 
@@ -490,7 +508,7 @@ begin
   writeln('Writeln DSP version ',DSPVersion);
 
 
-	res := Global_Dos_Alloc(BUF_SIZE*2);
+	res := Global_Dos_Alloc(BUFFER_SIZE);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
