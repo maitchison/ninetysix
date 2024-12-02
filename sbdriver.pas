@@ -25,6 +25,8 @@ procedure DSPWrite(command: byte);
 var
 	didWeGo: int32 = 0;
 
+LOOP_MUSIC: boolean = True;
+
 implementation
 
 
@@ -187,9 +189,13 @@ var
 	  // $F for 16bit, $E for 8bit
 		readAck := port[SB_BASE + $F];
   end else begin
-  	{stop the audio}
-    DSPStop();
-    {not sure if we should ack or not}
+  	if LOOP_MUSIC then begin
+    	audioDataPosition := 0;
+      readAck := port[SB_BASE + $F];
+    end else
+	  	{stop the audio}
+      {note: I intentially do not ack here, not sure if that's right or not}
+  	  DSPStop();
   end;
 
   // end of interupt
@@ -474,18 +480,6 @@ begin
 
   	
 end;
-
-
-  (*
-  writeln('dma');
-
-  programDMA(bytes shr 1);
-
-  writeln('start');
-  startAutoPlayback(bytes shr 1);
-
-  writeln('done');*)
-
 
 {----------------------------------------------------------}
 
