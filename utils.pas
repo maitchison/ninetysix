@@ -81,6 +81,8 @@ function StrToInt(s: string): integer;
 function Trim(s: string): string;
 
 function bytesForBits(x: integer): integer;
+function toBytes(x: array of dword): tBytes; overload;
+function toBytes(x: array of word): tBytes; overload;
 
 procedure Wait(ms: integer);
 function  RND(): byte; assembler; register;
@@ -409,6 +411,26 @@ end;
 function bytesForBits(x: integer): integer;
 begin
 	result := (x + 7) div 8;
+end;
+
+function toBytes(x: array of dword): tBytes; overload;
+var
+	i: int32;
+begin
+	result := nil;
+  setLength(result, length(x));
+  for i := 0 to length(x)-1 do
+  	result[i] := x[i];
+end;
+
+function toBytes(x: array of word): tBytes; overload;
+var
+	i: int32;
+begin
+	result := nil;
+  setLength(result, length(x));
+  for i := 0 to length(x)-1 do
+  	result[i] := x[i];
 end;
 
 {A more accurate version of sleep, espcially for short durations.

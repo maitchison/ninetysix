@@ -66,7 +66,7 @@ type
     function  readWord: word; inline;
     function  readDWord: dword; inline;
     function  readVLC: dword;
-		function  readVLCSegment(n: int32): tDWords;
+		function  readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
     function  readBytes(n: int32): tBytes;
 
     procedure byteAlign(); inline;
@@ -117,6 +117,28 @@ begin
   exit(-1);
 end;
 
+var
+	packing1: array[0..255] of array[0..7] of dword;
+	packing2: array[0..255] of array[0..3] of dword;
+	packing4: array[0..255] of array[0..1] of dword;
+	packing8: array[0..255] of array[0..0] of dword;
+
+{builds lookup tables used to accelerate unpacking.}
+procedure buildUnpackingTables();
+var
+	packingBits: byte;
+  i,j: integer;
+begin
+	for i := 0 to 255 do begin
+  	for j := 0 to 7 do
+	  	packing1[i][j] := (i shr j) and $1;
+  	for j := 0 to 3 do
+	  	packing2[i][j] := (i shr (j*2)) and $3;
+  	for j := 0 to 1 do
+	  	packing4[i][j] := (i shr (j*4)) and $f;
+    packing8[i][0] := i;
+  end;
+end;
 
 {------------------------------------------------------}
 
@@ -505,6 +527,53 @@ begin
 	filldword(outBuf^, n, 0);
 end;
 
+procedure unpack1(inBuf: pByte; outBuf: pDWord;n: dWord);
+var
+	i: integer;
+begin
+	for i := 1 to (n shr 3) do begin
+  	move(packing1[inBuf^], outBuf^, 4*8);
+    inc(inBuf);
+    inc(outBuf, 8); // inc is dwords...
+  end;
+  move(packing1[inBuf^], outBuf^, 4*(n and $7));
+end;
+
+procedure unpack2(inBuf: pByte; outBuf: pDWord;n: dWord);
+var
+	i: integer;
+begin
+	for i := 1 to (n shr 2) do begin
+  	move(packing2[inBuf^], outBuf^, 4*4);
+    inc(inBuf);
+    inc(outBuf, 4);
+  end;
+  move(packing2[inBuf^], outBuf^, 4*(n and $3));
+end;
+
+procedure unpack4(inBuf: pByte; outBuf: pDWord;n: dWord);
+var
+	i: integer;
+begin
+	for i := 1 to (n shr 1) do begin
+  	move(packing4[inBuf^], outBuf^, 4*2);
+    inc(inBuf);
+    inc(outBuf, 2);
+  end;
+  move(packing4[inBuf^], outBuf^, 4*(n and $1));
+end;
+
+procedure unpack8(inBuf: pByte; outBuf: pDWord;n: dWord);
+var
+	i: integer;
+begin
+	for i := 1 to n do begin
+  	move(packing8[inBuf^], outBuf^, 4);
+    inc(inBuf);
+    inc(outBuf);
+  end;
+end;
+
 {General unpacking routine.
  Works on any number of bits, but is a bit slow.}
 procedure unpack(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
@@ -544,27 +613,33 @@ end;
   bitsPerCode 	the number of packed bits per symbol
   nCodes	 			the number of symbols
 
-  output 				arry of 32bit dwords
+  output 				array of 32bit dwords
 }
 
-function unpackBits(s: tStream;bitsPerCode: byte;nCodes: integer): tDWords;
+function unpackBits(s: tStream;bitsPerCode: byte;nCodes: integer;outBuffer: tDWords=nil): tDWords;
 var
 	bytesRequired: int32;
   bytes: tBytes;
 begin
 
-	result := nil;
-  setLength(result, nCodes);
+	if not assigned(outBuffer) then
+  	setLength(outBuffer, nCodes);
 
-  if nCodes = 0 then exit;
+  if nCodes = 0 then exit(outBuffer);
 
   bytesRequired := bytesForBits(bitsPerCode * nCodes);
   bytes := s.readBytes(bytesRequired);
 
   case bitsPerCode of
-  	0: unpack0(nil, @result[0], nCodes);
-    else unpack(@bytes[0], @result[0], nCodes, bitsPerCode);
+  	0: unpack0(nil, @outBuffer[0], nCodes);
+    1: unpack1(@bytes[0], @outBuffer[0], nCodes);
+    2: unpack2(@bytes[0], @outBuffer[0], nCodes);
+    4: unpack4(@bytes[0], @outBuffer[0], nCodes);
+    8: unpack8(@bytes[0], @outBuffer[0], nCodes);
+    else unpack(@bytes[0], @outBuffer[0], nCodes, bitsPerCode);
   end;
+
+  exit(outBuffer);
 end;
 
 function isControlCode(b: byte): boolean;
@@ -572,7 +647,7 @@ begin
 	result := (b >= 8) and (b < 16);
 end;
 
-function tStream.readVLCSegment(n: int32): tDWords;
+function tStream.readVLCSegment(n: int32;outBuffer: tDWords=nil): tDWords;
 var
 	ctrlCode: word;
   b: byte;
@@ -582,22 +657,23 @@ var
   packingBits: int32;
 begin
 
+  if not assigned(outBuffer) then
+	  system.setLength(outBuffer, n);
+
   b := peekByte;
   if isControlCode(b) then begin
   	{this is a control code}
     packingBits := decodePackingCode(readByte-8);
     if packingBits < 0 then
     	Error('Invalid packing code');
-  	result := unpackBits(self, packingBits, n);
-    exit;
+  	unpackBits(self, packingBits, n, outBuffer);
+    exit(outBuffer);
   end;
 
-  result := nil;
-  system.setLength(result, n);
-
   for i := 0 to n-1 do
-  	result[i] := readVLC;	
+  	outBuffer[i] := readVLC;
 
+  exit(outBuffer);	
 end;
 
 {
@@ -626,14 +702,6 @@ begin
   	maxValue := max(maxValue, values[i]);
   	unpackedBits += VLCBits(values[i]);
   end;
-
-  {special case for all zeroes}
-  (*
-  if maxValue = 0 then begin
-		writeVLCControlCode(256);
-    exit;	
-  end;
-  *)
 
   if allowPacking then
     for n in [0,1,2,4,8] do begin
@@ -709,6 +777,29 @@ end;
 
 {---------------------------------------------------------------}
 
+procedure testUnpack();
+
+var	
+	outBuffer: array[0..9] of dword;
+  inBuffer: array[0..1] of byte;
+  ref: array[0..9] of dword;
+	i: integer;
+begin
+
+	inBuffer[0] := 53;
+	inBuffer[1] := 11;
+
+  for i := 0 to 9 do
+  	{to check if we are overwriting values or not}
+  	outBuffer[i] := i;
+
+  unpack(@inBuffer[0], @ref[0], 10, 1);
+  unpack1(@inBuffer[0], @outBuffer[0], 10);
+
+  assertEqual(toBytes(outBuffer), toBytes(ref));
+
+end;
+
 procedure runTests();
 var	
 	s: tStream;
@@ -733,6 +824,8 @@ begin
 	  for i := 0 to length(testData2)-1 do
   	  AssertEqual(data[i], testData2[i]);
   end;
+
+  testUnpack();
 
   {check vlcsegment standard}
   s := tStream.create;
@@ -848,6 +941,7 @@ begin
   s.free;
 end;
 
-begin	
+begin
+	buildUnpackingTables();	
 	runTests();
 end.

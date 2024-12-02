@@ -42,7 +42,7 @@ begin
 		assertError('Expecting "'+strb+'" but found "'+stra+'".');
   for i := 0 to length(a)-1 do
   	if a[i] <> b[i] then
-    	assertError('Expecting "'+strb+'" but found "'+stra+'".');
+    	assertError('Expecting "'+#13#10+strb+'" but found "'+#13#10+stra+'".');
 end;
 
 procedure assertEqualLarge(a, b: tBytes); overload;

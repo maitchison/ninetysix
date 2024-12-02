@@ -169,46 +169,48 @@ begin
   s.byteAlign();
 end;
 
+var
+	{todo: move all this into a clas}
+	global_deltas: tDwords;
 
 {Decode a 4x4 patch at given location.}
 procedure decodePatch(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
 var
-	i: integer;
+	i: int32;
 	c: RGBA;
-  x,y: integer;
+  x,y: int32;
   o1,o2,src: RGBA;
   dr,dg,db,da: byte;
   choiceCode: dword;
-	deltas: array of dword;
   dPos: word;
 begin
   {output deltas}
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
   if withAlpha then
-	  deltas := s.readVLCSegment(16*4)
+	  s.readVLCSegment(16*4, global_deltas)
   else
-  	deltas := s.readVLCSegment(16*3);
+  	s.readVLCSegment(16*3, global_deltas);
   s.byteAlign();
 
   dPos := 0;
   for y := 0 to 3 do begin
   	for x := 0 to 3 do begin
-      o1 := page.getPixel(atX+x-1, atY+y);
-      o2 := page.getPixel(atX+x, atY+y-1);
-      dr := deltas[dpos]; inc(dpos);
-      dg := deltas[dpos]; inc(dpos);
-      db := deltas[dpos]; inc(dpos);
+      dr := global_deltas[dpos]; inc(dpos);
+      dg := global_deltas[dpos]; inc(dpos);
+      db := global_deltas[dpos]; inc(dpos);
       if withAlpha then begin
-	      da := deltas[dpos]; inc(dpos);
+	      da := global_deltas[dpos]; inc(dpos);
       end;
       if choiceCode and $8000 = $8000 then
-      	src := o2
+      	src := page.getPixel(atX+x, atY+y-1)
       else
-      	src := o1;
-      c.r := applyByteDelta(src.r, dr);
-      c.g := applyByteDelta(src.g, dg);
-      c.b := applyByteDelta(src.b, db);
+      	src := page.getPixel(atX+x-1, atY+y);
+
+	    c.r := applyByteDelta(src.r, dr);
+  	  c.g := applyByteDelta(src.g, dg);
+    	c.b := applyByteDelta(src.b, db);
+
       if withAlpha then
 	      c.a := applyByteDelta(src.a, da)
       else
@@ -441,5 +443,10 @@ begin
 end;
 
 begin
+	{todo: move this out of global}
+  global_deltas := nil;
+  setLength(global_deltas, 16*4);
+  filldword(global_deltas[0], length(global_deltas), 0);
+
 	runTests();
 end.
