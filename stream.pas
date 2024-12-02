@@ -91,6 +91,35 @@ implementation
 
 {------------------------------------------------------}
 
+{Returns the packing code for given number of bits}
+function encodePackingCode(nBits: byte): int32;
+begin
+	case nBits of
+  	0: exit(0);
+  	1: exit(1);
+  	2: exit(2);
+  	4: exit(3);
+  	8: exit(4);
+  end;
+  exit(-1);
+end;
+
+{Returns the packing code for given number of bits}
+function decodePackingCode(value: byte): int32;
+begin
+	case value of
+  	0: exit(0);
+  	1: exit(1);
+  	2: exit(2);
+  	3: exit(4);
+  	4: exit(8);
+  end;
+  exit(-1);
+end;
+
+
+{------------------------------------------------------}
+
 constructor tStream.Create(aInitialCapacity: dword=0);
 begin
 	bytes := nil;
@@ -550,13 +579,16 @@ var
   w: word;
   i: int32;
   bytes: tBytes;
+  packingBits: int32;
 begin
 
   b := peekByte;
   if isControlCode(b) then begin
   	{this is a control code}
-    readByte;
-  	result := unpackBits(self, (b-8)+1, n);
+    packingBits := decodePackingCode(readByte-8);
+    if packingBits < 0 then
+    	Error('Invalid packing code');
+  	result := unpackBits(self, packingBits, n);
     exit;
   end;
 
@@ -604,12 +636,12 @@ begin
   *)
 
   if allowPacking then
-    for n := 1 to 8 do begin
+    for n in [0,1,2,4,8] do begin
     	if maxValue < (1 shl n) then begin
   	    packingCost := (length(values) * n)+8;
   	    if packingCost < unpackedBits then begin
           {control-code}
-      		writeVLCControlCode(n-1);
+      		writeVLCControlCode(encodePackingCode(n));
           packBits(values, n, self);
   	    	exit;
         end;
