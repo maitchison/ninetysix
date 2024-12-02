@@ -26,10 +26,13 @@ var
 begin
 	note('Loading graphics');
   startTime := getSec;
-  background := tSprite.create(loadBMP('e:\airtime\title_640.bmp'));
+{  background := tSprite.create(loadBMP('e:\airtime\title_640.bmp'));}
+
+	background := tSprite.create(loadLC96('gfx\title_640.p96'));	
+
   note(format('Loaded background in %fs', [getSec-startTime]));
 
-  saveLC96('c:\gfx\title_640.p96', background.page);
+  {saveLC96('gfx\title_640.p96', background.page);}
 
   note('Loading music');
 	music := tSoundFile.create('music\music2.wav');

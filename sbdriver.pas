@@ -500,7 +500,7 @@ begin
   	warn('No SoundBlaster detected');
 
 
-  writeln('Writeln DSP version ',DSPVersion);
+  writeln('DSP version ',DSPVersion);
 
 
 	res := Global_Dos_Alloc(BUFFER_SIZE);

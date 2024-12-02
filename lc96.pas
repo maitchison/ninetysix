@@ -29,9 +29,6 @@ implementation
 
 uses lz4;
 
-const
-	VERSION: word = $0001;
-
 {-------------------------------------------------------}
 { Private }
 {-------------------------------------------------------}
@@ -228,49 +225,55 @@ var
   bytes: tBytes;
   data: tStream;
   decompressedBytes: tBytes;
-  numPatches: int32;
+  numPatches: word;
+  compressedSize,uncompressedSize: dword;
   hasAlpha: boolean;
   verBig,verSmall: byte;
+  startPos: int32;
 const
 	CODE_4CC = 'LC96';
 
 begin
 
+	startPos := s.getPos;
+
 	for i := 1 to 4 do
   	if s.readByte <> ord(CODE_4CC[i]) then
-    	Error('Not a LC96 file.');	
+    	Error('Not an LC96 file.');	
 
+  {todo: make this a record}
   width := s.readWord;
   height := s.readWord;
-
-	result := tPage.create(width, height);
-  BPP := s.readWord;
-
+  bpp := s.readWord;
   verSmall := s.readByte;
   verBig := s.readByte;
+  numPatches := s.readWord;
+  uncompressedSize := s.readDWord;
+  compressedSize := s.readDWord;
+
+  {read reserved bytes}
+  while s.getPos < startPos+32 do
+  	s.readByte();
 
   if (verBig <> 0) and (verSmall <> 1) then
   	error(format('Invalid version, expecting 0.1, but found %d.%d',[verBig, verSmall]));
 
-  {read reserved bytes}
-  s.readBytes(32-12);
+	result := tPage.create(width, height);
 
-  if not (BPP in [24,32]) then
-  	Error('Invalid BitPerPixel '+intToStr(BPP));
+  if not (bpp in [24,32]) then
+  	Error('Invalid BitPerPixel '+intToStr(bpp));
 
-  hasAlpha := BPP = 32;
-
-  numPatches := (width div 4) * (height div 4);
+  hasAlpha := bpp = 32;
 
   {This is not great, it would be nice to be able decompress from
    part way in a stream.
    Note: having LZ4 work on streams rather than bytes would solve this.
    }
   decompressedBytes := nil;
-	setLength(decompressedBytes, numPatches * (16*(BPP div 8)+2));
+	setLength(decompressedBytes, uncompressedSize);
   data := tStream.create();
-  bytes := s.readBytes(s.len-s.getPos);
-  decompressedBytes := LZ4Decompress(bytes);
+  bytes := s.readBytes(compressedSize);
+  LZ4Decompress(bytes, decompressedBytes);
   data.writeBytes(decompressedBytes);
   data.seek(0);
 
@@ -296,25 +299,31 @@ var
   cnt: integer;
   data: tStream;
   bpp: byte;
+  numPatches: word;
+  uncompressedSize: dword;
+  compressedSize: dword;
+  startPos: int32;
+  compressedData: tBytes;
 
 begin
 
 	if not assigned(s) then	
 		s := tStream.Create();
 
+  startPos := s.getPos;
+
   if withAlpha then bpp := 32 else bpp := 24;
 
-  {write header}
-  s.writeChars('LC96');
-  s.writeWord(page.Width);
-  s.writeWord(page.Height);
-  s.writeWord(bpp);
-  s.writeWord(VERSION);
+  {check everything is ok}
+  if ((page.width and $3) <> 0) or ((page.height and $3) <> 0) then
+  	warn(format(
+      	'Page (%d, %d) has invalid dimensions, cropping to multiple of 4.',
+        [page.width, page.height]
+    ));
 
-  {write reserved space}
-  for i := 1 to (32-12) do
-  	s.writeByte(0);
+  numPatches := (page.width div 4) * (page.height div 4);
 
+  {compress first so we know length}
 	data := tStream.create();
   for py := 0 to page.height div 4-1 do
   	for px := 0 to page.width div 4-1 do
@@ -322,8 +331,25 @@ begin
       	32: encodePatch32(data, page, px*4, py*4);
       	24: encodePatch24(data, page, px*4, py*4);
       end;
+	compressedData := LZ4Compress(data.asBytes);
+  compressedSize := length(compressedData);
+  unCompressedSize := length(data.asBytes);
 
-  s.writeBytes(LZ4Compress(data.asBytes));
+  {write header}
+  s.writeChars('LC96');
+  s.writeWord(page.Width);
+  s.writeWord(page.Height);
+  s.writeWord(bpp);
+  s.writeWord($0001);
+  s.writeWord(numPatches);
+  s.writeDWord(uncompressedSize);
+  s.writeDWord(compressedSize);
+
+  {write reserved space}
+  while s.getPos < startPos+32 do
+  	s.writeByte(0);
+
+  s.writeBytes(compressedData);
 
   result := s;
 end;

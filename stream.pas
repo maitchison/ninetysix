@@ -48,6 +48,7 @@ type
     procedure writeNibble(b: byte); inline;
     procedure writeByte(b: byte); inline;
     procedure writeWord(w: word); inline;
+    procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
     procedure writeVLCControlCode(value: dword); inline;
     procedure writeVLCSegment(values: array of dword;allowPacking:boolean=True); inline;
@@ -58,10 +59,12 @@ type
 
     function  peekByte: byte; inline;
     function  peekWord: word; inline;
+    function  peekDWord: dword; inline;
 
     function  readByte: byte; inline;
 		function  readNibble: byte; inline;
     function  readWord: word; inline;
+    function  readDWord: dword; inline;
     function  readVLC: dword;
 		function  readVLCSegment(n: int32): tDWords;
     function  readBytes(n: int32): tBytes;
@@ -185,6 +188,25 @@ begin
   inc(pos,2);
 end;
 
+procedure tStream.writeDWord(d: dword); inline;
+begin
+	if midByte then begin
+  	writeNibble((d shr 0) and $f);
+  	writeByte((d shr 4) and $ff);
+  	writeByte((d shr 12) and $ff);
+  	writeByte((d shr 20) and $ff);
+  	writeNibble((d shr 28) and $f);
+    exit;
+  end;
+  setLength(pos+4);
+  {little edian}
+  bytes[pos] := d and $ff;
+  bytes[pos+1] := (d shr 8) and $ff;
+  bytes[pos+2] := (d shr 16) and $ff;
+  bytes[pos+3] := (d shr 24) and $ff;
+  inc(pos,4);
+end;
+
 procedure tStream.writeChars(s: string);
 var
 	i: integer;
@@ -226,9 +248,17 @@ end;
 function tStream.readWord: word; inline;
 begin
   if midByte then
-  	Error('Reading missaligned bytes not yet supported');
+  	Error('Reading missaligned words not yet supported');
   result := bytes[pos] + (bytes[pos+1] shl 8);
   inc(pos,2);
+end;
+
+function tStream.readDWord: dword; inline;
+begin
+  if midByte then
+  	Error('Reading missaligned dwords not yet supported');
+  result := bytes[pos] + (bytes[pos+1] shl 8) + (bytes[pos+2] shl 16) + (bytes[pos+3] shl 24);
+  inc(pos,4);
 end;
 
 function tStream.peekByte: byte; inline;
@@ -244,6 +274,13 @@ begin
   if midByte then
   	Error('Reading missaligned bytes not yet supported');
   result := bytes[pos] + (bytes[pos+1] shl 8);
+end;
+
+function tStream.peekDWord: dword; inline;
+begin
+  if midByte then
+  	Error('Reading missaligned dwords not yet supported');
+  result := bytes[pos] + (bytes[pos+1] shl 8) + (bytes[pos+2] shl 16) + (bytes[pos+3] shl 24);
 end;
 
 function tStream.readVLC: dword;

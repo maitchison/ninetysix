@@ -60,6 +60,7 @@ type
 function LZ4Compress(data: tBytes): tBytes; overload;
 function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes; overload;
 function LZ4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
+function LZ4Debug(bytes: tBytes;ref: tBytes=nil;print:boolean=False): tBytes;
 
 implementation
 
@@ -233,9 +234,6 @@ asm
   {eax is match length}
   mov [result], eax
 	end;
-
-{  tmp := MatchLength_REF(data, a, b);
-  AssertEqual(tmp, result);}
 
 end;
 
@@ -628,9 +626,6 @@ end;
 
 begin
 
-	if length(data) > MAX_BLOCK_SIZE then
-  	Error(Format('Maximum blocksize is %d, but tried to write %d', [MAX_BLOCK_SIZE, length(data)]));
-
 	{note: assume 5 <= blocksize <= 64k}
 
 	{todo: special case for short TBytes (i.e length <= 5)}
@@ -879,24 +874,12 @@ begin
   result := s;  	
 end;
 
-
-{reference implementation of lz4 decompress}
-function lz4Decompress_ref(bytes: tBytes;buffer:tBytes=nil;ref: tBytes=nil):tBytes;
-	{note:
-  do we want to do this as a stream? I.e. so receiver can just read from it?
-  maybe not, as we need to decode the entire block I think... yeah, just do this
-  in blocks. use ^patch, and some kind of index into them. Also means I'm not
-  tied to my streams thing (which can be a bit slow)
-
-  yeah, block is simpler, and my images will mostly be one block I think?
-
-  also BPE is block based on compress (but not for decompression)
-
-  hmm stream is simpler..
-  but block will be faster when optmized... ok block it is then.
-  }
+{reference implementation of lz4 decompress with debug printing}
+function LZ4Debug(bytes: tBytes;ref: tBytes=nil;print:boolean=False): tBytes;
+{todo: switch to using tStream}
 var
   bufferPtr: pointer;
+  buffer: tBytes;
   inPos, outPos: dword; {outpos is capped to 64k, but in pos, maybe not}
   i, ofs: int32;
   b: byte;
@@ -957,7 +940,11 @@ begin
     inc(outPos, numLiterals);
 
     {check for terminal sequence}
-    if eof then break;
+    if eof then begin
+    	if print then
+	      writeln(format('Final Token (lit:%d)',[numLiterals]));
+    	break;
+    end;
 
     {preform match}
     ofs := readword;
@@ -968,12 +955,9 @@ begin
     {min match length}
     matchLength += 4;
 
-    {stub:}
-{    writeln(Format('%d %d - n_lit:%d match:%d ofs:%d', [inPos, outPos, numLiterals, matchLength, offset]));
-    if assigned(ref) then
-			for i := 0 to outPos-1 do
-  	  	if buffer[i] <> ref[i] then
-    	  	Error('failed to match at pos '+intToStr(i));}
+    if print then
+	    {writeln(Format('inpos:%d outpos:%d - #lit:%d match_len:%d ofs:%d', [inPos, outPos, numLiterals, matchLength, ofs]));}
+      writeln(format('Token (lit:%d matchs:%d @:%d)',[numLiterals,matchLength,ofs]));
 
     {copy from buffer}
     {note: move is not safe if regions overlap, and I've seen it do the wrong thing
@@ -988,10 +972,19 @@ begin
     	
   end;	
 
+  if print then
+  	writeln('Output is ',outPos, ' bytes');
+
   {trim unused space}
   setLength(buffer, outPos);
+  if assigned(ref) then begin
+  	writeln('>>>> here', length(buffer), length(ref));
+  	assertEqual(buffer, ref);
+  end;
+
   result := buffer;
 end;
+
 
 function lz4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
 var
