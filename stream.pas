@@ -314,13 +314,8 @@ begin
   if n = 0 then
   	exit;
   system.setLength(result, n);
-  {stub:}
-  for i := 0 to n-1 do begin
-  	result[i] := bytes[pos];
-  	inc(pos);
-  end;
-  {move(bytes[pos], result[0], n);
-  pos += n;}
+  move(bytes[pos], result[0], n);
+  pos += n;
 end;
 
 {writes memory stream to disk}
@@ -473,20 +468,29 @@ begin
       	s.writeByte(bitBuffer);
     end;
   end;
-
 end;
 
-function unpackBits(s: tStream;bits: byte;n: integer): tDWords;
+
+procedure unpack0(inBuf: pByte; outBuf: pDWord;n: dWord);
+begin
+	filldword(outBuf^, n, 0);
+end;
+
+{General unpacking routine.
+ Works on any number of bits, but is a bit slow.}
+procedure unpack(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
 var
+  i,j: int32;
 	bitBuffer: byte;
   bitsRemaining: integer;
-  i,j: int32;
   value: dword;
+  bytePos: int32;
 
 function nextBit: byte; inline;
 begin
 	if bitsRemaining = 0 then begin
-  	bitBuffer := s.readByte;
+  	inc(inBuffer);
+  	bitBuffer := inBuffer^;
     bitsRemaining := 8;
   end;
   result := bitBuffer and $1;
@@ -495,26 +499,42 @@ begin
 end;
 
 begin
+  bitBuffer := inBuffer^;
+	bitsRemaining := 8;
+	for i := 0 to n-1 do begin
+		value := 0;
+		for j := 0 to bitsPerCode-1 do
+	  	value += nextBit shl j;
+		outBuffer^ := value;
+    inc(outBuffer);
+  end;
+end;
+
+{Unpack bits
+	s 						the stream to read from
+  bitsPerCode 	the number of packed bits per symbol
+  nCodes	 			the number of symbols
+
+  output 				arry of 32bit dwords
+}
+
+function unpackBits(s: tStream;bitsPerCode: byte;nCodes: integer): tDWords;
+var
+	bytesRequired: int32;
+  bytes: tBytes;
+begin
 
 	result := nil;
-  setLength(result, n);
+  setLength(result, nCodes);
 
-  case bits of
-  	0: begin
-	  	filldword(result[0], n, 0);
-  		exit;
-	  end;
-    else begin
-			bitBuffer := s.readByte;
-		  bitsRemaining := 8;
-		  for i := 0 to n-1 do begin
-  			{this could be a lot faster, but atleast it supports bits > 8}
-		    value := 0;
-		    for j := 0 to bits-1 do
-	  			value += nextBit shl j;
-		    result[i] := value;
-      end;
-    end;
+  if nCodes = 0 then exit;
+
+  bytesRequired := bytesForBits(bitsPerCode * nCodes);
+  bytes := s.readBytes(bytesRequired);
+
+  case bitsPerCode of
+  	0: unpack0(nil, @result[0], nCodes);
+    else unpack(@bytes[0], @result[0], nCodes, bitsPerCode);
   end;
 end;
 
@@ -532,9 +552,6 @@ var
   bytes: tBytes;
 begin
 
-	result := nil;
-  system.setLength(result, n);
-	
   b := peekByte;
   if isControlCode(b) then begin
   	{this is a control code}
@@ -542,6 +559,9 @@ begin
   	result := unpackBits(self, (b-8)+1, n);
     exit;
   end;
+
+  result := nil;
+  system.setLength(result, n);
 
   for i := 0 to n-1 do
   	result[i] := readVLC;	
@@ -795,7 +815,6 @@ begin
   writeln('Wrote 64kb at ',64*1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
   s.free;
 end;
-
 
 begin	
 	runTests();

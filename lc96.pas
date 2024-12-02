@@ -169,7 +169,8 @@ begin
   s.byteAlign();
 end;
 
-{Encode a 4x4 patch at given location.}
+
+{Decode a 4x4 patch at given location.}
 procedure decodePatch(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
 var
 	i: integer;
