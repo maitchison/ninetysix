@@ -1,6 +1,8 @@
 {Airtime game}
 program airtime;
 
+{$MODE delphi}
+
 uses
 	screen,
   graph32,
@@ -67,8 +69,60 @@ end;
 procedure drawCar();
 var
 	x,y,z: int32;
+  dX, dY: int32;
+  c: RGBA;
+
+{transform from object space to screen space}
+procedure transform(oX,oY,oZ: int32;out sX, sY: int32);
+var
+	cX, cY: int32;
 begin
-	carSprite.draw(canvas,320, 240);
+	{center point}
+  cX := 320;
+  cY := 240;
+	{simple }
+	sX := cX+oX-oY;
+  sY := cY-((oX+oY) shr 1)+oZ;
+end;
+
+function fetch(oX,oY,oZ: int32): RGBA;
+begin
+	result := carSprite.page.getPixel(oX, oY+(oZ*26));
+end;
+
+begin
+
+
+	{
+
+  y  z  x
+   \ | /
+    \|/
+
+
+  }
+
+	canvas.fillRect(tRect.create(320-100, 240-50, 200, 100), RGBA.create(0,0,0));
+	{dims are 65, 26, 18}
+  {note: I should trim this to 64, 32, 18 (for fast indexing)}
+	{guess this is 64x64xsomething}
+	{carSprite.draw(canvas,320, 240);}
+
+  {draw in 'y' slices}
+
+  for y := 0 to 26-1 do
+  	for x := 0 to 65-1 do
+    	for z := 0 to 18-1 do begin
+      	c := fetch(x,y,z);
+        {not sure why this color is transparent}
+        if c.r = 192 then
+        	continue;
+        if y = (frameCounter mod 30) then begin
+        	c := RGBA.create(0,255,0);
+        end;
+        transform(x,26-y,z,dX,dY);
+      	canvas.putPixel(dx, dy, c);
+      end;
 end;
 
 procedure drawGUI();
@@ -106,8 +160,7 @@ begin
 
 
   	drawCar();
- 		if frameCounter and $f = 0 then
-	    drawGUI();
+	  drawGUI();
 
     flipCanvas();
 
