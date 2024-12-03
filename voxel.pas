@@ -36,7 +36,9 @@ type
 var
 	levels: array[0..5] of array of array of array of byte;
 	grid: array[0..31,0..31,0..31] of tVoxel;
-  SAMPLES: integer = 16;
+  SAMPLES: integer = 128;
+  RESOLUTION: integ
+         ver = 8; {8=full, 1= very low}
 
 const
 	faceDir: array[1..6] of V3D = (
@@ -74,6 +76,11 @@ type
   	voxel: pVoxel;
 
   end;
+
+function TraceV1(pnt: V3D; norm: V3D): tHitInfo; forward;
+function TraceV2(pnt: V3D; norm: V3D): tHitInfo; forward;
+function TraceV3(pnt: V3D; norm: V3D; level: integer): tHitInfo; forward;
+
 
 {write a voxel at given location}
 procedure putVoxel(x, y, z: integer; voxel: tVoxel);
@@ -286,7 +293,8 @@ var
 begin
 	stats.traces := stats.traces + 1;
 	for i := 1 to 3 do begin
-		result := TraceV3(pnt, norm, 1);
+		{result := TraceV3(pnt, norm, 1);}
+		result := TraceV2(pnt, norm);
 	  notOk := (result.face > 0) and (result.voxel <> nil) and (result.voxel^.faceLighting[result.face].a = 0);
     if not notOk then exit;
     stats.retries := stats.retries + 1;
@@ -417,7 +425,7 @@ begin
 	asm
 		push es
     mov edi, ofs
-    mov ax, LFB
+    mov ax, LFB_SEG
     mov es, ax
 
     xor eax, eax
@@ -445,8 +453,8 @@ var
   ac, dc, lc, ic: RGBA;
   tmpC: RGBA;
 begin
-  h := 32*1;
-  w := 32*1;
+  h := 32*RESOLUTION;
+  w := 32*RESOLUTION;
 	camera := V3D.create(16, 16, 100);
 	for i := 0 to h-1 do begin
   	for j := 0 to w-1 do begin
@@ -590,7 +598,6 @@ begin
 
 	Randomize();
 
-
   {'lights'}
   for i := 0 to 31 do begin
   	for j := 0 to 31 do begin
@@ -627,15 +634,13 @@ begin
   end;
 
 
-  vox.diffuse := RGBA.create(100, 100, 100);
+  vox.diffuse := RGBA.create(150, 100, 100);
   MakeCube(8, 8, 25, 8);
   MakeCube(24, 8, 25, 8);
   MakeCube(24, 24, 25, 8);
   MakeCube(8, 24, 25, 8);
 
-	init_320x240x32();
-
-  samples := 32;
+  setMode(320, 240, 32);
 
   {generate lighting}
 	faceRemoval();
@@ -643,7 +648,7 @@ begin
 
   render();
 	
-  {Readkey();}
+  Readkey();
   asm
   	mov ax,03
     int $10

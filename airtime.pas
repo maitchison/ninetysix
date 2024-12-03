@@ -79,6 +79,16 @@ var
   x, y, rX, rY: double; {realX, realY}
   theta: double;
 begin
+
+	{solving order
+  1. switch to raytrace... maybe this is not a bad idea
+  2. depth buffer (probably simplest
+  3. find an axis-aligned plane that works... maybe there's always one?
+  4. switch from splatting pixels, to a plane moving through the vox?
+
+  From memory tracing is not bad, I already have code for this?
+  }
+
 	{center point}
   cX := 320;
   cY := 240;

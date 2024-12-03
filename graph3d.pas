@@ -82,21 +82,20 @@ end;
 {Initialize a default texture.}
 constructor Texture.Create(FileName: string); overload;
 var
-  data: array[0..64*64*4] of byte;
+  page: tPage;
   i, j: integer;
   brightness: word;
   loc: word;
 begin
   width := 64;
   height := 64;
-  LoadBMP(filename, data);
+  page := LoadBMP(filename);
   for i := 0 to 63 do
     for j := 0 to 63 do begin
-      loc := (i + (j*64)) * 4;
-      texels[i, j].r := data[loc+0];
-      texels[i, j].g := data[loc+1];
-      texels[i, j].b := data[loc+2];
-      texels[i, j].a := data[loc+3];
+    	texels[i, j].r := page.getPixel(i,j).r;
+    	texels[i, j].g := page.getPixel(i,j).g;
+    	texels[i, j].b := page.getPixel(i,j).b;
+    	texels[i, j].a := page.getPixel(i,j).a;
     end;
 end;
 

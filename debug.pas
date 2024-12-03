@@ -300,9 +300,7 @@ begin
     	1. It's really big
       2. It's not in the 'stuff from 1996' theme
     }
-  	writeln('Sysutils has been detected, but not not compatiable with the debug unit.');
-    writeln('Program will now terminate.');
-    halt(98);
+  	warn('Sysutils has been detected, but not not compatiable with the debug unit.');
   end;
 
   // Open Log File
