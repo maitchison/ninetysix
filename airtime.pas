@@ -76,13 +76,29 @@ var
 procedure transform(oX,oY,oZ: int32;out sX, sY: int32);
 var
 	cX, cY: int32;
+  x, y, rX, rY: double; {realX, realY}
+  theta: double;
 begin
 	{center point}
   cX := 320;
   cY := 240;
-	{simple }
+	{simple isometric}
+  {
 	sX := cX+oX-oY;
   sY := cY-((oX+oY) shr 1)+oZ;
+  }
+  {rotation matrix}
+
+  theta := frameCounter / 10;
+
+  x := oX - 32;
+  y := oY - 13;
+
+  rx := sin(theta)*x + cos(theta)*y;
+  ry := cos(theta)*x - sin(theta)*y;
+
+  sx := cX + round(rX*0.75);
+  sy := cY + round(rY*0.75) + oZ;
 end;
 
 function fetch(oX,oY,oZ: int32): RGBA;
@@ -92,17 +108,13 @@ end;
 
 begin
 
-
 	{
-
   y  z  x
    \ | /
     \|/
-
-
   }
 
-	canvas.fillRect(tRect.create(320-100, 240-50, 200, 100), RGBA.create(0,0,0));
+	canvas.fillRect(tRect.create(320-100, 240-100, 200, 200), RGBA.create(0,0,0));
 	{dims are 65, 26, 18}
   {note: I should trim this to 64, 32, 18 (for fast indexing)}
 	{guess this is 64x64xsomething}
