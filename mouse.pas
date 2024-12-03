@@ -9,6 +9,7 @@ uses
 	debug,
 	crt,
 	go32,
+  utils,
 	screen;
 
 var
@@ -233,21 +234,13 @@ end;
 procedure InitMouse();
 begin
 	Info('[init] Mouse');
-  info('a');
 	DetectMouse();
-  info('b');
   EnableHardwareCursor();
-  info('c');
   SetHardwareCursorSprite();
-  info('d');
   installMouseProc(@userproc, userProcLength);
-  info('e');
   SetBoundary(0, 0, PHYSICAL_WIDTH-1, PHYSICAL_HEIGHT-1);
-  info('f');
   SetPosition(PHYSICAL_WIDTH div 2, PHYSICAL_HEIGHT div 2);
-  info('g');
   UpdateMouse();
-  info('h');
 end;
 
 procedure CloseMouse();
@@ -347,16 +340,12 @@ begin
   { mouse driver reset }
   r.eax := $0; realintr(mouseint, r);
   if (r.eax <> $FFFF) then begin
-          Writeln('No Microsoft compatible mouse found');
-          Writeln('A Microsoft compatible mouse driver is necessary ',
-                  'to run this example');
-          halt;
+  	error(format('Microsoft compatible mouse not found code:%d',[r.eax]));
   end;
   { obtain number of mouse buttons }
   if (r.bx = $ffff) then mouse_numbuttons := 2
   else mouse_numbuttons := r.bx;
-  Writeln(mouse_numbuttons, ' button Microsoft compatible mouse ',
-          ' found.');
+  note(format(' -detected %d button mouse',[mouse_numbuttons]));
   { check for additional user procedure, and install it if
   available }
   if (userproc <> nil) then begin

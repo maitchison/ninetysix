@@ -208,7 +208,8 @@ var
     	
     // update the non-active buffer
 	  dosMemPut(dosSegment, bufOfs, backgroundBuffer[audioDataPosition], bytesToCopy);
-  	audioDataPosition += (bytesToCopy shr 1);
+
+    audioDataPosition += (bytesToCopy shr 1);
     // acknowledge the DSP interupt.
 	  // $F for 16bit, $E for 8bit
 		readAck := port[SB_BASE + $F];
@@ -232,21 +233,6 @@ end;
 var
 	oldIntVec: tSegInfo;
   newIntVec: tSegInfo;
-
-
-{$F+}
-procedure int10h_handler; assembler;
-asm
-    push eax
-
-    mov eax, [didWeGo]
-    inc eax
-    mov [didWeGo], eax
-
-    pop eax
-    iret
-end;
-{$F-}
 
 var
 	irqStartMask,
@@ -310,16 +296,16 @@ const
 begin
 	
   {note: 16bit transfers have address div 2, i.e. * 16 / 2}
-	addr := (dosSegment shl 3);
+	addr := (dosSegment shl 4);
 
 	port[$D4] := $04+channel_number;	// mask DMA channel
   port[$D8] := $00;									// any value
   port[$D6] := $48+channel_number;	// mode (was $48, but now $59 as channel_number=1
 
-  port[$8B] := byte(addr shr 16);	// page address, high bits of address, probably 0
+  port[$8B] := byte(addr shr 16);		// page address, high bits of address, probably 0
 
-  port[$C4] := lo(word(addr));	
-  port[$C4] := hi(word(addr));
+  port[$C4] := lo(word(addr shr 1));	
+  port[$C4] := hi(word(addr shr 1));
 
   port[$C6] := lo(word(length-1));	// length is words -1
   port[$C6] := hi(word(length-1));
@@ -327,27 +313,6 @@ begin
   port[$D4] := $01;		// unmask DMA channel 5}
   	
 end;
-
-{----------------------------------------------------------}
-
-var userproc: pointer;
-
-(*
-{kind of dodgy real-mode DMA}
-procedure installRMProc(userproc : pointer; userproclen : longint);
-var r : trealregs;
-begin
-  get_rm_callback(@callback_handler, mouse_regs, mouse_seginfo);
-  { install callback }
-  r.eax := $0c; r.ecx := $7f;
-  r.edx := longint(mouse_seginfo.offset);
-  r.es := mouse_seginfo.segment;
-  realintr(mouseint, r);
-  { show mouse cursor }
-  r.eax := $01;
-  realintr(mouseint, r);
-end;*)
-
 
 {----------------------------------------------------------}
 
@@ -476,13 +441,13 @@ begin
   {4. speaker on}
   {skip}
   {5. program ISA DMA}
-	addr := (dosSegment shl 3);
+	addr := (dosSegment shl 4);
 	port[$D4] := $05;	// mask DMA channel
   port[$D8] := $01;	// any value
   port[$D6] := $59; // single mode, auto-initialize, write
   port[$8B] := byte(addr shr 16);	// page address, high bits of address, probably 0
-  port[$C4] := lo(word(addr));	
-  port[$C4] := hi(word(addr));
+  port[$C4] := lo(word(addr shr 1));	
+  port[$C4] := hi(word(addr shr 1));
   port[$C6] := lo(word(words-1));	// length is words -1
   port[$C6] := hi(word(words-1));
   port[$D4] := $01;		// unmask DMA channel 5}
@@ -529,7 +494,7 @@ begin
   dosSegment := word(res shr 16);
   if dossegment = 0 then
   	Error('Failed to allocate dos memory');
-  note('Sucessfully allocated dos memory for DMA');
+  note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR();
 
@@ -538,7 +503,9 @@ end;
 procedure closeSound();
 begin
 	note('[done] sound');
+  note(' -IRQ was triggered '+intToStr(didWeGo)+' times.');
   uninstall_ISR();
+  DSPStop();
 end;
 
 {----------------------------------------------------------}

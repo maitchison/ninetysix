@@ -82,7 +82,7 @@ begin
 	setMode(640,480,32);
   canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-{  initMouse();}
+  initMouse();
   initKeyboard();
 
   mainLoop();

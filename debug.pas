@@ -50,7 +50,7 @@ procedure Warn(s: string);
 procedure Error(s: string;code: byte=100);
 
 procedure BasicPrintLog();
-procedure PrintLog(maxEntries: integer=10);
+procedure PrintLog(maxEntries: integer=20);
 
 function GetIOError(code: word): string;
 
@@ -123,7 +123,7 @@ begin
   	Error('Assertion failure:' + msg);
 end;
 
-procedure PrintLog(MaxEntries: integer = 10);
+procedure PrintLog(MaxEntries: integer = 20);
 var
 	i: integer;
   oldTextAttr: byte;

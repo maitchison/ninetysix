@@ -575,7 +575,7 @@ begin
   while DosError = 0 do begin
   	if sr.size > 0 then begin
 	    setLength(result, length(result)+1);
-	    result[length(result)-1] := sr.name;
+	    result[length(result)-1] := toLowerCase(sr.name);
     end;
     findNext(sr);
   end;
