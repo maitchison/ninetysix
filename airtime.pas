@@ -26,14 +26,8 @@ var
 begin
 	note('Loading graphics');
   startTime := getSec;
-{  background := tSprite.create(loadBMP('e:\airtime\title_640.bmp'));}
-
-	background := tSprite.create(loadLC96('gfx\title_640.p96'));	
-
+	background := tSprite.create(loadLC96('gfx\title.p96'));	
   note(format('Loaded background in %fs', [getSec-startTime]));
-
-{  saveLC96('gfx\title_640.p96', background.page);}
-
   note('Loading music');
 	music := tSoundFile.create('music\music2.wav');
 end;
@@ -88,8 +82,8 @@ begin
 	setMode(640,480,32);
   canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
+{  initMouse();}
   initKeyboard();
-  initMouse();
 
   mainLoop();
 

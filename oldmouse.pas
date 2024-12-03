@@ -39,7 +39,6 @@ procedure userproc; forward;
 var
 	{ supplied register structure to the callback }
   mouse_regs    : trealregs; external name '___v2prt0_rmcb_regs';
-	userProcLength: int32;
 
 
 const
@@ -233,21 +232,13 @@ end;
 procedure InitMouse();
 begin
 	Info('[init] Mouse');
-  info('a');
 	DetectMouse();
-  info('b');
   EnableHardwareCursor();
-  info('c');
   SetHardwareCursorSprite();
-  info('d');
-  installMouseProc(@userproc, userProcLength);
-  info('e');
+  installMouseProc(@userproc, 400);
   SetBoundary(0, 0, PHYSICAL_WIDTH-1, PHYSICAL_HEIGHT-1);
-  info('f');
   SetPosition(PHYSICAL_WIDTH div 2, PHYSICAL_HEIGHT div 2);
-  info('g');
   UpdateMouse();
-  info('h');
 end;
 
 procedure CloseMouse();
@@ -334,8 +325,6 @@ begin
 	UpdateHardwareCursor(mouse_x, mouse_y);
 end;
 
-procedure mouse_dummy2; begin end;
-
 { Description : Installs the mouse callback control handler and
 handles all necessary mouse related initialization.
   Input : userproc - pointer to a user procedure, nil if none
@@ -382,7 +371,8 @@ begin
 
   lock_data(mouse_regs, sizeof(mouse_regs));
   lock_data(mouse_seginfo, sizeof(mouse_seginfo));
-  lock_code(@callback_handler, dword(@mouse_dummy)-dword(@callback_handler));
+  lock_code(@callback_handler,
+  	dword(@mouse_dummy)-dword(@callback_handler));
   { allocate callback (supply registers structure) }
   get_rm_callback(@callback_handler, mouse_regs, mouse_seginfo);
   { install callback }
@@ -436,9 +426,6 @@ end;
 begin
 
 	userProc_Installed := False;
-  userProcLength := dword(@mouse_dummy2)-dword(@userProc);
-  {stub:}
-  writeln('User proc is ',(userProcLength),' bytes');
 
 	addExitProc(@CloseMouse);
 

@@ -264,6 +264,13 @@ var
 	targetMS: int64;
   safety: integer;
 begin
+
+	{unfortunately this isn't working.
+  I think it's because hlt can't be called if interuupts are disabled
+  and also maybe that dos does not support it}
+  delay(ms);
+  exit;
+
   {We have a safety counter to make sure we don't wait too
    long. This would happen if the ticks overflow, which is
    very unlikely}
@@ -276,7 +283,7 @@ begin
   while (getMSCount < targetMs) and ( safety > 0) do begin
 		{Give up timeslices in ~55ms blocks}    	
     asm
-    	hlt
+      hlt
       end;
     dec(safety);
   end;

@@ -119,6 +119,30 @@ begin
 end;
 
 
+function DSPIrq(): integer;
+var
+	value: byte;
+begin
+	asm
+  	mov dx, SB_BASE
+    add dx, 4
+    mov al, $80
+    out dx, al
+    inc dx
+
+    in  al, dx
+    mov [value], al
+  end;
+
+  case value of
+  	1: exit(2);
+    2: exit(5);
+    4: exit(7);
+    8: exit(10);
+    else exit(-1);
+  end;
+end;
+
 {----------------------------------------------------------}
 { DMA Stuff }
 {----------------------------------------------------------}
@@ -495,12 +519,9 @@ begin
   sbGood := DSPReset;
 
   if sbGood then
-	  info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0)', [SB_BASE, DSPVersion]))
+	  info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
   else
   	warn('No SoundBlaster detected');
-
-
-  writeln('DSP version ',DSPVersion);
 
 
 	res := Global_Dos_Alloc(BUFFER_SIZE);
