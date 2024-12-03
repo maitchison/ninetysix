@@ -58,8 +58,10 @@ begin
 end;
 
 
+
+
 {draw an image segment, stretched}
-procedure blit_ASM(dstPage, srcPage: TPage; Src, Dst: TRect);
+procedure stretchBlit_ASM(dstPage, srcPage: TPage; Src, Dst: TRect);
 var
 	deltaX, deltaY: uint32;
   x,y: uint32;
@@ -239,7 +241,7 @@ end;
 {Draws sprite stetched to cover destination rect}
 procedure TSprite.DrawStretched(DstPage: TPage; dest: TRect);
 begin
-	blit_ASM(DstPage, Self.Page, Self.Rect, dest);
+	stretchBlit_ASM(DstPage, Self.Page, Self.Rect, dest);
 end;
 
 {Draw sprite using nine-slice method}
