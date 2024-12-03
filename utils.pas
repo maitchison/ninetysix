@@ -7,7 +7,8 @@ unit utils;
 
 interface
 
-uses go32;
+uses
+	go32;
 
 {todo:
 	my format
@@ -61,7 +62,6 @@ procedure Sleep(ms: integer);
 
 procedure GetDate(var year, month, mday, wday: word);
 procedure GetTime(var hour, minute, second, sec100: word);
-
 
 {------------------------------------------------}
 { crt replacements}
@@ -257,7 +257,6 @@ begin
 	targetSec := getSec + ms/1000;
   while getSec < targetSec do;  	
 end;
-
 
 {Put CPU into idle for give number of ms}
 procedure sleep(ms: integer);

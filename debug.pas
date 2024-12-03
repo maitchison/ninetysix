@@ -7,7 +7,6 @@ interface
 
 uses
 	utils,
-  {todo: remove this}
   crt;
 
 var
@@ -65,7 +64,6 @@ const
   IO_ACCESS_DENIED = 5;
 
 implementation
-
 
 function TLogEntry.ToString(): String;
 begin
@@ -128,7 +126,7 @@ end;
 procedure PrintLog(MaxEntries: integer = 10);
 var
 	i: integer;
-  OldTextColor: byte;
+  oldTextAttr: byte;
   firstEntry: integer;
 
   begin
@@ -139,12 +137,12 @@ var
   if firstEntry > 0 then
   	writeln('...');
 
-	OldTextColor := TextAttr and $0F;
+	oldTextAttr := textAttr and $0F;
 	for i := firstEntry to LogCount-1 do begin
-  	TextColor(LOG_COLOR[LogEntries[i].level]);
+  	textAttr := LOG_COLOR[LogEntries[i].level];
   	writeln(LogEntries[i].ToString());
   end;
-  TextColor(OldTextColor);
+  textAttr := oldTextAttr;
 end;
 
 procedure BasicPrintLog();
