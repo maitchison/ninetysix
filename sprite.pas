@@ -5,6 +5,8 @@ unit sprite;
 interface
 
 uses
+	test,
+  utils,
 	debug,
 	screen,
 	graph2d,
@@ -40,7 +42,7 @@ implementation
 {-------------------------------------------------------------}
 
 {draw an image segment, stretched}
-procedure blit_REF(DstPage, SrcPage: TPage; Src,Dst: TRect);
+procedure stretchBlit_REF(DstPage, SrcPage: TPage; Src,Dst: TRect);
 var
 	x, y: integer;
   u, v: single;
@@ -51,13 +53,47 @@ begin
 		for x := Dst.Left to Dst.Right-1 do begin
 	    u := (x - Dst.Left) / Dst.Width;
 	    v := (y - Dst.Top) / Dst.Height;
-			c := SRcPage.GetPixel(Src.x+u*Src.Width, Src.y+v*Src.Height);
+			c := SrcPage.GetPixel(Src.x+u*Src.Width, Src.y+v*Src.Height);
       DstPage.PutPixel(x, y, c);	
 	  end;
   end;
 end;
 
+{draw an image segment to screen}
+procedure blit_REF(dstPage, srcPage: TPage; srcRect: tRect; atX,atY: int16);
+var
+	x,y: integer;
+begin
+	for y := 0 to srcRect.height-1 do
+  	for x := 0 to srcRect.width-1 do
+    	dstPage.putPixel(atX+x, atY+y, srcPage.getPixel(x+srcRect.x, y+srcRect.y));
+end;
 
+{draw an image segment to screen
+no alpha, no cropping on x-axis}
+procedure blit_ASM(dstPage, srcPage: TPage; srcRect: tRect; atX,atY: int16);
+var
+	srcOfs: dword;
+  dstOfs: dword;
+  y, y1, y2: int32;
+  bytesToCopy: word;
+begin
+
+	y1 := atY;
+  y2 := atY+srcRect.height;
+
+  y1 := max(y1, 0);
+  y2 := min(y2, dstPage.height-1);
+
+	srcOfs := 4 * (srcRect.x + srcRect.y*srcPage.width);
+  dstOfs := 4 * (atX + y1*dstPage.width);
+  bytesToCopy := 4 * srcRect.width;
+  for y := y1 to y2 do begin
+  	move((srcPage.pixels+srcOfs)^, (dstPage.pixels+dstOfs)^, bytesToCopy);
+    srcOfs += srcPage.width * 4;
+    dstOfs += dstPage.width * 4;
+  end;
+end;
 
 
 {draw an image segment, stretched}
@@ -233,9 +269,7 @@ procedure TSprite.Draw(DstPage: TPage; atX, atY: Integer);
 var
 	x,y: Integer;
 begin
-	for y := 0 to Rect.Height-1 do
-  	for x := 0 to Rect.Width-1 do
-    	DstPage.putPixel(atX+x, atY+y, Page.GetPixel(x+Rect.x, y+Rect.y));
+	blit_ASM(dstPage, self.page, self.rect, atX, atY);
 end;
 
 {Draws sprite stetched to cover destination rect}

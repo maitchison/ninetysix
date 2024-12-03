@@ -1,7 +1,7 @@
 {Unit for handling S3 Acceleration}
 unit s3;
 
-{$MODE delphi}
+{$MODE objfpc}
 
 interface
 
@@ -15,17 +15,16 @@ uses
 	screen;
 
 type
-	tS3Driver = object
+	tS3Driver = class
   	
     fgColor: RGBA;
     bgCOlor: RGBA;
 
-  private
-  	function detectS3(): boolean;
   public
     constructor create();
 
-  	procedure fillRect(x1, y1, x2, y2: int16);
+		procedure uploadScreen(pixels: pointer);
+		procedure fillRect(x1,y1,width,height:int16);    	
   end;
 
 
@@ -627,63 +626,6 @@ begin
 	
 end;
 
-{uses ports and Image Transfer to upload... using MMIO}
-procedure UploadScreen_MMIO();
-var
-	pixelsPtr: pointer;
-  counter: dword;
-begin
-
-	pixelsPtr := @pixels;
-
-
-  S3UnlockRegs();
-
-  S3Wait;
-
-	{scissors}
-
-  writew($BEE8, SCISSORS_T SHL 12 + 0);
-  writew($BEE8, SCISSORS_L SHL 12 + 0);
-  writew($BEE8, SCISSORS_B SHL 12 + 480);
-  writew($BEE8, SCISSORS_R SHL 12 + 640);
-
-  S3Wait;
-
-	writew(FRGD_MIX, MIX_NEW + MIX_CPU);
-  writew($BEE8, $A000); {PIXEL_CNTL}
-
-  writew(CUR_X, 0);
-  writew(CUR_Y, 0);
-  writew($BEE8, 480 + (MIN_AXIS_PCNT shl 12));
-  writew(MAJ_AXIS_PCNT, 640);
-
-  S3Wait;
-
-
-	writew(
-  	CMD,
-    CMD_FILL + CMD_BUS_32 + CMD_CPU + CMD_DRAW + CMD_ON +
-		CMD_XPOS + CMD_YPOS
-  );
-
-  S3LockRegs();
-
-  counter := 640*480;
-
-  while counter > 0 do begin
-  	if counter <= 8*1024 then begin
-    	pushMMIO(pixelsPtr, counter);
-      counter := 0;
-    end else begin
-    	pushMMIO(pixelsPtr, 8*1024);
-    	counter -= 8*1024;
-      pixelsPtr += 8*1024;
-    end;
-  end;
-end;
-
-
 procedure MapMMIO();
 var
 	VideoLinearAddress: DWord;
@@ -703,15 +645,15 @@ begin
   S3Wait;
 
   Port[$3D4] := $46;
-  Port[$3D5] := (mouse_x shr 8) and $FF;
+  Port[$3D5] := (x shr 8) and $FF;
   Port[$3D4] := $47;
-  Port[$3D5] := mouse_x and $FF;
+  Port[$3D5] := x and $FF;
 
   Port[$3D4] := $49;
-  Port[$3D5] := mouse_y and $FF;
+  Port[$3D5] := y and $FF;
   {high order bits should be last, as this forces the update}
   Port[$3D4] := $48;
-  Port[$3D5] := (mouse_y shr 8) and $FF;
+  Port[$3D5] := (y shr 8) and $FF;
 
   S3LockRegs();
 end;
@@ -721,10 +663,16 @@ end;
 
 constructor tS3Driver.create();
 begin
-	if not detectS3() then
-  	Error('No S3 detected');
+	info('[init] S3');
+  {todo: implement s3 detection}
+{	if not detectS3() then
+  	Error('No S3 detected');}
   fgColor.init(255,255,255);
   bgColor.init(0,0,0);
+
+  {enable MMIO}
+	S3EnableMMIO();
+  MapMMIO();
 end;
 
 (*
@@ -734,6 +682,66 @@ end;
   writew($BEE8, SCISSORS_B SHL 12 + 480);
   writew($BEE8, SCISSORS_R SHL 12 + 640);
 *)
+
+{uses ports and Image Transfer to upload... using MMIO}
+procedure tS3Driver.uploadScreen(pixels: pointer);
+var
+  counter: dword;
+  i: dword;
+const
+	{number of pixels to transfer at a time, max is 8k}
+	BLOCK_SIZE = 8*1024;
+begin
+
+  S3UnlockRegs();
+
+  S3Wait;
+
+	{scissors}
+
+  writew($BEE8, SCISSORS_T SHL 12 + 0);
+  writew($BEE8, SCISSORS_L SHL 12 + 0);
+  writew($BEE8, SCISSORS_B SHL 12 + 480);
+  writew($BEE8, SCISSORS_R SHL 12 + 640);
+
+  S3Wait;
+
+	writew(FRGD_MIX, MIX_NEW + MIX_CPU);
+  writew($BEE8, $A000); {PIXEL_CNTL}
+
+  writew(CUR_X, 0);
+  writew(CUR_Y, 0);
+  writew($BEE8, 480-1 + (MIN_AXIS_PCNT shl 12));
+  writew(MAJ_AXIS_PCNT, 640-1);
+
+  S3Wait;
+
+
+	writew(
+  	CMD,
+    CMD_FILL + CMD_BUS_32 + CMD_CPU + CMD_DRAW + CMD_ON +
+		CMD_XPOS + CMD_YPOS
+  );
+
+  S3LockRegs();
+
+  counter := 640*480;
+
+  {640x480 = 37.5 8k blocks}
+
+  while counter > 0 do begin
+  	if counter <= BLOCK_SIZE then begin
+    	pushMMIO(pixels, counter);
+      counter := 0;
+    end else begin
+    	pushMMIO(pixels, BLOCK_SIZE);
+    	counter -= BLOCK_SIZE;
+      pixels += BLOCK_SIZE * 4;
+    end;
+  end;
+
+
+end;
 
 procedure tS3Driver.fillRect(x1,y1,width,height:int16);
 begin
@@ -762,7 +770,6 @@ end;
 
 
 {-------------------------------------------------------------}
-
 
 begin
 {	S3ForceEnhancedModeMappings();
@@ -801,6 +808,8 @@ begin
 
   {
   Timings
+
+  (these are in (32bit) pixels per second)
 
   S3FillRect = 53.41M (but this happens in the background)
   Video Fill = 6.86M (this is a bit slower than I expected)

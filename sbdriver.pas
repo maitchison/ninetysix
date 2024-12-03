@@ -70,7 +70,7 @@ begin
 	result := (port[DSP_DATA_AVAIL] and $80) <> 0;
 end;
 
-function DSPStop(): boolean;
+procedure DSPStop();
 begin	
 	DSPWrite($D9);
 end;

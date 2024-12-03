@@ -14,6 +14,7 @@ uses
   sprite,
   gui,
 	lc96,
+  s3,
 	sound;
 
 var
@@ -27,6 +28,8 @@ var
   elapsed: double = 0;
   frameCounter: dword = 0;
 
+  S3D: tS3Driver;
+
 
 procedure loadResources();
 var
@@ -39,14 +42,15 @@ begin
 
 	note('Loading cars');
   carSprite := tSprite.create(loadBMP('gfx\car1.bmp'));
+  note(format('Car sprite is (%d, %d)', [carSprite.width, carSprite.height]));
 
   note('Loading music');
 	music := tSoundFile.create('music\music2.wav');
 end;
 
 procedure flipCanvas();
-begin
-  {flip page}
+begin	
+	{note: s3 upload is 2x faster, but causes stuttering on music}
   asm
   	pusha
   	push es
@@ -60,22 +64,9 @@ begin
     end;
 end;
 
-procedure pageFlip();
-begin
-  asm
-  	pushad
-  	push es
-    mov es,  LFB_SEG
-    mov edi,  0
-    mov esi, canvas.pixels
-    mov ecx, 640*480
-    rep movsd
-    pop es
-    popad
-    end;
-end;
-
 procedure drawCar();
+var
+	x,y,z: int32;
 begin
 	carSprite.draw(canvas,320, 240);
 end;
@@ -100,7 +91,7 @@ begin
 
   background.draw(canvas, 0, 0);
   music.play();
-  pageFlip();
+  flipCanvas();
 
   startClock := getSec;
   lastClock := startClock;
@@ -113,11 +104,12 @@ begin
     lastClock := thisClock;
     inc(frameCounter);
 
+
   	drawCar();
  		if frameCounter and $f = 0 then
 	    drawGUI();
 
-    pageFlip();
+    flipCanvas();
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
@@ -130,6 +122,7 @@ begin
   loadResources();
 
 	setMode(640,480,32);
+	S3D := tS3Driver.create();
   canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
   initMouse();
