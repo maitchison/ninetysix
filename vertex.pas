@@ -5,7 +5,7 @@ unit Vertex;
 
 interface
 
-uses Math, Sysutils;
+uses math, utils;
 
 type V2D = record
     x, y: single;
@@ -31,9 +31,11 @@ type V3D = record
     function Abs2: single;
     function Abs: single;
     function ToString(): string;
-    function Normed(): V3D;
+    function normed(): V3D;
 
     constructor Create(x, y, z: single);
+
+		procedure rotate(thetaX, thetaY, thetaZ: single);
 
     class operator Add(a, b: V3D): V3D;
     class operator Subtract(a, b: V3D): V3D;
@@ -54,7 +56,7 @@ end;
 
 function V2D.ToString(): string;
 begin
-    result := Format('(%.2f, %.2f)', [x, y]);
+    result := format('(%.2f, %.2f)', [x, y]);
 end;
 
 class operator V2D.Add(a, b: V2D): V2D;
@@ -135,6 +137,27 @@ begin
     result.y := a.y * b;
     result.z := a.z * b;
 end;
+
+procedure V3D.rotate(thetaX, thetaY, thetaZ: single);
+var
+	nX,nY,nZ: single;
+begin
+  nX := x;
+  nY := cos(thetaX)*y - sin(thetaX)*z;
+  nZ := sin(thetaX)*y + cos(thetaX)*z;
+  x := nX; y := nY; z := nZ;
+
+  nX := cos(thetaY)*x + sin(thetaY)*z;
+  nY := y;
+  nZ := -sin(thetaY)*x + cos(thetaY)*z;
+  x := nX; y := nY; z := nZ;
+
+  nX := cos(thetaZ)*x - sin(thetaZ)*y;
+  nY := sin(thetaZ)*x + cos(thetaZ)*y;
+  nZ := z;
+  x := nX; y := nY; z := nZ;
+end;
+
 
 constructor V3D.Create(x, y, z: single);
 begin

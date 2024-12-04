@@ -13,6 +13,7 @@ uses
   sbDriver,
   mouse,
   keyboard,
+  vertex,
   sprite,
   gui,
 	lc96,
@@ -28,6 +29,7 @@ var
 
   {global time keeper}
   elapsed: double = 0;
+  gameTime: double = 0;
   frameCounter: dword = 0;
 
   carDrawTime: double = 0;
@@ -68,8 +70,75 @@ begin
     end;
 end;
 
-procedure drawCar();
+{trace through voxels to draw the car}
+procedure drawCar_TRACE();
 
+function getVoxel(pos: V3D): RGBA;
+var
+	x,y,z: int32;
+begin
+	result.init(0,0,0,0);
+  x := trunc(pos.x+32.5);
+  y := trunc(pos.y+13);
+  z := trunc(pos.z+9);
+	if (x < 0) or (x >= 65) then exit;
+	if (y < 0) or (y >= 26) then exit;
+	if (z < 0) or (z >= 18) then exit;
+  result := carSprite.page.getPixel(x,y+z*26);
+end;
+
+{trace ray at location and direction (in object space)}
+function trace(pos: V3D;dir: V3D): RGBA;
+var
+	k: integer;
+  c: RGBA;
+begin
+	result := RGBA.create(255,0,255,0);
+	for k := 0 to 31 do begin
+  	c := getVoxel(pos);
+
+    {fix annoying transparent color}
+    if c.r=192 then c.a := 0;
+
+    if c.a > 0 then
+    	exit(c)
+    else
+	  	pos += dir * 0.5;
+  end;
+end;
+
+
+var
+	i,j: integer;
+  c: RGBA;
+
+	cameraX: V3D;
+	cameraY: V3D;
+  cameraZ: V3D;
+
+
+begin
+
+	cameraX := V3D.create(1,0,0);
+	cameraY := V3D.create(0,1,0);
+	cameraZ := V3D.create(0,0,1);
+
+  cameraX.rotate(0,gameTime/3,gameTime);
+  cameraY.rotate(0,gameTime/3,gameTime);
+  cameraZ.rotate(0,gameTime/3,gameTime);
+
+	for i := -24 to 24-1 do begin
+  	for j := -24 to 24-1 do begin
+    	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-10), cameraZ);
+      c.a := 255;
+      canvas.putPixel(i+320-16,j+240-16, c);
+    end;
+  end;	
+	
+end;
+
+{write each voxel to the screen, like a point cloud}
+procedure drawCar_SPLAT();
 var
 	M: array[1..9] of single;
   thetaX, thetaY, thetaZ: single;
@@ -261,17 +330,15 @@ begin
         c3 := RGBA(pCanvas^);
         if c3.a > c.a then
 	        RGBA(pCanvas^) := c;
-
       end;
 end;
 
 procedure drawGUI();
 var
-	fps,cps: double;
+	fps: double;
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
-	if carDrawTime > 0 then cps := 1.0 / carDrawTime else cps := -1;
-	GUILabel(canvas, 10, 10, format('FPS: %f CPS: %f', [fps,cps]));
+	GUILabel(canvas, 10, 10, format('FPS: %f Car: %f ms', [fps,carDrawTime*1000]));
 end;
 
 procedure mainLoop();
@@ -294,11 +361,12 @@ begin
   	{time keeping}
   	thisClock := getSec;
     elapsed := thisClock-lastClock;
+    gameTime += elapsed;
     lastClock := thisClock;
     inc(frameCounter);
 
     startTime := getSec;
-  	drawCar();
+  	drawCar_TRACE();
     carDrawTime := getSec - startTime;
 	  drawGUI();
 
