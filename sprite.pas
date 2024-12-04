@@ -269,7 +269,7 @@ procedure TSprite.Draw(DstPage: TPage; atX, atY: Integer);
 var
 	x,y: Integer;
 begin
-	blit_ASM(dstPage, self.page, self.rect, atX, atY);
+	blit_REF(dstPage, self.page, self.rect, atX, atY);
 end;
 
 {Draws sprite stetched to cover destination rect}

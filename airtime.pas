@@ -77,7 +77,7 @@ function getVoxel(pos: V3D): RGBA;
 var
 	x,y,z: int32;
 begin
-	result.init(0,0,0,0);
+	result.init(255,0,255,0);
   x := trunc(pos.x+32.5);
   y := trunc(pos.y+13);
   z := trunc(pos.z+9);
@@ -87,24 +87,114 @@ begin
   result := carSprite.page.getPixel(x,y+z*26);
 end;
 
+function intersectX(size, pos, dir: V3D): single;
+var
+	t: single;
+  pnt: V3D;
+begin
+	if dir.x = 0 then exit(9999);
+  if dir.x > 0 then
+  	t := (-size.x-pos.x) / dir.x
+  else
+		t := (+size.x-pos.x) / dir.x;
+  pos := pos + dir * t;
+  if (pos.y < -size.y) or (pos.y > size.y) then exit(9999);
+  if (pos.z < -size.z) or (pos.z > size.z) then exit(9999);
+  exit(t);
+end;
+
+function intersectY(size, pos, dir: V3D): single;
+var
+	t: single;
+  pnt: V3D;
+begin
+	if dir.y = 0 then exit(9999);
+  if dir.y > 0 then
+  	t := (-size.y-pos.y) / dir.y
+  else
+		t := (+size.y-pos.y) / dir.y;
+  pos := pos + dir * t;
+  if (pos.x < -size.x) or (pos.x > size.x) then exit(9999);
+  if (pos.z < -size.z) or (pos.z > size.z) then exit(9999);
+  exit(t);
+end;
+
+function intersectZ(size, pos, dir: V3D): single;
+var
+	t: single;
+  pnt: V3D;
+begin
+	if dir.z = 0 then exit(9999);
+  if dir.z > 0 then
+  	t := (-size.z-pos.z) / dir.z
+  else
+		t := (+size.z-pos.z) / dir.z;
+  pos := pos + dir * t;
+  if (pos.x < -size.x) or (pos.x > size.x) then exit(9999);
+  if (pos.y < -size.y) or (pos.y > size.y) then exit(9999);
+  exit(t);
+end;
+
 {trace ray at location and direction (in object space)}
 function trace(pos: V3D;dir: V3D): RGBA;
 var
 	k: integer;
   c: RGBA;
+  t,tX,tY,tZ,tMin,tMax: single; {time to intersect each of the planes}
+  size: V3D; {half size of cuboid}
+  depth: single;
+  maxSamples: integer;
 begin
-	result := RGBA.create(255,0,255,0);
-	for k := 0 to 31 do begin
+
+	result.init(0,0,0,0);
+
+  	
+	size := V3D.create(32.5,13,9);
+
+  {note: in theory at most one of these should intersect for each of the
+   entry and exit points}
+
+	{find the entry point}
+  t := intersectX(size, pos, dir);
+  if t > 1000 then
+		t := intersectY(size, pos, dir);
+  if t > 1000 then
+  	t := intersectZ(size, pos, dir);
+
+  if t > 1000 then exit; {did not intersect any faces}
+
+  maxSamples := 128;
+
+  {move to intersection point}
+  t += 0.0001; {for rounding}
+  pos += dir*t;    	
+
+	result := RGBA.create(0,0,trunc(depth*8),255);
+
+	for k := 0 to maxSamples-1 do begin
+
   	c := getVoxel(pos);
 
     {fix annoying transparent color}
     if c.r=192 then c.a := 0;
 
-    if c.a > 0 then
+    {left bounds}
+    if (c.r=255) and (c.g=0) and (c.b=255) then begin
+			result.init(0,0,0,0);
+      exit;	
+    end;
+
+    if c.a > 0 then begin
+    	{connection, so stop}
+      depth := (255-((t + k)*4))/255;	
+      c *= depth;
     	exit(c)
-    else
-	  	pos += dir * 0.5;
+    end else begin
+    	{move to next voxel}
+	  	pos += dir;
+    end;
   end;
+
 end;
 
 
@@ -116,22 +206,26 @@ var
 	cameraY: V3D;
   cameraZ: V3D;
 
+  thetaX,thetaY,thetaZ: single;
+
 
 begin
 
-	cameraX := V3D.create(1,0,0);
-	cameraY := V3D.create(0,1,0);
-	cameraZ := V3D.create(0,0,1);
+  thetaX := gameTime;
+  thetaY := 0;
+  thetaZ := gameTime;
 
-  cameraX.rotate(0,gameTime/3,gameTime);
-  cameraY.rotate(0,gameTime/3,gameTime);
-  cameraZ.rotate(0,gameTime/3,gameTime);
+	cameraX := V3D.create(1,0,0).rotated(thetaX, thetaY, thetaZ);
+	cameraY := V3D.create(0,1,0).rotated(thetaX, thetaY, thetaZ);
+	cameraZ := V3D.create(0,0,1).rotated(thetaX, thetaY, thetaZ);
 
-	for i := -24 to 24-1 do begin
-  	for j := -24 to 24-1 do begin
-    	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-10), cameraZ);
-      c.a := 255;
-      canvas.putPixel(i+320-16,j+240-16, c);
+  canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
+
+	for i := -32 to 64-1 do begin
+  	for j := -32 to 64-1 do begin
+    	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);
+      if c.a > 0 then
+	      canvas.putPixel(i+320,j+240, c);
     end;
   end;	
 	

@@ -35,12 +35,16 @@ type V3D = record
 
     constructor Create(x, y, z: single);
 
-		procedure rotate(thetaX, thetaY, thetaZ: single);
+		function rotated(thetaX, thetaY, thetaZ: single): V3D;
 
     class operator Add(a, b: V3D): V3D;
     class operator Subtract(a, b: V3D): V3D;
     class operator Multiply(a: V3D; b:single): V3D;
     end;
+
+type Ray = record
+	dir,pos: V3D;
+  end;
 
 implementation
 
@@ -138,24 +142,33 @@ begin
     result.z := a.z * b;
 end;
 
-procedure V3D.rotate(thetaX, thetaY, thetaZ: single);
+function V3D.rotated(thetaX, thetaY, thetaZ: single): V3D;
 var
 	nX,nY,nZ: single;
+	tX,tY,tZ: single;
+
 begin
-  nX := x;
-  nY := cos(thetaX)*y - sin(thetaX)*z;
-  nZ := sin(thetaX)*y + cos(thetaX)*z;
-  x := nX; y := nY; z := nZ;
 
-  nX := cos(thetaY)*x + sin(thetaY)*z;
-  nY := y;
-  nZ := -sin(thetaY)*x + cos(thetaY)*z;
-  x := nX; y := nY; z := nZ;
+	tx := x;
+  ty := y;
+  tz := z;
 
-  nX := cos(thetaZ)*x - sin(thetaZ)*y;
-  nY := sin(thetaZ)*x + cos(thetaZ)*y;
-  nZ := z;
-  x := nX; y := nY; z := nZ;
+  nX := tx;
+  nY := cos(thetaX)*ty - sin(thetaX)*tz;
+  nZ := sin(thetaX)*ty + cos(thetaX)*tz;
+  tx := nX; ty := nY; tz := nZ;
+
+  nX := cos(thetaY)*tx + sin(thetaY)*tz;
+  nY := ty;
+  nZ := -sin(thetaY)*tx + cos(thetaY)*tz;
+  tx := nX; ty := nY; tz := nZ;
+
+  nX := cos(thetaZ)*tx - sin(thetaZ)*ty;
+  nY := sin(thetaZ)*tx + cos(thetaZ)*ty;
+  nZ := tz;
+  tx := nX; ty := nY; tz := nZ;
+
+  result := V3D.create(tx, ty, tz);
 end;
 
 
