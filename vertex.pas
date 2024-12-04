@@ -14,7 +14,7 @@ type V2D = record
 
     function Abs2: single;
     function Abs: single;
-    function ToString(): string;
+    function ToString(): shortstring;
 
     constructor Create(x, y: single);
 
@@ -28,12 +28,12 @@ type V2D = record
 type V3D = record
     x, y, z, w: single;
 
-    function Abs2: single;
-    function Abs: single;
-    function ToString(): string;
+    function abs2: single;
+    function abs: single;
+    function toString(): shortstring;
     function normed(): V3D;
 
-    constructor Create(x, y, z: single);
+    constructor create(x, y, z: single);
 
 		function rotated(thetaX, thetaY, thetaZ: single): V3D;
 
@@ -48,6 +48,7 @@ type
   	M: array[1..9] of single;
     function apply(p: V3D): V3D;
     procedure rotation(thetaX, thetaY, thetaZ: single);
+    function transpose(): Matrix3x3;
   end;
 
 implementation
@@ -62,9 +63,9 @@ begin
     result := sqrt(abs2);
 end;
 
-function V2D.ToString(): string;
+function V2D.ToString(): shortstring;
 begin
-    result := format('(%.2f, %.2f)', [x, y]);
+    result := format('(%f, %f)', [x, y]);
 end;
 
 class operator V2D.Add(a, b: V2D): V2D;
@@ -107,9 +108,9 @@ begin
 end;
 
 
-function V3D.ToString(): string;
+function V3D.toString(): shortstring;
 begin
-    result := Format('(%.2f, %.2f, %.2f)', [x, y, z]);
+    result := Format('(%f, %f, %f)', [x, y, z]);
 end;
 
 function V3D.Normed(): V3D;
@@ -201,17 +202,95 @@ begin
 end;
 
 procedure Matrix3X3.rotation(thetaX, thetaY, thetaZ: single);
+var
+	cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
+	{Byran angles... maybe should have used euler?}
+	sinX := sin(thetaX);
+	cosX := cos(thetaX);
+	sinY := sin(thetaY);
+	cosY := cos(thetaY);
+	sinZ := sin(thetaZ);
+	cosZ := cos(thetaZ);
+  M[1] := cosX*cosY;
+  M[2] := cosX*sinY*sinZ-sinX*cosZ;
+  M[3] := cosX*sinY*cosZ+sinX*sinZ;
+  M[4] := sinX*cosY;
+  M[5] := sinX*sinY*sinZ+cosX*cosZ;
+  M[6] := sinX*sinY*cosZ-cosX*sinZ;
+  M[7] := -sinY;
+  M[8] := cosY*sinZ;
+  M[9] := cosY*cosZ;
+(*
   M[1] := cos(thetaY)*cos(thetaZ);
-  M[2] := cos(thetaY)*sin(thetaZ);
-  M[3] := -sin(thetaY);
-  M[4] := sin(thetaX)*sin(thetaY)*cos(thetaZ)-cos(thetaX)*sin(thetaZ);
-  M[5] := sin(thetaX)*sin(thetaY)*sin(thetaZ)+cos(thetaX)*cos(thetaZ);
-  M[6] := sin(thetaX)*cos(thetaY);
-  M[7] := cos(thetaX)*sin(thetaY)*cos(thetaZ)+sin(thetaX)*sin(thetaZ);
-  M[8] := cos(thetaX)*sin(thetaY)*sin(thetaZ)-sin(thetaX)*cos(thetaZ);
-  M[9] := cos(thetaX)*sin(thetaY);
+  M[2] := -cos(thetaY)*sin(thetaZ);
+  M[3] := sin(thetaY);
+  M[4] := sin(thetaX)*sin(thetaY)*cos(thetaZ)+cos(thetaX)*sin(thetaZ);
+  M[5] := sin(thetaX)*sin(thetaY)*sin(thetaZ)-sin(thetaX)*cos(thetaY);
+  M[6] := -sin(thetaX)*cos(thetaY);
+  M[7] := -cos(thetaX)*sin(thetaY)*cos(thetaZ)+sin(thetaX)*sin(thetaZ);
+  M[8] := cos(thetaX)*sin(thetaY)*cos(thetaZ)-sin(thetaX)*cos(thetaZ);
+  M[9] := cos(thetaX)*cos(thetaY);
+   *)
+(*
+  M[1] := cos(thetaY)*cos(thetaZ);
+  M[2] := -cos(thetaY)*sin(thetaZ);
+  M[3] := sin(thetaY);
+  M[4] := sin(thetaX)*sin(thetaY)*cos(thetaZ)+cos(thetaX)*sin(thetaZ);
+  M[5] := sin(thetaX)*sin(thetaY)*sin(thetaZ)-sin(thetaX)*cos(thetaY);
+  M[6] := -sin(thetaX)*cos(thetaY);
+  M[7] := -cos(thetaX)*sin(thetaY)*cos(thetaZ)+sin(thetaX)*sin(thetaZ);
+  M[8] := cos(thetaX)*sin(thetaY)*cos(thetaZ)-sin(thetaX)*cos(thetaZ);
+  M[9] := cos(thetaX)*cos(thetaY);
+   *)
+end;
+
+{rotates, but applies in ZYX order}
+function Matrix3X3.transpose(): Matrix3x3;
+begin
+	result.M[1] := M[1];
+	result.M[2] := M[4];
+	result.M[3] := M[7];
+	result.M[4] := M[2];
+	result.M[5] := M[5];
+	result.M[6] := M[8];
+	result.M[7] := M[3];
+	result.M[8] := M[6];
+	result.M[9] := M[9];
+end;
+
+{-----------------------------------------------------}
+procedure runTests();
+var
+	p, pInitial: V3D;
+  M: Matrix3x3;
+  i: integer;
+const
+	degrees45 = 0.785398; {45 degrees in radians}
+
+begin
+	p := V3D.create(rnd,rnd,rnd);
+  p := p.normed();
+  pInitial := p;
+  assert(abs(p.abs-1) < 0.01);
+
+  {rotate 45 degrees}
+  M.rotation(degrees45,degrees45,degrees45);
+	p := M.apply(pInitial);
+	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
+
+  {rotate random degrees}
+  M.rotation(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+	p := M.apply(pInitial);
+	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
+
+  {check transpose looks ok}
+  M.rotation(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+	p := M.transpose.apply(pInitial);
+	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
+
 end;
 
 begin
+	runTests();
 end.

@@ -9,6 +9,7 @@ type
 
 procedure assertError(msg: string); overload;
 
+procedure assert(condition: boolean;msg: string); overload;
 procedure assertEqual(value, expected: string); overload;
 procedure assertEqual(value, expected: int64); overload;
 procedure assertEqual(a, b: tBytes); overload;
@@ -23,6 +24,11 @@ uses
 procedure assertError(msg: string); overload;
 begin
 	error('Test case failed: '+msg);
+end;
+
+procedure assert(condition: boolean;msg: string); overload;
+begin
+	if not condition then assertError(msg);
 end;
 
 procedure assertEqual(value, expected: string); overload;

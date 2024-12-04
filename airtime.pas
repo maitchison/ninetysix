@@ -107,6 +107,16 @@ procedure drawCar_TRACE();
 var
   size: V3D; {half size of cuboid}
   debugCol: RGBA;
+var
+	cameraX: V3D;
+	cameraY: V3D;
+  cameraZ: V3D;
+  objToWorld: Matrix3X3;
+  worldToObj: Matrix3X3;
+
+var
+	faceColor: array[1..6] of RGBA;
+
 
 function getVoxel(pos: V3D): RGBA;
 var
@@ -182,11 +192,12 @@ var
 begin
 
 	result.init(0,0,0,0);
-  	
+
   {note: in theory at most one of these should intersect for each of the
    entry and exit points}
 
 	{find the entry point}
+  (*
   t := intersectX(size, pos, dir);
   if t > 1000 then
 		t := intersectY(size, pos, dir);
@@ -194,12 +205,15 @@ begin
   	t := intersectZ(size, pos, dir);
 
   if t > 1000 then exit; {did not intersect any faces}
+  *) {this is done for us now}
 
   maxSamples := 128;
 
+  (*
   {move to intersection point}
   t += 0.5; {start halfway in the voxel}
-  pos += dir*t;    	
+  pos += dir*t;
+  *)  	
 
 	result := RGBA.create(0,0,0,255);
 
@@ -212,8 +226,8 @@ begin
 
     {left bounds}
     if (c.r=255) and (c.g=0) and (c.b=255) then begin
-			result.init(0,0,0,0);
-      exit;	
+			{result.init(0,0,0,0);
+      exit;}	
     end;
 
     if c.a > 0 then begin
@@ -232,7 +246,7 @@ end;
 {traces all pixels within the given polygon.
 points are in world space
 }
-procedure traceFace(p1,p2,p3,p4: V3D);
+procedure traceFace(faceID: byte; p1,p2,p3,p4: V3D);
 var
 	c: RGBA;
   cross: single;
@@ -273,6 +287,11 @@ begin
   end;
 end;
 
+var
+	x: int32;
+  worldPos: V3D;
+  t: single;
+
 begin
 	{do not render back face}
 	cross := ((p2.x-p1.x) * (p3.y - p1.y)) - ((p2.y - p1.y) * (p3.x - p1.x));
@@ -305,8 +324,51 @@ begin
   scanLine(s3, s4);
   scanLine(s4, s1);
 
-  for y := yMin to yMax do
-  	canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, debugCol);
+  {solid faces}
+  {
+  if not (faceID in [3,4]) then begin
+    for y := yMin to yMax do
+			canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, faceColor[faceID]);
+    exit;
+  end;}
+
+  for y := yMin to yMax do begin
+  	for x := screenLines[y].xMin to screenLines[y].xMax do begin
+    	{map from screen space to object space}
+      {worldPos := worldToObj.apply(V3D.create(x - 320, y - 240, -100));}
+      worldPos := (cameraX*(x-320))+(cameraY*(y-240))+(cameraZ*-50);
+
+
+      case faceID of
+      	1: t := (-size.z-worldPos.z) / cameraZ.z;
+        2: t := (+size.z-worldPos.z) / cameraZ.z;
+        3: t := (-size.x-worldPos.x) / cameraZ.x;
+        4: t := (+size.x-worldPos.x) / cameraZ.x;
+        5: t := (-size.y-worldPos.y) / cameraZ.y;
+        6: t := (+size.y-worldPos.y) / cameraZ.y;
+        else t := 0;
+      end;
+
+      if t > 1000 then begin
+      	{this should not happen}
+        c.init(0,255,0);
+        canvas.putPixel(x,y, c);
+        continue;
+      end;
+
+      worldPos += cameraZ * (t + 0.5);
+
+      c := trace(worldPos, cameraZ);
+     {c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);}
+    	if c.a > 0 then
+	      canvas.putPixel(x,y, c);
+    end;
+  {
+  	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);
+      if c.a > 0 then
+	      canvas.putPixel(i+320,j+240, c);}
+
+  end;
 
 end;
 
@@ -315,29 +377,36 @@ var
 	i,j: integer;
   c: RGBA;
 
-	cameraX: V3D;
-	cameraY: V3D;
-  cameraZ: V3D;
 
   thetaX,thetaY,thetaZ: single;
 
   p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
 
-  objToWorld: Matrix3X3;
 
 begin
 
-  thetaX := gameTime/2;
-  thetaY := gameTime/3;
+  faceColor[1].init(255,0,0); 	
+  faceColor[2].init(128,0,0);
+  faceColor[3].init(0,255,0); 		
+  faceColor[4].init(0,128,0); 	
+  faceColor[5].init(0,0,255); 	
+  faceColor[6].init(0,0,128);
+
+
+  thetaX := gameTime/3;
+  thetaY := gameTime/2;
   thetaZ := gameTime;
 
   objToWorld.rotation(thetaX, thetaY, thetaZ);
+  worldToObj := objToWorld.transpose();
 
-  {
-	cameraX := V3D.create(1,0,0).rotated(thetaX, thetaY, thetaZ);
-	cameraY := V3D.create(0,1,0).rotated(thetaX, thetaY, thetaZ);
-	cameraZ := V3D.create(0,0,1).rotated(thetaX, thetaY, thetaZ);
-  }
+	cameraX := worldToObj.apply(V3D.create(1,0,0));
+  cameraY := worldToObj.apply(V3D.create(0,1,0));
+  cameraZ := worldToObj.apply(V3D.create(0,0,1));
+
+  assert(abs(cameraZ.abs-1)<0.01, 'cameraZ not normed');
+
+  info(cameraZ.toString);
 
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
@@ -353,21 +422,15 @@ begin
   p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z));
   p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z));
 
-  {trace each side of the cube}
-  debugCol.init(255,0,0); 		{-Z}
-  traceFace(p1, p2, p3, p4);
-  debugCol.init(128,0,0);
-  traceFace(p8, p7, p6, p5); 	{+Z}
+  {trace each side of the cubeoid}
+  traceFace(1, p1, p2, p3, p4);
+  traceFace(2, p8, p7, p6, p5);
+  traceFace(3, p4, p8, p5, p1);
+  traceFace(4, p2, p6, p7, p3);
+	traceFace(5, p5, p6, p2, p1);
+  traceFace(6, p4, p3, p7, p8);
 
-  debugCol.init(0,255,0); 		{-X}
-  traceFace(p4, p8, p5, p1);
-  debugCol.init(0,128,0); 		{+X}
-  traceFace(p2, p6, p7, p3);
 
-  debugCol.init(0,0,255); 		{+Y}
-  traceFace(p5, p6, p2, p1);
-  debugCol.init(0,0,128); 		{-Y}
-  traceFace(p4, p3, p7, p8);
 
 	(*
 	for i := -32 to 64-1 do begin
