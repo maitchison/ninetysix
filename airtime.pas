@@ -31,11 +31,14 @@ var
   {global time keeper}
   elapsed: double = 0;
   gameTime: double = 0;
-  frameCounter: dword = 0;
+  frameCount: dword = 0;
 
   carDrawTime: double = 0;
 
   S3D: tS3Driver;
+
+  {debugging stuff}
+  TRACE_COUNT: int32 = 0;
 
 {----------------------------------------------------}
 { Poly drawing }
@@ -76,7 +79,7 @@ var
 	dx,dy,dz: integer;
   d, i: integer;
 const
-	MAX_D=10;	
+	MAX_D=64;	
 begin
 	if getVoxel(x,y,z).a = 255 then exit(0);
 
@@ -86,7 +89,7 @@ begin
     		for dz := -d to d do
       		if getVoxel(x+dx, y+dy, z+dz).a = 255 then
         		exit(d);
-  exit(MAX_D+2);
+  exit(MAX_D+1);
 end;
 
 {calculate SDF (the slow way) for voxel car.}
@@ -98,6 +101,7 @@ var
   c: RGBA;
 begin
 	result := tPage.create(68, 26*18);
+  {todo: use proper L2 distance, not L1}
 	{note: doing this as largest cubiod make a lot of sense, and it
    lets me trace super fast in many directions}
 	{note, it would be nice to actually have negative for interior... but
@@ -187,14 +191,19 @@ var
   c: RGBA;
   d: integer;
   x,y,z: integer;
-	depth: single;
+	depth: integer;
+
 const
   MAX_SAMPLES = 64;
 begin
 	//result.init(0,255,0,255); {color used when out of bounds}
 	result.init(0,0,0,255); {color used when out of bounds}
 
+  depth := 0;
+
 	for k := 0 to MAX_SAMPLES-1 do begin
+
+  	inc(TRACE_COUNT);
 
 		x := trunc(pos.x+32.5);
 	  y := trunc(pos.y+13);
@@ -203,22 +212,22 @@ begin
 		if (y < 0) or (y >= 26) then exit();
 		if (z < 0) or (z >= 18) then exit();
 	  c := carSprite.page.getPixel(x,y+z*26);
-    d := carSDF.getPixel(x,y+z*26).r;
 
     if c.a > 0 then begin
     	{stub: show trace length}
-      depth := (255-((k)*4))/255;	
-      c *= depth;
-      {c.init(k*16, k*4, k);}
+      c *= (255-(depth*8))/255;
     	exit(c)
     end else begin
     	{move to next voxel}
-	  	pos += dir * d;
+	    d := carSDF.getPixel(x,y+z*26).r;
+	    {assert(d>0, 'invalid distance');}
+		  pos += dir * d;
+      depth += d;
     end;
   end;
 
   {color used when we ran out of samples}
-	result.init(255,0,255,255); {purple}
+  result.init(255,0,255,255); {purple}
 
 end;
 
@@ -270,8 +279,9 @@ var
 	x: int32;
   worldPos: V3D;
   t: single;
-  pos, deltaX, deltaY: V3D;
+  pos, basePos, deltaX, deltaY: V3D;
   tDelta: single;
+  invZ: single;
 
 begin
 	{do not render back face}
@@ -316,14 +326,24 @@ begin
     exit;
   end;
 
+  case faceID of
+  	1: invZ := 1 / cameraZ.z;
+  	2: invZ := 1 / cameraZ.z;
+  	3: invZ := 1 / cameraZ.x;
+  	4: invZ := 1 / cameraZ.x;
+  	5: invZ := 1 / cameraZ.y;
+  	6: invZ := 1 / cameraZ.y;
+    else invZ := 0;
+  end;
+
   {calculate our deltas}
 	case faceID of
-  	1: tDelta := -cameraX.z / cameraZ.z;
-    2: tDelta := -cameraX.z / cameraZ.z;
-    3: tDelta := -cameraX.x / cameraZ.x;
-    4: tDelta := -cameraX.x / cameraZ.x;
-    5: tDelta := -cameraX.y / cameraZ.y;
-    6: tDelta := -cameraX.y / cameraZ.y;
+  	1: tDelta := -cameraX.z * invZ;
+    2: tDelta := -cameraX.z * invZ;
+    3: tDelta := -cameraX.x * invZ;
+    4: tDelta := -cameraX.x * invZ;
+    5: tDelta := -cameraX.y * invZ;
+    6: tDelta := -cameraX.y * invZ;
     else tDelta := 0;
   end;
   deltaX := cameraX + cameraZ*tDelta;
@@ -333,12 +353,12 @@ begin
     pos := (cameraX*(screenLines[y].xMin-320))+(cameraY*(y-240));
 
     case faceID of
-    	1: t := (-size.z-pos.z) / cameraZ.z;
-      2: t := (+size.z-pos.z) / cameraZ.z;
-      3: t := (-size.x-pos.x) / cameraZ.x;
-      4: t := (+size.x-pos.x) / cameraZ.x;
-      5: t := (-size.y-pos.y) / cameraZ.y;
-      6: t := (+size.y-pos.y) / cameraZ.y;
+    	1: t := (-size.z-pos.z) * invZ;
+      2: t := (+size.z-pos.z) * invZ;
+      3: t := (-size.x-pos.x) * invZ;
+      4: t := (+size.x-pos.x) * invZ;
+      5: t := (-size.y-pos.y) * invZ;
+      6: t := (+size.y-pos.y) * invZ;
       else t := 0;
     end;
 
@@ -374,19 +394,24 @@ begin
   faceColor[5].init(0,0,255); 	
   faceColor[6].init(0,0,128);
 
-
+	{
   thetaX := gameTime/3;
   thetaY := gameTime/2;
   thetaZ := gameTime;
+  }
+  thetaX := 0.1;
+  thetaY := 0.0;
+  thetaZ := 0.1;
 
   objToWorld.rotation(thetaX, thetaY, thetaZ);
   worldToObj := objToWorld.transpose();
 
+  objToWorld.applyScale(1);
+  worldToObj.applyScale(1);
+
 	cameraX := worldToObj.apply(V3D.create(1,0,0));
   cameraY := worldToObj.apply(V3D.create(0,1,0));
-  cameraZ := worldToObj.apply(V3D.create(0,0,1));
-
-  assert(abs(cameraZ.abs-1)<0.01, 'cameraZ not normed');
+  cameraZ := worldToObj.apply(V3D.create(0,0,1)).normed();
 
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
@@ -527,7 +552,7 @@ begin
 
   thetaX := 0;
   thetaY := 0;
-  thetaZ := frameCounter / 10;
+  thetaZ := frameCount / 10;
 
   {calculate transformation matrix}
   M[1] := cos(thetaY)*cos(thetaZ);
@@ -573,7 +598,7 @@ begin
         {not sure why this color is transparent}
         if c.r = 192 then
         	continue;
-        {if y = (frameCounter mod 30) then begin
+        {if y = (frameCount mod 30) then begin
         	c := RGBA.create(0,255,0);
         end;}
 
@@ -611,9 +636,12 @@ end;
 procedure drawGUI();
 var
 	fps: double;
+	tpf: double;
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
-	GUILabel(canvas, 10, 10, format('FPS: %f Car: %f ms', [fps,carDrawTime*1000]));
+  {stub:}
+  tpf := TRACE_COUNT / frameCount;
+	GUILabel(canvas, 10, 10, format('TPF: %f Car: %f ms', [tpf,carDrawTime*1000]));
 end;
 
 procedure mainLoop();
@@ -638,7 +666,7 @@ begin
     elapsed := thisClock-lastClock;
     gameTime += elapsed;
     lastClock := thisClock;
-    inc(frameCounter);
+    inc(frameCount);
 
     startTime := getSec;
   	drawCar_TRACE();
@@ -650,7 +678,7 @@ begin
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
 
-  note(format('FPS: %f',[frameCounter / (getSec-startClock)]));
+  note(format('FPS: %f',[frameCount / (getSec-startClock)]));
 end;
 
 begin

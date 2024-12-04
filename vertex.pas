@@ -47,6 +47,7 @@ type
 	Matrix3X3 = record	
   	M: array[1..9] of single;
     function apply(p: V3D): V3D;
+    procedure applyScale(factor: single);
     procedure rotation(thetaX, thetaY, thetaZ: single);
     function transpose(): Matrix3x3;
   end;
@@ -124,7 +125,7 @@ begin
 end;
 
 
-class operator V3D.Add(a, b: V3D): V3D;
+class operator V3D.Add(a, b: V3D): V3D; inline;
 begin
     result.x := a.x + b.x;
     result.y := a.y + b.y;
@@ -132,7 +133,7 @@ begin
 end;
 
 
-class operator V3D.Subtract(a, b: V3D): V3D;
+class operator V3D.Subtract(a, b: V3D): V3D; inline;
 begin
     result.x := a.x - b.x;
     result.y := a.y - b.y;
@@ -140,14 +141,14 @@ begin
 end;
 
 
-class operator V3D.Multiply(a: V3D; b: single): V3D;
+class operator V3D.Multiply(a: V3D; b: single): V3D; inline;
 begin
     result.x := a.x * b;
     result.y := a.y * b;
     result.z := a.z * b;
 end;
 
-class operator V3D.Multiply(a: V3D; b: V3D): V3D;
+class operator V3D.Multiply(a: V3D; b: V3D): V3D; inline;
 begin
     result.x := a.x * b.x;
     result.y := a.y * b.y;
@@ -199,6 +200,14 @@ begin
   result.x := M[1]*p.x + M[2]*p.y + M[3]*p.z;
   result.y := M[4]*p.x + M[5]*p.y + M[6]*p.z;
   result.z := M[7]*p.x + M[8]*p.y + M[9]*p.z;
+end;
+
+procedure Matrix3X3.applyScale(factor: single);
+var
+	i: integer;
+begin
+	for i := 1 to 9 do
+		M[i] *= factor;
 end;
 
 procedure Matrix3X3.rotation(thetaX, thetaY, thetaZ: single);

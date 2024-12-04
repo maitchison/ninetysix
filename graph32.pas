@@ -508,7 +508,6 @@ begin
 	address := dword(pixels) + (y * Width + x) shl 2;
   asm
   	push edi
-    push esi
     push eax
 
   	mov edi, address
@@ -516,7 +515,6 @@ begin
     mov col, eax
 
     pop eax
-    pop esi
     pop edi
   end;
   result := col;
