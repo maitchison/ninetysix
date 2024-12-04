@@ -43,8 +43,11 @@ type V3D = record
     class operator Multiply(a: V3D; b:V3D): V3D;
     end;
 
-type Ray = record
-	dir,pos: V3D;
+type
+	Matrix3X3 = record	
+  	M: array[1..9] of single;
+    function apply(p: V3D): V3D;
+    procedure rotation(thetaX, thetaY, thetaZ: single);
   end;
 
 implementation
@@ -187,6 +190,28 @@ begin
     self.z := z;
 end;
 
+{---------------------------------------------------}
+
+
+function Matrix3X3.apply(p: V3D): V3D;
+begin
+  result.x := M[1]*p.x + M[2]*p.y + M[3]*p.z;
+  result.y := M[4]*p.x + M[5]*p.y + M[6]*p.z;
+  result.z := M[7]*p.x + M[8]*p.y + M[9]*p.z;
+end;
+
+procedure Matrix3X3.rotation(thetaX, thetaY, thetaZ: single);
+begin
+  M[1] := cos(thetaY)*cos(thetaZ);
+  M[2] := cos(thetaY)*sin(thetaZ);
+  M[3] := -sin(thetaY);
+  M[4] := sin(thetaX)*sin(thetaY)*cos(thetaZ)-cos(thetaX)*sin(thetaZ);
+  M[5] := sin(thetaX)*sin(thetaY)*sin(thetaZ)+cos(thetaX)*cos(thetaZ);
+  M[6] := sin(thetaX)*cos(thetaY);
+  M[7] := cos(thetaX)*sin(thetaY)*cos(thetaZ)+sin(thetaX)*sin(thetaZ);
+  M[8] := cos(thetaX)*sin(thetaY)*sin(thetaZ)-sin(thetaX)*cos(thetaZ);
+  M[9] := cos(thetaX)*sin(thetaY);
+end;
 
 begin
 end.

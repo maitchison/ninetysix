@@ -301,8 +301,6 @@ begin
   scanLine(s3, s4);
   scanLine(s4, s1);
 
-  c.init(128,0,0);
-
   for y := yMin to yMax do
   	canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, debugCol)
 
@@ -321,46 +319,50 @@ var
 
   p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
 
+  objToWorld: Matrix3X3;
+
 begin
 
   thetaX := gameTime/2;
   thetaY := gameTime/3;
   thetaZ := gameTime;
 
+  objToWorld.rotation(thetaX, thetaY, thetaZ);
+
+  {
 	cameraX := V3D.create(1,0,0).rotated(thetaX, thetaY, thetaZ);
 	cameraY := V3D.create(0,1,0).rotated(thetaX, thetaY, thetaZ);
 	cameraZ := V3D.create(0,0,1).rotated(thetaX, thetaY, thetaZ);
+  }
 
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
   {get cube corners}
   size := V3D.create(32.5,13,9);
-  {I think this works?}
   {object space -> world space}
-  p1 := (size * V3D.create(-1, -1, -1)).rotated(thetaX, thetaY, thetaZ);
-  p2 := (size * V3D.create(+1, -1, -1)).rotated(thetaX, thetaY, thetaZ);
-  p3 := (size * V3D.create(+1, +1, -1)).rotated(thetaX, thetaY, thetaZ);
-  p4 := (size * V3D.create(-1, +1, -1)).rotated(thetaX, thetaY, thetaZ);
-
-  p5 := (size * V3D.create(-1, -1, +1)).rotated(thetaX, thetaY, thetaZ);
-  p6 := (size * V3D.create(+1, -1, +1)).rotated(thetaX, thetaY, thetaZ);
-  p7 := (size * V3D.create(+1, +1, +1)).rotated(thetaX, thetaY, thetaZ);
-  p8 := (size * V3D.create(-1, +1, +1)).rotated(thetaX, thetaY, thetaZ);
+  p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z));
+  p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z));
+  p3 := objToWorld.apply(V3D.create(+size.x, +size.y, -size.z));
+  p4 := objToWorld.apply(V3D.create(-size.x, +size.y, -size.z));
+  p5 := objToWorld.apply(V3D.create(-size.x, -size.y, +size.z));
+  p6 := objToWorld.apply(V3D.create(+size.x, -size.y, +size.z));
+  p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z));
+  p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z));
 
   {trace each side of the cube}
-  debugCol.init(255,0,0); {-Z}
+  debugCol.init(255,0,0); 		{-Z}
   traceFace(p1, p2, p3, p4);
   debugCol.init(128,0,0);
-  traceFace(p8, p7, p6, p5); {+Z}
+  traceFace(p8, p7, p6, p5); 	{+Z}
 
-  debugCol.init(0,255,0); {-X}
+  debugCol.init(0,255,0); 		{-X}
   traceFace(p4, p8, p5, p1);
-  debugCol.init(0,128,0); {+X}
+  debugCol.init(0,128,0); 		{+X}
   traceFace(p2, p6, p7, p3);
 
-  debugCol.init(0,0,255); {+Y}
+  debugCol.init(0,0,255); 		{+Y}
   traceFace(p5, p6, p2, p1);
-  debugCol.init(0,0,128); {-Y}
+  debugCol.init(0,0,128); 		{-Y}
   traceFace(p4, p3, p7, p8);
 
 	(*
