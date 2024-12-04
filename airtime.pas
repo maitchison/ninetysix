@@ -51,13 +51,13 @@ type
     procedure adjust(x: int16);
   end;
 
-procedure tScreenLine.reset();
+procedure tScreenLine.reset(); inline;
 begin
 	xMax := 0;
   xMin := 639;
 end;
 
-procedure tScreenLine.adjust(x: int16);
+procedure tScreenLine.adjust(x: int16); inline;
 begin
 	xMin := min(x, xMin);
   xMax := max(x, xMax);
@@ -248,7 +248,9 @@ end;
 procedure scanLine(a, b: tScreenPoint);
 var
 	tmp: tScreenPoint;
-  x, y: int32;
+  y: int32;
+  x: single;
+  deltaX: single;
 begin
 	if a.y = b.y then begin
   	{special case}
@@ -262,10 +264,12 @@ begin
   	tmp := a; a := b; b := tmp;
   end;
 
+  {I think this is off by 1}
+  x := a.x;
+  deltaX := (b.x-a.x) / (b.y-a.y);
   for y := a.y to b.y do begin
-  	{todo: check this is right}
-	  x := a.x + round((b.x-a.x) * ((y-a.y) / (b.y-a.y)));
-    screenLines[y].adjust(x);
+    screenLines[y].adjust(trunc(x));
+    x += deltaX;
   end;
 end;
 
@@ -302,7 +306,7 @@ begin
   scanLine(s4, s1);
 
   for y := yMin to yMax do
-  	canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, debugCol)
+  	canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, debugCol);
 
 end;
 
