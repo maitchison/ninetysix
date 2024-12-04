@@ -5,7 +5,7 @@ unit Vertex;
 
 interface
 
-uses math, utils;
+uses utils;
 
 type V2D = record
     x, y: single;

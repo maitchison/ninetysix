@@ -236,10 +236,23 @@ var
 	depth: single;
 
 const
-  MAX_SAMPLES = 32;
+  MAX_SAMPLES = 64;
 begin
-	//result.init(0,255,0,255); {color used when out of bounds}
-	result.init(0,0,0,255); {color used when out of bounds}
+
+	{color used when initial sample is out of of bounds}
+  {this shouldn't happen, but might due to rounding error or bug}	
+  result.init(255,0,0,255);
+
+	x := trunc(pos.x+32.5);
+	y := trunc(pos.y+13);
+	z := trunc(pos.z+9);
+
+	if (x < 0) or (x >= 65) or
+		(y < 0) or (y >= 26) or
+		(z < 0) or (z >= 18) then
+		exit;
+
+	result.init(255,0,255,0); {color used when out of bounds}
 
   depth := 0;
 
@@ -264,10 +277,7 @@ begin
     end else begin
     	{move to next voxel}
       {stub:}
-      d := carSDF.getPixel(x,y+z*26).g * 0.25;
-      {d := (255-c.a) * 0.25;}
-      {stub: fix bug with depth on edges}
-      if d < 1.0 then d := 1.0;
+      d := (255-c.a) * 0.25;
 		  pos += dir * d;
       depth += d;
     end;
@@ -468,8 +478,8 @@ begin
   objToWorld.rotation(thetaX, thetaY, thetaZ);
   worldToObj := objToWorld.transpose();
 
-  objToWorld.applyScale(0.5);
-  worldToObj.applyScale(1/0.5);
+  objToWorld.applyScale(1);
+  worldToObj.applyScale(1);
 
 	cameraX := worldToObj.apply(V3D.create(1,0,0));
   cameraY := worldToObj.apply(V3D.create(0,1,0));
