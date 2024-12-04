@@ -143,9 +143,9 @@ var
   maxSamples: integer;
 begin
 
-	result.init(0,0,0,0);
+	result.init(0,255,255,0);
 
-  maxSamples := 32;
+  maxSamples := 64;
 
 	result := RGBA.create(0,0,0,255);
 
@@ -223,6 +223,8 @@ var
 	x: int32;
   worldPos: V3D;
   t: single;
+  pos, deltaX, deltaY: V3D;
+  tDelta: single;
 
 begin
 	{do not render back face}
@@ -267,24 +269,39 @@ begin
     exit;
   end;
 
+  {calculate our deltas}
+	case faceID of
+  	1: tDelta := -cameraX.z / cameraZ.z;
+    2: tDelta := -cameraX.z / cameraZ.z;
+    3: tDelta := -cameraX.x / cameraZ.x;
+    4: tDelta := -cameraX.x / cameraZ.x;
+    5: tDelta := -cameraX.y / cameraZ.y;
+    6: tDelta := -cameraX.y / cameraZ.y;
+    else tDelta := 0;
+  end;
+  deltaX := cameraX + cameraZ*tDelta;
+
 	for y := yMin to yMax do begin
+
+    pos := (cameraX*(screenLines[y].xMin-320))+(cameraY*(y-240));
+
+    case faceID of
+    	1: t := (-size.z-pos.z) / cameraZ.z;
+      2: t := (+size.z-pos.z) / cameraZ.z;
+      3: t := (-size.x-pos.x) / cameraZ.x;
+      4: t := (+size.x-pos.x) / cameraZ.x;
+      5: t := (-size.y-pos.y) / cameraZ.y;
+      6: t := (+size.y-pos.y) / cameraZ.y;
+      else t := 0;
+    end;
+
+    pos += cameraZ * (t+0.5); {start half way in a voxel}
+
   	for x := screenLines[y].xMin to screenLines[y].xMax do begin
-    	{note, this could, and should, be all done with adds}
-      worldPos := (cameraX*(x-320))+(cameraY*(y-240))+(cameraZ*-50);
-      case faceID of
-      	1: t := (-size.z-worldPos.z) / cameraZ.z;
-        2: t := (+size.z-worldPos.z) / cameraZ.z;
-        3: t := (-size.x-worldPos.x) / cameraZ.x;
-        4: t := (+size.x-worldPos.x) / cameraZ.x;
-        5: t := (-size.y-worldPos.y) / cameraZ.y;
-        6: t := (+size.y-worldPos.y) / cameraZ.y;
-        else t := 0;
-      end;
 
-      {start halfway into the first pixel}
-      worldPos += cameraZ * (t + 0.5);
+      c := trace(pos, cameraZ);
+      pos += deltaX;
 
-      c := trace(worldPos, cameraZ);
     	if c.a > 0 then
 	      canvas.putPixel(x,y, c);
     end;
