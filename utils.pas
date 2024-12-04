@@ -48,6 +48,7 @@ type
 { Math replacements}
 
 function min(a,b: int32): int32; overload;
+function min(a,b: single): single; overload;
 function min(a,b,c: single): single; overload;
 function max(a,b: int32): int32; inline; overload;
 function max(a,b,c: int32): int32; overload;
@@ -133,6 +134,12 @@ begin
 end;
 
 function min(a,b: int32): int32; inline; overload;
+begin
+	if a < b then exit(a);
+  exit(b);
+end;
+
+function min(a,b: single): single; inline; overload;
 begin
 	if a < b then exit(a);
   exit(b);

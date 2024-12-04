@@ -74,22 +74,45 @@ function getVoxel(x,y,z:integer): RGBA; forward;
 
 {-----------------------------------------------------}
 
-function getDistance(x,y,z: integer): integer;
+function getDistance_L1(x,y,z: integer): integer;
 var
 	dx,dy,dz: integer;
   d, i: integer;
 const
-	MAX_D=64;	
+	MAX_D=63;	
 begin
 	if getVoxel(x,y,z).a = 255 then exit(0);
-
   for d := 1 to MAX_D do
 	  for dx := -d to d do	
   		for dy := -d to d do
     		for dz := -d to d do
       		if getVoxel(x+dx, y+dy, z+dz).a = 255 then
         		exit(d);
-  exit(MAX_D+1);
+  exit(MAX_D);
+end;
+
+function getDistance_L2(x,y,z: integer): single;
+var
+	dx,dy,dz: integer;
+  i,d: integer;
+ 	d2: single;
+  bestD2: single;
+  max_d: integer;
+begin
+	
+  if getVoxel(x,y,z).a = 255 then exit(0);
+  {if we hit something L1 distance away, then closest L2 distance must
+   be between L1 and sqrt(2)*L1}
+  d := trunc(getDistance_L1(x,y,z) * sqrt(2) + 0.999);
+  bestD2 := d*d;
+	for dx := -d to d do	
+		for dy := -d to d do
+  		for dz := -d to d do
+    		if getVoxel(x+dx, y+dy, z+dz).a = 255 then begin
+        	d2 := sqr(dx)+sqr(dy)+sqr(dz);
+	        bestD2 := min(bestD2, d2);
+  	    end;
+  exit(sqrt(bestD2));
 end;
 
 {calculate SDF (the slow way) for voxel car.}
@@ -97,7 +120,7 @@ function generateSDF(): tPage;
 var
 	i,j,k: integer;
   minDst: integer;
-  d: integer;
+  d: single;
   c: RGBA;
 begin
 	result := tPage.create(68, 26*18);
@@ -109,10 +132,28 @@ begin
   for i := 0 to 68-1 do
   	for j := 0 to 26-1 do
     	for k := 0 to 18-1 do begin
-      	d := getDistance(i,j,k);
-        c.init(d,d*4,d*16,255);
+      	d := getDistance_L2(i,j,k);
+        c.init(trunc(d),trunc(d*4),trunc(d*16),255);
         result.setPixel(i,j+k*26, c);
       end;
+end;
+
+{store SDF on the alpha channel of the car image}
+procedure transferSDF();
+var
+	x,y: integer;
+  c: RGBA;
+  d: byte;
+  page: tPage;
+begin
+	page := carSprite.page;
+  for y := 0 to page.height do
+		for x := 0 to page.width do begin
+    	d := carSDF.getPixel(x,y).g;
+      c := page.getPixel(x,y);
+      c.a := 255-d;
+      page.setPixel(x,y,c);
+    end;
 end;
 
 procedure loadResources();
@@ -135,6 +176,7 @@ begin
     carSDF := generateSDF();
 	  saveLC96('gfx\car1.sdf', carSDF);
   end;
+  transferSDF();
 
   background := tSprite.create(loadLC96('gfx\title.p96'));	
 
@@ -189,12 +231,12 @@ function trace(pos: V3D;dir: V3D): RGBA;
 var
 	k: integer;
   c: RGBA;
-  d: integer;
+  d: single;
   x,y,z: integer;
-	depth: integer;
+	depth: single;
 
 const
-  MAX_SAMPLES = 64;
+  MAX_SAMPLES = 32;
 begin
 	//result.init(0,255,0,255); {color used when out of bounds}
 	result.init(0,0,0,255); {color used when out of bounds}
@@ -205,22 +247,23 @@ begin
 
   	inc(TRACE_COUNT);
 
-		x := trunc(pos.x+32.5);
-	  y := trunc(pos.y+13);
-  	z := trunc(pos.z+9);
+		x := round(pos.x+32.5);
+	  y := round(pos.y+13);
+  	z := round(pos.z+9);
+
 		if (x < 0) or (x >= 65) then exit();
 		if (y < 0) or (y >= 26) then exit();
 		if (z < 0) or (z >= 18) then exit();
+
 	  c := carSprite.page.getPixel(x,y+z*26);
 
-    if c.a > 0 then begin
-    	{stub: show trace length}
+    if c.a = 255 then begin
+    	{shade by distance from bounding box}
       c *= (255-(depth*8))/255;
     	exit(c)
     end else begin
     	{move to next voxel}
-	    d := carSDF.getPixel(x,y+z*26).r;
-	    {assert(d>0, 'invalid distance');}
+      d := (255-c.a) * 0.25;
 		  pos += dir * d;
       depth += d;
     end;
@@ -386,6 +429,9 @@ var
 
 
 begin
+
+	TRACE_COUNT := 0;
+
 
   faceColor[1].init(255,0,0); 	
   faceColor[2].init(128,0,0);
@@ -639,8 +685,7 @@ var
 	tpf: double;
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
-  {stub:}
-  tpf := TRACE_COUNT / frameCount;
+  tpf := TRACE_COUNT;
 	GUILabel(canvas, 10, 10, format('TPF: %f Car: %f ms', [tpf,carDrawTime*1000]));
 end;
 
