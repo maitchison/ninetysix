@@ -239,10 +239,11 @@ function trace(pos: V3D;dir: V3D): RGBA;
 var
 	k: integer;
   c: RGBA;
-  d: single;
+  d: integer;
   x,y,z: int32;
-	depth: single;
-
+  dx,dy,dz: int32;
+  sx,sy,sz: int32;
+	depth: integer;
 const
   MAX_SAMPLES = 64;
 begin
@@ -253,31 +254,29 @@ begin
   {this shouldn't happen, but might due to rounding error or bug}	
   result.init(255,0,0,255);
 
+  {center}
+  {todo: make sender do this for us}
   pos += V3D.create(32,16,9);
 
-  {this can be slightly faster by checking the float values instead of
-   truncating first}
-  x := trunc(pos.x);
-	y := trunc(pos.y);
-	z := trunc(pos.z);
-
-	if (x < 0) or (x >= 64) or
-		(y < 0) or (y >= 32) or
-		(z < 0) or (z >= 18) then
-		exit;
+  sx := trunc(256*pos.x);
+	sy := trunc(256*pos.y);
+	sz := trunc(256*pos.z);
 
 	result.init(255,0,255,0); {color used when out of bounds}
 
   depth := 0;
+  dx := round(256*dir.x);
+  dy := round(256*dir.y);
+  dz := round(256*dir.z);
 
 	for k := 0 to MAX_SAMPLES-1 do begin
 
   	inc(TRACE_COUNT);
     inc(lastTraceCount);
 
-		x := trunc(pos.x);
-	  y := trunc(pos.y);
-  	z := trunc(pos.z);
+		x := sx shr 8;
+	  y := sy shr 8;
+  	z := sz shr 8;
 
 		if (x < 0) or (x >= 64) then exit();
 		if (y < 0) or (y >= 32) then exit();
@@ -306,12 +305,17 @@ begin
 
     if c.a = 255 then begin
     	{shade by distance from bounding box}
-      c *= (255-(depth*8))/255;
+      c *= (255-(depth*2))/255;
     	exit(c)
     end else begin
     	{move to next voxel}
-      d := (255-c.a) * 0.25;
-		  pos += dir * d;
+      d := (255-c.a);
+      {d is distance * 4}
+		  {pos += dir * d;}
+      sx += (dx * d) shr 2;
+      sy += (dy * d) shr 2;
+      sz += (dz * d) shr 2;
+
       depth += d;
     end;
   end;
