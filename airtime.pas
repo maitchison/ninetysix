@@ -247,9 +247,9 @@ begin
 
   	inc(TRACE_COUNT);
 
-		x := round(pos.x+32.5);
-	  y := round(pos.y+13);
-  	z := round(pos.z+9);
+		x := trunc(pos.x+32.5);
+	  y := trunc(pos.y+13);
+  	z := trunc(pos.z+9);
 
 		if (x < 0) or (x >= 65) then exit();
 		if (y < 0) or (y >= 26) then exit();
@@ -263,7 +263,11 @@ begin
     	exit(c)
     end else begin
     	{move to next voxel}
-      d := (255-c.a) * 0.25;
+      {stub:}
+      d := carSDF.getPixel(x,y+z*26).g * 0.25;
+      {d := (255-c.a) * 0.25;}
+      {stub: fix bug with depth on edges}
+      if d < 1.0 then d := 1.0;
 		  pos += dir * d;
       depth += d;
     end;
@@ -325,6 +329,7 @@ var
   pos, basePos, deltaX, deltaY: V3D;
   tDelta: single;
   invZ: single;
+  c1,c2,c3,c4: RGBA;
 
 begin
 	{do not render back face}
@@ -408,7 +413,17 @@ begin
     pos += cameraZ * (t+0.5); {start half way in a voxel}
 
   	for x := screenLines[y].xMin to screenLines[y].xMax do begin
-      c := trace(pos, cameraZ);
+     	c := trace(pos, cameraZ);
+
+      {AA}
+      {
+      c1 := trace(pos+cameraX*0.25+cameraY*0.25, cameraZ);
+      c2 := trace(pos-cameraX*0.25+cameraY*0.25, cameraZ);
+      c3 := trace(pos-cameraX*0.25-cameraY*0.25, cameraZ);
+      c4 := trace(pos+cameraX*0.25-cameraY*0.25, cameraZ);
+      c := c*0.2+c1*0.2+c2*0.2+c3*0.2+c4*0.2;
+      }
+
       pos += deltaX;
     	if c.a > 0 then
 	      canvas.putPixel(x,y, c);
@@ -440,20 +455,21 @@ begin
   faceColor[5].init(0,0,255); 	
   faceColor[6].init(0,0,128);
 
-	{
+	
   thetaX := gameTime/3;
   thetaY := gameTime/2;
   thetaZ := gameTime;
-  }
+
+  {
   thetaX := 0.1;
   thetaY := 0.0;
-  thetaZ := 0.1;
+  thetaZ := 0.1;}
 
   objToWorld.rotation(thetaX, thetaY, thetaZ);
   worldToObj := objToWorld.transpose();
 
-  objToWorld.applyScale(1);
-  worldToObj.applyScale(1);
+  objToWorld.applyScale(0.5);
+  worldToObj.applyScale(1/0.5);
 
 	cameraX := worldToObj.apply(V3D.create(1,0,0));
   cameraY := worldToObj.apply(V3D.create(0,1,0));
