@@ -36,6 +36,38 @@ var
 
   S3D: tS3Driver;
 
+{----------------------------------------------------}
+{ Poly drawing }
+{----------------------------------------------------}
+
+type
+	tScreenPoint = record
+  	x,y: int16;
+  end;
+
+  tScreenLine = record
+  	xMin, xMax: int16;
+    procedure reset();
+    procedure adjust(x: int16);
+  end;
+
+procedure tScreenLine.reset();
+begin
+	xMax := 0;
+  xMin := 639;
+end;
+
+procedure tScreenLine.adjust(x: int16);
+begin
+	xMin := min(x, xMin);
+  xMax := max(x, xMax);
+end;
+
+var
+	screenLines: array[0..480-1] of tScreenLine;
+
+{-----------------------------------------------------}
+
 
 procedure loadResources();
 var
@@ -72,6 +104,9 @@ end;
 
 {trace through voxels to draw the car}
 procedure drawCar_TRACE();
+var
+  size: V3D; {half size of cuboid}
+  debugCol: RGBA;
 
 function getVoxel(pos: V3D): RGBA;
 var
@@ -141,16 +176,13 @@ var
 	k: integer;
   c: RGBA;
   t,tX,tY,tZ,tMin,tMax: single; {time to intersect each of the planes}
-  size: V3D; {half size of cuboid}
+
   depth: single;
   maxSamples: integer;
 begin
 
 	result.init(0,0,0,0);
-
   	
-	size := V3D.create(32.5,13,9);
-
   {note: in theory at most one of these should intersect for each of the
    entry and exit points}
 
@@ -166,10 +198,10 @@ begin
   maxSamples := 128;
 
   {move to intersection point}
-  t += 0.0001; {for rounding}
+  t += 0.5; {start halfway in the voxel}
   pos += dir*t;    	
 
-	result := RGBA.create(0,0,trunc(depth*8),255);
+	result := RGBA.create(0,0,0,255);
 
 	for k := 0 to maxSamples-1 do begin
 
@@ -197,6 +229,85 @@ begin
 
 end;
 
+{traces all pixels within the given polygon.
+points are in world space
+}
+procedure traceFace(p1,p2,p3,p4: V3D);
+var
+	c: RGBA;
+  cross: single;
+  y, yMin, yMax: int32;
+  s1,s2,s3,s4: tScreenPoint;
+
+function toScreen(p: V3D): tScreenPoint;
+begin
+	result.x := 320 + trunc(p.x);
+	result.y := 240 + trunc(p.y);
+end;
+
+procedure scanLine(a, b: tScreenPoint);
+var
+	tmp: tScreenPoint;
+  x, y: int32;
+begin
+	if a.y = b.y then begin
+  	{special case}
+    y := a.y;
+    screenLines[y].adjust(a.x);
+    screenLines[y].adjust(b.x);
+    exit;
+  end;
+
+  if a.y > b.y then begin
+  	tmp := a; a := b; b := tmp;
+  end;
+
+  for y := a.y to b.y do begin
+  	{todo: check this is right}
+	  x := a.x + round((b.x-a.x) * ((y-a.y) / (b.y-a.y)));
+    screenLines[y].adjust(x);
+  end;
+end;
+
+begin
+	{do not render back face}
+	cross := ((p2.x-p1.x) * (p3.y - p1.y)) - ((p2.y - p1.y) * (p3.x - p1.x));
+  if cross <= 0 then exit;
+
+  s1 := toScreen(p1);
+  s2 := toScreen(p2);
+  s3 := toScreen(p3);
+  s4 := toScreen(p4);
+
+  yMin := min(s1.y,s2.y);
+  yMin := min(yMin,s3.y);
+  yMin := min(yMin,s4.y);
+
+  yMax := max(s1.y,s2.y);
+  yMax := max(yMax,s3.y);
+  yMax := max(yMax,s4.y);
+
+	c.init(255,0,255);
+	canvas.putPixel(s1.x, s1.y, c);
+	canvas.putPixel(s2.x, s2.y, c);
+	canvas.putPixel(s3.x, s3.y, c);
+	canvas.putPixel(s4.x, s4.y, c);
+
+  for y := yMin to yMax do
+  	screenLines[y].reset();
+
+  scanLine(s1, s2);
+  scanLine(s2, s3);
+  scanLine(s3, s4);
+  scanLine(s4, s1);
+
+  c.init(128,0,0);
+
+  for y := yMin to yMax do
+  	canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, debugCol)
+
+end;
+
 
 var
 	i,j: integer;
@@ -208,11 +319,12 @@ var
 
   thetaX,thetaY,thetaZ: single;
 
+  p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
 
 begin
 
-  thetaX := gameTime;
-  thetaY := 0;
+  thetaX := gameTime/2;
+  thetaY := gameTime/3;
   thetaZ := gameTime;
 
 	cameraX := V3D.create(1,0,0).rotated(thetaX, thetaY, thetaZ);
@@ -221,13 +333,45 @@ begin
 
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
+  {get cube corners}
+  size := V3D.create(32.5,13,9);
+  {I think this works?}
+  {object space -> world space}
+  p1 := (size * V3D.create(-1, -1, -1)).rotated(thetaX, thetaY, thetaZ);
+  p2 := (size * V3D.create(+1, -1, -1)).rotated(thetaX, thetaY, thetaZ);
+  p3 := (size * V3D.create(+1, +1, -1)).rotated(thetaX, thetaY, thetaZ);
+  p4 := (size * V3D.create(-1, +1, -1)).rotated(thetaX, thetaY, thetaZ);
+
+  p5 := (size * V3D.create(-1, -1, +1)).rotated(thetaX, thetaY, thetaZ);
+  p6 := (size * V3D.create(+1, -1, +1)).rotated(thetaX, thetaY, thetaZ);
+  p7 := (size * V3D.create(+1, +1, +1)).rotated(thetaX, thetaY, thetaZ);
+  p8 := (size * V3D.create(-1, +1, +1)).rotated(thetaX, thetaY, thetaZ);
+
+  {trace each side of the cube}
+  debugCol.init(255,0,0); {-Z}
+  traceFace(p1, p2, p3, p4);
+  debugCol.init(128,0,0);
+  traceFace(p8, p7, p6, p5); {+Z}
+
+  debugCol.init(0,255,0); {-X}
+  traceFace(p4, p8, p5, p1);
+  debugCol.init(0,128,0); {+X}
+  traceFace(p2, p6, p7, p3);
+
+  debugCol.init(0,0,255); {+Y}
+  traceFace(p5, p6, p2, p1);
+  debugCol.init(0,0,128); {-Y}
+  traceFace(p4, p3, p7, p8);
+
+	(*
 	for i := -32 to 64-1 do begin
   	for j := -32 to 64-1 do begin
     	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);
       if c.a > 0 then
 	      canvas.putPixel(i+320,j+240, c);
     end;
-  end;	
+  end;
+  *)	
 	
 end;
 

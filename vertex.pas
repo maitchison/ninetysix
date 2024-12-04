@@ -40,6 +40,7 @@ type V3D = record
     class operator Add(a, b: V3D): V3D;
     class operator Subtract(a, b: V3D): V3D;
     class operator Multiply(a: V3D; b:single): V3D;
+    class operator Multiply(a: V3D; b:V3D): V3D;
     end;
 
 type Ray = record
@@ -140,6 +141,13 @@ begin
     result.x := a.x * b;
     result.y := a.y * b;
     result.z := a.z * b;
+end;
+
+class operator V3D.Multiply(a: V3D; b: V3D): V3D;
+begin
+    result.x := a.x * b.x;
+    result.y := a.y * b.y;
+    result.z := a.z * b.z;
 end;
 
 function V3D.rotated(thetaX, thetaY, thetaZ: single): V3D;

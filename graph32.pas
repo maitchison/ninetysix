@@ -690,14 +690,15 @@ var
 	count: int32;
   ofs: dword;
 begin
+
+  if c.a = 0 then exit;
+
 	{clipping}
 	if word(y) >= self.Height then exit;
 	if x1 < 0 then x1 := 0;
   if x2 > self.Width then x2 := self.Width;
   count := x2-x1;
   if count <= 0 then exit;
-
-  if c.a = 0 then exit;
 
 	ofs := (y * self.Width + x1) * 4;
 
