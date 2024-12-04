@@ -115,7 +115,7 @@ type
     procedure Clear(c: RGBA);
 		procedure FillRect(aRect: TRect; c: RGBA);
     procedure DrawRect(aRect: TRect; c: RGBA);
-    function Clone(): TPage;
+    function clone(): TPage;
     function asBytes: tBytes;
     function asRGBBytes: tBytes;
     procedure setTransparent(col: RGBA);

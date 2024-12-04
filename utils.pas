@@ -72,6 +72,7 @@ procedure delay(ms: double);
 {------------------------------------------------}
 { My custom routines }
 
+function exists(filename: string): boolean;
 function toLowerCase(const s: string): string;
 function getExtension(const filename: string): string;
 
@@ -356,6 +357,21 @@ begin
     else
     	result += '#('+intToStr(b)+')';
   end;
+end;
+
+function exists(filename: string): boolean;
+var
+	f: file;
+begin
+	assign(f, filename);
+  {$I-}
+  reset(f);
+  {$I+}
+  if IOResult = 0 then begin
+  	close(f);
+    exit(True);
+  end else
+  	exit(False);
 end;
 
 function toLowerCase(const s: string): string;

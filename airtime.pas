@@ -26,6 +26,7 @@ var
   background: tSprite;
   canvas: tPage;
   carSprite: tSprite;
+  carSDF: tPage;
 
   {global time keeper}
   elapsed: double = 0;
@@ -66,25 +67,48 @@ end;
 var
 	screenLines: array[0..480-1] of tScreenLine;
 
+function getVoxel(x,y,z:integer): RGBA; forward;
+
 {-----------------------------------------------------}
 
+function getDistance(x,y,z: integer): integer;
+var
+	dx,dy,dz: integer;
+  d, i: integer;
+const
+	MAX_D=10;	
+begin
+	if getVoxel(x,y,z).a = 255 then exit(0);
+
+  for d := 1 to MAX_D do
+	  for dx := -d to d do	
+  		for dy := -d to d do
+    		for dz := -d to d do
+      		if getVoxel(x+dx, y+dy, z+dz).a = 255 then
+        		exit(d);
+  exit(MAX_D+2);
+end;
+
 {calculate SDF (the slow way) for voxel car.}
-procedure generateSDF();
+function generateSDF(): tPage;
 var
 	i,j,k: integer;
   minDst: integer;
-
+  d: integer;
+  c: RGBA;
 begin
-(*
+	result := tPage.create(68, 26*18);
+	{note: doing this as largest cubiod make a lot of sense, and it
+   lets me trace super fast in many directions}
 	{note, it would be nice to actually have negative for interior... but
   for now just closest is fine}
-  for x := 0 to 65-1 do
-  	for y := 0 to 26-1 do
-    	for z := 0 to 18-1 do begin
-      	if getVoxel(x,y,z).a
-				      	
-    	end;
-  *)
+  for i := 0 to 68-1 do
+  	for j := 0 to 26-1 do
+    	for k := 0 to 18-1 do begin
+      	d := getDistance(i,j,k);
+        c.init(d,d*4,d*16,255);
+        result.setPixel(i,j+k*26, c);
+      end;
 end;
 
 procedure loadResources();
@@ -100,6 +124,16 @@ begin
   carSprite := tSprite.create(loadBMP('gfx\car1.bmp'));
   carSprite.page.setTransparent(RGBA.create(192, 192, 192));
   note(format('Car sprite is (%d, %d)', [carSprite.width, carSprite.height]));
+
+  if exists('gfx\car1.sdf') then begin
+	  carSDF := loadLC96('gfx\car1.sdf');
+  end else begin
+    carSDF := generateSDF();
+	  saveLC96('gfx\car1.sdf', carSDF);
+  end;
+
+  background := tSprite.create(loadLC96('gfx\title.p96'));	
+
 
   note('Loading music');
 	music := tSoundFile.create('music\music2.wav');
@@ -121,14 +155,9 @@ begin
     end;
 end;
 
-function getVoxel(pos: V3D): RGBA; inline;
-var
-	x,y,z: int32;
+function getVoxel(x,y,z:integer): RGBA;
 begin
 	result.init(255,0,255,0);
-  x := trunc(pos.x+32.5);
-  y := trunc(pos.y+13);
-  z := trunc(pos.z+9);
 	if (x < 0) or (x >= 65) then exit;
 	if (y < 0) or (y >= 26) then exit;
 	if (z < 0) or (z >= 18) then exit;
@@ -151,36 +180,40 @@ var
 	faceColor: array[1..6] of RGBA;
 
 
-
 {trace ray at location and direction (in object space)}
 function trace(pos: V3D;dir: V3D): RGBA;
 var
 	k: integer;
   c: RGBA;
+  d: integer;
   x,y,z: integer;
 	depth: single;
 const
   MAX_SAMPLES = 64;
 begin
-	result.init(0,0,0,0);
+	//result.init(0,255,0,255); {color used when out of bounds}
+	result.init(0,0,0,255); {color used when out of bounds}
 
 	for k := 0 to MAX_SAMPLES-1 do begin
 
 		x := trunc(pos.x+32.5);
 	  y := trunc(pos.y+13);
   	z := trunc(pos.z+9);
-		if (x < 0) or (x >= 65) then exit;
-		if (y < 0) or (y >= 26) then exit;
-		if (z < 0) or (z >= 18) then exit;
+		if (x < 0) or (x >= 65) then exit();
+		if (y < 0) or (y >= 26) then exit();
+		if (z < 0) or (z >= 18) then exit();
 	  c := carSprite.page.getPixel(x,y+z*26);
+    d := carSDF.getPixel(x,y+z*26).r;
 
     if c.a > 0 then begin
+    	{stub: show trace length}
       depth := (255-((k)*4))/255;	
       c *= depth;
+      {c.init(k*16, k*4, k);}
     	exit(c)
     end else begin
     	{move to next voxel}
-	  	pos += dir;
+	  	pos += dir * d;
     end;
   end;
 
