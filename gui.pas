@@ -23,7 +23,7 @@ var
 	padX, padY: integer;
 begin
 
-	FrameSprite.NineSlice(page, atX, atY, 100, 22);
+	FrameSprite.NineSlice(page, atX, atY, 200, 22);
   atX += PanelSprite.border.left;
   atY += PanelSprite.border.top;
   {Custom positioning}
