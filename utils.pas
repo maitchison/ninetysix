@@ -55,6 +55,7 @@ function max(a,b,c: int32): int32; overload;
 function max(a,b,c: single): single; overload;
 function Power(Base, Exponent: double): double; inline;
 function Log10(x: double): double;
+function Log2(x: double): double;
 
 {------------------------------------------------}
 { SysUtils replacements}
@@ -161,6 +162,11 @@ end;
 function Log10(x: double): double; inline;
 begin
 	result := ln(x) / ln(10);
+end;
+
+function Log2(x: double): double; inline;
+begin
+	result := ln(x) / ln(2);
 end;
 
 {----------------------------------------------------------}
