@@ -79,7 +79,7 @@ var
 	dx,dy,dz: integer;
   d, i: integer;
 const
-	MAX_D=63;	
+	MAX_D=16;	
 begin
 	if getVoxel(x,y,z).a = 255 then exit(0);
   for d := 1 to MAX_D do
@@ -123,18 +123,18 @@ var
   d: single;
   c: RGBA;
 begin
-	result := tPage.create(68, 26*18);
+	result := carSprite.page.clone();
   {todo: use proper L2 distance, not L1}
 	{note: doing this as largest cubiod make a lot of sense, and it
    lets me trace super fast in many directions}
 	{note, it would be nice to actually have negative for interior... but
   for now just closest is fine}
-  for i := 0 to 68-1 do
-  	for j := 0 to 26-1 do
+  for i := 0 to 64-1 do
+  	for j := 0 to 32-1 do
     	for k := 0 to 18-1 do begin
       	d := getDistance_L2(i,j,k);
         c.init(trunc(d),trunc(d*4),trunc(d*16),255);
-        result.setPixel(i,j+k*26, c);
+        result.setPixel(i,j+k*32, c);
       end;
 end;
 
@@ -165,11 +165,17 @@ begin
 	background := tSprite.create(loadLC96('gfx\title.p96'));	
   note(format('Loaded background in %fs', [getSec-startTime]));
 
-	note('Loading cars');
-  carSprite := tSprite.create(loadBMP('gfx\car1.bmp'));
-  carSprite.page.setTransparent(RGBA.create(192, 192, 192));
+  {car}
+  if exists('gfx\car1.p96') then
+	  carSprite := tSprite.create(loadLC96('gfx\car1.p96'))
+  else begin
+		carSprite := tSprite.create(loadBMP('gfx\car1.bmp'));
+	  saveLC96('gfx\car1.p96', carSprite.page);
+  end;  	
+  carSprite.page.setTransparent(RGBA.create(255,255,255));
   note(format('Car sprite is (%d, %d)', [carSprite.width, carSprite.height]));
 
+  {car distance field}
   if exists('gfx\car1.sdf') then begin
 	  carSDF := loadLC96('gfx\car1.sdf');
   end else begin
@@ -178,6 +184,7 @@ begin
   end;
   transferSDF();
 
+  {background}
   background := tSprite.create(loadLC96('gfx\title.p96'));	
 
 
@@ -204,10 +211,10 @@ end;
 function getVoxel(x,y,z:integer): RGBA;
 begin
 	result.init(255,0,255,0);
-	if (x < 0) or (x >= 65) then exit;
-	if (y < 0) or (y >= 26) then exit;
+	if (x < 0) or (x >= 64) then exit;
+	if (y < 0) or (y >= 32) then exit;
 	if (z < 0) or (z >= 18) then exit;
-  result := carSprite.page.getPixel(x,y+z*26);
+  result := carSprite.page.getPixel(x,y+z*32);
 end;
 
 {trace through voxels to draw the car}
@@ -221,6 +228,7 @@ var
   cameraZ: V3D;
   objToWorld: Matrix3X3;
   worldToObj: Matrix3X3;
+  lastTraceCount: integer;
 
 var
 	faceColor: array[1..6] of RGBA;
@@ -243,12 +251,12 @@ begin
   {this shouldn't happen, but might due to rounding error or bug}	
   result.init(255,0,0,255);
 
-	x := trunc(pos.x+32.5);
-	y := trunc(pos.y+13);
+	x := trunc(pos.x+32);
+	y := trunc(pos.y+16);
 	z := trunc(pos.z+9);
 
-	if (x < 0) or (x >= 65) or
-		(y < 0) or (y >= 26) or
+	if (x < 0) or (x >= 64) or
+		(y < 0) or (y >= 32) or
 		(z < 0) or (z >= 18) then
 		exit;
 
@@ -260,15 +268,15 @@ begin
 
   	inc(TRACE_COUNT);
 
-		x := trunc(pos.x+32.5);
-	  y := trunc(pos.y+13);
+		x := trunc(pos.x+32);
+	  y := trunc(pos.y+16);
   	z := trunc(pos.z+9);
 
-		if (x < 0) or (x >= 65) then exit();
-		if (y < 0) or (y >= 26) then exit();
+		if (x < 0) or (x >= 64) then exit();
+		if (y < 0) or (y >= 32) then exit();
 		if (z < 0) or (z >= 18) then exit();
 
-	  c := carSprite.page.getPixel(x,y+z*26);
+	  c := carSprite.page.getPixel(x,y+z*32);
 
     if c.a = 255 then begin
     	{shade by distance from bounding box}
@@ -276,8 +284,9 @@ begin
     	exit(c)
     end else begin
     	{move to next voxel}
-      {stub:}
-      d := (255-c.a) * 0.25;
+      {d := (255-c.a) * 0.25;}
+      {stub: no CDF}
+      d := 1;
 		  pos += dir * d;
       depth += d;
     end;
@@ -339,6 +348,7 @@ var
   pos, basePos, deltaX, deltaY: V3D;
   tDelta: single;
   invZ: single;
+  value: integer;
   c1,c2,c3,c4: RGBA;
 
 begin
@@ -423,7 +433,12 @@ begin
     pos += cameraZ * (t+0.5); {start half way in a voxel}
 
   	for x := screenLines[y].xMin to screenLines[y].xMax do begin
+
+    	{show trace count}
+      lastTraceCount := TRACE_COUNT;
      	c := trace(pos, cameraZ);
+      value := TRACE_COUNT-lastTraceCount;
+{      c.init(c,c*4, c*16);}
 
       {AA}
       {
@@ -488,7 +503,7 @@ begin
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
   {get cube corners}
-  size := V3D.create(32.5,13,9);
+  size := V3D.create(32,16,9);
   {object space -> world space}
   p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z));
   p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z));
@@ -599,7 +614,7 @@ end;
 
 function fetch(oX,oY,oZ: int32): RGBA;
 begin
-	result := carSprite.page.getPixel(oX, oY+(oZ*26));
+	result := carSprite.page.getPixel(oX, oY+(oZ*32));
 end;
 
 var
@@ -639,7 +654,7 @@ begin
 
 
 	canvas.fillRect(tRect.create(320-100, 240-100, 200, 200), RGBA.create(0,0,0));
-	{dims are 65, 26, 18}
+	{dims are 64, 32, 18}
   {note: I should trim this to 64, 32, 18 (for fast indexing)}
 	{guess this is 64x64xsomething}
 	{carSprite.draw(canvas,320, 240);}
@@ -655,8 +670,8 @@ begin
   carSprite.page.putPixel(0,1,RGBA.create(255,0,255));
   carSprite.page.putPixel(1,1,RGBA.create(255,0,255));
 
-  for j := 0 to 26-1 do
-  	for i := 0 to 65-1 do
+  for j := 0 to 32-1 do
+  	for i := 0 to 64-1 do
     	for k := 0 to 18-1 do begin
 
       	{ this doesn't really work unless we also rotate the axis...}
@@ -683,7 +698,7 @@ begin
         if k > 9 then
         	c.init(128, 128, 128);}
 
-        transform(x-32.5,y-13,z-9,dX,dY,tmp);
+        transform(x-32,y-16,z-9,dX,dY,tmp);
 
         depthByte := clip(128 + tmp, 0, 255);
 
