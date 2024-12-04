@@ -132,54 +132,6 @@ begin
   result := carSprite.page.getPixel(x,y+z*26);
 end;
 
-function intersectX(size, pos, dir: V3D): single;
-var
-	t: single;
-  pnt: V3D;
-begin
-	if dir.x = 0 then exit(9999);
-  if dir.x > 0 then
-  	t := (-size.x-pos.x) / dir.x
-  else
-		t := (+size.x-pos.x) / dir.x;
-  pos := pos + dir * t;
-  if (pos.y < -size.y) or (pos.y > size.y) then exit(9999);
-  if (pos.z < -size.z) or (pos.z > size.z) then exit(9999);
-  exit(t);
-end;
-
-function intersectY(size, pos, dir: V3D): single;
-var
-	t: single;
-  pnt: V3D;
-begin
-	if dir.y = 0 then exit(9999);
-  if dir.y > 0 then
-  	t := (-size.y-pos.y) / dir.y
-  else
-		t := (+size.y-pos.y) / dir.y;
-  pos := pos + dir * t;
-  if (pos.x < -size.x) or (pos.x > size.x) then exit(9999);
-  if (pos.z < -size.z) or (pos.z > size.z) then exit(9999);
-  exit(t);
-end;
-
-function intersectZ(size, pos, dir: V3D): single;
-var
-	t: single;
-  pnt: V3D;
-begin
-	if dir.z = 0 then exit(9999);
-  if dir.z > 0 then
-  	t := (-size.z-pos.z) / dir.z
-  else
-		t := (+size.z-pos.z) / dir.z;
-  pos := pos + dir * t;
-  if (pos.x < -size.x) or (pos.x > size.x) then exit(9999);
-  if (pos.y < -size.y) or (pos.y > size.y) then exit(9999);
-  exit(t);
-end;
-
 {trace ray at location and direction (in object space)}
 function trace(pos: V3D;dir: V3D): RGBA;
 var
@@ -193,27 +145,7 @@ begin
 
 	result.init(0,0,0,0);
 
-  {note: in theory at most one of these should intersect for each of the
-   entry and exit points}
-
-	{find the entry point}
-  (*
-  t := intersectX(size, pos, dir);
-  if t > 1000 then
-		t := intersectY(size, pos, dir);
-  if t > 1000 then
-  	t := intersectZ(size, pos, dir);
-
-  if t > 1000 then exit; {did not intersect any faces}
-  *) {this is done for us now}
-
-  maxSamples := 128;
-
-  (*
-  {move to intersection point}
-  t += 0.5; {start halfway in the voxel}
-  pos += dir*t;
-  *)  	
+  maxSamples := 32;
 
 	result := RGBA.create(0,0,0,255);
 
@@ -226,8 +158,8 @@ begin
 
     {left bounds}
     if (c.r=255) and (c.g=0) and (c.b=255) then begin
-			{result.init(0,0,0,0);
-      exit;}	
+			result.init(255,255,0,255);
+      exit;	
     end;
 
     if c.a > 0 then begin
@@ -259,7 +191,7 @@ begin
 	result.y := 240 + trunc(p.y);
 end;
 
-procedure scanLine(a, b: tScreenPoint);
+procedure scanSide(a, b: tScreenPoint);
 var
 	tmp: tScreenPoint;
   y: int32;
@@ -310,35 +242,35 @@ begin
   yMax := max(yMax,s3.y);
   yMax := max(yMax,s4.y);
 
+  {debuging, show corners}
+  (*
 	c.init(255,0,255);
 	canvas.putPixel(s1.x, s1.y, c);
 	canvas.putPixel(s2.x, s2.y, c);
 	canvas.putPixel(s3.x, s3.y, c);
 	canvas.putPixel(s4.x, s4.y, c);
+	*)
 
   for y := yMin to yMax do
   	screenLines[y].reset();
 
-  scanLine(s1, s2);
-  scanLine(s2, s3);
-  scanLine(s3, s4);
-  scanLine(s4, s1);
+  {scan the sides of the polygon}
+  scanSide(s1, s2);
+  scanSide(s2, s3);
+  scanSide(s3, s4);
+  scanSide(s4, s1);
 
-  {solid faces}
-  {
-  if not (faceID in [3,4]) then begin
-    for y := yMin to yMax do
+	{alternative solid face render (for debugging)}
+  if (faceID in []) then begin
+	  for y := yMin to yMax do
 			canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, faceColor[faceID]);
     exit;
-  end;}
+  end;
 
-  for y := yMin to yMax do begin
+	for y := yMin to yMax do begin
   	for x := screenLines[y].xMin to screenLines[y].xMax do begin
-    	{map from screen space to object space}
-      {worldPos := worldToObj.apply(V3D.create(x - 320, y - 240, -100));}
+    	{note, this could, and should, be all done with adds}
       worldPos := (cameraX*(x-320))+(cameraY*(y-240))+(cameraZ*-50);
-
-
       case faceID of
       	1: t := (-size.z-worldPos.z) / cameraZ.z;
         2: t := (+size.z-worldPos.z) / cameraZ.z;
@@ -349,25 +281,13 @@ begin
         else t := 0;
       end;
 
-      if t > 1000 then begin
-      	{this should not happen}
-        c.init(0,255,0);
-        canvas.putPixel(x,y, c);
-        continue;
-      end;
-
+      {start halfway into the first pixel}
       worldPos += cameraZ * (t + 0.5);
 
       c := trace(worldPos, cameraZ);
-     {c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);}
     	if c.a > 0 then
 	      canvas.putPixel(x,y, c);
     end;
-  {
-  	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);
-      if c.a > 0 then
-	      canvas.putPixel(i+320,j+240, c);}
-
   end;
 
 end;
@@ -406,8 +326,6 @@ begin
 
   assert(abs(cameraZ.abs-1)<0.01, 'cameraZ not normed');
 
-  info(cameraZ.toString);
-
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
   {get cube corners}
@@ -429,18 +347,6 @@ begin
   traceFace(4, p2, p6, p7, p3);
 	traceFace(5, p5, p6, p2, p1);
   traceFace(6, p4, p3, p7, p8);
-
-
-
-	(*
-	for i := -32 to 64-1 do begin
-  	for j := -32 to 64-1 do begin
-    	c := trace((cameraX*i)+(cameraY*j)+(cameraZ*-40), cameraZ);
-      if c.a > 0 then
-	      canvas.putPixel(i+320,j+240, c);
-    end;
-  end;
-  *)	
 	
 end;
 
