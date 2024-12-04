@@ -52,6 +52,7 @@ type
 
 		class operator add(a,b: RGBA): RGBA;
     class operator multiply(a: RGBA; b: single): RGBA;
+		class operator equal(a,b: RGBA): boolean;
 
     function toString: shortString;
 
@@ -110,12 +111,14 @@ type
     function GetPixelScaled(x, y, s: integer;doGamma: boolean=False): RGBA;
     procedure HLine(x1, y, x2: int16;c: RGBA); pascal;
     procedure PutPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
+    procedure SetPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure Clear(c: RGBA);
 		procedure FillRect(aRect: TRect; c: RGBA);
     procedure DrawRect(aRect: TRect; c: RGBA);
     function Clone(): TPage;
     function asBytes: tBytes;
     function asRGBBytes: tBytes;
+    procedure setTransparent(col: RGBA);
 
     function checkForAlpha: boolean;
 
@@ -294,6 +297,11 @@ begin
 	self.a := clip(a, 0, 255);
 end;
 
+class operator RGBA.equal(a,b: RGBA): boolean;
+begin
+	exit(pDword(@a)^=pDword(@b)^);
+end;
+
 
 {----------------------------------------------}
 
@@ -340,7 +348,6 @@ begin
   result.b := other.b;
   result.a := other.a;
 end;
-
 
 class operator RGBA32.add(a, b: RGBA32): RGBA32;
 begin
@@ -684,6 +691,43 @@ asm
 
   end;
 
+{sets the pixel, no alpha blending}
+procedure TPage.setPixel(atX,atY: int16;c: RGBA); inline; assembler; register;
+asm
+    push edi
+    push esi
+    push ebx
+
+    mov esi, eax
+
+    cmp dx,  [esi].Width								// unsigned cmp will catch negative values.
+    jge @SKIP
+    cmp cx,  [esi].Height
+    jge @SKIP
+
+    movzx edi, dx
+
+    mov ax,  [esi].Width
+    mul cx
+    shl edx, 16
+    movzx eax, ax
+    or  edx, eax
+    add edi, edx
+
+    shl edi, 2
+
+    add edi, [esi].[Pixels]
+
+		mov eax, c
+	  mov dword ptr [edi], eax
+
+	@SKIP:
+
+  	pop ebx
+  	pop esi
+    pop edi
+  end;
+
 {Draw line from (x1,y) to (x2,y) inclusive at start and exclusive at end.}
 procedure TPage.HLine(x1,y,x2: int16; c: RGBA); pascal;
 var
@@ -849,6 +893,18 @@ begin
     	if getPixel(x,y).a <> 255 then exit(True);
   exit(False);
 end;
+
+{Sets all instances of this color to transparent}
+procedure tPage.setTransparent(col: RGBA);
+var
+	x,y: integer;
+begin
+	for y := 0 to height-1 do
+  	for x := 0 to width-1 do
+    	if getPixel(x,y) = col then
+	    	setPixel(x,y, RGBA.create(0,0,0,0));				      	
+end;
+
 
 {-------------------------------------------------}
 

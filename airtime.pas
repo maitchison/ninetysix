@@ -68,6 +68,24 @@ var
 
 {-----------------------------------------------------}
 
+{calculate SDF (the slow way) for voxel car.}
+procedure generateSDF();
+var
+	i,j,k: integer;
+  minDst: integer;
+
+begin
+(*
+	{note, it would be nice to actually have negative for interior... but
+  for now just closest is fine}
+  for x := 0 to 65-1 do
+  	for y := 0 to 26-1 do
+    	for z := 0 to 18-1 do begin
+      	if getVoxel(x,y,z).a
+				      	
+    	end;
+  *)
+end;
 
 procedure loadResources();
 var
@@ -80,6 +98,7 @@ begin
 
 	note('Loading cars');
   carSprite := tSprite.create(loadBMP('gfx\car1.bmp'));
+  carSprite.page.setTransparent(RGBA.create(192, 192, 192));
   note(format('Car sprite is (%d, %d)', [carSprite.width, carSprite.height]));
 
   note('Loading music');
@@ -102,6 +121,20 @@ begin
     end;
 end;
 
+function getVoxel(pos: V3D): RGBA; inline;
+var
+	x,y,z: int32;
+begin
+	result.init(255,0,255,0);
+  x := trunc(pos.x+32.5);
+  y := trunc(pos.y+13);
+  z := trunc(pos.z+9);
+	if (x < 0) or (x >= 65) then exit;
+	if (y < 0) or (y >= 26) then exit;
+	if (z < 0) or (z >= 18) then exit;
+  result := carSprite.page.getPixel(x,y+z*26);
+end;
+
 {trace through voxels to draw the car}
 procedure drawCar_TRACE();
 var
@@ -118,53 +151,31 @@ var
 	faceColor: array[1..6] of RGBA;
 
 
-function getVoxel(pos: V3D): RGBA;
-var
-	x,y,z: int32;
-begin
-	result.init(255,0,255,0);
-  x := trunc(pos.x+32.5);
-  y := trunc(pos.y+13);
-  z := trunc(pos.z+9);
-	if (x < 0) or (x >= 65) then exit;
-	if (y < 0) or (y >= 26) then exit;
-	if (z < 0) or (z >= 18) then exit;
-  result := carSprite.page.getPixel(x,y+z*26);
-end;
 
 {trace ray at location and direction (in object space)}
 function trace(pos: V3D;dir: V3D): RGBA;
 var
 	k: integer;
   c: RGBA;
-  t,tX,tY,tZ,tMin,tMax: single; {time to intersect each of the planes}
-
-  depth: single;
-  maxSamples: integer;
+  x,y,z: integer;
+	depth: single;
+const
+  MAX_SAMPLES = 64;
 begin
+	result.init(0,0,0,0);
 
-	result.init(0,255,255,0);
+	for k := 0 to MAX_SAMPLES-1 do begin
 
-  maxSamples := 64;
-
-	result := RGBA.create(0,0,0,255);
-
-	for k := 0 to maxSamples-1 do begin
-
-  	c := getVoxel(pos);
-
-    {fix annoying transparent color}
-    if c.r=192 then c.a := 0;
-
-    {left bounds}
-    if (c.r=255) and (c.g=0) and (c.b=255) then begin
-			result.init(255,255,0,255);
-      exit;	
-    end;
+		x := trunc(pos.x+32.5);
+	  y := trunc(pos.y+13);
+  	z := trunc(pos.z+9);
+		if (x < 0) or (x >= 65) then exit;
+		if (y < 0) or (y >= 26) then exit;
+		if (z < 0) or (z >= 18) then exit;
+	  c := carSprite.page.getPixel(x,y+z*26);
 
     if c.a > 0 then begin
-    	{connection, so stop}
-      depth := (255-((t + k)*4))/255;	
+      depth := (255-((k)*4))/255;	
       c *= depth;
     	exit(c)
     end else begin
@@ -172,6 +183,9 @@ begin
 	  	pos += dir;
     end;
   end;
+
+  {color used when we ran out of samples}
+	result.init(255,0,255,255); {purple}
 
 end;
 
@@ -298,10 +312,8 @@ begin
     pos += cameraZ * (t+0.5); {start half way in a voxel}
 
   	for x := screenLines[y].xMin to screenLines[y].xMax do begin
-
       c := trace(pos, cameraZ);
       pos += deltaX;
-
     	if c.a > 0 then
 	      canvas.putPixel(x,y, c);
     end;
