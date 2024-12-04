@@ -37,6 +37,56 @@ var
 
   S3D: tS3Driver;
 
+{-------------------------------------------------}
+
+type
+	tCar = class
+  	pos: V3D;
+    zAngle: single;
+    tilt: single;
+    constructor create();
+    procedure draw();
+    procedure update();
+  end;
+
+
+constructor tCar.create();
+begin
+	pos := V3D.create(320,240,0);
+	zAngle := 0;
+  tilt := 0;
+end;
+
+procedure tCar.draw();
+var
+	startTime: double;
+begin
+	startTime := getSec;
+  carVox.draw(canvas, trunc(pos.x), trunc(pos.y), zAngle, 0, tilt, 1.0);
+  carDrawTime := getSec - startTime;
+end;
+
+
+procedure tCar.update();
+begin
+	{process input}
+	if keyDown(key_left) then begin
+  	zAngle -= elapsed;
+  	tilt += elapsed*0.5;
+  end;
+	if keyDown(key_right) then begin
+  	zAngle += elapsed;
+  	tilt -= elapsed*0.5;
+  end;
+	if keyDown(key_up) then begin
+  	pos += V3D.create(-50,0,0).rotated(0,0,zAngle) * elapsed;
+  end;
+  tilt *= 0.95;
+end;
+
+{-------------------------------------------------}
+	
+
 procedure loadResources();
 var
 	startTime: double;
@@ -86,9 +136,12 @@ procedure mainLoop();
 var
 	startClock,lastClock,thisClock: double;
   startTime: double;
+  car: tCar;
 begin
 
 	note('Main loop started');
+
+  car := tCar.create();
 
   background.draw(canvas, 0, 0);
   music.play();
@@ -108,11 +161,10 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 
+    car.update();
 
-    startTime := getSec;
-  	carVox.draw(canvas, 320, 240, gameTime/1,gameTime/2,gameTime/3, 1.0);
-    carDrawTime := getSec - startTime;
-	  drawGUI();
+    car.draw();
+    drawGUI();
 
     flipCanvas();
 

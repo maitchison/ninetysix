@@ -48,7 +48,7 @@ type
   	M: array[1..9] of single;
     function apply(p: V3D): V3D;
     procedure applyScale(factor: single);
-    procedure rotation(thetaX, thetaY, thetaZ: single);
+    procedure rotationZYX(thetaZ, thetaY, thetaX: single);
     function transpose(): Matrix3x3;
   end;
 
@@ -210,7 +210,7 @@ begin
 		M[i] *= factor;
 end;
 
-procedure Matrix3X3.rotation(thetaX, thetaY, thetaZ: single);
+procedure Matrix3X3.rotationZYX(thetaZ, thetaY, thetaX: single);
 var
 	cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
@@ -284,17 +284,18 @@ begin
   assert(abs(p.abs-1) < 0.01);
 
   {rotate 45 degrees}
-  M.rotation(degrees45,degrees45,degrees45);
+  M.rotationZYX(degrees45,degrees45,degrees45);
 	p := M.apply(pInitial);
 	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {rotate random degrees}
-  M.rotation(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  M.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
 	p := M.apply(pInitial);
 	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {check transpose looks ok}
-  M.rotation(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  M.rotationZYX
+  (rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
 	p := M.transpose.apply(pInitial);
 	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
 

@@ -44,7 +44,7 @@ type
     procedure setPage(page: tPage; height: integer);
     class function loadFromFile(filename: string; height: integer): tVoxelSprite; static;
   	function getVoxel(x,y,z:int32): RGBA;
-		procedure draw(canvas: tPage;atX, atY: int16; thetaX, thetaY, thetaZ: single; scale: single=0);
+		procedure draw(canvas: tPage;atX, atY: int16; thetaZ, thetaY, thetaX: single; scale: single=1);
   end;
 
 implementation
@@ -238,7 +238,7 @@ begin
 end;
 
 {draw voxel sprite.}
-procedure tVoxelSprite.draw(canvas: tPage; atX, atY: int16; thetaX, thetaY, thetaZ: single; scale: single=0);
+procedure tVoxelSprite.draw(canvas: tPage; atX, atY: int16; thetaZ, thetaY, thetaX: single; scale: single=1);
 var
   size: V3D; {half size of cuboid}
   debugCol: RGBA;
@@ -362,8 +362,8 @@ var
 
 function toScreen(p: V3D): tScreenPoint;
 begin
-	result.x := 320 + trunc(p.x);
-	result.y := 240 + trunc(p.y);
+	result.x := atX + trunc(p.x);
+	result.y := atY + trunc(p.y);
 end;
 
 procedure scanSide(a, b: tScreenPoint);
@@ -471,7 +471,7 @@ begin
 
 	for y := yMin to yMax do begin
 
-    pos := (cameraX*(screenLines[y].xMin-320))+(cameraY*(y-240));
+    pos := (cameraX*(screenLines[y].xMin-atX))+(cameraY*(y-atY));
 
     case faceID of
     	1: t := (-size.z-pos.z) * invZ;
@@ -528,7 +528,7 @@ begin
   faceColor[6].init(0,0,128);
 
 
-  objToWorld.rotation(thetaX, thetaY, thetaZ);
+  objToWorld.rotationZYX(thetaX, thetaY, thetaZ);
   worldToObj := objToWorld.transpose();
 
   objToWorld.applyScale(scale);
