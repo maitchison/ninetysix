@@ -228,7 +228,7 @@ var
   cameraZ: V3D;
   objToWorld: Matrix3X3;
   worldToObj: Matrix3X3;
-  lastTraceCount: integer;
+  lastTraceCount: int32;
 
 var
 	faceColor: array[1..6] of RGBA;
@@ -240,20 +240,26 @@ var
 	k: integer;
   c: RGBA;
   d: single;
-  x,y,z: integer;
+  x,y,z: int32;
 	depth: single;
 
 const
   MAX_SAMPLES = 64;
 begin
 
+  lastTraceCount := 0;
+
 	{color used when initial sample is out of of bounds}
   {this shouldn't happen, but might due to rounding error or bug}	
   result.init(255,0,0,255);
 
-	x := trunc(pos.x+32);
-	y := trunc(pos.y+16);
-	z := trunc(pos.z+9);
+  pos += V3D.create(32,16,9);
+
+  {this can be slightly faster by checking the float values instead of
+   truncating first}
+  x := trunc(pos.x);
+	y := trunc(pos.y);
+	z := trunc(pos.z);
 
 	if (x < 0) or (x >= 64) or
 		(y < 0) or (y >= 32) or
@@ -267,16 +273,36 @@ begin
 	for k := 0 to MAX_SAMPLES-1 do begin
 
   	inc(TRACE_COUNT);
+    inc(lastTraceCount);
 
-		x := trunc(pos.x+32);
-	  y := trunc(pos.y+16);
-  	z := trunc(pos.z+9);
+		x := trunc(pos.x);
+	  y := trunc(pos.y);
+  	z := trunc(pos.z);
 
 		if (x < 0) or (x >= 64) then exit();
 		if (y < 0) or (y >= 32) then exit();
 		if (z < 0) or (z >= 18) then exit();
 
-	  c := carSprite.page.getPixel(x,y+z*32);
+    asm
+    	push edi
+      push edx
+      push eax
+
+    	mov edi, carSprite.page.pixels
+      xor edx, edx
+      or dl, byte ptr [z]
+      shl edx, 5
+      or dl, byte ptr [y]
+      shl edx, 6
+      or dl, byte ptr [x]
+      mov eax, [edi+edx*4]
+      mov [c],eax
+
+      pop eax
+      pop edx
+      pop edi
+
+    end;
 
     if c.a = 255 then begin
     	{shade by distance from bounding box}
@@ -284,9 +310,7 @@ begin
     	exit(c)
     end else begin
     	{move to next voxel}
-      {d := (255-c.a) * 0.25;}
-      {stub: no CDF}
-      d := 1;
+      d := (255-c.a) * 0.25;
 		  pos += dir * d;
       depth += d;
     end;
@@ -347,7 +371,7 @@ var
   t: single;
   pos, basePos, deltaX, deltaY: V3D;
   tDelta: single;
-  invZ: single;
+  aZ, invZ: single;
   value: integer;
   c1,c2,c3,c4: RGBA;
 
@@ -395,14 +419,15 @@ begin
   end;
 
   case faceID of
-  	1: invZ := 1 / cameraZ.z;
-  	2: invZ := 1 / cameraZ.z;
-  	3: invZ := 1 / cameraZ.x;
-  	4: invZ := 1 / cameraZ.x;
-  	5: invZ := 1 / cameraZ.y;
-  	6: invZ := 1 / cameraZ.y;
-    else invZ := 0;
+  	1: aZ := cameraZ.z;
+  	2: aZ := cameraZ.z;
+  	3: aZ := cameraZ.x;
+  	4: aZ := cameraZ.x;
+  	5: aZ := cameraZ.y;
+  	6: aZ := cameraZ.y;
   end;
+  if aZ = 0 then exit; {should not happen?}
+  invZ := 1/aZ;
 
   {calculate our deltas}
 	case faceID of
@@ -412,7 +437,6 @@ begin
     4: tDelta := -cameraX.x * invZ;
     5: tDelta := -cameraX.y * invZ;
     6: tDelta := -cameraX.y * invZ;
-    else tDelta := 0;
   end;
   deltaX := cameraX + cameraZ*tDelta;
 
@@ -434,11 +458,9 @@ begin
 
   	for x := screenLines[y].xMin to screenLines[y].xMax do begin
 
-    	{show trace count}
-      lastTraceCount := TRACE_COUNT;
      	c := trace(pos, cameraZ);
-      value := TRACE_COUNT-lastTraceCount;
-{      c.init(c,c*4, c*16);}
+      {show trace count}
+     	// c.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);
 
       {AA}
       {
@@ -480,15 +502,16 @@ begin
   faceColor[5].init(0,0,255); 	
   faceColor[6].init(0,0,128);
 
-	
+
+  {	
   thetaX := gameTime/3;
   thetaY := gameTime/2;
-  thetaZ := gameTime;
+  thetaZ := gameTime;}
 
-  {
+
   thetaX := 0.1;
   thetaY := 0.0;
-  thetaZ := 0.1;}
+  thetaZ := 0.1;
 
   objToWorld.rotation(thetaX, thetaY, thetaZ);
   worldToObj := objToWorld.transpose();
@@ -503,7 +526,8 @@ begin
   canvas.fillRect(tRect.create(320-50,240-50,100,100), RGBA.create(0,0,0));
 
   {get cube corners}
-  size := V3D.create(32,16,9);
+  {note: we apply cropping here, actual half size is 32x16x9}
+  size := V3D.create(32,13,9);
   {object space -> world space}
   p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z));
   p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z));
@@ -700,7 +724,7 @@ begin
 
         transform(x-32,y-16,z-9,dX,dY,tmp);
 
-        depthByte := clip(128 + tmp, 0, 255);
+        depthByte := clamp(128 + tmp, 0, 255);
 
         {stub: show depth}
         c *= 1-(depthByte/255);

@@ -56,7 +56,7 @@ type
 
     function toString: shortString;
 
-    procedure init(r,g,b: integer;a: integer=255);
+    procedure init(r,g,b: int32;a: int32=255);
     procedure gammaAdjust(v: single);
     procedure linearAdjust(v: single);
     procedure blend(other: RGBA; factor: single);
@@ -155,12 +155,12 @@ begin
 		adjusted := 12.92 * linear
   else	
 	  adjusted := 1.055 * power(linear, 1/GAMMA) - 0.055;
-  result := clip(round(adjusted * 255.0), 0, 255);
+  result := clamp(round(adjusted * 255.0), 0, 255);
 end;
 
 function linearCorrect(v: byte; b: single): byte;
 begin
-  result := clip(round(v * b), 0, 255);
+  result := clamp(round(v * b), 0, 255);
 end;
 
 function linear(v: byte): single;
@@ -188,7 +188,7 @@ begin
 		adjusted := 12.92 * linear
   else	
 	  adjusted := 1.055 * power(linear, 1/GAMMA) - 0.055;
-  result := clip(round(adjusted * 255.0), 0, 255);
+  result := clamp(round(adjusted * 255.0), 0, 255);
 end;
 
 
@@ -267,9 +267,9 @@ end;
 
 procedure RGBA.toLinear();
 begin
-	r := clip(round(linear(r) * 255), 0, 255);
-  g := clip(round(linear(g) * 255), 0, 255);
-  b := clip(round(linear(b) * 255), 0, 255);
+  r := clamp(round(linear(r) * 255), 0, 255);
+  g := clamp(round(linear(g) * 255), 0, 255);
+  b := clamp(round(linear(b) * 255), 0, 255);
 end;
 
 procedure RGBA.toSRGB();
@@ -291,10 +291,10 @@ end;
 
 procedure RGBA.init(r,g,b: integer;a: integer=255);
 begin
-	self.r := clip(r, 0, 255);
-	self.g := clip(g, 0, 255);
-	self.b := clip(b, 0, 255);
-	self.a := clip(a, 0, 255);
+  self.r := clamp(r, 0, 255);
+  self.g := clamp(g, 0, 255);
+  self.b := clamp(b, 0, 255);
+  self.a := clamp(a, 0, 255);
 end;
 
 class operator RGBA.equal(a,b: RGBA): boolean;
@@ -735,7 +735,7 @@ begin
 
   if c.a = 0 then exit;
 
-	{clipping}
+  {clipping}
 	if word(y) >= self.Height then exit;
 	if x1 < 0 then x1 := 0;
   if x2 > self.Width then x2 := self.Width;
