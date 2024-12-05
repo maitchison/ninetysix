@@ -8,7 +8,7 @@ uses
   graph2d,
   graph32,
   utils,
-  screen;
+  vga;
 
 type
 

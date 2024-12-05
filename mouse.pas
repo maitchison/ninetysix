@@ -215,6 +215,7 @@ const
 	CURSOR_FOREGROUND = 2;
 	CURSOR_NOT_SCREEN = 3;
 begin
+
 	for x := 0 to 63 do
   	for y := 0 to 63 do begin
     	if (x > 15) or (y > 15) then
@@ -429,8 +430,6 @@ begin
 
 	userProc_Installed := False;
   userProcLength := dword(@mouse_dummy2)-dword(@userProc);
-  {stub:}
-  writeln('User proc is ',(userProcLength),' bytes');
 
 	addExitProc(@CloseMouse);
 

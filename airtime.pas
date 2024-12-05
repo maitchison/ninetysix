@@ -183,16 +183,11 @@ var
 	thisClock, startClock, lastClock: double;
   subRegion: tSprite;
 begin
-	{title really needs 640x480}
-	screen.setMode(320,240,32);
-	screen.setLogicalSize(640,480);
-  canvas := tPage.create(screen.width, screen.height);
 	note('Title screen started');
 
 	background.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
 	background.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
 	background.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
-
 
   background.blit(canvas, 0, 0);
   subRegion := background;
@@ -213,8 +208,6 @@ begin
     	VX_GHOST_MODE := not keyDown(key_leftshift);
   	if keyDown(key_2) then
     	VX_SHOW_TRACE_EXITS := not keyDown(key_leftshift);
-
-    screen.setDisplayStart(mouse_x, mouse_y);
 
   	{time keeping}
   	thisClock := getSec;
@@ -296,7 +289,7 @@ begin
 
   loadResources();
 
-	screen.setMode(320,240,32);
+	screen.setMode(640,480,32);
 	S3D := tS3Driver.create();
   canvas := tPage.create(screen.width, screen.height);
 

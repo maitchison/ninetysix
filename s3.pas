@@ -32,6 +32,9 @@ procedure S3SetHardwareCursorLocation(x,y: int16);
 
 implementation
 
+var
+  HAS_MMIO: boolean = False;
+
 const
 	STATUS_0  = $03C2;
 	STATUS_1  = $03DA;
@@ -150,18 +153,18 @@ begin
   Also we want bit 5 to be 0
   }
 
-  {Enable only old MMIO}
 	S3UnlockRegs();
   WriteReg(CR, $53, (ReadReg(CR, $53) and %11000111) or %00011000);
   S3LockRegs();	
+  HAS_MMIO := true;
 end;
 
 procedure S3DisableMMIO();
 begin
-  {Enable only old MMIO}
 	S3UnlockRegs();
   WriteReg(CR, $53, (ReadReg(CR, $53) and %11000111) or %00000000);
-  S3LockRegs();	
+  S3LockRegs();
+  HAS_MMIO := true;  	
 end;
 
 procedure S3SetClipping(x1,y1,x2,y2: int16);
@@ -645,6 +648,7 @@ end;
 
 procedure S3SetHardwareCursorLocation(x,y: int16);
 begin
+
 	S3UnlockRegs();
   S3Wait;
 
@@ -675,8 +679,11 @@ begin
   bgColor.init(0,0,0);
 
   {enable MMIO}
+  {todo: enable MMIO by default}
+  {
 	S3EnableMMIO();
   MapMMIO();
+  }
 end;
 
 (*

@@ -9,10 +9,10 @@ interface
 
 uses
 	test,
-	Debug,
-  Screen,
-  Utils,
-  Graph2d;
+	debug,
+  vga,
+  utils,
+  graph2d;
 
 type
   TBMPHeader = packed record
