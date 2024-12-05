@@ -47,7 +47,7 @@ begin
   dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+destinationPath+'_tmp');
   mkDIR(destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
-  dos.exec(getEnv('COMSPEC'), '/C rmdir /s '+destinationPath+'_tmp');
+  dos.exec(getEnv('COMSPEC'), '/C rmdir '+destinationPath+'_tmp /s');
 end;
 
 
