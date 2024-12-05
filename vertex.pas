@@ -44,12 +44,23 @@ type V3D = record
     end;
 
 type
-	Matrix3X3 = record	
-  	M: array[1..9] of single;
+	tMatrix3x3 = record	
+  	data: array[1..9] of single;
+
+    function M(i,j: integer): single; inline;
+
     function apply(p: V3D): V3D;
     procedure applyScale(factor: single);
+
+    procedure rotationX(theta: single);
+
     procedure rotationZYX(thetaZ, thetaY, thetaX: single);
-    function transpose(): Matrix3x3;
+    procedure rotationXYZ(thetaX, thetaY, thetaZ: single);
+
+    function MM(other: tMatrix3x3): tMatrix3x3;
+    function transposed(): tMatrix3x3;
+    function cloned(): tMatrix3x3;
+    function toString(): string;
   end;
 
 implementation
@@ -194,23 +205,27 @@ end;
 
 {---------------------------------------------------}
 
-
-function Matrix3X3.apply(p: V3D): V3D;
+function tMatrix3x3.M(i,j: integer): single; inline;
 begin
-  result.x := M[1]*p.x + M[2]*p.y + M[3]*p.z;
-  result.y := M[4]*p.x + M[5]*p.y + M[6]*p.z;
-  result.z := M[7]*p.x + M[8]*p.y + M[9]*p.z;
+	result := data[i+(j-1)*3];
 end;
 
-procedure Matrix3X3.applyScale(factor: single);
+function tMatrix3x3.apply(p: V3D): V3D;
+begin
+  result.x := data[1]*p.x + data[2]*p.y + data[3]*p.z;
+  result.y := data[4]*p.x + data[5]*p.y + data[6]*p.z;
+  result.z := data[7]*p.x + data[8]*p.y + data[9]*p.z;
+end;
+
+procedure tMatrix3X3.applyScale(factor: single);
 var
 	i: integer;
 begin
 	for i := 1 to 9 do
-		M[i] *= factor;
+    data[i] *= factor;
 end;
 
-procedure Matrix3X3.rotationZYX(thetaZ, thetaY, thetaX: single);
+procedure tMatrix3X3.rotationZYX(thetaZ, thetaY, thetaX: single);
 var
 	cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
@@ -221,59 +236,105 @@ begin
 	cosY := cos(thetaY);
 	sinZ := sin(thetaZ);
 	cosZ := cos(thetaZ);
-  M[1] := cosX*cosY;
-  M[2] := cosX*sinY*sinZ-sinX*cosZ;
-  M[3] := cosX*sinY*cosZ+sinX*sinZ;
-  M[4] := sinX*cosY;
-  M[5] := sinX*sinY*sinZ+cosX*cosZ;
-  M[6] := sinX*sinY*cosZ-cosX*sinZ;
-  M[7] := -sinY;
-  M[8] := cosY*sinZ;
-  M[9] := cosY*cosZ;
-(*
-  M[1] := cos(thetaY)*cos(thetaZ);
-  M[2] := -cos(thetaY)*sin(thetaZ);
-  M[3] := sin(thetaY);
-  M[4] := sin(thetaX)*sin(thetaY)*cos(thetaZ)+cos(thetaX)*sin(thetaZ);
-  M[5] := sin(thetaX)*sin(thetaY)*sin(thetaZ)-sin(thetaX)*cos(thetaY);
-  M[6] := -sin(thetaX)*cos(thetaY);
-  M[7] := -cos(thetaX)*sin(thetaY)*cos(thetaZ)+sin(thetaX)*sin(thetaZ);
-  M[8] := cos(thetaX)*sin(thetaY)*cos(thetaZ)-sin(thetaX)*cos(thetaZ);
-  M[9] := cos(thetaX)*cos(thetaY);
-   *)
-(*
-  M[1] := cos(thetaY)*cos(thetaZ);
-  M[2] := -cos(thetaY)*sin(thetaZ);
-  M[3] := sin(thetaY);
-  M[4] := sin(thetaX)*sin(thetaY)*cos(thetaZ)+cos(thetaX)*sin(thetaZ);
-  M[5] := sin(thetaX)*sin(thetaY)*sin(thetaZ)-sin(thetaX)*cos(thetaY);
-  M[6] := -sin(thetaX)*cos(thetaY);
-  M[7] := -cos(thetaX)*sin(thetaY)*cos(thetaZ)+sin(thetaX)*sin(thetaZ);
-  M[8] := cos(thetaX)*sin(thetaY)*cos(thetaZ)-sin(thetaX)*cos(thetaZ);
-  M[9] := cos(thetaX)*cos(thetaY);
-   *)
+  data[1] := cosX*cosY;
+  data[2] := cosX*sinY*sinZ-sinX*cosZ;
+  data[3] := cosX*sinY*cosZ+sinX*sinZ;
+  data[4] := sinX*cosY;
+  data[5] := sinX*sinY*sinZ+cosX*cosZ;
+  data[6] := sinX*sinY*cosZ-cosX*sinZ;
+  data[7] := -sinY;
+  data[8] := cosY*sinZ;
+  data[9] := cosY*cosZ;
 end;
 
-{rotates, but applies in ZYX order}
-function Matrix3X3.transpose(): Matrix3x3;
+procedure tMatrix3X3.rotationXYZ(thetaX, thetaY, thetaZ: single);
+var
+	cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
-	result.M[1] := M[1];
-	result.M[2] := M[4];
-	result.M[3] := M[7];
-	result.M[4] := M[2];
-	result.M[5] := M[5];
-	result.M[6] := M[8];
-	result.M[7] := M[3];
-	result.M[8] := M[6];
-	result.M[9] := M[9];
+	sinX := sin(thetaX);
+	cosX := cos(thetaX);
+	sinY := sin(thetaY);
+	cosY := cos(thetaY);
+	sinZ := sin(thetaZ);
+	cosZ := cos(thetaZ);
+  data[1] := cosY*cosZ;
+  data[2] := sinX*sinY*cosZ-cosX*sinZ;
+  data[3] := cosX*sinY*cosZ+sinX*sinZ;
+  data[4] := cosY*sinZ;
+  data[5] := sinX*sinY*sinZ+cosX*cosZ;
+  data[6] := cosX*sinY*sinZ-sinX*cosZ;
+  data[7] := -sinY;
+  data[8] := sinX*cosY;
+  data[9] := cosX*cosY;
+end;
+
+procedure tMatrix3X3.rotationX(theta: single);
+var	
+	cs,sn: single;
+begin
+	cs := cos(theta);
+  sn := sin(theta);
+  data[1] := 1;
+  data[2] := 0;
+  data[3] := 0;
+  data[4] := 0;
+  data[5] := cs;
+  data[6] := -sn;
+  data[7] := 0;
+  data[8] := sn;
+  data[9] := cs;
+end;
+
+{matrix multiplication}
+function tMatrix3X3.MM(other: tMatrix3x3): tMatrix3x3;
+var	
+	i,j,k: integer;
+  value: single;
+begin
+	for i := 1 to 3 do
+  	for j := 1 to 3 do begin
+    	value := 0;
+      for k := 1 to 3 do
+      	value += M(i,k) * other.M(k,j);
+      result.data[i+((j-1)*3)] := value;
+    end;
+end;
+
+{returns the transpose}
+function tMatrix3X3.transposed(): tMatrix3x3;
+begin
+  result.data[1] := data[1];
+  result.data[2] := data[4];
+  result.data[3] := data[7];
+  result.data[4] := data[2];
+  result.data[5] := data[5];
+  result.data[6] := data[8];
+  result.data[7] := data[3];
+  result.data[8] := data[6];
+  result.data[9] := data[9];
+end;
+
+function tMatrix3X3.cloned(): tMatrix3x3;
+begin
+  move(data, result.data, length(data)*sizeof(data[1]));
+end;
+
+function tMatrix3X3.toString(): string;
+var
+	i: integer;
+begin
+	result := '';
+  for i := 0 to 2 do
+		result += format('%f %f %f', [data[i*3+1],data[i*3+2],data[i*3+3]]) + #13#10;
 end;
 
 {-----------------------------------------------------}
 procedure runTests();
 var
 	p, pInitial: V3D;
-  M: Matrix3x3;
-  i: integer;
+  target: single;
+  A,B,C: tMatrix3x3;
+  i,j: integer;
 const
 	degrees45 = 0.785398; {45 degrees in radians}
 
@@ -284,20 +345,36 @@ begin
   assert(abs(p.abs-1) < 0.01);
 
   {rotate 45 degrees}
-  M.rotationZYX(degrees45,degrees45,degrees45);
-	p := M.apply(pInitial);
+  A.rotationZYX(degrees45,degrees45,degrees45);
+	p := A.apply(pInitial);
 	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {rotate random degrees}
-  M.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
-	p := M.apply(pInitial);
+  A.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+	p := A.apply(pInitial);
+	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
+
+  {rotate random degrees}
+  A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+	p := A.apply(pInitial);
 	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {check transpose looks ok}
-  M.rotationZYX
-  (rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
-	p := M.transpose.apply(pInitial);
+  A.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+	p := A.transposed().apply(pInitial);
 	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
+
+  {make sure inverses kind of work}
+  A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  p := A.apply(pInitial);
+  B := A.transposed();
+  C := A.MM(B);
+  for i := 1 to 3 do
+  	for j := 1 to 3 do begin
+    	if i=j then target := 1 else target := 0;
+    	assert(abs(C.M(i,j)-target) < 0.01, 'Inversion did not work: '+#10#13+C.toString);
+    end;
+
 
 end;
 

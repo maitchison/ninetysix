@@ -246,8 +246,8 @@ var
 	cameraX: V3D;
 	cameraY: V3D;
   cameraZ: V3D;
-  objToWorld: Matrix3X3;
-  worldToObj: Matrix3X3;
+  objToWorld: tMatrix3X3;
+  worldToObj: tMatrix3X3;
   lastTraceCount: int32;
 
 var
@@ -519,6 +519,7 @@ var
 begin
 
 	TRACE_COUNT := 0;
+  if scale = 0 then exit;
 
   faceColor[1].init(255,0,0); 	
   faceColor[2].init(128,0,0);
@@ -527,9 +528,8 @@ begin
   faceColor[5].init(0,0,255); 	
   faceColor[6].init(0,0,128);
 
-
-  objToWorld.rotationZYX(thetaX, thetaY, thetaZ);
-  worldToObj := objToWorld.transpose();
+  objToWorld.rotationXYZ(thetaX, thetaY, thetaZ);
+  worldToObj := objToWorld.transposed();
 
   objToWorld.applyScale(scale);
   worldToObj.applyScale(1/scale);

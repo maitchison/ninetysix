@@ -62,7 +62,7 @@ var
 	startTime: double;
 begin
 	startTime := getSec;
-  carVox.draw(canvas, trunc(pos.x), trunc(pos.y), zAngle, 0, tilt, 1.0);
+  carVox.draw(canvas, trunc(pos.x), trunc(pos.y), zAngle, 0, 0, 1.0);
   carDrawTime := getSec - startTime;
 end;
 
