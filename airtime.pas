@@ -5,6 +5,7 @@ program airtime;
 
 uses
 	vga,
+  vesa,
   graph32,
   graph2d,
 	debug,
@@ -287,6 +288,9 @@ begin
 end;
 
 begin
+
+	{use svga driver}
+	screen := tVesaDriver.create();
 
   loadResources();
 
