@@ -41,8 +41,6 @@ var
 
   camX, camY: int32;
 
-  screen: tVesaDriver;
-
 procedure mainLoop(); forward;
 
 {-------------------------------------------------}
@@ -294,11 +292,7 @@ end;
 begin
 
 	{use svga driver}
-	screen := tVesaDriver.create();
-  {this is silly... find a way to extend screen properly}
-  {what i'm doing here is updating the 'global' screen, as well
-   as keeping a 'local' copy}
-  vga.screen := screen;
+	vga.screen := tVesaDriver.create();
 
   loadResources();
 

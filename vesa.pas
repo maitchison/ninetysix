@@ -15,8 +15,8 @@ uses
 type tVesaDriver = class(tVGADriver)
 	public	
 		procedure setMode(width, height, BPP: word); override;
-    procedure setLogicalSize(width, height: word);
-    procedure setDisplayStart(x, y: word);
+    procedure setLogicalSize(width, height: word); override;
+    procedure setDisplayStart(x, y: word); override;
 	end;
 
 implementation
