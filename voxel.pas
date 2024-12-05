@@ -19,6 +19,7 @@ var
   {debugging stuff}
   VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
+  VX_GHOST_MODE: boolean = false;
 
 
 {restrictions
@@ -500,7 +501,8 @@ begin
 
      	c := trace(pos, cameraZ);
       {show trace count}
-     	//c.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);
+      if VX_GHOST_MODE then
+     		c.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);
 
       {AA}
       {

@@ -40,6 +40,8 @@ var
 
   camX, camY: int32;
 
+procedure mainLoop(); forward;
+
 {-------------------------------------------------}
 
 type
@@ -83,16 +85,16 @@ begin
 	{process input}
 	if keyDown(key_left) then begin
   	zAngle -= elapsed;
-  	tilt += elapsed*0.5;
+  	tilt += elapsed*1.0;
   end;
 	if keyDown(key_right) then begin
   	zAngle += elapsed;
-  	tilt -= elapsed*0.5;
+  	tilt -= elapsed*1.0;
   end;
 	if keyDown(key_up) then begin
   	pos += V3D.create(-50,0,0).rotated(0,0,zAngle) * elapsed;
   end;
-  tilt *= 0.95;
+  tilt *= 0.90;
 end;
 
 {-------------------------------------------------}
@@ -137,6 +139,28 @@ begin
     end;
 end;
 
+procedure flipCanvasLines(y1,y2: int32);
+var
+	len: dword;
+  ofs: dword;
+begin	
+	{note: s3 upload is 2x faster, but causes stuttering on music}
+  len := SCREEN_WIDTH*(y2-y1);
+  ofs := y1*SCREEN_WIDTH*4;
+  asm
+  	pusha
+  	push es
+    mov es,  LFB_SEG
+    mov edi, ofs
+    mov esi, canvas.pixels
+    add esi, ofs
+    mov ecx, len
+    rep movsd
+    pop es
+    popa
+    end;
+end;
+
 procedure drawGUI();
 var
 	fps: double;
@@ -157,12 +181,17 @@ begin
   canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 	note('Title screen started');
 
+	background.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
+	background.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
+	background.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
+
+
   background.blit(canvas, 0, 0);
   subRegion := background;
-  subRegion.rect.position.x := 320-50;
-  subRegion.rect.position.y := 360-50;
-  subRegion.rect.width := 100;
-  subRegion.rect.height := 100;
+  subRegion.rect.position.x := 320-30;
+  subRegion.rect.position.y := 360-30;
+  subRegion.rect.width := 60;
+  subRegion.rect.height := 60;
 
   music.play();
   flipCanvas();
@@ -170,10 +199,13 @@ begin
   startClock := getSec;
   lastClock := startClock;
 
-  camX := 0;
-  camY := 0;
-
   while True do begin
+
+  	if keyDown(key_1) then
+    	VX_GHOST_MODE := not keyDown(key_leftshift);
+  	if keyDown(key_2) then
+    	VX_SHOW_TRACE_EXITS := not keyDown(key_leftshift);
+
 
   	{time keeping}
   	thisClock := getSec;
@@ -184,13 +216,15 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 		
-
-    subRegion.blit(canvas, 320-50, 360-50);
-    carVox.draw(canvas, 320, 360, gameTime, gameTime/2, gameTime/3, 1);
+    subRegion.blit(canvas, 320-30, 360-30);
+    carVox.draw(canvas, 320, 360, gameTime, gameTime/2, gameTime*3, 0.75);
 
     drawGUI();
 
-    flipCanvas();
+		flipCanvasLines(0,35);
+		flipCanvasLines(360-30,360+30);
+
+    if keyDown(key_p) then mainLoop();
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
@@ -204,9 +238,12 @@ var
 
 begin
 
+	setMode(320,240,32);
+  canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 	note('Main loop started');
 
   car := tCar.create();
+  car.pos := V3D.create(300,300,0);
 
   flipCanvas();
 
@@ -254,7 +291,6 @@ begin
   initMouse();
   initKeyboard();
 
-  {mainLoop();}
   titleScreen();
 
   setText();
