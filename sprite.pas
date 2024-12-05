@@ -31,7 +31,8 @@ type
     function Width: Integer;
     function Height: Integer;
 
-    procedure Draw(DstPage: TPage; atX, atY: Integer);
+    procedure blit(dstPage: tPage; atX, atY: int32);
+    procedure draw(dstPage: tPage; atX, atY: int32);
     procedure DrawStretched(DstPage: TPage; dest: TRect);
     procedure NineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
@@ -62,32 +63,48 @@ end;
 {draw an image segment to screen}
 procedure blit_REF(dstPage, srcPage: TPage; srcRect: tRect; atX,atY: int16);
 var
-	x,y: integer;
+	x,y: int32;
+  xMin,xMax,yMin,yMax: int32;
 begin
-	for y := 0 to srcRect.height-1 do
-  	for x := 0 to srcRect.width-1 do
+	xMin := max(0, -atX);
+	yMin := max(0, -atY);
+	xMax := min(SCREEN_WIDTH-atX, srcRect.width);
+	yMax := min(SCREEN_HEIGHT-atY, srcRect.height);
+
+	for y := yMin to yMax-1 do
+  	for x := xMin to xMax-1 do
     	dstPage.putPixel(atX+x, atY+y, srcPage.getPixel(x+srcRect.x, y+srcRect.y));
 end;
 
-{draw an image segment to screen
-no alpha, no cropping on x-axis}
+{draw an image segment to screen, no alpha}
 procedure blit_ASM(dstPage, srcPage: TPage; srcRect: tRect; atX,atY: int16);
 var
 	srcOfs: dword;
   dstOfs: dword;
   y, y1, y2: int32;
+  x1,x2: int32;
   bytesToCopy: word;
+  topCrop,leftCrop: int32;
 begin
 
-	y1 := atY;
-  y2 := atY+srcRect.height;
+  y1 := max(atY, 0);
+  y2 := min(atY+srcRect.height, dstPage.height-1);
+  topCrop := y1-atY;
 
-  y1 := max(y1, 0);
-  y2 := min(y2, dstPage.height-1);
+	x1 := max(atX, 0);
+  x2 := min(atX+srcRect.width, dstPage.width-1);
+  leftCrop := x1-atX;
 
-	srcOfs := 4 * (srcRect.x + srcRect.y*srcPage.width);
-  dstOfs := 4 * (atX + y1*dstPage.width);
-  bytesToCopy := 4 * srcRect.width;
+  {might be off by one here}
+  if y2 < y1 then exit;
+  if x2 < x1 then exit;
+
+  {todo adjust when cropping y on top}
+	srcOfs := 4 * ((srcRect.x + leftCrop) + (srcRect.y+topCrop)*srcPage.width);
+  dstOfs := 4 * (x1 + y1*dstPage.width);
+
+  bytesToCopy := 4 * (x2-x1);
+
   for y := y1 to y2 do begin
   	move((srcPage.pixels+srcOfs)^, (dstPage.pixels+dstOfs)^, bytesToCopy);
     srcOfs += srcPage.width * 4;
@@ -264,12 +281,16 @@ begin
 end;
 
 
-{Draw sprite to screen at given location.}
-procedure TSprite.Draw(DstPage: TPage; atX, atY: Integer);
-var
-	x,y: Integer;
+{Draw sprite to screen at given location, with alpha etc}
+procedure TSprite.draw(dstPage: tPage; atX, atY: Integer);
 begin
 	blit_REF(dstPage, self.page, self.rect, atX, atY);
+end;
+
+{Copy sprite to screen at given location, no alpha blending}
+procedure TSprite.blit(dstPage: tPage; atX, atY: Integer);
+begin
+	blit_ASM(dstPage, self.page, self.rect, atX, atY);
 end;
 
 {Draws sprite stetched to cover destination rect}

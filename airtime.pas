@@ -38,6 +38,8 @@ var
 
   S3D: tS3Driver;
 
+  camX, camY: int32;
+
 {-------------------------------------------------}
 
 type
@@ -58,12 +60,20 @@ begin
   tilt := 0;
 end;
 
+procedure worldToScreen(pos: V3D; out dx: int16; out dy: int16);
+begin
+	dx := trunc(pos.x-camX)+320;
+	dy := trunc(pos.y-camY)+240;
+end;
+
 procedure tCar.draw();
 var
 	startTime: double;
+  dx, dy: int16;
 begin
 	startTime := getSec;
-  carVox.draw(canvas, trunc(pos.x), trunc(pos.y), zAngle, 0, 0, 0.5);
+  worldToScreen(pos, dx, dy);
+  carVox.draw(canvas, dx, dy, zAngle, 0, 0, 0.5);
   carDrawTime := getSec - startTime;
 end;
 
@@ -130,7 +140,7 @@ var
 	tpf: double;
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
-  tpf := TRACE_COUNT;
+  tpf := VX_TRACE_COUNT;
 	GUILabel(canvas, 10, 10, format('TPF: %f Car: %f ms', [tpf,carDrawTime*1000]));
 end;
 
@@ -143,13 +153,12 @@ var
 	startClock,lastClock,thisClock: double;
   startTime: double;
   car: tCar;
+
 begin
 
 	note('Main loop started');
 
   car := tCar.create();
-
-  track.draw(canvas, 0, 0);
 
   music.play();
   flipCanvas();
@@ -157,7 +166,15 @@ begin
   startClock := getSec;
   lastClock := startClock;
 
+  camX := 0;
+  camY := 0;
+
   while True do begin
+
+  	camX := trunc(car.pos.x);
+    camY := trunc(car.pos.y);
+
+    track.blit(canvas, -camX+320, -camY+240);
   	
   	{time keeping}
   	thisClock := getSec;

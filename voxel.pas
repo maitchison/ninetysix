@@ -11,12 +11,14 @@ uses
   debug,
   graph32,
   graph2d,
+	screen,
   vertex,
   lc96;
 
 var
   {debugging stuff}
-  TRACE_COUNT: int32 = 0;
+  VX_TRACE_COUNT: int32 = 0;
+  VX_SHOW_TRACE_EXITS: boolean = false;
 
 
 {restrictions
@@ -68,7 +70,7 @@ type
 procedure tScreenLine.reset(); inline;
 begin
 	xMax := 0;
-  xMin := 639;
+  xMin := SCREEN_WIDTH;
 end;
 
 procedure tScreenLine.adjust(x: int16); inline;
@@ -78,7 +80,7 @@ begin
 end;
 
 var
-	screenLines: array[0..480-1] of tScreenLine;
+	screenLines: array[0..1024-1] of tScreenLine;
 
 
 {-----------------------------------------------------}
@@ -297,16 +299,25 @@ begin
 
 	for k := 0 to MAX_SAMPLES-1 do begin
 
-  	inc(TRACE_COUNT);
+  	inc(VX_TRACE_COUNT);
     inc(lastTraceCount);
 
 		x := sx div 256;
 	  y := sy div 256;
   	z := sz div 256;
 
-		if (x < 0) or (x >= 64) then exit(RGBA.create(255,0,0));
-		if (y < 0) or (y >= 32) then exit(RGBA.create(0,255,0));
-		if (z < 0) or (z >= 18) then exit(RGBA.create(0,0,255));
+		if (x < 0) or (x >= 64) then begin
+    	if not VX_SHOW_TRACE_EXITS then exit;
+      exit(RGBA.create(255,0,0));
+    end;
+		if (y < 0) or (y >= 32) then begin
+    	if not VX_SHOW_TRACE_EXITS then exit;
+    	exit(RGBA.create(0,255,0));
+    end;
+		if (z < 0) or (z >= 18) then begin
+    	if not VX_SHOW_TRACE_EXITS then exit;
+    	exit(RGBA.create(0,0,255));
+    end;
 
     asm
     	push edi
@@ -520,7 +531,7 @@ var
 
 begin
 
-	TRACE_COUNT := 0;
+	VX_TRACE_COUNT := 0;
   if scale = 0 then exit;
 
   faceColor[1].init(255,0,0); 	
