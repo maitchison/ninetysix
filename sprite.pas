@@ -22,9 +22,9 @@ type
 
 	TSprite = record
 
-  	page: TPage;
-  	rect: TRect;
-    border: TBorder;
+  	page: tPage;
+  	rect: tRect;
+    border: tBorder;
 
     constructor Create(APage: TPage);
 

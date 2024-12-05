@@ -55,15 +55,15 @@ type
 
 constructor tCar.create();
 begin
-	pos := V3D.create(320,240,0);
+	pos := V3D.create(SCREEN_WIDTH div 2,SCREEN_HEIGHT div 2,0);
 	zAngle := 0;
   tilt := 0;
 end;
 
 procedure worldToScreen(pos: V3D; out dx: int16; out dy: int16);
 begin
-	dx := trunc(pos.x-camX)+320;
-	dy := trunc(pos.y-camY)+240;
+	dx := trunc(pos.x-camX)+SCREEN_WIDTH div 2;
+	dy := trunc(pos.y-camY)+SCREEN_HEIGHT div 2;
 end;
 
 procedure tCar.draw();
@@ -73,7 +73,7 @@ var
 begin
 	startTime := getSec;
   worldToScreen(pos, dx, dy);
-  carVox.draw(canvas, dx, dy, zAngle, 0, 0, 0.5);
+  carVox.draw(canvas, dx, dy, zAngle, 0, tilt, 0.5);
   carDrawTime := getSec - startTime;
 end;
 
@@ -119,15 +119,18 @@ begin
 end;
 
 procedure flipCanvas();
+var
+	screenDWords: dword;
 begin	
 	{note: s3 upload is 2x faster, but causes stuttering on music}
+  screenDWords := SCREEN_WIDTH*SCREEN_HEIGHT;
   asm
   	pusha
   	push es
     mov es,  LFB_SEG
     mov edi,  0
     mov esi, canvas.pixels
-    mov ecx, 640*480
+    mov ecx, screenDWords
     rep movsd
     pop es
     popa
@@ -141,11 +144,56 @@ var
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
-	GUILabel(canvas, 10, 10, format('TPF: %f Car: %f ms', [tpf,carDrawTime*1000]));
+	GUILabel(canvas, 10, 10, format('FPS:%f Car: %f ms', [fps,carDrawTime*1000]));
 end;
 
-procedure titleLoop();
+procedure titleScreen();
+var
+	thisClock, startClock, lastClock: double;
+  subRegion: tSprite;
 begin
+	{title really needs 640x480}
+	setMode(640,480,32);
+  canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
+	note('Title screen started');
+
+  background.blit(canvas, 0, 0);
+  subRegion := background;
+  subRegion.rect.position.x := 320-50;
+  subRegion.rect.position.y := 360-50;
+  subRegion.rect.width := 100;
+  subRegion.rect.height := 100;
+
+  music.play();
+  flipCanvas();
+
+  startClock := getSec;
+  lastClock := startClock;
+
+  camX := 0;
+  camY := 0;
+
+  while True do begin
+
+  	{time keeping}
+  	thisClock := getSec;
+    elapsed := thisClock-lastClock;
+    if keyDown(key_space) then
+    	elapsed /= 100;
+    gameTime += elapsed;
+    lastClock := thisClock;
+    inc(frameCount);
+		
+
+    subRegion.blit(canvas, 320-50, 360-50);
+    carVox.draw(canvas, 320, 360, gameTime, gameTime/2, gameTime/3, 1);
+
+    drawGUI();
+
+    flipCanvas();
+
+  	if keyDown(key_q) or keyDown(key_esc) then break;
+  end;
 end;
 
 procedure mainLoop();
@@ -160,7 +208,6 @@ begin
 
   car := tCar.create();
 
-  music.play();
   flipCanvas();
 
   startClock := getSec;
@@ -171,8 +218,8 @@ begin
 
   while True do begin
 
-  	camX := trunc(car.pos.x);
-    camY := trunc(car.pos.y);
+  	camX += trunc((car.pos.x-CamX)*0.1);
+    camY += trunc((car.pos.y-CamY)*0.1);
 
     track.blit(canvas, -camX+320, -camY+240);
   	
@@ -194,22 +241,21 @@ begin
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
-
-  note(format('FPS: %f',[frameCount / (getSec-startClock)]));
 end;
 
 begin
 
   loadResources();
 
-	setMode(640,480,32);
+	setMode(320,240,32);
 	S3D := tS3Driver.create();
   canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
   initMouse();
   initKeyboard();
 
-  mainLoop();
+  {mainLoop();}
+  titleScreen();
 
   setText();
   printLog();

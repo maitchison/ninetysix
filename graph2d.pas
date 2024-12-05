@@ -12,15 +12,15 @@ uses
 
 type
 
-	TPoint = record
+	tPoint = record
   	x, y: Integer;
     class operator add(a,b: TPoint): TPoint;
     constructor Create(AX, AY: Integer);
   end;
 
-	TRect = record
-  	Position: TPoint;
-    Width, Height: Integer;
+	tRect = record
+  	position: TPoint;
+    width, height: Integer;
 
     constructor Create(ALeft, ATop, AWidth, AHeight: Integer);
     class function Inset(Other: tRect;x1, y1, x2, y2: integer): TRect; static;

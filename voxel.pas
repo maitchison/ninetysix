@@ -542,7 +542,7 @@ begin
   faceColor[6].init(0,0,128);
 
   isometricTransform.rotationX(-0.955);
-  objToWorld.rotationXYZ(0, 0, zAngle);
+  objToWorld.rotationXYZ(roll, 0, zAngle);
 
   objToWorld := objToWorld.MM(isometricTransform);
 	{transpose is inverse (for unitary)}
