@@ -25,6 +25,7 @@ var
 	music: tSoundFile;
 
   background: tSprite;
+  track: tSprite;
   canvas: tPage;
   carVox: tVoxelSprite;
 
@@ -62,7 +63,7 @@ var
 	startTime: double;
 begin
 	startTime := getSec;
-  carVox.draw(canvas, trunc(pos.x), trunc(pos.y), zAngle, 0, 0, 1.0);
+  carVox.draw(canvas, trunc(pos.x), trunc(pos.y), zAngle, 0, 0, 0.5);
   carDrawTime := getSec - startTime;
 end;
 
@@ -85,20 +86,25 @@ begin
 end;
 
 {-------------------------------------------------}
-	
 
-procedure loadResources();
+function loadSprite(filename: shortstring): tSprite;
 var
 	startTime: double;
 begin
-	note('Loading title');
   startTime := getSec;
-	background := tSprite.create(loadLC96('gfx\title.p96'));
-  note(format('Loaded background (%dx%d) in %fs', [background.width, background.height, getSec-startTime]));
+	result := tSprite.create(loadLC96('gfx\'+filename+'.p96'));
+  note(format(' -loaded %s (%dx%d) in %fs', [filename, result.width, result.height, getSec-startTime]));
+end;	
+
+procedure loadResources();
+begin
+
+	note('Loading Resources.');
+
+  background := loadSprite('title');
+  track := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('gfx\car1', 32);
-
-  note('Loading music');
 	music := tSoundFile.create('music\music2.wav');
 end;
 
@@ -128,6 +134,10 @@ begin
 	GUILabel(canvas, 10, 10, format('TPF: %f Car: %f ms', [tpf,carDrawTime*1000]));
 end;
 
+procedure titleLoop();
+begin
+end;
+
 procedure mainLoop();
 var
 	startClock,lastClock,thisClock: double;
@@ -139,7 +149,8 @@ begin
 
   car := tCar.create();
 
-  background.draw(canvas, 0, 0);
+  track.draw(canvas, 0, 0);
+
   music.play();
   flipCanvas();
 

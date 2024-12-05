@@ -546,9 +546,6 @@ begin
   cameraY := worldToObj.apply(V3D.create(0,1,0));
   cameraZ := worldToObj.apply(V3D.create(0,0,1)).normed();
 
-  {todo: remove}
-  canvas.fillRect(tRect.create(atX-50,atY-50,100,100), RGBA.create(0,0,0));
-
   {get cube corners}
   {note: we apply cropping here, actual half size is 32x16x9}
   size := V3D.create(32,13,9);
