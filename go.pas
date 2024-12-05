@@ -37,6 +37,21 @@ uses
   hashMap,
   dos;
 
+{copies all '.pas' files from current path to destination folder.
+if destination folder exists it is renamed, and then a new folder is
+created. If back exists, it is removed.}
+
+procedure safeCopy(destinationPath: string);
+begin
+  {$I-}
+  mkDIR(destinationPath);
+  {$I+}
+  dos.exec(getEnv('COMSPEC'), '/C rmdir /s _'+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+'_'+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+end;
+
+
 procedure commit(msg: string);
 var
   sourcePath, destinationPath, command, folderName: string;
@@ -61,18 +76,10 @@ begin
   close(t);
 
   {it's handy to have a daily folder aswell}
-  destinationPath := '$rep\'+time.YYMMDD('');
-  {$I-}
-  mkDIR(destinationPath);
-  {$I+}
-  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+  safeCopy('$rep\'+time.YYMMDD(''));
 
   {and head...}
-  destinationPath := '$rep\head';
-  {$I-}
-  mkDIR(destinationPath);
-  {$I+}
-  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+  safeCopy('$rep\head');
 
 end;
 
