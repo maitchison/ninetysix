@@ -4,7 +4,7 @@ program airtime;
 {$MODE delphi}
 
 uses
-	screen,
+	vga,
   graph32,
   graph2d,
 	debug,
@@ -57,15 +57,15 @@ type
 
 constructor tCar.create();
 begin
-	pos := V3D.create(SCREEN_WIDTH div 2,SCREEN_HEIGHT div 2,0);
+	pos := V3D.create(screen.width div 2,screen.height div 2,0);
 	zAngle := 0;
   tilt := 0;
 end;
 
 procedure worldToScreen(pos: V3D; out dx: int16; out dy: int16);
 begin
-	dx := trunc(pos.x-camX)+SCREEN_WIDTH div 2;
-	dy := trunc(pos.y-camY)+SCREEN_HEIGHT div 2;
+	dx := trunc(pos.x-camX)+screen.width div 2;
+	dy := trunc(pos.y-camY)+screen.height div 2;
 end;
 
 procedure tCar.draw();
@@ -123,13 +123,16 @@ end;
 procedure flipCanvas();
 var
 	screenDWords: dword;
+  lfb_seg: word;
 begin	
 	{note: s3 upload is 2x faster, but causes stuttering on music}
-  screenDWords := SCREEN_WIDTH*SCREEN_HEIGHT;
+  screenDWords := screen.width*screen.height;
+  lfb_seg := screen.LFB_SEG;
+  if lfb_seg = 0 then exit;
   asm
   	pusha
   	push es
-    mov es,  LFB_SEG
+    mov es,  lfb_seg
     mov edi,  0
     mov esi, canvas.pixels
     mov ecx, screenDWords
@@ -143,14 +146,17 @@ procedure flipCanvasLines(y1,y2: int32);
 var
 	len: dword;
   ofs: dword;
+  lfb_seg: word;
 begin	
 	{note: s3 upload is 2x faster, but causes stuttering on music}
-  len := SCREEN_WIDTH*(y2-y1);
-  ofs := y1*SCREEN_WIDTH*4;
+  len := screen.width*(y2-y1);
+  ofs := y1*screen.width*4;
+  lfb_seg := screen.LFB_SEG;
+  if lfb_seg = 0 then exit;
   asm
   	pusha
   	push es
-    mov es,  LFB_SEG
+    mov es,  lfb_seg
     mov edi, ofs
     mov esi, canvas.pixels
     add esi, ofs
@@ -177,8 +183,8 @@ var
   subRegion: tSprite;
 begin
 	{title really needs 640x480}
-	setMode(640,480,32);
-  canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
+	screen.setMode(640,480,32);
+  canvas := tPage.create(screen.width, screen.height);
 	note('Title screen started');
 
 	background.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
@@ -238,8 +244,8 @@ var
 
 begin
 
-	setMode(320,240,32);
-  canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
+	screen.setMode(320,240,32);
+  canvas := tPage.create(screen.width, screen.height);
 	note('Main loop started');
 
   car := tCar.create();
@@ -284,15 +290,15 @@ begin
 
   loadResources();
 
-	setMode(320,240,32);
+	screen.setMode(320,240,32);
 	S3D := tS3Driver.create();
-  canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
+  canvas := tPage.create(screen.width, screen.height);
 
-  initMouse();
+  {initMouse();}
   initKeyboard();
 
   titleScreen();
 
-  setText();
+  screen.setText();
   printLog();
 end.

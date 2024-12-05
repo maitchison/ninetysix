@@ -8,7 +8,7 @@ uses
 	test,
   utils,
 	debug,
-	screen,
+	vga,
 	graph2d,
   graph32;
 
@@ -68,8 +68,8 @@ var
 begin
 	xMin := max(0, -atX);
 	yMin := max(0, -atY);
-	xMax := min(SCREEN_WIDTH-atX, srcRect.width);
-	yMax := min(SCREEN_HEIGHT-atY, srcRect.height);
+  xMax := min(screen.width-atX, srcRect.width);
+  yMax := min(screen.height-atY, srcRect.height);
 
 	for y := yMin to yMax-1 do
   	for x := xMin to xMax-1 do
@@ -161,9 +161,9 @@ begin
   if cnt <= 0 then exit;
 
   for y := dy1 to dy2-1 do begin
-  	if y > SCREEN_HEIGHT then exit;
+  	if y > screen.height then exit;
     v := (y - dy1) / (dy2 - dy1);
-  	screenOfs := y * SCREEN_WIDTH + dx1;
+  	screenOfs := y * screen.width + dx1;
 		imageOfs := sy1 + round((sy2-sy1) * v);
     imageOfs *= srcPage.width * 4;
     imageOfs += dword(srcPage.Pixels);

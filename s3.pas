@@ -12,7 +12,7 @@ uses
   crt,
   time,
   graph32,
-	screen;
+	vga;
 
 type
 	tS3Driver = class
@@ -434,8 +434,10 @@ var
 procedure UploadScreen_ASM();
 var
 	pixelsPtr: pointer;
+  lfb_seg: word;
 begin
 	pixelsPtr := @pixels;
+  lfb_seg := screen.LFB_SEG;
 	asm
   	push es
     push ds
@@ -444,7 +446,7 @@ begin
     push ecx
     push eax
 
-  	mov es, [LFB_SEG]
+  	mov es, [lfb_seg]
     mov edi, 0
 
     mov esi, PixelsPtr
@@ -466,8 +468,10 @@ end;
 procedure UploadScreen_MMX();
 var
 	pixelsPtr: pointer;
+  lfb_seg: word;
 begin
 	pixelsPtr := @pixels;
+  lfb_seg := screen.LFB_SEG;
 	asm
   	push es
     push ds
@@ -476,7 +480,7 @@ begin
     push ecx
     push eax
     	
-    mov ax, LFB_SEG
+    mov ax, lfb_seg
 
   	mov es, ax
     mov edi, 0

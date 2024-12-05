@@ -10,7 +10,7 @@ uses
 	crt,
 	go32,
   utils,
-	screen;
+	vga;
 
 var
 	{These only update when UpdateMouse is called}
@@ -130,6 +130,7 @@ var
 	BitWithinWord: integer;
   BitMask: byte;
 	b: byte;
+  lfb_seg: word;
 begin
 	{The images are word interleaved.
   i.e. AND word 0, XOR word 0, AND word 1, XOR word 1, ... }
@@ -142,11 +143,13 @@ begin
   	address += 1;
 
   bitMask := $80 shr (bitWithinWord mod 8);    // e.g. 00100000b
+	lfb_seg := SCREEN.LFB_SEG;
+
 	asm
   	pusha
     push es
 
-    mov es, LFB_SEG
+    mov es, lfb_seg
     mov edi, 0
     add edi, address
     mov al, es:[edi]
@@ -238,8 +241,8 @@ begin
   EnableHardwareCursor();
   SetHardwareCursorSprite();
   installMouseProc(@userproc, userProcLength);
-  SetBoundary(0, 0, PHYSICAL_WIDTH-1, PHYSICAL_HEIGHT-1);
-  SetPosition(PHYSICAL_WIDTH div 2, PHYSICAL_HEIGHT div 2);
+  SetBoundary(0, 0, screen.physicalWidth-1, screen.physicalHeight-1);
+  SetPosition(screen.physicalWidth div 2, screen.physicalHeight div 2);
   UpdateMouse();
 end;
 

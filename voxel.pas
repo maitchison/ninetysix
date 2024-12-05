@@ -11,7 +11,7 @@ uses
   debug,
   graph32,
   graph2d,
-	screen,
+	vga,
   vertex,
   lc96;
 
@@ -71,7 +71,7 @@ type
 procedure tScreenLine.reset(); inline;
 begin
 	xMax := 0;
-  xMin := SCREEN_WIDTH;
+  xMin := screen.width;
 end;
 
 procedure tScreenLine.adjust(x: int16); inline;

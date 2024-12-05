@@ -1,27 +1,5 @@
-{Screen handling via VESA}
-unit Screen;
-
-{
-	todo:
-
-  [ ] add logging
-	[ ] general cleanup
-  [ ] remove S3 code (move to S3 unit)
-}
-
-{VBE Info: phatcode.net/res/221/files/vbe20.pdf}
-{More info: pdos.csail.mit.edi/6.828/2010/readings/hardware/vgadoc/VESA.txt}
-
-
-{
-	VBE / S3 Unit for handling video
-
-  todo: rename to video maybe?
-
-  support: linear framebuffer (maybe already have?)
-  support: fast copy
-  support: set video mode
-}
+{vga video driver}
+unit vga;
 
 {$MODE delphi}
 
@@ -33,17 +11,67 @@ uses
 	go32,
   crt;
 
-procedure SetDisplayStart(x, y: word);
-procedure SetDisplayPage(page: integer);
-procedure SetMode(width, height, bpp: integer);
-procedure SetLogicalScreenSize(width, height: word);
-procedure SetText();
+type
+	tVideoDriver = class
+  	
+  protected
+  	{the resolution of the screen}
+    fPhysicalWidth,fPhysicalHeight:word;
+    {logical dimensions, which may be larger when uing fullscreen scrolling}
+    fLogicalWidth,fLogicalHeight:word;
+    fBPP: word;
+    fLFB_SEG: word;
+
+    function getPhysicalWidth: word;
+    function getPhysicalHeight: word;
+    function getLogicalWidth: word;
+    function getLogicalHeight: word;
+    function getBPP: word;
+    function getLFB_SEG: word;
+
+  public
+  	constructor create();
+
+    {shortcut for logical dims}
+		property width:word read getLogicalWidth;
+    property height:word read getLogicalHeight;
+
+		property logicalWidth:word read getLogicalWidth;
+    property logicalHeight:word read getLogicalHeight;
+		property physicalWidth:word read getPhysicalWidth;
+    property physicalHeight:word read getPhysicalHeight;
+
+		property BPP:word read getBPP;
+		property LFB_SEG:word read getLFB_SEG;
+
+  	procedure setMode(width, height, BPP: word); virtual; abstract;
+  end;
+
+	tVGADriver = class(tVideoDriver)
+  	{basic VGA driver}
+  	procedure setMode(width, height, BPP: word); override;
+    procedure setText();
+  end;
+
+var
+	screen: tVGADriver;
+
+implementation
+
+{todo: move to vga driver}
+procedure SetDisplayStart(x, y: word); forward;
+procedure SetDisplayPage(page: integer); forward;
+procedure fSetMode(width, height, bpp: integer); forward;
+procedure SetLogicalScreenSize(width, height: word); forward;
+procedure fSetText(); forward;
+
 
 CONST
 	USE_80x50: boolean = True;
 
+
 var
-  LFB_SEG: word;
+  myLFB_SEG: word;
 
   SCREEN_WIDTH: word;
   SCREEN_HEIGHT: word;
@@ -52,8 +80,76 @@ var
   {Used when logical screen is larger than physical screen.}
   PHYSICAL_WIDTH, PHYSICAL_HEIGHT: word;
 
+{--------------------------------------------------------------}
+{ tVideoDriver }
+{--------------------------------------------------------------}
 
-implementation
+constructor tVideoDriver.create();
+begin
+	fPhysicalWidth := 0;
+  fPhysicalHeight := 0;
+	fLogicalWidth := 0;
+  fLogicalHeight := 0;
+  fBPP := 0;
+  fLFB_SEG := 0;
+end;
+
+function tVideoDriver.getPhysicalWidth: word;
+begin
+	result := fPhysicalWidth;
+end;
+
+function tVideoDriver.getPhysicalHeight: word;
+begin	
+	result := fPhysicalHeight;
+end;
+
+function tVideoDriver.getLogicalWidth: word;
+begin
+	result := fLogicalWidth;
+end;
+
+function tVideoDriver.getLogicalHeight: word;
+begin	
+	result := fLogicalHeight;
+end;
+
+function tVideoDriver.getBPP: word;
+begin
+	result := fBPP;
+end;
+
+function tVideoDriver.getLFB_SEG: word;
+begin
+	result := fLFB_SEG;
+end;
+
+{--------------------------------------------------------------}
+{ tVGADriver }
+{--------------------------------------------------------------}
+
+procedure tVGADriver.setMode(width, height, bpp: word);
+begin
+	{todo: switch to vga driver}
+	fSetMode(width, height, bpp);
+  self.fPhysicalWidth := width;
+  self.fPhysicalHeight := height;
+  self.fLogicalWidth := width;
+  self.fLogicalHeight := height;
+  self.fBpp := bpp;
+  self.fLFB_SEG := myLFB_SEG;
+  info(format('Setting mode to %dx%dx%d with LFB at %s', [width, height, bpp, fLFB_SEG, hexStr(pointer(self.LFB_SEG))]));
+
+end;
+
+procedure tVGADriver.setText();
+begin
+	fSetText();
+end;
+
+{--------------------------------------------------------------}
+
+{todo: visa driver and S3 driver}
 
 type TVesaModeInfo = packed record
   {Vesa 1.0}
@@ -195,7 +291,7 @@ end;
 
 {Set graphics mode. Once complete the framebuffer can be accessed via
  the LFB pointer}
-procedure SetMode(width, height, bpp: integer);
+procedure fSetMode(width, height, bpp: integer);
 var
   i: integer;
 
@@ -270,13 +366,13 @@ begin
   LinearAddress := get_linear_addr(PhysicalAddress, VIDEO_MEMORY);
 
   {Set Permissions}
-	LFB_SEG := Allocate_LDT_Descriptors(1);
-  if not set_segment_base_address(LFB_SEG, LinearAddress) then
+  myLFB_SEG := Allocate_LDT_Descriptors(1);
+  if not set_segment_base_address(myLFB_SEG, LinearAddress) then
   	Error('Error setting LFB segment base address.');
-	if not set_segment_limit(LFB_SEG, VIDEO_MEMORY-1) then
+	if not set_segment_limit(myLFB_SEG, VIDEO_MEMORY-1) then
 	  Error('Error setting LFB segment limit.');
 
-  Info('Mapped LFB to segment $' + HexStr(LFB_SEG, 4));
+  Info('Mapped LFB to segment $' + HexStr(myLFB_SEG, 4));
 
   SCREEN_WIDTH := width;
   SCREEN_HEIGHT := height;
@@ -288,7 +384,7 @@ end;
 
 
 {Set text mode}
-procedure SetText();
+procedure fSetText();
 begin
   {set mode, but only if we have to}
   asm
@@ -310,4 +406,5 @@ begin
 end;
 
 begin
+	screen := tVGADriver.create();
 end.
