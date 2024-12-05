@@ -98,7 +98,7 @@ const
 	ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
 
 type
-	TPage = record
+	tPage = record
   	Width, Height, BPP: Word;
     Pixels: pointer;
     defaultColor: RGBA;

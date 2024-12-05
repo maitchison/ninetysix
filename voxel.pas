@@ -44,7 +44,7 @@ type
     procedure setPage(page: tPage; height: integer);
     class function loadFromFile(filename: string; height: integer): tVoxelSprite; static;
   	function getVoxel(x,y,z:int32): RGBA;
-		procedure draw(canvas: tPage;atX, atY: int16; thetaZ, thetaY, thetaX: single; scale: single=1);
+		procedure draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
   end;
 
 implementation
@@ -238,7 +238,7 @@ begin
 end;
 
 {draw voxel sprite.}
-procedure tVoxelSprite.draw(canvas: tPage; atX, atY: int16; thetaZ, thetaY, thetaX: single; scale: single=1);
+procedure tVoxelSprite.draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
 var
   size: V3D; {half size of cuboid}
   debugCol: RGBA;
@@ -515,6 +515,8 @@ var
 
   p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
 
+  isometricTransform : tMatrix3x3;
+
 
 begin
 
@@ -528,8 +530,14 @@ begin
   faceColor[5].init(0,0,255); 	
   faceColor[6].init(0,0,128);
 
-  objToWorld.rotationXYZ(thetaX, thetaY, thetaZ);
+  isometricTransform.rotationX(-0.955);
+  objToWorld.rotationXYZ(0, 0, zAngle);
+
+  objToWorld := objToWorld.MM(isometricTransform);
+	{transpose is inverse (for unitary)}
   worldToObj := objToWorld.transposed();
+
+
 
   objToWorld.applyScale(scale);
   worldToObj.applyScale(1/scale);

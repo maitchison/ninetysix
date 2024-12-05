@@ -17,6 +17,7 @@ uses
 	test,
   utils,
 	stream,
+  graph2d,
 	graph32;
 
 procedure saveLC96(filename: string; page: tPage;forceAlpha: boolean=False);
@@ -78,7 +79,7 @@ var
 begin
 	{$R-}
   result := byte(a)+byte(invFunkyNeg(code));
-  {$R+}	
+  {$R+} 	
 end;
 
 {Encode a 4x4 patch at given location.}
@@ -174,15 +175,17 @@ var
 	global_deltas: tDwords;
 
 {Decode a 4x4 patch at given location.}
-procedure decodePatch(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
+{reference implementation}
+procedure decodePatch_REF(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
 var
-	i: int32;
+	i,j: int32;
 	c: RGBA;
   x,y: int32;
   o1,o2,src: RGBA;
   dr,dg,db,da: byte;
   choiceCode: dword;
   dPos: word;
+
 begin
   {output deltas}
   page.defaultColor.init(0,0,0);
@@ -205,19 +208,92 @@ begin
       if choiceCode and $8000 = $8000 then
       	src := page.getPixel(atX+x, atY+y-1)
       else
-      	src := page.getPixel(atX+x-1, atY+y);
+        src := page.getPixel(atX+x-1, atY+y);
 
 	    c.r := applyByteDelta(src.r, dr);
   	  c.g := applyByteDelta(src.g, dg);
     	c.b := applyByteDelta(src.b, db);
 
       if withAlpha then
-	      c.a := applyByteDelta(src.a, da)
+				c.a := applyByteDelta(src.a, da)
       else
       	c.a := 255;
-			page.putPixel(atX+x, atY+y, c);
+
+			page.setPixel(atX+x, atY+y, c);
 			choiceCode := choiceCode shl 1;
+
     end;
+  end;
+end;
+
+{Decode a 4x4 patch at given location.}
+procedure decodePatch(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
+var
+	i,j: int32;
+	c: RGBA;
+  x,y: int32;
+  o1,o2,src: RGBA;
+  choiceCode: dword;
+
+	db,dg,dr,da: byte;
+  dPos: word;
+  ofs: dword;
+
+begin
+  {output deltas}
+  page.defaultColor.init(0,0,0);
+  choiceCode := s.readWord;
+  if withAlpha then
+	  s.readVLCSegment(16*4, global_deltas)
+  else
+  	s.readVLCSegment(16*3, global_deltas);
+  s.byteAlign();
+
+  ofs := (atX + (atY*page.width)) * 4;
+
+  {eventually this will all be asm...}
+  dPos := 0;
+  for y := 0 to 3 do begin
+  	for x := 0 to 3 do begin
+      dr := global_deltas[dpos]; inc(dpos);
+      dg := global_deltas[dpos]; inc(dpos);
+      db := global_deltas[dpos]; inc(dpos);
+      if withAlpha then begin
+	      da := global_deltas[dpos]; inc(dpos);
+      end;
+
+      if choiceCode and $8000 = $8000 then begin
+      	if (atY = 0) and (y = 0) then
+        	src.init(0,0,0)
+        else
+	      	pDword(@src)^ := pDword(page.pixels+ofs-(4*page.width))^
+      end else begin
+      	if (atX = 0) and (x = 0) then
+        	src.init(0,0,0)
+        else
+	      	pDword(@src)^ := pDword(page.pixels+ofs-4)^;
+      end;
+
+	    c.r := applyByteDelta(src.r, dr);
+  	  c.g := applyByteDelta(src.g, dg);
+    	c.b := applyByteDelta(src.b, db);
+
+      if withAlpha then
+      	{check this is right}
+				c.a := applyByteDelta(src.a, da)
+      else
+      	c.a := 255;
+
+      pDword(page.pixels+ofs)^ := pDword(@c)^;
+
+			choiceCode := choiceCode shl 1;
+
+      ofs += 4;
+
+    end;
+
+    ofs += ((page.width-4) * 4);
+
   end;
 end;
 

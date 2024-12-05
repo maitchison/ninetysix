@@ -93,14 +93,10 @@ var
 begin
 	note('Loading title');
   startTime := getSec;
-	background := tSprite.create(loadLC96('gfx\title.p96'));	
-  note(format('Loaded background in %fs', [getSec-startTime]));
+	background := tSprite.create(loadLC96('gfx\title.p96'));
+  note(format('Loaded background (%dx%d) in %fs', [background.width, background.height, getSec-startTime]));
 
   carVox := tVoxelSprite.loadFromFile('gfx\car1', 32);
-
-  {background}
-  background := tSprite.create(loadLC96('gfx\title.p96'));	
-
 
   note('Loading music');
 	music := tSoundFile.create('music\music2.wav');
