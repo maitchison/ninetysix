@@ -43,11 +43,9 @@ created. If back exists, it is removed.}
 
 procedure safeCopy(destinationPath: string);
 begin
-  {$I-}
-  mkDIR(destinationPath);
-  {$I+}
   dos.exec(getEnv('COMSPEC'), '/C rmdir /s '+destinationPath+'_tmp');
   dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+destinationPath+'_tmp');
+  mkDIR(destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
 end;
 
