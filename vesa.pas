@@ -15,6 +15,8 @@ uses
 type tVesaDriver = class(tVGADriver)
 	public	
 		procedure setMode(width, height, BPP: word); override;
+    procedure setLogicalSize(width, height: word);
+    procedure setDisplayStart(x, y: word);
 	end;
 
 implementation
@@ -114,43 +116,6 @@ begin
 
 end;
 
-{Sets the logical screen width, allowing for smooth horizontal scrolling}
-procedure SetLogicalScreenSize(width, height: word);
-begin
-	asm
-  	pusha
-
-  	mov ax, $4F06
-    mov bl, $00 // set display start during vsync
-
-    mov cx, [width]
-
-    int $10
-    popa
-  end;
-  {SCREEN_WIDTH := width;
-  SCREEN_HEIGHT := height;}	
-end;
-
-
-{Set display start address (in pixels)}
-procedure SetDisplayStart(x, y: word);
-begin
-	asm
-  	pusha
-
-  	mov ax, $4F07
-    mov bh, $00
-    mov bl, $80 // set display start during vsync
-
-    mov cx, [x]
-    mov dx, [y]
-
-
-    int $10
-    popa
-  end;
-end;
 
 {Set the display page (zero indexed)}
 procedure SetDisplayPage(page: integer);
@@ -253,6 +218,46 @@ begin
   fBpp := bpp;
 end;
 
+{Sets the logical screen width, allowing for smooth scrolling}
+procedure tVesaDriver.setLogicalSize(width, height: word);
+begin
+	info(format('Setting logical size: %dx%d', [width, height]));
+	asm
+  	pusha
+
+  	mov ax, $4F06
+    mov bl, $00 // set display start during vsync
+
+    mov cx, [width]
+
+    int $10
+    popa
+  end;
+  fLogicalWidth := width;
+  fLogicalHeight := height;
+end;
+
+{Set display start address (in pixels)}
+procedure tVesaDriver.setDisplayStart(x, y: word);
+begin
+	asm
+  	pusha
+
+  	mov ax, $4F07
+    mov bh, $00
+    mov bl, $80 // set display start during vsync
+
+    mov cx, [x]
+    mov dx, [y]
+
+
+    int $10
+    popa
+  end;
+end;
+
+
+{----------------------------------------------------------------}
 
 begin
 end.

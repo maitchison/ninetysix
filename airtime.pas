@@ -41,6 +41,8 @@ var
 
   camX, camY: int32;
 
+  screen: tVesaDriver;
+
 procedure mainLoop(); forward;
 
 {-------------------------------------------------}
@@ -184,7 +186,8 @@ var
   subRegion: tSprite;
 begin
 	{title really needs 640x480}
-	screen.setMode(640,480,32);
+	screen.setMode(320,240,32);
+	screen.setLogicalSize(640,480);
   canvas := tPage.create(screen.width, screen.height);
 	note('Title screen started');
 
@@ -213,6 +216,7 @@ begin
   	if keyDown(key_2) then
     	VX_SHOW_TRACE_EXITS := not keyDown(key_leftshift);
 
+    screen.setDisplayStart(mouse_x, mouse_y);
 
   	{time keeping}
   	thisClock := getSec;
@@ -291,6 +295,10 @@ begin
 
 	{use svga driver}
 	screen := tVesaDriver.create();
+  {this is silly... find a way to extend screen properly}
+  {what i'm doing here is updating the 'global' screen, as well
+   as keeping a 'local' copy}
+  vga.screen := screen;
 
   loadResources();
 
@@ -298,7 +306,7 @@ begin
 	S3D := tS3Driver.create();
   canvas := tPage.create(screen.width, screen.height);
 
-  {initMouse();}
+  initMouse();
   initKeyboard();
 
   titleScreen();

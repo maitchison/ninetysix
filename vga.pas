@@ -163,6 +163,5 @@ end;
 {--------------------------------------------------------------}
 
 begin
-	if not assigned(screen) then
-		screen := tVGADriver.create();
+	screen := tVGADriver.create();
 end.
