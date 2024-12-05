@@ -1,4 +1,0 @@
-uses sysutils;
-
-begin
-end.
