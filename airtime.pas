@@ -385,16 +385,19 @@ begin
 
   loadResources();
 
-	videoDriver.setMode(320,240,32);
-  videoDriver.setLogicalSize(1024,480);
+
+	videoDriver.setMode(640,480,32);
+
+  //videoDriver.setMode(320,240,32);
+  //videoDriver.setLogicalSize(1024,480);
 	S3D := tS3Driver.create();
   screen.create();
 
   initMouse();
   initKeyboard();
 
-	{titleScreen();}
-	mainLoop;
+	titleScreen();
+	{mainLoop;}
 
   videoDriver.setText();
   printLog();

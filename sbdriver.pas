@@ -22,13 +22,159 @@ procedure backgroundPCMData(buffer: tWords);
 
 procedure DSPWrite(command: byte);
 
-var
-	didWeGo: int32 = 0;
+VAR
+  INTERRUPT_COUNTER: int32 = 0;
+  LOOP_MUSIC: boolean = True;
 
-LOOP_MUSIC: boolean = True;
 
 implementation
 
+CONST
+  NUM_CHANNELS = 8;
+
+var
+	{number of seconds it took to process the last audio chunk}
+	lastChunkTime: double;
+
+type
+
+	{time, where unit is 1/256 of a sample.}
+  tTimeCode = int64;
+
+  tAudioSample = packed record
+  {16 bit stereo sample}
+  case byte of
+		0: (left,right: int16);
+  	1: (value: dword);
+  end;
+
+  tAudioSampleHD = packed record
+  {32 bit stereo sample, used for mixing}
+		left,right: single;
+  end;
+
+	tSoundEffect = class
+  	sample: array of tAudioSample;
+    function getSample(tc: tTimeCode;looped: boolean=false): tAudioSample;
+    constructor FromFile(filename: string);
+  end;
+
+	tSoundChannel = class
+		soundEffect: tSoundEffect; 	{the currently playing sound effect}
+    volume: single;
+    pitch: single;
+    startTime: tTimeCode;      {when the sound should start playing}
+    loop: boolean;
+    constructor create();
+		procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
+  end;
+
+  tSoundMixer = class
+    {handles mixing of channels}
+    channel: array[1..NUM_CHANNELS] of tSoundChannel;
+
+    constructor create();
+    procedure play(soundEffect: tSoundEffect; volume: single; pitch: single;timeOffset: single=0);
+		procedure mixDown(startTC: tTimeCode;buf: pointer; bufBytes: int32);
+
+  end;
+
+
+{-----------------------------------------------------}
+
+{converts from seconds since app launch, to timestamp code}
+function secToTC(s: double): tTimeCode;
+begin
+	{note, we do not allow fractional samples when converting}
+	result := round(s * 44100) * 256;
+end;
+
+
+{-----------------------------------------------------}
+
+{returns sample at given time code (where 0 is the first sample of the file}
+function tSoundEffect.getSample(tc: tTimeCode;looped:boolean=false): tAudioSample;
+begin
+	result.value := 0;
+  tc := tc div 256;
+	if tc < 0 then exit;
+  if looped then
+  	{todo: this is too expensive}
+  	tc := tc mod length(sample)
+  else
+  	if tc >= length(sample) then exit;
+	result := sample[tc];
+end;
+
+constructor tSoundEffect.FromFile(filename: string);
+begin
+	{todo: load}
+end;
+
+{-----------------------------------------------------}
+
+constructor tSoundChannel.create();
+begin	
+  soundEffect := nil;
+  volume := 1.0;
+  pitch := 1.0;
+  startTime := 0;
+  loop := false;		
+end;
+
+procedure tSoundChannel.play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
+begin
+	self.soundEffect := soundEffect;
+  self.volume := volume;
+  self.pitch := pitch;
+	self.startTime := startTime;
+  self.loop := loop;
+end;
+
+{-----------------------------------------------------}
+
+constructor tSoundMixer.create();
+var
+	i: integer;
+begin
+	for i := 1 to NUM_CHANNELS do
+  	channel[i] := tSoundChannel.create();		
+end;
+
+procedure tSoundMixer.play(soundEffect: tSoundEffect; volume:single; pitch: single;timeOffset:single=0);
+var
+	channelNum: integer;
+begin
+	{for the moment lock onto the first channel}
+  channelNum := 1;
+	channel[channelNum].play(soundEffect, volume, pitch, secToTC(getSec+timeOffset));
+end;
+
+{generate mix for given time}
+procedure tSoundMixer.mixDown(startTC: tTimeCode;buf: pointer; bufBytes: int32);
+var
+	value: single;
+  value16: word;
+  i,j: int32;
+  numSamples: int32;
+begin
+	numSamples := bufBytes div 4; {16-bit stereo}
+
+  for i := 0 to numSamples-1 do begin
+  	value := 0;
+		for j := 1 to 8 do begin
+  		if not assigned(channel[j].soundEffect) then continue;
+    	value += channel[j].soundEffect.getSample(channel[j].startTime-startTC+i).left;
+	  end;
+    value16 := clamp(trunc(value), 0, 65535);
+    {mono -> stereo for the moment}
+    pWord(buf+i*2)^ := value16;
+    pWord(buf+i*2+1)^ := value16;
+  end;		
+end;
+
+
+{-----------------------------------------------------}
 
 const
 {72?}
@@ -191,10 +337,11 @@ var
   readAck: byte;
   bufOfs: word;
   bytesRemaining: dword;
+  startTime: double;
  begin
 
-  inc(didWeGo);
-
+ 	startTime := getSec;
+  inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
 
   // refill the buffer
@@ -222,6 +369,8 @@ var
       {note: I intentially do not ack here, not sure if that's right or not}
   	  DSPStop();
   end;
+
+  lastChunkTime := getSec-startTime;
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
@@ -499,7 +648,7 @@ end;
 procedure closeSound();
 begin
 	note('[done] sound');
-  note(' -IRQ was triggered '+intToStr(didWeGo)+' times.');
+  note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   uninstall_ISR();
   DSPStop();
 end;

@@ -94,7 +94,7 @@ function  RND(): byte; assembler; register;
 function  Quantize(value, levels: byte): byte;
 function  clamp(x, a, b: int32): int32; overload;
 function  clamp(x, a, b: single): single; overload;
-function  GetRDTSC(): uint64; assembler; register;
+function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
 
 function  GetTickCount(): int64;
@@ -109,6 +109,7 @@ uses
 
 var
 	SEED: byte;
+  programStartTSC: uint64 = 0;
 
 const
 	CLOCK_FREQ = 166*1000*1000;	
@@ -554,7 +555,7 @@ begin
   exit(x);
 end;
 
-function GetRDTSC(): uint64; assembler; register;
+function GetTSC(): uint64; assembler; register;
 asm
 	rdtsc
 	{result will already be in EAX:EDX, so nothing to do}
@@ -572,11 +573,11 @@ begin
 	result := int64(MemL[$40:$6c]) * 55;
 end;
 
-{Get seconds since power on.
+{Get seconds since program start.
 Can be used for very accurate timing measurement}
 function GetSec(): double; inline;
 begin
-    result := getRDTSC() * INV_CLOCK_FREQ;
+    result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
 end;
 
 {-------------------------------------------------------------------}
@@ -720,6 +721,7 @@ begin
 end;
 
 begin
+	programStartTSC := getTSC();
 	SEED := 97;
 	UnitTests();
 end.
