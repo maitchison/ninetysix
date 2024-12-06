@@ -9,6 +9,7 @@ uses
 	test,
 	debug,
   utils,
+  graph2d,
 	go32,
 	vga;
 

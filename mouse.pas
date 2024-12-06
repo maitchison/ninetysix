@@ -143,7 +143,7 @@ begin
   	address += 1;
 
   bitMask := $80 shr (bitWithinWord mod 8);    // e.g. 00100000b
-	lfb_seg := SCREEN.LFB_SEG;
+	lfb_seg := videoDriver.LFB_SEG;
 
 	asm
   	pusha
@@ -242,8 +242,8 @@ begin
   EnableHardwareCursor();
   SetHardwareCursorSprite();
   installMouseProc(@userproc, userProcLength);
-  SetBoundary(0, 0, screen.physicalWidth-1, screen.physicalHeight-1);
-  SetPosition(screen.physicalWidth div 2, screen.physicalHeight div 2);
+  SetBoundary(0, 0, videoDriver.physicalWidth-1, videoDriver.physicalHeight-1);
+  SetPosition(videoDriver.physicalWidth div 2, videoDriver.physicalHeight div 2);
   UpdateMouse();
 end;
 

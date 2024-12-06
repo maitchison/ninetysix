@@ -13,40 +13,36 @@ uses
 type
 
 	tPoint = record
-  	x, y: Integer;
-    class operator add(a,b: TPoint): TPoint;
-    constructor Create(AX, AY: Integer);
+  	x, y: int32;
+    class operator add(a,b: TPoint): tPoint;
+    constructor Create(x, y: int32);
   end;
 
 	tRect = record
-  	position: TPoint;
-    width, height: Integer;
+  	x,y: int32;
+    width, height: int32;
 
-    constructor Create(ALeft, ATop, AWidth, AHeight: Integer);
-    class function Inset(Other: tRect;x1, y1, x2, y2: integer): TRect; static;
+    constructor create(width, height: int32); overload;
+    constructor create(left, top, width, height: int32); overload;
+
+    class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
     class operator Explicit(a: TRect): ShortString;
-
-  private
-
-  	function GetX: Integer;
-  	function GetY: Integer;
-  	procedure SetX(x: Integer);
-  	procedure SetY(y: Integer);
 
   public
 
-    function Area: Integer;
+    function area: int32;
 
-    function TopLeft: TPoint;
-    function BottomRight: TPoint;
+    function topLeft: tPoint;
+    function bottomRight: tPoint;
 
-    function Top: Integer; inline;
-    function Left: Integer; inline;
-    function Bottom: Integer; inline;
-    function Right: Integer; inline;
+    function top: int32; inline;
+    function left: int32; inline;
+    function bottom: int32; inline;
+    function right: int32; inline;
 
-    property x:Integer read GetX write SetX;
-    property y:Integer read GetY write SetY;
+    procedure clear();
+    procedure clip(other: tRect);
+
   end;
 
 
@@ -54,51 +50,36 @@ implementation
 
 {--------------------------------------------------------}
 
-class operator TPoint.add(a,b: TPoint): TPoint;
+class operator tPoint.add(a,b: TPoint): TPoint;
 begin
 	result.x := a.x + b.x;
   result.y := a.y + b.y;
 end;
 
-constructor TPoint.Create(AX, AY: integer);
+constructor tPoint.Create(x, y: int32);
 begin
-	self.x := AX;
-  self.y := AY;
+	self.x := x;
+  self.y := y;
 end;
 
 
 {--------------------------------------------------------}
 
-constructor TRect.Create(ALeft, ATop, AWidth, AHeight: integer);
+constructor tRect.create(width, height: int32); overload;
 begin
-	self.Position.x := ALeft;
-	self.Position.y := ATop;
-  self.Width := AWidth;
-  self.Height := AHeight;
+  self.width := width;
+  self.height := height;
 end;
 
-function TRect.GetX: Integer;
+constructor tRect.create(left, top, width, height: int32); overload;
 begin
-	result := position.x;
+	self.x := left;
+	self.y := top;
+  self.width := width;
+  self.height := height;
 end;
 
-function TRect.GetY: Integer;
-begin
-	result := position.y;
-end;
-
-procedure TRect.SetX(x: Integer);
-begin
-	position.x := x;
-end;
-
-procedure TRect.SetY(y: Integer);
-begin
-	position.y := y;
-end;
-
-
-class operator TRect.Explicit(a: TRect): ShortString;
+class operator tRect.Explicit(a: TRect): ShortString;
 begin
 	result := Format('%d,%d (%d,%d)', [a.x, a.y, a.width, a.height]);
 end;
@@ -110,7 +91,7 @@ If values are negative, they are taken as distance from edge of other rectangle
 
 Note: 0 means width/height if used for x2 or y2.
 }
-class function TRect.Inset(Other: TRect;x1, y1, x2, y2: integer): TRect; static;
+class function TRect.Inset(Other: TRect;x1, y1, x2, y2: int32): TRect; static;
 begin
 	if x1 < 0 then x1 := Other.Width+x1;
 	if y1 < 0 then y1 := Other.Height+y1;
@@ -124,42 +105,61 @@ end;
 
 {----------------------------------}
 
-function TRect.Area: Integer;
+function TRect.area: int32;
 begin
-	result := Width * Height;
+	result := width * height;
 end;
 
-function TRect.TopLeft: TPoint;
+function TRect.topLeft: TPoint;
 begin
-	result.x := Left;
-  result.y := Top;
+	result.x := left;
+  result.y := top;
 end;
 
-function TRect.BottomRight: TPoint;
+function TRect.bottomRight: TPoint;
 begin
-	result.x := Right;
-  result.y := Bottom;
+	result.x := right;
+  result.y := bottom;
 end;
 
-function TRect.Top: Integer; inline;
+function TRect.top: int32; inline;
 begin
-	result := position.y;
+	result := y;
 end;
 
-function TRect.Left: Integer; inline;
+function TRect.left: int32; inline;
 begin
-	result := position.x;
+	result := x;
 end;
 
-function TRect.Bottom: Integer; inline;
+function tRect.bottom: int32; inline;
 begin
-	result := position.y + height;
+	result := y + height;
 end;
 
-function TRect.Right: Integer; inline;
+function tRect.right: int32; inline;
 begin
-	result := position.x + width;
+	result := x + width;
 end;
+
+procedure tRect.clear();
+begin
+	x := 0; y := 0;
+  width := 0; height := 0;
+end;
+
+{clips this rect to another, i.e. returns their intersection.
+if two rectangles do not intersect sets rect to (0,0,0,0)}
+procedure tRect.clip(other: tRect);
+begin
+	x := max(x, other.x);
+	y := max(y, other.y);
+  width := min(width, other.x-x+other.width);
+  height := min(height, other.y-y+other.height);
+  if (width <= 0) or (height <= 0) then clear();
+end;
+
+{--------------------------------------------------}
 
 procedure UnitTests();
 var	

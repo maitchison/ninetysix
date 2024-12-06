@@ -436,7 +436,7 @@ var
   lfb_seg: word;
 begin
 	pixelsPtr := @pixels;
-	lfb_seg := SCREEN.LFB_SEG;
+	lfb_seg := videoDriver.LFB_SEG;
 	asm
   	push es
     push ds
@@ -470,7 +470,7 @@ var
   lfb_seg: word;
 begin
 	pixelsPtr := @pixels;
-	lfb_seg := SCREEN.LFB_SEG;
+	lfb_seg := videoDriver.LFB_SEG;
 	asm
   	push es
     push ds

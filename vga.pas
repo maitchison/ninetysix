@@ -9,6 +9,7 @@ uses
 	debug,
   utils,
 	go32,
+  graph2d,
   crt;
 
 type
@@ -32,11 +33,10 @@ type
   public
   	constructor create();
 
-    {shortcut for logical dims}
-		property width:word read getLogicalWidth;
+    property width:word read getLogicalWidth;
     property height:word read getLogicalHeight;
 
-		property logicalWidth:word read getLogicalWidth;
+    property logicalWidth:word read getLogicalWidth;
     property logicalHeight:word read getLogicalHeight;
 		property physicalWidth:word read getPhysicalWidth;
     property physicalHeight:word read getPhysicalHeight;
@@ -47,6 +47,8 @@ type
   	procedure setMode(width, height, BPP: word); virtual; abstract;
     procedure setLogicalSize(width, height: word); virtual; abstract;
     procedure setDisplayStart(x, y: word); virtual; abstract;
+    procedure setText(); virtual; abstract;
+
   end;
 
 	tVGADriver = class(tVideoDriver)
@@ -56,7 +58,7 @@ type
   end;
 
 var
-	screen: tVGADriver;
+	videoDriver: tVideoDriver;
 
 implementation
 
@@ -165,5 +167,5 @@ end;
 {--------------------------------------------------------------}
 
 begin
-	screen := tVGADriver.create();
+	videoDriver := tVGADriver.create();
 end.

@@ -19,15 +19,19 @@ uses
   gui,
 	lc96,
   voxel,
+  screen,
   s3,
 	sound;
 
 var
-	music: tSoundFile;
 
-  background: tSprite;
+	{screen}
+	screen: tScreen;
+
+  {resources}
+  titleBackground: tSprite;
+	music: tSoundFile;
   track: tSprite;
-  canvas: tPage;
   carVox: tVoxelSprite;
 
   {global time keeper}
@@ -39,11 +43,7 @@ var
 
   S3D: tS3Driver;
 
-  camX, camY: int32;
-
 procedure mainLoop(); forward;
-
-{-------------------------------------------------}
 
 type
 	tCar = class
@@ -58,15 +58,9 @@ type
 
 constructor tCar.create();
 begin
-	pos := V3D.create(screen.width div 2,screen.height div 2,0);
+	pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
 	zAngle := 0;
   tilt := 0;
-end;
-
-procedure worldToScreen(pos: V3D; out dx: int16; out dy: int16);
-begin
-	dx := trunc(pos.x-camX)+screen.width div 2;
-	dy := trunc(pos.y-camY)+screen.height div 2;
 end;
 
 procedure tCar.draw();
@@ -75,8 +69,7 @@ var
   dx, dy: int16;
 begin
 	startTime := getSec;
-  worldToScreen(pos, dx, dy);
-  carVox.draw(canvas, dx, dy, zAngle, 0, tilt, 0.5);
+  carVox.draw(screen.canvas, round(pos.x), round(pos.y), zAngle, 0, tilt, 0.5);
   carDrawTime := getSec - startTime;
 end;
 
@@ -114,7 +107,7 @@ begin
 
 	note('Loading Resources.');
 
-  background := loadSprite('title');
+  titleBackground := loadSprite('title');
   track := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('gfx\car1', 32);
@@ -125,17 +118,19 @@ procedure flipCanvas();
 var
 	screenDWords: dword;
   lfb_seg: word;
+  pixels: pointer;
 begin	
 	{note: s3 upload is 2x faster, but causes stuttering on music}
   screenDWords := screen.width*screen.height;
-  lfb_seg := screen.LFB_SEG;
+  lfb_seg := videoDriver.LFB_SEG;
   if lfb_seg = 0 then exit;
+  pixels := screen.canvas.pixels;
   asm
   	pusha
   	push es
     mov es,  lfb_seg
     mov edi,  0
-    mov esi, canvas.pixels
+    mov esi, pixels
     mov ecx, screenDWords
     rep movsd
     pop es
@@ -147,19 +142,21 @@ procedure flipCanvasLines(y1,y2: int32);
 var
 	len: dword;
   ofs: dword;
+  pixels: pointer;
   lfb_seg: word;
 begin	
 	{note: s3 upload is 2x faster, but causes stuttering on music}
   len := screen.width*(y2-y1);
   ofs := y1*screen.width*4;
-  lfb_seg := screen.LFB_SEG;
+  lfb_seg := videoDriver.LFB_SEG;
   if lfb_seg = 0 then exit;
+  pixels := screen.canvas.pixels;
   asm
   	pusha
   	push es
     mov es,  lfb_seg
     mov edi, ofs
-    mov esi, canvas.pixels
+    mov esi, pixels
     add esi, ofs
     mov ecx, len
     rep movsd
@@ -175,7 +172,7 @@ var
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
-	GUILabel(canvas, 10, 10, format('FPS:%f Car: %f ms', [fps,carDrawTime*1000]));
+	GUILabel(screen.canvas, 10, 10, format('FPS:%f Car: %f ms', [fps,carDrawTime*1000]));
 end;
 
 procedure titleScreen();
@@ -188,14 +185,14 @@ var
 begin
 	note('Title screen started');
 
-	background.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
-	background.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
-	background.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
+	titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
+	titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
+	titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
-  background.blit(canvas, 0, 0);
-  subRegion := background;
-  subRegion.rect.position.x := 320-30;
-  subRegion.rect.position.y := 360-30;
+  titleBackground.blit(screen.canvas, 0, 0);
+  subRegion := titleBackground;
+  subRegion.rect.x := 320-30;
+  subRegion.rect.y := 360-30;
   subRegion.rect.width := 60;
   subRegion.rect.height := 60;
 
@@ -221,7 +218,7 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 		
-    subRegion.blit(canvas, 320-30, 360-30);
+    subRegion.blit(screen.canvas, 320-30, 360-30);
 
     if mouse_b and $1 = $1 then begin
       xAngle := (mouse_x-320)/640*360;
@@ -245,7 +242,7 @@ begin
     end;
 
 
-	  carVox.draw(canvas, 320, 360, xTheta, 0, zTheta, 0.75);
+	  carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
     drawGUI();
 
 		flipCanvasLines(0,35);
@@ -264,9 +261,8 @@ var
   car: tCar;
 
 begin
-
-	screen.setMode(320,240,32);
-  canvas := tPage.create(screen.width, screen.height);
+(*
+	vgaDriver.setMode(320,240,32);
 	note('Main loop started');
 
   car := tCar.create();
@@ -305,24 +301,25 @@ begin
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
+*)
 end;
 
 begin
 
 	{use svga driver}
-	vga.screen := tVesaDriver.create();
+	videoDriver := tVesaDriver.create();
 
   loadResources();
 
-	screen.setMode(640,480,32);
+	videoDriver.setMode(640,480,32);
 	S3D := tS3Driver.create();
-  canvas := tPage.create(screen.width, screen.height);
+  screen.create();
 
   initMouse();
   initKeyboard();
 
   titleScreen();
 
-  screen.setText();
+  videoDriver.setText();
   printLog();
 end.

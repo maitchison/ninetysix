@@ -71,7 +71,7 @@ type
 procedure tScreenLine.reset(); inline;
 begin
 	xMax := 0;
-  xMin := screen.width;
+  xMin := videoDriver.width;
 end;
 
 procedure tScreenLine.adjust(x: int16); inline;
