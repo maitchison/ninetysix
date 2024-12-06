@@ -7,8 +7,7 @@ unit graph2d;
 interface
 
 uses
-	test,
-	utils;
+	test;
 
 type
 
@@ -41,12 +40,16 @@ type
     function right: int32; inline;
 
     procedure clear();
-    procedure clip(other: tRect);
+    procedure clip(const other: tRect);
+
+    function toString: string;
 
   end;
 
 
 implementation
+
+uses utils;
 
 {--------------------------------------------------------}
 
@@ -67,6 +70,8 @@ end;
 
 constructor tRect.create(width, height: int32); overload;
 begin
+	self.x := 0;
+  self.y := 0;
   self.width := width;
   self.height := height;
 end;
@@ -81,7 +86,7 @@ end;
 
 class operator tRect.Explicit(a: TRect): ShortString;
 begin
-	result := Format('%d,%d (%d,%d)', [a.x, a.y, a.width, a.height]);
+	result := a.toString;
 end;
 
 {
@@ -91,7 +96,7 @@ If values are negative, they are taken as distance from edge of other rectangle
 
 Note: 0 means width/height if used for x2 or y2.
 }
-class function TRect.Inset(Other: TRect;x1, y1, x2, y2: int32): TRect; static;
+class function tRect.Inset(Other: TRect;x1, y1, x2, y2: int32): TRect; static;
 begin
 	if x1 < 0 then x1 := Other.Width+x1;
 	if y1 < 0 then y1 := Other.Height+y1;
@@ -105,29 +110,29 @@ end;
 
 {----------------------------------}
 
-function TRect.area: int32;
+function tRect.area: int32;
 begin
 	result := width * height;
 end;
 
-function TRect.topLeft: TPoint;
+function tRect.topLeft: TPoint;
 begin
 	result.x := left;
   result.y := top;
 end;
 
-function TRect.bottomRight: TPoint;
+function tRect.bottomRight: TPoint;
 begin
 	result.x := right;
   result.y := bottom;
 end;
 
-function TRect.top: int32; inline;
+function tRect.top: int32; inline;
 begin
 	result := y;
 end;
 
-function TRect.left: int32; inline;
+function tRect.left: int32; inline;
 begin
 	result := x;
 end;
@@ -150,25 +155,41 @@ end;
 
 {clips this rect to another, i.e. returns their intersection.
 if two rectangles do not intersect sets rect to (0,0,0,0)}
-procedure tRect.clip(other: tRect);
+procedure tRect.clip(const other: tRect);
+var
+	ox, oy: int32;
 begin
+	ox := x; oy := y;
 	x := max(x, other.x);
 	y := max(y, other.y);
-  width := min(width, other.x-x+other.width);
-  height := min(height, other.y-y+other.height);
+  width := min(width-(x-ox), other.x-x+other.width);
+  height := min(height-(y-oy), other.y-y+other.height);
   if (width <= 0) or (height <= 0) then clear();
+end;
+
+function tRect.toString(): string;
+begin
+	result := format('(%d,%d %dx%d)',[x,y,width,height]);
 end;
 
 {--------------------------------------------------}
 
-procedure UnitTests();
+procedure runTests();
 var	
-	r: TRect;
+	a,b: tRect;
+  r: tRect;
 begin
-	r := TRect.Create(10,10,50,50);
-  AssertEqual(ShortString(r),'10,10 (50,50)');
+	r := tRect.create(10,10,50,50);
+  AssertEqual(r.toString, '(10,10 50x50)');
+
+  a := tRect.create(0,0,50,50);
+  b := tRect.create(10,25,10,50);
+  a.clip(b);
+  assertEqual(a.toString, '(10,25 10x25)');
+
+
 end;
 
 begin
-	UnitTests();
+	runTests();
 end.

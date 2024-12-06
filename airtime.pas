@@ -114,57 +114,6 @@ begin
 	music := tSoundFile.create('music\music2.wav');
 end;
 
-procedure flipCanvas();
-var
-	screenDWords: dword;
-  lfb_seg: word;
-  pixels: pointer;
-begin	
-	{note: s3 upload is 2x faster, but causes stuttering on music}
-  screenDWords := screen.width*screen.height;
-  lfb_seg := videoDriver.LFB_SEG;
-  if lfb_seg = 0 then exit;
-  pixels := screen.canvas.pixels;
-  asm
-  	pusha
-  	push es
-    mov es,  lfb_seg
-    mov edi,  0
-    mov esi, pixels
-    mov ecx, screenDWords
-    rep movsd
-    pop es
-    popa
-    end;
-end;
-
-procedure flipCanvasLines(y1,y2: int32);
-var
-	len: dword;
-  ofs: dword;
-  pixels: pointer;
-  lfb_seg: word;
-begin	
-	{note: s3 upload is 2x faster, but causes stuttering on music}
-  len := screen.width*(y2-y1);
-  ofs := y1*screen.width*4;
-  lfb_seg := videoDriver.LFB_SEG;
-  if lfb_seg = 0 then exit;
-  pixels := screen.canvas.pixels;
-  asm
-  	pusha
-  	push es
-    mov es,  lfb_seg
-    mov edi, ofs
-    mov esi, pixels
-    add esi, ofs
-    mov ecx, len
-    rep movsd
-    pop es
-    popa
-    end;
-end;
-
 procedure drawGUI();
 var
 	fps: double;
@@ -178,26 +127,20 @@ end;
 procedure titleScreen();
 var
 	thisClock, startClock, lastClock: double;
-  subRegion: tSprite;
   xAngle, zAngle: single; {in degrees}
   xTheta, zTheta: single; {in radians}
   k: single;
 begin
 	note('Title screen started');
 
-	titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
+  titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
 	titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
 	titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
   titleBackground.blit(screen.canvas, 0, 0);
-  subRegion := titleBackground;
-  subRegion.rect.x := 320-30;
-  subRegion.rect.y := 360-30;
-  subRegion.rect.width := 60;
-  subRegion.rect.height := 60;
 
   music.play();
-  flipCanvas();
+  screen.pageFlip();
 
   startClock := getSec;
   lastClock := startClock;
@@ -218,7 +161,7 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 		
-    subRegion.blit(screen.canvas, 320-30, 360-30);
+    {subRegion.blit(screen.canvas, 320-30, 360-30);}
 
     if mouse_b and $1 = $1 then begin
       xAngle := (mouse_x-320)/640*360;
@@ -241,12 +184,13 @@ begin
 			zTheta := zAngle / 180 * 3.1415;
     end;
 
+    screen.clearRegion(tRect.create(320-30, 360-30, 60, 60));
 
 	  carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
     drawGUI();
 
-		flipCanvasLines(0,35);
-		flipCanvasLines(360-30,360+30);
+		screen.copyRegion(tRect.create(0,10,250,25));
+    screen.copyRegion(tRect.create(320-30, 360-30, 60, 60));
 
     if keyDown(key_p) then mainLoop();
 

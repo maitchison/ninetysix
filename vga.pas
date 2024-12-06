@@ -54,7 +54,7 @@ type
 	tVGADriver = class(tVideoDriver)
   	{basic VGA driver}
   	procedure setMode(width, height, BPP: word); override;
-    procedure setText();
+    procedure setText(); override;
   end;
 
 var
