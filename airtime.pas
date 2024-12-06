@@ -145,7 +145,6 @@ begin
 
   vel += engineForce * (1/mass) * elapsed;
 
-
   {-----------------------------------}
   {tire traction}
 
@@ -192,7 +191,6 @@ begin
   end;
 
   vel += tractionForce * (elapsed/mass);
-
 
   {-----------------------------------}
   {drag
