@@ -182,6 +182,9 @@ procedure titleScreen();
 var
 	thisClock, startClock, lastClock: double;
   subRegion: tSprite;
+  xAngle, zAngle: single; {in degrees}
+  xTheta, zTheta: single; {in radians}
+  k: single;
 begin
 	note('Title screen started');
 
@@ -219,8 +222,30 @@ begin
     inc(frameCount);
 		
     subRegion.blit(canvas, 320-30, 360-30);
-    carVox.draw(canvas, 320, 360, gameTime, gameTime/2, gameTime*3, 0.75);
 
+    if mouse_b and $1 = $1 then begin
+      xAngle := (mouse_x-320)/640*360;
+      zAngle := (mouse_y-240)/480*360;
+    end else begin
+      xAngle := gameTime*50;
+      zAngle := gameTime*150;
+    end;
+
+		xTheta := xAngle / 180 * 3.1415;
+		zTheta := zAngle / 180 * 3.1415;
+
+    if mouse_b and $2 = $2 then begin
+    	{round to k-degree increments}
+      k := 45;
+			xTheta := round(xAngle/k)*k / 180 * 3.1415;
+      zTheta := round(zAngle/k)*k / 180 * 3.1415;	
+    end else begin
+			xTheta := xAngle / 180 * 3.1415;
+			zTheta := zAngle / 180 * 3.1415;
+    end;
+
+
+	  carVox.draw(canvas, 320, 360, xTheta, 0, zTheta, 0.75);
     drawGUI();
 
 		flipCanvasLines(0,35);
