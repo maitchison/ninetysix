@@ -24,6 +24,7 @@ type
     constructor create(width, height: int32); overload;
     constructor create(left, top, width, height: int32); overload;
 
+    function isInside(x,y: int32): boolean;
     class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
     class operator Explicit(a: TRect): ShortString;
 
@@ -165,6 +166,11 @@ begin
   width := min(width-(x-ox), other.x-x+other.width);
   height := min(height-(y-oy), other.y-y+other.height);
   if (width <= 0) or (height <= 0) then clear();
+end;
+
+function tRect.isInside(x,y: int32): boolean;
+begin
+	result := (x >= left) and (y >= top) and (x < right) and (y < bottom);
 end;
 
 function tRect.toString(): string;

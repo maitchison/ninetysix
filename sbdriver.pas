@@ -253,11 +253,7 @@ begin
 	get_pm_interrupt(SB_IRQ, oldIntVec);
   set_pm_interrupt(SB_IRQ, newIntVec);
 
-  {why do we do this?}
-  writeln(port[$A1]);
-  writeln('then');
   port[$A1] := port[$A1] and IRQStartMask;
-  writeln(port[$A1]);
 
   hasInstalledInt := true;
 

@@ -30,8 +30,8 @@ type
     kerning: array[0..255, 0..255] of shortint;
   end;
 
-procedure TextOut(page: TPage; atX, atY: integer; s: string;col: RGBA);
-function TextExtents(s: string): TRect;
+procedure textOut(page: TPage; atX, atY: integer; s: string;col: RGBA);
+function textExtents(s: string): TRect;
 
 implementation
 
@@ -109,7 +109,7 @@ begin
 end;
 
 
-function CharOut(Page: TPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
+function charOut(Page: TPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
 var
 	char: TChar;
   kerning: integer;
@@ -125,14 +125,14 @@ begin
   result := atX;
 end;
 
-procedure TextOut(page: TPage; atX, atY: integer; s: string;col: RGBA);
+procedure textOut(page: TPage; atX, atY: integer; s: string;col: RGBA);
 var
 	i: integer;
   prevChar: char;
 begin
 	prevChar := #0;
   for i := 1 to length(s) do begin
-  	atX := CharOut(page, atX, atY, s[i], col, prevChar);
+  	atX := charOut(page, atX, atY, s[i], col, prevChar);
     prevChar := s[i];
   end;
 end;

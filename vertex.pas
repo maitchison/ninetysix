@@ -36,6 +36,8 @@ type V3D = record
     constructor create(x, y, z: single);
 
 		function rotated(thetaX, thetaY, thetaZ: single): V3D;
+    function dot(other: V3D): single;
+    procedure clip(maxLen: single);
 
     class operator Add(a, b: V3D): V3D;
     class operator Subtract(a, b: V3D): V3D;
@@ -130,6 +132,7 @@ var
 	len: single;
 begin
 	len := self.Abs();
+  if len = 0 then exit;
   result.x := x / len;
   result.y := y / len;
   result.z := z / len;
@@ -195,12 +198,22 @@ begin
   result := V3D.create(tx, ty, tz);
 end;
 
+function V3D.dot(other: V3D): single;
+begin
+	result := x*other.x + y*other.y + z*other.z;
+end;
 
 constructor V3D.Create(x, y, z: single);
 begin
     self.x := x;
     self.y := y;
     self.z := z;
+end;
+
+procedure V3D.clip(maxLen: single);
+begin
+	if self.abs2 > maxLen*maxLen then	
+  	self := self.normed()*maxLen;
 end;
 
 {---------------------------------------------------}

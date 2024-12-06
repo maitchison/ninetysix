@@ -29,22 +29,24 @@ type
   	procedure copyLine(x1, x2, y: int32);
   public
 
-
     constructor create();
 
     function width: word;
     function height: word;
+    function rect: tRect;
 
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
 
     procedure setViewPort(x,y: int32);
 
-    {copy cmmands}
+    {copy commands}
     procedure copyRegion(rect: tRect);
     procedure clearRegion(rect: tRect);
     procedure pageFlip();
     procedure clear();
+
+
 
   end;
 
@@ -68,6 +70,11 @@ end;
 function tScreen.height: word;
 begin
 	result := canvas.height;
+end;
+
+function tScreen.rect(): tRect;
+begin
+	result := tRect.create(width, height);
 end;
 
 (*

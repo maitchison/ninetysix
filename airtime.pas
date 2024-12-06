@@ -20,6 +20,8 @@ uses
 	lc96,
   voxel,
   screen,
+  font,
+  math, {todo: remove}
   s3,
 	sound;
 
@@ -48,6 +50,7 @@ procedure mainLoop(); forward;
 type
 	tCar = class
   	pos: V3D;
+    vel: V3D;
     zAngle: single;
     tilt: single;
     constructor create();
@@ -59,6 +62,7 @@ type
 constructor tCar.create();
 begin
 	pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
+  vel := V3D.create(0,0,0);
 	zAngle := 0;
   tilt := 0;
 end;
@@ -66,31 +70,158 @@ end;
 procedure tCar.draw();
 var
 	startTime: double;
-  dx, dy: int16;
+  dx, dy: int32;
 begin
-	screen.clearRegion(tRect.create(trunc(pos.x)-20, trunc(pos.y)-20, 40, 40));
+
+	{correct for isometric}
+	dx := round(pos.x);
+	dy := round(pos.rotated(0.955, 0,0).y);
+
+	if not screen.rect.isInside(dx, dy) then exit;
+
+	screen.clearRegion(tRect.create(dx-20, dy-20, 40, 40));
 	startTime := getSec;
-  carVox.draw(screen.canvas, round(pos.x), round(pos.y), zAngle, 0, tilt, 0.5);
+  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.5);
   carDrawTime := getSec - startTime;
-  screen.copyRegion(tRect.create(trunc(pos.x)-20, trunc(pos.y)-20, 40, 40));
+  screen.copyRegion(tRect.create(dx-20, dy-20, 40, 40));
 end;
 
 
-procedure tCar.update();
+{returns decay factor for with given halflife (in seconds) over current
+ elapsed time}
+function decayFactor(const decayTime: single): single;
+var
+	rate: single;
 begin
+	rate := ln(2.0) / decayTime;
+  result := exp(-rate*elapsed);
+end;
+
+procedure tCar.update();
+var
+	drag, coefficent: single;
+  slipAngle: single;
+
+  dir: v3d;
+
+  engineForce: v3d;
+  lateralForce: v3d;
+  dragForce: v3d;
+
+  tractionForce: v3d;
+  targetVelocity: v3d;
+  lateralForceCap: single;
+
+const
+	mass: single = 1;
+  slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
+
+begin
+
+	dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+	dragForce := v3d.create(0,0,0);
+	engineForce := v3d.create(0,0,0);
+  lateralForce := v3d.create(0,0,0);
+
 	{process input}
 	if keyDown(key_left) then begin
-  	zAngle -= elapsed;
+  	zAngle -= elapsed*2.5;
   	tilt += elapsed*1.0;
   end;
 	if keyDown(key_right) then begin
-  	zAngle += elapsed;
+  	zAngle += elapsed*2.5;
   	tilt -= elapsed*1.0;
   end;
-	if keyDown(key_up) then begin
-  	pos += V3D.create(-50,0,0).rotated(0,0,zAngle) * elapsed;
+	if keyDown(key_up) then
+  	engineForce := dir * 500;
+
+  {movement from last rame}
+  {note: we correct for isometric projection here}
+  pos += vel * elapsed; {stub on the *100}
+
+
+  {-----------------------------------}
+  {engine in 'spaceship' mode}
+
+  vel += engineForce * (1/mass) * elapsed;
+
+
+  {-----------------------------------}
+  {tire traction}
+
+  (*
+  {calculate the slip angle}
+  slipAngle := arcCos(vel.dot(dir) / vel.abs);
+
+  {linear until a point then constant, but really I want this to
+   decrease after a point}
+  lateralForceCap := min(slipAngle, slipThreshold) * 40000;
+  if keyDown(key_x) then
+  	lateralForceCap := 0;
+  if keyDown(key_z) then
+  	lateralForceCap := 99999999999;
+
+  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
+
+  tractionForce := ((targetVelocity-vel)*mass).rotated(0,0,-zAngle);
+
+  tractionForce.x := 0;  {logatudinal, could be used for breaking.}
+  tractionForce.y := clamp(tractionForce.y, -lateralForceCap, +lateralForceCap);
+  tractionForce.z := 0;
+
+  screen.clearRegion(tRect.create(300, 300, 200, 20));
+  textOut(screen.canvas, 300, 300, format('%f %f %f',[log2(1+abs(tractionForce.x)), log2(1+abs(tractionForce.y)), log2(1+tractionForce.z)]), RGBA.create(255,255,255));
+	screen.copyRegion(tRect.create(300, 300, 200, 20));
+
+ 	tractionForce := tractionForce.rotated(0,0,+zAngle);
+
+	vel += tractionForce * (1/mass);
+  *)
+
+  {simplified model}
+  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
+  tractionForce := ((targetVelocity-vel)*mass);
+  if keyDown(key_x) then begin
+  	{perfect traction}
+  end else if keyDown(key_z) then begin
+		tractionForce.clip(0) {no traction}  	
+  end else begin
+  	{standard traction}
+    {note: tires are usually better than engine in terms of acceleration}
+    tractionForce.clip(1000);
   end;
-  tilt *= 0.90;
+
+  vel += tractionForce * (elapsed/mass);
+
+
+  {-----------------------------------}
+  {drag
+  	constant is static resistance
+  	linear is rolling sitance nad internal friction
+  	quadratic is due to air resistance
+  }
+
+  (*
+  drag := 30000.0 + 100.0*vel.abs + 10.0*vel.abs2;
+  if (drag*elapsed/mass > vel.abs) then
+  	vel *= 0
+  else begin
+	  dragForce := vel.normed() * drag;
+	  vel -= dragForce * (elapsed/mass);
+  end;
+  *)
+
+  {again a simpler model}
+  drag := 3.0 + 1.5 * vel.abs;
+	dragForce := vel.normed() * drag;
+  dragForce *= (elapsed/mass);
+  dragForce.clip(vel.abs);
+	
+  vel -= dragForce;
+
+  {-----------------------------------}
+
+  tilt *= decayFactor(0.5);
 end;
 
 {-------------------------------------------------}
@@ -227,7 +358,7 @@ begin
   while True do begin
 
   	camX += trunc((car.pos.x-CamX)*0.1);
-    camY += trunc((car.pos.y-CamY)*0.1);
+    camY += trunc((car.pos.rotated(0.955, 0,0).y-CamY)*0.1);
 
     screen.setViewPort(trunc(camX)-(videoDriver.physicalWidth div 2), trunc(camY)-(videoDriver.physicalHeight div 2));
 
@@ -264,7 +395,7 @@ begin
   initMouse();
   initKeyboard();
 
-{  titleScreen();}
+	{titleScreen();}
 	mainLoop;
 
   videoDriver.setText();
