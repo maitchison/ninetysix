@@ -17,13 +17,13 @@ type
 
 	tScreen = object
 
+  private
+  	fViewPort: tRect;
+
   public
   	canvas: tPage;
     background: tSprite;
     backgroundColor: RGBA;
-
-    {current offset for viewport}
-    xOffset,yOffset: single;
 
   private
   	procedure copyLine(x1, x2, y: int32);
@@ -34,10 +34,11 @@ type
 
     function width: word;
     function height: word;
-    function viewPort: tRect;
 
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
+
+    procedure setViewPort(x,y: int32);
 
     {copy cmmands}
     procedure copyRegion(rect: tRect);
@@ -69,10 +70,12 @@ begin
 	result := canvas.height;
 end;
 
+(*
 function tScreen.viewPort: tRect;
 begin
 	result := tRect.create(round(xOffset), round(yOffset), videoDriver.physicalWidth, videoDriver.logicalWidth);
 end;
+*)
 
 {copies region from canvas to screen.}
 procedure tScreen.copyRegion(rect: tRect);
@@ -221,7 +224,7 @@ begin
 			if (y > canvas.height - (paddingY*2)) then
 				hline(rect.left, rect.right, y, backgroundColor)
       else
-        copyLine(rect.left, rect.right, y);    	
+        copyLine(rect.left, rect.right, y);
 
     end else
 	  	hline(rect.left, rect.right, y, backgroundColor);
@@ -238,6 +241,17 @@ end;
 procedure tScreen.clear();
 begin
 	clearRegion(tRect.create(canvas.width, canvas.height));
+end;
+
+procedure tScreen.setViewPort(x,y: int32);
+begin
+	if x < 0 then x := 0;
+  if y < 0 then y := 0;
+  if x > (canvas.width-videoDriver.physicalWidth) then
+  	x := (canvas.width-videoDriver.physicalWidth);
+  if y > (canvas.height-videoDriver.physicalHeight) then
+  	y := (canvas.height-videoDriver.physicalHeight);
+  videoDriver.setDisplayStart(x,y);
 end;
 
 {-------------------------------------------------}

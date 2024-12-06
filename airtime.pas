@@ -31,7 +31,7 @@ var
   {resources}
   titleBackground: tSprite;
 	music: tSoundFile;
-  track: tSprite;
+  trackSprite: tSprite;
   carVox: tVoxelSprite;
 
   {global time keeper}
@@ -68,9 +68,11 @@ var
 	startTime: double;
   dx, dy: int16;
 begin
+	screen.clearRegion(tRect.create(trunc(pos.x)-20, trunc(pos.y)-20, 40, 40));
 	startTime := getSec;
   carVox.draw(screen.canvas, round(pos.x), round(pos.y), zAngle, 0, tilt, 0.5);
   carDrawTime := getSec - startTime;
+  screen.copyRegion(tRect.create(trunc(pos.x)-20, trunc(pos.y)-20, 40, 40));
 end;
 
 
@@ -108,7 +110,7 @@ begin
 	note('Loading Resources.');
 
   titleBackground := loadSprite('title');
-  track := loadSprite('track1');
+  trackSprite := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('gfx\car1', 32);
 	music := tSoundFile.create('music\music2.wav');
@@ -204,16 +206,17 @@ var
 	startClock,lastClock,thisClock: double;
   startTime: double;
   car: tCar;
+  camX, camY: single;
 
 begin
-(*
-	vgaDriver.setMode(320,240,32);
 	note('Main loop started');
+
+  screen.background := trackSprite;
+  screen.clear();
+  screen.pageFlip();
 
   car := tCar.create();
   car.pos := V3D.create(300,300,0);
-
-  flipCanvas();
 
   startClock := getSec;
   lastClock := startClock;
@@ -226,8 +229,8 @@ begin
   	camX += trunc((car.pos.x-CamX)*0.1);
     camY += trunc((car.pos.y-CamY)*0.1);
 
-    track.blit(canvas, -camX+320, -camY+240);
-  	
+    screen.setViewPort(trunc(camX)-(videoDriver.physicalWidth div 2), trunc(camY)-(videoDriver.physicalHeight div 2));
+
   	{time keeping}
   	thisClock := getSec;
     elapsed := thisClock-lastClock;
@@ -238,15 +241,12 @@ begin
     inc(frameCount);
 
     car.update();
-
     car.draw();
-    drawGUI();
 
-    flipCanvas();
+    drawGUI();
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
-*)
 end;
 
 begin
@@ -256,14 +256,16 @@ begin
 
   loadResources();
 
-	videoDriver.setMode(640,480,32);
+	videoDriver.setMode(320,240,32);
+  videoDriver.setLogicalSize(1024,480);
 	S3D := tS3Driver.create();
   screen.create();
 
   initMouse();
   initKeyboard();
 
-  titleScreen();
+{  titleScreen();}
+	mainLoop;
 
   videoDriver.setText();
   printLog();
