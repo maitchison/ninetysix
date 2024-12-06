@@ -137,7 +137,8 @@ begin
 	titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
 	titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
-  titleBackground.blit(screen.canvas, 0, 0);
+  screen.background := titleBackground;
+  screen.clear();
 
   music.play();
   screen.pageFlip();

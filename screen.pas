@@ -17,12 +17,18 @@ type
 
 	tScreen = object
 
+  public
   	canvas: tPage;
     background: tSprite;
     backgroundColor: RGBA;
 
     {current offset for viewport}
     xOffset,yOffset: single;
+
+  private
+  	procedure copyLine(x1, x2, y: int32);
+  public
+
 
     constructor create();
 
@@ -37,6 +43,7 @@ type
     procedure copyRegion(rect: tRect);
     procedure clearRegion(rect: tRect);
     procedure pageFlip();
+    procedure clear();
 
   end;
 
@@ -80,12 +87,9 @@ begin
 
   rect.clip(tRect.create(canvas.width, canvas.height));
   if rect.area = 0 then exit;
-  note('b');
 
   lfb_seg := videoDriver.LFB_SEG;
   if lfb_seg = 0 then exit;
-
-  note('copy region starting');
 
   pixels := canvas.pixels;
 
@@ -119,8 +123,9 @@ var
 begin
 
 	if (y < 0) or (y >= canvas.height) then exit;
+
 	x1 := max(0, x1);
-  x2 := min(0, canvas.width-1);
+  x2 := min(canvas.width-1, x2);
 
   pixels := canvas.pixels;
   ofs := (x1 + (y * canvas.width))*4;
@@ -128,8 +133,9 @@ begin
   if len <= 0 then exit;
 
 	asm
-  	pushad
-    push es
+  	push edi
+    push eax
+    push ecx
 
     mov edi, pixels
     add edi, ofs
@@ -138,15 +144,62 @@ begin
     mov ecx, len
     rep stosd
 
-    pop es
-    popad
+    pop ecx
+    pop eax
+    pop edi
+    end;
+end;
+
+{copy line background to canvas}
+procedure tScreen.copyLine(x1, x2, y: int32);
+var
+	canvasPixels,backgroundPixels: pointer;
+  ofs,len: int32;
+begin
+
+	if not assigned(background) then
+  	error('background not assigned');
+	if background.page.width < canvas.width then
+  	error('background width must match canvas');
+
+	if (y < 0) or (y >= canvas.height) then exit;
+
+	x1 := max(0, x1);
+  x2 := min(canvas.width-1, x2);
+
+  canvasPixels := canvas.pixels;
+  backgroundPixels := background.page.pixels;
+  ofs := (x1 + (y * canvas.width))*4;
+  len := (x2-x1)+1;
+  if len <= 0 then exit;
+
+	asm
+  	push edi
+    push esi
+    push eax
+    push ecx
+
+    mov edi, canvasPixels
+    add edi, ofs
+
+    mov esi, backgroundPixels
+    add esi, ofs
+
+    mov ecx, len
+    rep movsd
+
+    pop ecx
+    pop eax
+    pop esi
+    pop edi
     end;
 end;
 
 {clears region on canvas with background color}
 procedure tScreen.clearRegion(rect: tRect);
 var
-	y,yMin,yMax: integer;
+	y,yMin,yMax: int32;
+  paddingX,paddingY: int32;
 begin
 	{todo: support S3 upload (but maybe make sure regions are small enough
    to not cause stutter - S3 is about twice as fast.}
@@ -154,8 +207,24 @@ begin
   rect.clip(tRect.create(canvas.width, canvas.height));
   if rect.area = 0 then exit;
 
+  if assigned(background) then begin
+  	{calculate padding}
+    paddingX := (canvas.width - background.width) div 2;
+    paddingY := (canvas.height - background.height) div 2;
+  end;
+
   for y := rect.top to rect.bottom do begin
-  	hline(rect.left, rect.right, y, backgroundColor);
+  	
+    {support for background}
+    if assigned(background) then begin
+    	{top alignment for the moment}
+			if (y > canvas.height - (paddingY*2)) then
+				hline(rect.left, rect.right, y, backgroundColor)
+      else
+        copyLine(rect.left, rect.right, y);    	
+
+    end else
+	  	hline(rect.left, rect.right, y, backgroundColor);
   end;
 
 end;
@@ -164,6 +233,11 @@ end;
 procedure tScreen.pageFlip();
 begin
 	copyRegion(tRect.create(canvas.width, canvas.height));
+end;
+
+procedure tScreen.clear();
+begin
+	clearRegion(tRect.create(canvas.width, canvas.height));
 end;
 
 {-------------------------------------------------}
