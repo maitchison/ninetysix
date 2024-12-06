@@ -211,7 +211,7 @@ begin
       	'f': begin
         	// float
           case a.VType of
-	          vtExtended: Str(args[ArgIndex].VExtended^:0:2, s);
+	          vtExtended: Str(args[ArgIndex].VExtended^:0:1, s);
             else Error('Invalid type:'+IntToStr(a.VType));
           end;
           result += s;

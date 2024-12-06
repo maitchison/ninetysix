@@ -26,15 +26,14 @@ VAR
   INTERRUPT_COUNTER: int32 = 0;
   LOOP_MUSIC: boolean = True;
 
+var
+	{number of seconds it took to process the last audio chunk}
+	lastChunkTime: double;
 
 implementation
 
 CONST
   NUM_CHANNELS = 8;
-
-var
-	{number of seconds it took to process the last audio chunk}
-	lastChunkTime: double;
 
 type
 

@@ -249,15 +249,17 @@ procedure drawGUI();
 var
 	fps: double;
 	tpf: double;
+
 begin
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
-	GUILabel(screen.canvas, 10, 10, format('FPS:%f Car: %f ms', [fps,carDrawTime*1000]));
+	GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %fms', [fps,carDrawTime*1000,lastChunkTime*1000]));
 end;
 
 procedure titleScreen();
 var
 	thisClock, startClock, lastClock: double;
+  startTime: double;
   xAngle, zAngle: single; {in degrees}
   xTheta, zTheta: single; {in radians}
   k: single;
@@ -318,10 +320,12 @@ begin
 
     screen.clearRegion(tRect.create(320-30, 360-30, 60, 60));
 
+    startTime := getSec;
 	  carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
+    carDrawTime := getSec - startTime;
     drawGUI();
 
-		screen.copyRegion(tRect.create(0,10,250,25));
+		screen.copyRegion(tRect.create(10, 10, 300, 25));
     screen.copyRegion(tRect.create(320-30, 360-30, 60, 60));
 
     if keyDown(key_p) then mainLoop();
