@@ -20,16 +20,18 @@ type
   end;
   	
 
-	TSprite = record
+	tSprite = class
 
   	page: tPage;
   	rect: tRect;
     border: tBorder;
 
-    constructor Create(APage: TPage);
+    constructor create(aPage: tPage);
 
-    function Width: Integer;
-    function Height: Integer;
+    function width: int32;
+    function height: int32;
+
+    function clone(): tSprite;
 
     procedure blit(dstPage: tPage; atX, atY: int32);
     procedure draw(dstPage: tPage; atX, atY: int32);
@@ -128,9 +130,8 @@ var
 
 begin
 	{todo: implement proper clipping}
-
   if (src.height <= 0) or (src.width <= 0) then
-  	Error('Tried drawing sprite with invalid bounds: '+ShortString(src));
+  	error('Tried drawing sprite with invalid bounds: '+ShortString(src));
 
   if (dst.height <= 0) or (dst.width <= 0) then exit;
 
@@ -270,12 +271,12 @@ begin
 end;
 
 
-function TSprite.Width: Integer;
+function TSprite.Width: int32;
 begin
 	result := self.Rect.Width;
 end;
 
-function TSprite.Height: Integer;
+function TSprite.Height: int32;
 begin
 	result := Self.Rect.Height;
 end;
@@ -305,7 +306,11 @@ var
 	Sprite: TSprite;
   DrawRect: TRect;
 begin
-	Sprite := self;
+
+  if not assigned(self) then
+		error('Tried drawing unassigned sprite');
+
+	sprite := self.clone();
 
   DrawRect := TRect.Create(atX, atY, DrawWidth, DrawHeight);
 
@@ -378,8 +383,13 @@ begin
 
 end;
 
-
-end.
+{create a shallow copy of the sprite}
+function tSprite.clone(): tSprite;
+begin
+	result := tSprite.create(self.page);
+  result.rect := self.rect;
+  result.border := self.border;
+end;
 
 begin
 end.

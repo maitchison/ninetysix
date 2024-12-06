@@ -11,8 +11,8 @@ uses
 	graph32;
 
 var
-	PanelSprite: TSprite;
-  FrameSprite: TSprite;
+	panelSprite: tSprite = nil;
+  frameSprite: tSprite = nil;
 
 procedure GUILabel(page: tPage; atX, atY: integer; s: string);
 
@@ -22,10 +22,12 @@ procedure GUILabel(page: tPage; atX, atY: integer; s: string);
 var
 	padX, padY: integer;
 begin
+	if not assigned(panelSprite) or not assigned(frameSprite) then
+  	error('Tried to draw gui component before InitGUI called.');
 
 	FrameSprite.NineSlice(page, atX, atY, 200, 22);
-  atX += PanelSprite.border.left;
-  atY += PanelSprite.border.top;
+  atX += panelSprite.border.left;
+  atY += panelSprite.border.top;
   {Custom positioning}
   atX += 5;
   atY -= 0;
@@ -37,11 +39,11 @@ procedure InitGui();
 begin
 	Info('[init] GUI');
 
-  panelSprite := TSprite.Create(LoadBMP('gui/panel.bmp'));
-  panelSprite.Border := TBorder.Create(2,2,2,2);
+  panelSprite := tSprite.Create(LoadBMP('gui/panel.bmp'));
+  panelSprite.Border := tBorder.Create(2,2,2,2);
 
-  FrameSprite := TSprite.Create(LoadBMP('gui/ec_frame.bmp'));
-  FrameSprite.Border := TBorder.Create(8,8,8,8);
+  frameSprite := tSprite.Create(LoadBMP('gui/ec_frame.bmp'));
+  frameSprite.Border := tBorder.Create(8,8,8,8);
 
 end;
 
