@@ -48,6 +48,11 @@ uses
 
 {-----------------------------------------------------}
 
+var
+	{during IRQ our segements will sometime be wrong, so we need to
+   reference a copy of it}
+	backupDS: word = 0;
+
 const
 {72?}
 	SB_IRQ = $72; {INT10 in protected mode is $70+IRQ-8}
@@ -75,11 +80,11 @@ const
   64k = ~200-400 ms 		This is way too much latency
   32k = ~100-200 ms			Perhaps a safe trade-off
   16k = ~50-100 ms			Might be ideal.
-  8k  = ~25-50 ms				This would be super cool, but crashes (maybe due to STI)
+  8k  = ~25-50 ms			
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 64*1024; {64k generates a bit of clicking if the mixer is too slow}
+  BUFFER_SIZE = 8*1024;
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 {----------------------------------------------------------}
@@ -219,6 +224,23 @@ var
 
 begin
 
+	{todo: do everything in asm, and without any calls}
+	asm
+    push es
+    push ds
+    push fs
+    push gs
+  	pushad
+
+    mov ax, cs:[backupDS]
+    mov ds, ax
+    mov es, ax
+  	end;
+
+  // acknowledge the DSP
+	// $F for 16bit, $E for 8bit
+	readAck := port[SB_BASE + $F];
+
  	startTime := getSec;
   inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
@@ -233,8 +255,7 @@ begin
   if (dosSegment <> 0) then begin
 
 	  if backgroundMusicBuffer <> nil then begin
-  		{todo: hande end case better}
-		
+  		{todo: hande end case better}		
 	  	newSamples := HALF_BUFFER_SIZE div 4;
   	  if (backgroundMusicPosition + newSamples) >= backgroundMusicLength then
     	  backgroundMusicPosition := 0;
@@ -248,14 +269,19 @@ begin
 
   lastChunkTime := getSec-startTime;
 
-  // acknowledge the DSP
-	// $F for 16bit, $E for 8bit
-	readAck := port[SB_BASE + $F];
-
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
   port[$A0] := $20;
   port[$20] := $20;
+
+  asm
+  	
+  	popad
+    pop gs
+    pop fs
+    pop ds
+    pop es
+  end;
 
 end;
 {$F-,S+,R+,Q+}
@@ -451,11 +477,15 @@ begin
 
   words := BUFFER_SIZE div 2; 					// number of words in buffer.
   halfWords := HALF_BUFFER_SIZE div 2;	// number of words in halfbuffer.
+	addr := (dosSegment shl 4);
+
+  {check address does not span 64K}
+  if (addr shr 16) <> ((addr + words*2) shr 16) then
+  	error('DMA destination buffer spans 64k boundary');
 
   {1. reset}
 	DSPReset();
-	addr := (dosSegment shl 4);
-	port[$D4] := $05;	// mask DMA channel
+  port[$D4] := $05; // mask DMA channel
   port[$D8] := $01;	// any value
   port[$D6] := $59; // single mode, auto-initialize, write
   port[$8B] := byte(addr shr 16);	// page address, high bits of address, probably 0
@@ -515,14 +545,21 @@ begin
 
 end;
 
+procedure freeBuffer();
+begin
+  global_dos_free(dosSelector);
+  dosSegment := 0;
+  dosSelector := 0;
+end;
+
 procedure closeSound();
 begin
 	note('[done] sound');
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   uninstall_ISR();
   stopDMAPlayback();
-  delay(100); {make sure SB has stoped reading this}
-  global_dos_free(dosSelector);
+  delay(10); {make sure SB has stoped reading}
+  freeBuffer();
 end;
 
 {----------------------------------------------------------}
@@ -534,6 +571,8 @@ end;
 {----------------------------------------------------------}
 
 begin
+
+	backupDS := get_ds();
 
 	runTests();
 
