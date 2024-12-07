@@ -200,6 +200,9 @@ begin
     	InPlaceholder := False;
       a := args[ArgIndex];
       case fmt[i] of
+	      '%': begin
+	      		result += '%'
+          end;
       	'd': begin
         	// integer
           case a.VType of

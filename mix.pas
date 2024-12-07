@@ -31,6 +31,9 @@ type
     {handles mixing of channels}
     channel: array[1..NUM_CHANNELS] of tSoundChannel;
 
+    mute: boolean;
+    noise: boolean;
+
     constructor create();
     procedure play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
 

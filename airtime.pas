@@ -249,11 +249,18 @@ procedure drawGUI();
 var
 	fps: double;
 	tpf: double;
-
+  mixerCpuUsage: double;
 begin
+
 	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
-	GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %fms', [fps,carDrawTime*1000,lastChunkTime*1000]));
+
+  if lastChunkTime > 0 then
+		mixerCpuUsage := 100 * lastChunkTime / (HALF_BUFFER_SIZE/4/44100)  	
+	else
+  	mixerCpuUsage := -1;
+
+	GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
 end;
 
 procedure titleScreen();
