@@ -44,6 +44,8 @@ type
 
 	tSoundEffect = class
 
+  	{todo: switch back to dynamic array}
+
   	sample: pAudioSample;
     length: int32;
 

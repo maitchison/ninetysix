@@ -274,7 +274,8 @@ begin
   screen.clear();
 
   screen.pageFlip();
-  mixer.play(music);
+  {stub: make this work}
+  //mixer.play(music);
 
   startClock := getSec;
   lastClock := startClock;
@@ -389,13 +390,18 @@ begin
 
   loadResources();
 
-
 	videoDriver.setMode(640,480,32);
 
   //videoDriver.setMode(320,240,32);
   //videoDriver.setLogicalSize(1024,480);
 	S3D := tS3Driver.create();
   screen.create();
+
+  {todo: make mixer.playMusic}
+  backgroundMusicPosition := 0;
+  backgroundMusicLength := music.length;
+  backgroundMusicBuffer := music.sample; {set last}
+
 
   initMouse();
   initKeyboard();

@@ -82,11 +82,6 @@ begin
   	Even 20MS is sort of ok, as we'd just reduce halve the block size
     and 10% CPU to audio is probably ok on a P166}
 
-  asm
-    mov [currentES], es
-    mov [currentDS], ds
-  end;
-
   {pascal expects es and ds to be set to to start of linear space,
    if they do not match, then someone has modified them when the
    interupt was fired. In this case some functions (e.g. fillchar)
@@ -101,8 +96,6 @@ begin
   if (mixer = nil) then exit;
 
   fillchar(scratchBufferI32, sizeof(scratchBufferI32), 0);
-
-	exit;
 
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin

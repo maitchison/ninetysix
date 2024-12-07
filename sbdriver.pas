@@ -33,6 +33,12 @@ var
 	lastChunkTime: double = -1;
   currentTC: uint64;
 
+  backgroundMusicBuffer: pointer = nil;
+  backgroundMusicPosition: int32 = 0;
+  backgroundMusicLength: int32 = 0;
+
+var
+	bufferDirty: boolean = false;  	
 
 implementation
 
@@ -51,7 +57,7 @@ var
   IS_DMA_ACTIVE: boolean = false;
   DSPVersion: byte = 0;
   dosSegment: word = 0;
-  dosSelector: word;
+  dosSelector: word = 0;
 
   currentBuffer: boolean;			// True = BufferA, False = BufferB
 
@@ -73,7 +79,7 @@ const
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 32*1024; {64k generates a bit of clicking if the mixer is too slow}
+  BUFFER_SIZE = 64*1024; {64k generates a bit of clicking if the mixer is too slow}
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 {----------------------------------------------------------}
@@ -205,14 +211,13 @@ end;
 {$F+,S-,R-,Q-}
 procedure soundBlaster_ISR; interrupt;
 var
-	bytesToCopy: int32;
   readAck: byte;
   bufOfs: word;
-  bytesRemaining: dword;
   startTime: double;
-  scratchBuffer: pointer;
+  musicBuffer: pointer;	
+  newSamples: int32;
 
- begin
+begin
 
  	startTime := getSec;
   inc(INTERRUPT_COUNTER);
@@ -223,19 +228,23 @@ var
   else
   	bufOfs := 0;
 
-  // calculate our mix
-  scratchBuffer := nil;
-  scratchBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
-  currentTC += HALF_BUFFER_SIZE div 4;
+  {Initialize the buffer with the music stream.}
 
-  asm
-  	mov ax, ds
-  	mov es, ax
-  	end;
+  if (dosSegment <> 0) then begin
 
-  // update the non-active buffer
-  if (scratchBuffer <> nil) and (dosSegment <> 0) then
-		dosMemPut(dosSegment, bufOfs, scratchBuffer^, HALF_BUFFER_SIZE);
+	  if backgroundMusicBuffer <> nil then begin
+  		{todo: hande end case better}
+		
+	  	newSamples := HALF_BUFFER_SIZE div 4;
+  	  if (backgroundMusicPosition + newSamples) >= backgroundMusicLength then
+    	  backgroundMusicPosition := 0;
+  	  dosMemPut(dosSegment, bufOfs, (backgroundMusicBuffer + (backgroundMusicPosition * 4))^, HALF_BUFFER_SIZE);
+	    backgroundMusicPosition += newSamples;
+	  end else begin
+	  	dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
+	  end;
+	  bufferDirty := true;
+  end;
 
   lastChunkTime := getSec-startTime;
 
@@ -420,6 +429,9 @@ var
 
 begin
 
+	if IS_DMA_ACTIVE then
+  	error('DMA transfer is already active');
+
   note('Setting up DMA transfer.');
   if not assigned(mixer) then
   	error('A mixer has not yet been assigned.');
@@ -481,7 +493,7 @@ end;
 
 procedure initSound();
 var
-	res: dword;
+	res: longint;
 begin
 	note('[init] Sound');
   sbGood := DSPReset();
@@ -491,14 +503,11 @@ begin
   else
   	warn('No SoundBlaster detected');
 
-  {always allocate 64k, I figure this might help make sure we are aligned}
-  if BUFFER_SIZE > 64*1024 then
-  	error('Block size is too large, must be <= 65536');
-	res := Global_Dos_Alloc(64*1024);
+	res := Global_Dos_Alloc(BUFFER_SIZE);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
-  	Error('Failed to allocate dos memory');
+  	error('Failed to allocate dos memory');
   note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR();
@@ -512,6 +521,8 @@ begin
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   uninstall_ISR();
   stopDMAPlayback();
+  delay(100); {make sure SB has stoped reading this}
+  global_dos_free(dosSelector);
 end;
 
 {----------------------------------------------------------}
