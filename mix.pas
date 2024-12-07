@@ -87,17 +87,11 @@ begin
   if bufSamples > (8*1024) then exit;
   if (mixer = nil) then exit;
 
-  (*
-	for i := 0 to numSamples-1 do begin
-  	scratchBufferI32[i].left := 0;
-  	scratchBufferI32[i].right := 0;
-  end;*)
-
-  	{fillchar does not work?}
   filldword(scratchBufferI32, bufSamples * 2, 0);
 
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
+  	if mixer.mute or mixer.noise then continue;
 	  if assigned(mixer.channel[j].soundEffect) then begin
 			sfx := mixer.channel[j].soundEffect;
       len := sfx.length;
@@ -113,14 +107,23 @@ begin
 	  end;
   end;
 
-
   {mix down}
-  for i := 0 to bufSamples-1 do begin
-  	{adding triangle noise to reduce quantization distortion}
-    {costs 2ms, for 8ks samples, but I think it's worth it}
-    noise := ((rnd + rnd) div 2) - 128;
-		scratchBuffer[i].left := (scratchBufferI32[i].left + noise) div 256;
-		scratchBuffer[i].right := (scratchBufferI32[i].right + noise) div 256;    	
+  if mixer.mute then begin
+    filldword(scratchBuffer, bufSamples, 0);
+  end else if mixer.noise then begin
+  	for i := 0 to bufSamples-1 do begin
+    	noise := ((rnd + rnd) div 2) - 128;
+			scratchBuffer[i].left := noise*128;
+			scratchBuffer[i].right := noise*128;
+    end;
+  end else begin
+  	for i := 0 to bufSamples-1 do begin
+  		{adding triangle noise to reduce quantization distortion}
+    	{costs 2ms, for 8ks samples, but I think it's worth it}
+    	noise := ((rnd + rnd) div 2) - 128;
+			scratchBuffer[i].left := (scratchBufferI32[i].left + noise) div 256;
+			scratchBuffer[i].right := (scratchBufferI32[i].right + noise) div 256;
+    end;
   end;
 
   result := @scratchBuffer[0];
@@ -164,6 +167,8 @@ constructor tSoundMixer.create();
 var
 	i: integer;
 begin
+	mute := false;
+  noise := false;
 	for i := 1 to NUM_CHANNELS do
   	channel[i] := tSoundChannel.create();		
 end;
