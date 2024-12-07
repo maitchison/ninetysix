@@ -104,16 +104,14 @@ begin
   pixels := canvas.pixels;
 
   for y := rect.top to rect.bottom-1 do begin
+  	{todo: one asm loop}
   	ofs := (rect.left + (y * canvas.width))*4;
     len := rect.width;
   	asm
-    	{pascal gets super confused if we change es, then an interupt fires.
-       when this happens es will be wrong and fillchar will write to random
-       memory... which isn't great. Therefore I just disable interupts during
-       the upload}
-    	cli
-      pushad
       push es
+      push edi
+      push esi
+      push ecx
 
       mov es,  lfb_seg
       mov edi, ofs
@@ -124,9 +122,10 @@ begin
       mov ecx, len
       rep movsd
 
+      pop ecx
+      pop esi
+      pop edi
       pop es
-      popad
-      sti
 
     end;
   end;

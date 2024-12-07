@@ -329,6 +329,8 @@ begin
 		screen.copyRegion(tRect.create(10, 10, 300, 25));
     screen.copyRegion(tRect.create(320-30, 360-30, 60, 60));
 
+
+
     if keyDown(key_p) then mainLoop();
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
