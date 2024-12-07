@@ -3,6 +3,15 @@ unit sound;
 
 {$MODE delphi}
 
+{todo:
+	support load load of wave files (via getsample)
+  support pitch and volume (via get sample)
+  support fade and and fade out (via get sample)
+
+  todo: split mixer and sound
+}
+
+
 interface
 
 uses
@@ -12,30 +21,44 @@ uses
   sbDriver;
 
 type
+	{time in samples from start of application.}
+  tTimeCode = int64;
 
-	tWaveform = array of word;
+  tAudioSample = packed record
+  {16 bit stereo sample}
+  case byte of
+		0: (left,right: int16);
+  	1: (value: dword);
+  end;
 
-	tSoundFile = class
+  pAudioSample = ^tAudioSample;
 
-  public
+  tAudioSampleF32 = packed record
+  {32 bit stereo sample, used for mixing}
+		left,right: single;
+  end;
+  tAudioSampleI32 = packed record
+  {32 bit stereo sample, used for mixing}
+		left,right: int32;
+  end;
 
-  	data: tWaveform;
+	tSoundEffect = class
 
-  public
+  	sample: array of tAudioSample;
 
-  	constructor create(filename: string='');
+    constructor create(filename: string='');
 
   	procedure loadFromWave(filename: string);
     procedure loadFromLA96(filename: string);
     procedure saveToLA96(filename: string);
     procedure saveToWave(filename: string);
 
-    procedure play();
-
   end;
 
-
 implementation
+
+uses
+	mix;
 
 type
 	tWaveFileHeader = packed record
@@ -60,12 +83,12 @@ type
 {--------------------------------------------------------}
 
 {create soundfile, optionally loading it from disk.}
-constructor tSoundFile.create(filename: string='');
+constructor tSoundEffect.create(filename: string='');
 var
 	extension: string;
 begin
 
-	data := nil;
+	sample := nil;
 
 	extension := getExtension(filename);
   if extension = 'wav' then
@@ -74,14 +97,17 @@ begin
   	loadFromLA96(filename);
 end;
 
-procedure tSoundFile.loadFromWave(filename: string);
+
+{-----------------------------------------------------}
+
+procedure tSoundEffect.loadFromWave(filename: string);
 var
 	f: file;
   fileHeader: tWaveFileHeader;
   chunkHeader: tChunkHeader;
   samples: int32;
   i,j: integer;
-  wordsToRead: dword;
+  samplesToRead: dword;
   chunkWords: dword;
 
 function wordAlign(x: int32): int32;
@@ -126,12 +152,12 @@ begin
           continue;
         end;
         chunkWords := chunkSize div 2;
-        wordsToRead := min(chunkWords, 32*1024*1024);
-        if (wordsToRead < chunkWords) then
+        samplesToRead := min(chunkWords div 2, 16*1024*1024);
+        if (samplesToRead < chunkWords div 2) then
         	warn(format('Wave file too large to read (%f MB), reading partial file.', [chunkSize/1024/1024]));
-  			data := nil;
-        setLength(data, wordsToRead);
-        blockRead(f, data[0], wordsToRead*2);
+  			sample := nil;
+        setLength(sample, samplesToRead);
+        blockRead(f, sample[0], samplesToRead*4);
         break;
       end;
     end;
@@ -142,29 +168,26 @@ begin
 	
 end;
 
-procedure tSoundFile.loadFromLA96(filename: string);
+procedure tSoundEffect.loadFromLA96(filename: string);
 begin
 end;
 
-procedure tSoundFile.saveToLA96(filename: string);
+procedure tSoundEffect.saveToLA96(filename: string);
 begin
 end;
 
-procedure tSoundFile.saveToWave(filename: string);
+procedure tSoundEffect.saveToWave(filename: string);
 begin
 end;
 
-procedure tSoundFile.play();
-begin
-	{for the moment just play as 'music'}
-  sbDriver.backgroundPCMData(self.data);
-end;
 
-{------------------------------------------------------}
+{----------------------------------------------------------}
 
 procedure runTests();
 begin
 end;
+
+{----------------------------------------------------------}
 
 begin
 	runTests();

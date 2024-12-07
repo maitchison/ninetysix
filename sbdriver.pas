@@ -3,6 +3,8 @@ unit sbDriver;
 
 {$MODE delphi}
 
+{todo: remove references to mixer, and just have a procedure call}
+
 interface
 
 uses
@@ -15,163 +17,28 @@ uses
 type
 	tWords = array of word;
 
+{todo: remove these, and handle through mixer
+ (except the direct ones)}
 procedure directNoise(s: double);
 procedure directPCMData(buffer: tWords);
 procedure playPCMData(buffer: tWords);
-procedure backgroundPCMData(buffer: tWords);
 
-procedure DSPWrite(command: byte);
+{-----------------------------------------------------}
 
-VAR
+var
   INTERRUPT_COUNTER: int32 = 0;
   LOOP_MUSIC: boolean = True;
 
-var
 	{number of seconds it took to process the last audio chunk}
-	lastChunkTime: double;
+	lastChunkTime: double = -1;
+  currentTC: uint64;
+
 
 implementation
 
-CONST
-  NUM_CHANNELS = 8;
-
-type
-
-	{time, where unit is 1/256 of a sample.}
-  tTimeCode = int64;
-
-  tAudioSample = packed record
-  {16 bit stereo sample}
-  case byte of
-		0: (left,right: int16);
-  	1: (value: dword);
-  end;
-
-  tAudioSampleHD = packed record
-  {32 bit stereo sample, used for mixing}
-		left,right: single;
-  end;
-
-	tSoundEffect = class
-  	sample: array of tAudioSample;
-    function getSample(tc: tTimeCode;looped: boolean=false): tAudioSample;
-    constructor FromFile(filename: string);
-  end;
-
-	tSoundChannel = class
-		soundEffect: tSoundEffect; 	{the currently playing sound effect}
-    volume: single;
-    pitch: single;
-    startTime: tTimeCode;      {when the sound should start playing}
-    loop: boolean;
-    constructor create();
-		procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
-  end;
-
-  tSoundMixer = class
-    {handles mixing of channels}
-    channel: array[1..NUM_CHANNELS] of tSoundChannel;
-
-    constructor create();
-    procedure play(soundEffect: tSoundEffect; volume: single; pitch: single;timeOffset: single=0);
-		procedure mixDown(startTC: tTimeCode;buf: pointer; bufBytes: int32);
-
-  end;
-
-
-{-----------------------------------------------------}
-
-{converts from seconds since app launch, to timestamp code}
-function secToTC(s: double): tTimeCode;
-begin
-	{note, we do not allow fractional samples when converting}
-	result := round(s * 44100) * 256;
-end;
-
-
-{-----------------------------------------------------}
-
-{returns sample at given time code (where 0 is the first sample of the file}
-function tSoundEffect.getSample(tc: tTimeCode;looped:boolean=false): tAudioSample;
-begin
-	result.value := 0;
-  tc := tc div 256;
-	if tc < 0 then exit;
-  if looped then
-  	{todo: this is too expensive}
-  	tc := tc mod length(sample)
-  else
-  	if tc >= length(sample) then exit;
-	result := sample[tc];
-end;
-
-constructor tSoundEffect.FromFile(filename: string);
-begin
-	{todo: load}
-end;
-
-{-----------------------------------------------------}
-
-constructor tSoundChannel.create();
-begin	
-  soundEffect := nil;
-  volume := 1.0;
-  pitch := 1.0;
-  startTime := 0;
-  loop := false;		
-end;
-
-procedure tSoundChannel.play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
-begin
-	self.soundEffect := soundEffect;
-  self.volume := volume;
-  self.pitch := pitch;
-	self.startTime := startTime;
-  self.loop := loop;
-end;
-
-{-----------------------------------------------------}
-
-constructor tSoundMixer.create();
-var
-	i: integer;
-begin
-	for i := 1 to NUM_CHANNELS do
-  	channel[i] := tSoundChannel.create();		
-end;
-
-procedure tSoundMixer.play(soundEffect: tSoundEffect; volume:single; pitch: single;timeOffset:single=0);
-var
-	channelNum: integer;
-begin
-	{for the moment lock onto the first channel}
-  channelNum := 1;
-	channel[channelNum].play(soundEffect, volume, pitch, secToTC(getSec+timeOffset));
-end;
-
-{generate mix for given time}
-procedure tSoundMixer.mixDown(startTC: tTimeCode;buf: pointer; bufBytes: int32);
-var
-	value: single;
-  value16: word;
-  i,j: int32;
-  numSamples: int32;
-begin
-	numSamples := bufBytes div 4; {16-bit stereo}
-
-  for i := 0 to numSamples-1 do begin
-  	value := 0;
-		for j := 1 to 8 do begin
-  		if not assigned(channel[j].soundEffect) then continue;
-    	value += channel[j].soundEffect.getSample(channel[j].startTime-startTC+i).left;
-	  end;
-    value16 := clamp(trunc(value), 0, 65535);
-    {mono -> stereo for the moment}
-    pWord(buf+i*2)^ := value16;
-    pWord(buf+i*2+1)^ := value16;
-  end;		
-end;
-
+uses
+	mix,
+	sound;
 
 {-----------------------------------------------------}
 
@@ -181,12 +48,11 @@ const
 
 var
 	sbGood: boolean = false;
+  IS_DMA_ACTIVE: boolean = false;
   DSPVersion: byte = 0;
-  dosSegment: word;
+  dosSegment: word = 0;
   dosSelector: word;
 
-  backgroundBuffer: tWords;
-  audioDataPosition: dword;
   currentBuffer: boolean;			// True = BufferA, False = BufferB
 
 const
@@ -197,8 +63,17 @@ const
   DSP_WRITE_STATUS = SB_BASE + $C;
   DSP_DATA_AVAIL = SB_BASE + $E;
 
-  //half buffer size in bytes
-  BUFFER_SIZE = 64*1024;
+  {
+  Timings for 16bit stereo
+
+  64k = ~200-400 ms 		This is way too much latency
+  32k = ~100-200 ms			Perhaps a safe trade-off
+  16k = ~50-100 ms			Might be ideal.
+  8k  = ~25-50 ms				This would be super cool, but crashes (maybe due to STI)
+  }
+
+  //buffer size in bytes
+  BUFFER_SIZE = 64*1024; {64k generates a bit of clicking if the mixer is too slow}
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 {----------------------------------------------------------}
@@ -213,11 +88,6 @@ end;
 function DSPDataAvailable(): boolean;
 begin
 	result := (port[DSP_DATA_AVAIL] and $80) <> 0;
-end;
-
-procedure DSPStop();
-begin	
-	DSPWrite($D9);
 end;
 
 procedure DSPWaitForWrite(timeout: double=1);
@@ -235,6 +105,11 @@ var
 begin
 	DSPWaitForWrite();
   port[DSP_WRITE_DATA] := command;
+end;
+
+procedure DSPStop();
+begin	
+	DSPWrite($D9);
 end;
 
 function DSPRead(): byte;
@@ -328,8 +203,6 @@ begin
 end;
 
 {$F+,S-,R-,Q-}
-{note: this could all be in asm if we wanted}
-{also... should set up a read from file}
 procedure soundBlaster_ISR; interrupt;
 var
 	bytesToCopy: int32;
@@ -337,39 +210,45 @@ var
   bufOfs: word;
   bytesRemaining: dword;
   startTime: double;
+  scratchBuffer: pointer;
+
  begin
 
  	startTime := getSec;
   inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
 
-  // refill the buffer
-  bytesRemaining := (length(backgroundBuffer) - audioDataPosition)*2;
-  bytesToCopy := min(bytesRemaining, HALF_BUFFER_SIZE);
-  if bytesToCopy > 1 then begin
-  	if currentBuffer then
-    	bufOfs := HALF_BUFFER_SIZE
-    else
-    	bufOfs := 0;
-    	
-    // update the non-active buffer
-	  dosMemPut(dosSegment, bufOfs, backgroundBuffer[audioDataPosition], bytesToCopy);
+	if currentBuffer then
+  	bufOfs := HALF_BUFFER_SIZE
+  else
+  	bufOfs := 0;
 
-    audioDataPosition += (bytesToCopy shr 1);
-    // acknowledge the DSP interupt.
-	  // $F for 16bit, $E for 8bit
-		readAck := port[SB_BASE + $F];
-  end else begin
-  	if LOOP_MUSIC then begin
-    	audioDataPosition := 0;
-      readAck := port[SB_BASE + $F];
-    end else
-	  	{stop the audio}
-      {note: I intentially do not ack here, not sure if that's right or not}
-  	  DSPStop();
-  end;
+  {give gime back, as this next part might take some time}
+  {
+  asm
+  	sti
+    end;
+  }
+
+  // calculate our mix
+  scratchBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
+  currentTC += HALF_BUFFER_SIZE div 4;
+
+  {
+  asm
+  	cli
+    end;
+  }
+
+  // update the non-active buffer
+  if (scratchBuffer <> nil) and (dosSegment <> 0) then
+		dosMemPut(dosSegment, bufOfs, scratchBuffer^, HALF_BUFFER_SIZE);
 
   lastChunkTime := getSec-startTime;
+
+  // acknowledge the DSP interupt.
+	// $F for 16bit, $E for 8bit
+	readAck := port[SB_BASE + $F];
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
@@ -404,7 +283,6 @@ begin
   port[$A1] := port[$A1] and IRQStartMask;
 
   hasInstalledInt := true;
-
 
 end;
 
@@ -533,9 +411,8 @@ begin
   delay(samples*1000/44100);
 end;
 
-{Play audio in background using IRQ.
-Input should be stero 16-bit, and 44.1kh.}
-procedure backgroundPCMData(buffer: tWords);
+{Start IRQ and DMA to handle audio in background.}
+procedure initiateDMAPlayback();
 var
 	bytestoCopy: dword;
   samples: dword;
@@ -549,19 +426,14 @@ var
 
 begin
 
-	backgroundBuffer := buffer;
-  audioDataPosition := 0;
-
-  note(format('Playing new audio, with %d bytes', [length(buffer)*2]));
-  note('Setting up initial transfer.');
+  note('Setting up DMA transfer.');
+  if not assigned(mixer) then
+  	error('A mixer has not yet been assigned.');
 
   DSPReset();
 
-  {first transfer}
-  {note: full buffer transfer}
-  bytesToCopy := min(BUFFER_SIZE, length(buffer)*2);
-  dosMemPut(dosSegment, 0, backgroundBuffer[0], bytesToCopy);
-  audioDataPosition += (bytesToCopy shr 1);
+  {start with an empty buffer}
+  dosMemFillWord(dosSegment, 0, BUFFER_SIZE div 2, 0);
 
   currentBuffer := True;
 
@@ -574,17 +446,8 @@ begin
   words := BUFFER_SIZE div 2; 					// number of words in buffer.
   halfWords := HALF_BUFFER_SIZE div 2;	// number of words in halfbuffer.
 
-  {ok.. now the steps}
-
   {1. reset}
-	DSPReset;
-  {2. load sound}
-  {aleady done}
-  {3. master}
-  {skip}
-  {4. speaker on}
-  {skip}
-  {5. program ISA DMA}
+	DSPReset();
 	addr := (dosSegment shl 4);
 	port[$D4] := $05;	// mask DMA channel
   port[$D8] := $01;	// any value
@@ -609,31 +472,35 @@ begin
   DSPWrite(lo(word(halfWords-1)));
   DSPWrite(hi(word(halfWords-1)));
 
-  {we should now expect an interupt}
-
+  IS_DMA_ACTIVE := true;
   	
 end;
 
-{----------------------------------------------------------}
-
-procedure runTests();
+procedure stopDMAPlayback();
 begin
+	{does this actually stop playback?}
+	DSPStop();
+  IS_DMA_ACTIVE := false;
 end;
+
+{----------------------------------------------------------}
 
 procedure initSound();
 var
 	res: dword;
 begin
 	note('[init] Sound');
-  sbGood := DSPReset;
+  sbGood := DSPReset();
 
   if sbGood then
 	  info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
   else
   	warn('No SoundBlaster detected');
 
-
-	res := Global_Dos_Alloc(BUFFER_SIZE);
+  {always allocate 64k, I figure this might help make sure we are aligned}
+  if BUFFER_SIZE > 64*1024 then
+  	error('Block size is too large, must be <= 65536');
+	res := Global_Dos_Alloc(64*1024);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
@@ -641,6 +508,7 @@ begin
   note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR();
+  initiateDMAPlayback();
 
 end;
 
@@ -649,7 +517,13 @@ begin
 	note('[done] sound');
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   uninstall_ISR();
-  DSPStop();
+  stopDMAPlayback();
+end;
+
+{----------------------------------------------------------}
+
+procedure runTests();
+begin
 end;
 
 {----------------------------------------------------------}
@@ -657,7 +531,8 @@ end;
 begin
 
 	runTests();
-  initSound;
+
+  initSound();
 
   addExitProc(closeSound);
 

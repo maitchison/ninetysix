@@ -20,8 +20,8 @@ uses
 	lc96,
   voxel,
   screen,
+  mix,
   font,
-  math, {todo: remove}
   s3,
 	sound;
 
@@ -32,7 +32,7 @@ var
 
   {resources}
   titleBackground: tSprite;
-	music: tSoundFile;
+	music: tSoundEffect;
   trackSprite: tSprite;
   carVox: tVoxelSprite;
 
@@ -242,7 +242,7 @@ begin
   trackSprite := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('gfx\car1', 32);
-	music := tSoundFile.create('music\music2.wav');
+	music := tSoundEffect.create('music\music2.wav');
 end;
 
 procedure drawGUI();
@@ -273,8 +273,8 @@ begin
   screen.background := titleBackground;
   screen.clear();
 
-  music.play();
   screen.pageFlip();
+  mixer.play(music);
 
   startClock := getSec;
   lastClock := startClock;

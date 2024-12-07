@@ -92,8 +92,8 @@ function toBytes(x: array of word): tBytes; overload;
 procedure Wait(ms: integer);
 function  RND(): byte; assembler; register;
 function  Quantize(value, levels: byte): byte;
-function  clamp(x, a, b: int32): int32; overload;
-function  clamp(x, a, b: single): single; overload;
+function  clamp(x, a, b: int32): int32; inline; overload;
+function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
 
@@ -541,14 +541,14 @@ begin
   result := (quotient + roll)
 end;
 
-function clamp(x, a, b: int32): int32; overload;
+function clamp(x, a, b: int32): int32; inline; overload;
 begin
 	if x < a then exit(a);
   if x > b then exit(b);
   exit(x);
 end;
 
-function clamp(x, a, b: single): single; overload;
+function clamp(x, a, b: single): single; inline; overload;
 begin
 	if x < a then exit(a);
   if x > b then exit(b);
