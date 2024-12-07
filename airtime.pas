@@ -439,9 +439,13 @@ begin
   screen.create();
 
   {todo: make mixer.playMusic}
+  (*
   backgroundMusicPosition := 0;
   backgroundMusicLength := music.length;
   backgroundMusicBuffer := music.sample; {set last}
+  *)
+  mixer.play(music);
+
 
 
   initMouse();

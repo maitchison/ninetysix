@@ -33,7 +33,7 @@ var
 
 	{number of seconds it took to process the last audio chunk}
 	lastChunkTime: double = -1;
-  currentTC: uint64;
+  currentTC: uint64 = 0;
 
   backgroundMusicBuffer: pointer = nil;
   backgroundMusicPosition: int32 = 0;
@@ -229,7 +229,14 @@ begin
 end;
 
 {$F+,S-,R-,Q-}
-procedure soundBlaster_ISR; interrupt;
+{handle sound buffer refill
+Hybrid mode:
+	- music handled in ISR
+  - mixing must be performed by main loop outside of ISR
+  - this is quite stable but requires a high frame rate for
+   	sfx to not sound choppy.
+}
+procedure soundBlaster_ISR_Hybrid; interrupt;
 var
   readAck: byte;
   bufOfs: word;
@@ -266,9 +273,7 @@ begin
   	bufOfs := 0;
 
   {Initialize the buffer with the music stream.}
-
   if (dosSegment <> 0) then begin
-
 	  if backgroundMusicBuffer <> nil then begin
   		{todo: hande end case better}		
 	  	newSamples := HALF_BUFFER_SIZE div 4;
@@ -300,6 +305,80 @@ begin
 
 end;
 {$F-,S+,R+,Q+}
+
+{$F+,S-,R-,Q-}
+{handle sound buffer refill
+ISR mixing mode:
+	- music handled in ISR
+  - mixing must be performed by main loop outside of ISR
+}
+procedure soundBlaster_ISR; interrupt;
+var
+  readAck: byte;
+  bufOfs: word;
+  startTime: double;
+  mixBuffer: pointer;	
+  newSamples: int32;
+
+begin
+
+	{todo: do everything in asm, and without any calls}
+	asm
+  	cli
+    push es
+    push ds
+    push fs
+    push gs
+  	pushad
+
+    mov ax, cs:[backupDS]
+    mov ds, ax
+    mov es, ax
+  	end;
+
+  // acknowledge the DSP
+	// $F for 16bit, $E for 8bit
+	readAck := port[SB_BASE + $F];
+
+ 	startTime := getSec;
+  inc(INTERRUPT_COUNTER);
+  currentBuffer := not currentBuffer;
+
+	if currentBuffer then
+  	bufOfs := HALF_BUFFER_SIZE
+  else
+  	bufOfs := 0;
+
+  {Initialize the buffer with the music stream.}
+  mixBuffer := nil;
+  mixBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
+  if (mixBuffer <> nil) then begin
+	  dosMemPut(dosSegment, bufOfs, mixBuffer^, HALF_BUFFER_SIZE);
+  end else begin
+  	dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
+  end;
+
+  currentTC += HALF_BUFFER_SIZE div 4;
+
+  lastChunkTime := getSec-startTime;
+
+  // end of interupt
+  // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
+  port[$A0] := $20;
+  port[$20] := $20;
+
+  asm
+  	
+  	popad
+    pop gs
+    pop fs
+    pop ds
+    pop es
+  end;
+
+end;
+{$F-,S+,R+,Q+}
+
 
 var
 	oldIntVec: tSegInfo;

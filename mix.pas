@@ -55,8 +55,6 @@ var
   scratchBufferF32: array[0..8*1024-1] of tAudioSampleF32;
   scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32;
 
-	BAD_ES_COUNTER: dword = 0;
-
 {-----------------------------------------------------}
 {our big mixdown function}
 {note: this can not be mixer.mixdown, as calls to
@@ -66,13 +64,14 @@ var
 {$S-,R-,Q-}
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 var
-	numSamples: int32;
   sfx: tSoundEffect;
   i,j: int32;
   volume: single = 0.49;
   noise: int32;
   pos,len: int32;
   sample: pAudioSample;
+	bufSamples: int32;
+
 begin
 
 	result := nil;
@@ -81,25 +80,28 @@ begin
   	Even 20MS is sort of ok, as we'd just reduce halve the block size
     and 10% CPU to audio is probably ok on a P166}
 
-  numSamples := bufBytes div 4;
-  if numSamples > (8*1024) then exit;
+  bufSamples := bufBytes div 4;
+  if bufSamples > (8*1024) then exit;
   if (mixer = nil) then exit;
 
-  fillchar(scratchBufferI32, sizeof(scratchBufferI32), 0);
+  (*
+	for i := 0 to numSamples-1 do begin
+  	scratchBufferI32[i].left := 0;
+  	scratchBufferI32[i].right := 0;
+  end;*)
+
+  	{fillchar does not work?}
+  filldword(scratchBufferI32, bufSamples * 2, 0);
 
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
-  	continue;
 	  if assigned(mixer.channel[j].soundEffect) then begin
 			sfx := mixer.channel[j].soundEffect;
       len := sfx.length;
       if len <= 0 then continue;
       pos := startTC mod len;
-      continue;
-
-	  	for i := 0 to numSamples div 4-1 do begin
-      {	sample := pointer(sfx.sample) + (pos * 4);}
-	      sample := pointer(sfx.sample)+(pos);
+	  	for i := 0 to bufSamples-1 do begin
+      	sample := pointer(sfx.sample) + (pos * 4);
         scratchBufferI32[i].left += sample^.left*256;
     	  scratchBufferI32[i].right += sample^.right*256;
         inc(pos);
@@ -110,15 +112,13 @@ begin
 
 
   {mix down}
-  (*
-  for i := 0 to numSamples-1 do begin
+  for i := 0 to bufSamples-1 do begin
   	{adding triangle noise to reduce quantization distortion}
     {costs 2ms, for 8ks samples, but I think it's worth it}
-    {noise := ((rnd + rnd) div 2) - 128;}
-    noise := 0;
+    noise := ((rnd + rnd) div 2) - 128;
 		scratchBuffer[i].left := (scratchBufferI32[i].left + noise) div 256;
 		scratchBuffer[i].right := (scratchBufferI32[i].right + noise) div 256;    	
-  end; *)
+  end;
 
   result := @scratchBuffer[0];
 end;
@@ -226,10 +226,6 @@ end;
 procedure closeMixer();
 begin
 	note('[close] Mixer');
-  if BAD_ES_COUNTER > 0 then begin
-  	warn(format(' - BAD_ES_COUNTER non-zero %d',[BAD_ES_COUNTER]));
-  	sbdriver.directNoise(0.5);
-  end;
 end;
 
 begin
