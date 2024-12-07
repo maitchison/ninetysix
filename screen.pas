@@ -57,7 +57,7 @@ implementation
 
 constructor tScreen.create();
 begin
-  canvas := tPage.create(videoDriver.width, videoDriver.height);
+  canvas.init(videoDriver.width, videoDriver.height);
   backgroundColor.init(0,0,0,255);
   background := nil;	
 end;

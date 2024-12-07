@@ -98,13 +98,14 @@ const
 	ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
 
 type
-	tPage = record
+	tPage = object
   	Width, Height, BPP: Word;
     Pixels: pointer;
     defaultColor: RGBA;
 
-    constructor Create(AWidth, AHeight: word);
-		constructor CreateReference(AWidth, AHeight: word;PixelData: Pointer);
+    destructor  Done();
+    constructor Init(AWidth, AHeight: word);
+		constructor InitReference(AWidth, AHeight: word;PixelData: Pointer);
 
     function GetPixel(x, y: integer): RGBA; inline; overload;
     function GetPixel(fx,fy: single): RGBA; overload;
@@ -478,7 +479,7 @@ end;
 { TPage }
 {----------------------------------------------------------------}
 
-constructor TPage.Create(AWidth, AHeight: word);
+constructor TPage.Init(AWidth, AHeight: word);
 begin
 	self.Width := AWidth;
   self.Height := AHeight;
@@ -488,7 +489,17 @@ begin
   self.Clear(RGBA.Create(0,0,0));
 end;
 
-constructor TPage.CreateReference(AWidth, AHeight: word;PixelData: Pointer);
+destructor tPage.Done();
+begin
+	if assigned(self.pixels) then
+		freeMem(self.pixels, width*height*4);
+  self.pixels := nil;
+  self.width := 0;
+  self.height := 0;
+  self.bpp := 0;
+end;
+
+constructor tPage.InitReference(AWidth, AHeight: word;PixelData: Pointer);
 {todo: support logical width}
 begin
 	self.Width := AWidth;

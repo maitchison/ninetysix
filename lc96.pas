@@ -45,14 +45,14 @@ begin
 end;
 
 {interleave pos and negative numbers into a whole number}
-function invFunkyNeg(x: int32): int32; inline;
+function invFunkyNeg(x: word): int32; inline;
 begin
 	result := ((x+1) shr 1);
   if x and $1 = 0 then result := -result;
 end;
 
 {interleave pos and negative numbers into a whole number}
-function funkyNeg(x: int32): int32; inline;
+function funkyNeg(x: int32): word; inline;
 begin
 	result := abs(x)*2;
   if x > 0 then dec(result);
@@ -61,10 +61,10 @@ end;
 {generates code representing delta to go from a to b}
 function encodeByteDelta(a,b: byte): byte; inline;
 var
-	delta: integer;
+	delta: int32;
 begin
 	{take advantage of 256 wrap around on bytes}
-	delta := integer(b)-a;
+	delta := int32(b)-a;
 	if delta > 128 then
 		exit(funkyNeg(delta-256))
   else if delta < -127 then
@@ -337,7 +337,7 @@ begin
   if (verBig <> 0) and (verSmall <> 1) then
   	error(format('Invalid version, expecting 0.1, but found %d.%d',[verBig, verSmall]));
 
-	result := tPage.create(width, height);
+	result.Init(width, height);
 
   if not (bpp in [24,32]) then
   	Error('Invalid BitPerPixel '+intToStr(bpp));
@@ -490,31 +490,40 @@ begin
 	assertEqual(applyByteDelta(0, delta), 255);
 
 	{make sure we can encode and decode a simple page}
-	img1 := tPage.create(4,4);
+	img1.init(4,4);
   img1.clear(RGBA.create(255,0,128));
 	s := encodeLC96(img1);
   s.seek(0);
   img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
+  img1.done;
+  img2.done;
 
   {test on random bytes for larger page}
-	img1 := tPage.create(4,4);
+	img1.init(4,4);
   makePageRandom(img1);
 	s := encodeLC96(img1);
   s.seek(0);
   img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
+  img1.done;
+  img2.done;
 
   {test on random bytes for larger page}
-	img1 := tPage.create(16,16);
-  makePageRandom(img1);
-	s := encodeLC96(img1);
-  s.seek(0);
-  img2 := decodeLC96(s);
-  assertEqual(img1, img2);
-  s.free;
+  img1.init(16,16);
+  for i := 0 to 1000 do begin
+  	{stub: really try to catch this have an error}
+	  makePageRandom(img1);
+		s := encodeLC96(img1);
+	  s.seek(0);
+	  img2 := decodeLC96(s);
+	  assertEqual(img1, img2);
+    img2.done;
+	  s.free;
+  end;
+  img1.done;
 
 end;
 

@@ -48,22 +48,18 @@ const
 
   {
   Timings for 16bit stereo
+  (note: there's a little extra delay due to having to wait one frame,
+   this will add around 16ms
 
   64k = ~200-400 ms 		This is way too much latency
   32k = ~100-200 ms			Perhaps a safe trade-off
   16k = ~50-100 ms			Might be ideal.
   8k  = ~25-50 ms
-
-  required FPS = (1/((bufsize/4/2)/44100);
-
-  16k 	= 21 FPS
-  8k 		= 43 FPS
-  6k 		= 57 FPS
-  4k    = 86 FPS  			
-  }
+  4k  = ~12.5-25 ms			This feels about right to me.
+	}
 
   //buffer size in bytes
-  BUFFER_SIZE = 8*1024;
+  BUFFER_SIZE = 4*1024;
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 

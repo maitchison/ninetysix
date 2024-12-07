@@ -619,7 +619,7 @@ begin
 end;
 
 
-procedure UnitTests();
+procedure runTests();
 var
 	PatchA, PatchB: TPatch;
   x,y,i: integer;
@@ -637,22 +637,12 @@ begin
   a := EvaluateSSE_Ref(PatchA, PatchA.color);
   b := EvaluateSSE_Asm(PatchB, PatchB.color);
 
-  (*
-  {show ids}
-  for y := 0 to 3 do
-  	Info(Format('%d%d%d%d', [a_ids[y,0], a_ids[y,1], a_ids[y,2], a_ids[y,3]]));
-	Info('');
-  for y := 0 to 3 do
-  	Info(Format('%d%d%d%d', [b_ids[y,0], b_ids[y,1], b_ids[y,2], b_ids[y,3]]));
-	*)
-
   {show grads}
   for i := 0 to 3 do
   	Info(Format('%s', [ShortString(RGBA32(PatchA.grad[i]))]));
   Info('');
   for i := 0 to 3 do
   	Info(Format('%s', [ShortString(RGBA32(PatchB.grad[i]))]));
-
 
   AssertEqual(b, a);
 
@@ -668,5 +658,5 @@ begin
 end;
 
 begin
-	UnitTests();
+	runTests();
 end.
