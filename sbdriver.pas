@@ -73,7 +73,7 @@ const
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 64*1024; {64k generates a bit of clicking if the mixer is too slow}
+  BUFFER_SIZE = 32*1024; {64k generates a bit of clicking if the mixer is too slow}
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 {----------------------------------------------------------}
@@ -223,22 +223,15 @@ var
   else
   	bufOfs := 0;
 
-  {give gime back, as this next part might take some time}
-  {
-  asm
-  	sti
-    end;
-  }
-
   // calculate our mix
+  scratchBuffer := nil;
   scratchBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
   currentTC += HALF_BUFFER_SIZE div 4;
 
-  {
   asm
-  	cli
-    end;
-  }
+  	mov ax, ds
+  	mov es, ax
+  	end;
 
   // update the non-active buffer
   if (scratchBuffer <> nil) and (dosSegment <> 0) then
@@ -246,7 +239,7 @@ var
 
   lastChunkTime := getSec-startTime;
 
-  // acknowledge the DSP interupt.
+  // acknowledge the DSP
 	// $F for 16bit, $E for 8bit
 	readAck := port[SB_BASE + $F];
 
@@ -254,6 +247,7 @@ var
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
   port[$A0] := $20;
   port[$20] := $20;
+
 end;
 {$F-,S+,R+,Q+}
 

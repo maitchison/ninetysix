@@ -24,7 +24,6 @@ type
     loop: boolean;
     constructor create();
 		procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
-  	function getSample(tc: tTimeCode): tAudioSample;
   end;
 
 
@@ -41,6 +40,8 @@ type
 var
 	{our global mixer}
 	mixer: tSoundMixer = nil;
+
+  inIRQ: boolean = false;
 
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 
@@ -72,6 +73,7 @@ var
   volume: single = 0.49;
   noise: int32;
   pos,len: int32;
+  sample: pAudioSample;
 begin
 
 	result := nil;
@@ -100,29 +102,40 @@ begin
 
   fillchar(scratchBufferI32, sizeof(scratchBufferI32), 0);
 
+	exit;
+
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
-	  if (mixer.channel[j].soundEffect <> nil) then begin
+  	continue;
+	  if assigned(mixer.channel[j].soundEffect) then begin
 			sfx := mixer.channel[j].soundEffect;
-      len := length(sfx.sample);
+      len := sfx.length;
+      if len <= 0 then continue;
       pos := startTC mod len;
-	  	for i := 0 to numSamples-1 do begin
-        scratchBufferI32[i].left += int32(sfx.sample[pos].left)*256;
-    	  scratchBufferI32[i].right += int32(sfx.sample[pos].right)*256;
+      continue;
+
+	  	for i := 0 to numSamples div 4-1 do begin
+      {	sample := pointer(sfx.sample) + (pos * 4);}
+	      sample := pointer(sfx.sample)+(pos);
+        scratchBufferI32[i].left += sample^.left*256;
+    	  scratchBufferI32[i].right += sample^.right*256;
         inc(pos);
-        if pos > len then pos := 0; {looping}
+        if pos >= len then pos := 0;
 	    end;
 	  end;
   end;
 
+
   {mix down}
+  (*
   for i := 0 to numSamples-1 do begin
   	{adding triangle noise to reduce quantization distortion}
     {costs 2ms, for 8ks samples, but I think it's worth it}
-    noise := ((rnd + rnd) div 2) - 128;
+    {noise := ((rnd + rnd) div 2) - 128;}
+    noise := 0;
 		scratchBuffer[i].left := (scratchBufferI32[i].left + noise) div 256;
 		scratchBuffer[i].right := (scratchBufferI32[i].right + noise) div 256;    	
-  end;
+  end; *)
 
   result := @scratchBuffer[0];
 end;
@@ -158,16 +171,6 @@ begin
 	self.startTime := startTime;
   self.loop := loop;
 end;
-
-function tSoundChannel.getSample(tc: tTimeCode): tAudioSample;
-begin
-	{todo: remove this and have the channel handle it (faster}
-	result.value := 0;
-	if tc < 0 then exit;
-  if tc >= length(soundEffect.sample) then exit;
-	result := soundEffect.sample[tc];
-end;
-
 
 {-----------------------------------------------------}
 

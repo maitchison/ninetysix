@@ -44,7 +44,8 @@ type
 
 	tSoundEffect = class
 
-  	sample: array of tAudioSample;
+  	sample: pAudioSample;
+    length: int32;
 
     constructor create(filename: string='');
 
@@ -89,6 +90,7 @@ var
 begin
 
 	sample := nil;
+  length := 0;
 
 	extension := getExtension(filename);
   if extension = 'wav' then
@@ -107,7 +109,6 @@ var
   chunkHeader: tChunkHeader;
   samples: int32;
   i,j: integer;
-  samplesToRead: dword;
   chunkWords: dword;
 
 function wordAlign(x: int32): int32;
@@ -152,12 +153,12 @@ begin
           continue;
         end;
         chunkWords := chunkSize div 2;
-        samplesToRead := min(chunkWords div 2, 16*1024*1024);
-        if (samplesToRead < chunkWords div 2) then
+        length := min(chunkWords div 2, 16*1024*1024);
+        if (length < chunkWords div 2) then
         	warn(format('Wave file too large to read (%f MB), reading partial file.', [chunkSize/1024/1024]));
-  			sample := nil;
-        setLength(sample, samplesToRead);
-        blockRead(f, sample[0], samplesToRead*4);
+      	sample := getMem(length*4);
+        blockRead(f, sample^, length*4);
+
         break;
       end;
     end;
