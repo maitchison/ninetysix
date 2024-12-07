@@ -25,6 +25,8 @@ procedure playPCMData(buffer: tWords);
 
 {-----------------------------------------------------}
 
+{todo: remove most of these public globals}
+
 var
   INTERRUPT_COUNTER: int32 = 0;
   LOOP_MUSIC: boolean = True;
@@ -38,7 +40,34 @@ var
   backgroundMusicLength: int32 = 0;
 
 var
-	bufferDirty: boolean = false;  	
+	bufferDirty: boolean = false;
+  dosSelector: word = 0;
+  currentBuffer: boolean;			// True = BufferA, False = BufferB
+
+const
+
+  {
+  Timings for 16bit stereo
+
+  64k = ~200-400 ms 		This is way too much latency
+  32k = ~100-200 ms			Perhaps a safe trade-off
+  16k = ~50-100 ms			Might be ideal.
+  8k  = ~25-50 ms
+
+  required FPS = (1/((bufsize/4/2)/44100);
+
+  16k 	= 21 FPS
+  8k 		= 43 FPS
+  6k 		= 57 FPS
+  4k    = 86 FPS  			
+  }
+
+  //buffer size in bytes
+  BUFFER_SIZE = 8*1024;
+  HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
+
+
+  	
 
 implementation
 
@@ -62,9 +91,7 @@ var
   IS_DMA_ACTIVE: boolean = false;
   DSPVersion: byte = 0;
   dosSegment: word = 0;
-  dosSelector: word = 0;
 
-  currentBuffer: boolean;			// True = BufferA, False = BufferB
 
 const
 	SB_BASE = $220;
@@ -74,18 +101,6 @@ const
   DSP_WRITE_STATUS = SB_BASE + $C;
   DSP_DATA_AVAIL = SB_BASE + $E;
 
-  {
-  Timings for 16bit stereo
-
-  64k = ~200-400 ms 		This is way too much latency
-  32k = ~100-200 ms			Perhaps a safe trade-off
-  16k = ~50-100 ms			Might be ideal.
-  8k  = ~25-50 ms			
-  }
-
-  //buffer size in bytes
-  BUFFER_SIZE = 8*1024;
-  HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 {----------------------------------------------------------}
 { DSP stuff}

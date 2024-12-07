@@ -69,7 +69,6 @@ var
 	numSamples: int32;
   sfx: tSoundEffect;
   i,j: int32;
-	currentDS, currentES: word;
   volume: single = 0.49;
   noise: int32;
   pos,len: int32;
@@ -81,15 +80,6 @@ begin
 	{The budget here is about 10ms (for 8ksamples).
   	Even 20MS is sort of ok, as we'd just reduce halve the block size
     and 10% CPU to audio is probably ok on a P166}
-
-  {pascal expects es and ds to be set to to start of linear space,
-   if they do not match, then someone has modified them when the
-   interupt was fired. In this case some functions (e.g. fillchar)
-   will not work, so just exit.}
-  if (currentES <> currentDS) then begin
-  	inc(BAD_ES_COUNTER);
-  	exit;
-  end;
 
   numSamples := bufBytes div 4;
   if numSamples > (8*1024) then exit;

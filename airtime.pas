@@ -329,7 +329,46 @@ begin
 		screen.copyRegion(tRect.create(10, 10, 300, 25));
     screen.copyRegion(tRect.create(320-30, 360-30, 60, 60));
 
+  	if keyDown(key_m) and bufferDirty then begin
+    	{make some noise :)}
+      asm
+      	pushad
+      	push fs
 
+      	mov fs, [dosSelector]
+
+        mov ecx, HALF_BUFFER_SIZE
+        shr ecx, 2
+        mov edi, 0
+        mov eax, 0
+
+        cmp [currentBuffer], 0
+        je @SKIP
+        add edi, HALF_BUFFER_SIZE	
+      @SKIP:
+
+
+      @LOOP:
+
+      	call rnd
+        shr eax,8
+      	call rnd
+        shr eax,8
+      	call rnd
+        shr eax,8
+      	call rnd
+
+      	mov fs:[edi], eax
+      	add edi,4
+        dec ecx
+      	jnz @LOOP
+      	
+
+        pop fs
+        popad
+      end;
+			bufferDirty := false;
+    end;
 
     if keyDown(key_p) then mainLoop();
 
