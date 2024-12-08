@@ -269,7 +269,7 @@ end;
 procedure tStream.writeBytes(aBytes: tBytes);
 begin
 	if length(aBytes) = 0 then exit;
-	byteAlign();
+  if midByte then error('unaligned write bytes');
   setLength(pos + length(aBytes));
   move(aBytes[0], self.bytes[pos], length(aBytes));
   inc(pos, length(aBytes));
@@ -358,9 +358,9 @@ var
 	i: integer;
 begin
 	if midByte then
-  	Error('Misaligned readBytes');
+  	error('Unaligned readBytes');
   if n > (len-pos) then
-  	Error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (pos + n)]));
+  	error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (pos + n)]));
 	result := nil;
   if n = 0 then
   	exit;
@@ -389,6 +389,7 @@ var
 begin
 	assignFile(f, fileName);
   system.reset(f,1);
+  bytes := nil; {todo, is this needed?}
   system.setLength(bytes, fileSize(f));
   bytesLen := length(bytes);
   blockread(f, bytes[0], length(bytes), bytesRead);
@@ -445,7 +446,6 @@ are out of band, and used for control codes
 }
 procedure tStream.writeVLC(value: dword);
 begin
-	{stub: logging}
 	{this is the nibble aligned method}
   while True do begin
     if value < 8 then begin
@@ -515,8 +515,9 @@ begin
         for j := 0 to bits-1 do
         	writeBit((values[i] shr j) and $1);
 
-      if bitPos > 0 then
-      	s.writeByte(bitBuffer);
+      {pad with 0s to write final byte}
+      while bitPos <> 0 do
+      	writeBit(0);
     end;
   end;
 end;
@@ -660,6 +661,8 @@ begin
   if not assigned(outBuffer) then
 	  system.setLength(outBuffer, n);
 
+  self.byteAlign();
+
   b := peekByte;
   if isControlCode(b) then begin
   	{this is a control code}
@@ -672,6 +675,8 @@ begin
 
   for i := 0 to n-1 do
   	outBuffer[i] := readVLC;
+
+  self.byteAlign();
 
   exit(outBuffer);	
 end;
@@ -703,6 +708,8 @@ begin
   	unpackedBits += VLCBits(values[i]);
   end;
 
+  self.byteAlign();
+
   if allowPacking then
     for n in [0,1,2,4,8] do begin
     	if maxValue < (1 shl n) then begin
@@ -719,6 +726,8 @@ begin
 	{just write out the data}
 	for i := 0 to length(values)-1 do
   	writeVLC(values[i]);
+
+  self.byteAlign();
 end;
 
 {returns size of variable length encoded token}

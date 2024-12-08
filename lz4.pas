@@ -50,7 +50,7 @@ type
   tLZ4Stream = class(tStream)
 	
 	private
-  	procedure writeVLC(value: int32);
+  	procedure writeVLL(value: int32);
   public
   	class function getSequenceSize(matchLength: integer;numLiterals: word): word;
     procedure writeSequence(matchLength: integer;offset: word;const literals: array of byte);
@@ -105,7 +105,8 @@ begin
   result := bytesRequired;	
 end;
 
-procedure tLZ4Stream.writeVLC(value: int32);
+{variable length length}
+procedure tLZ4Stream.writeVLL(value: int32);
 begin
 	while True do begin
 		if value < 255 then begin
@@ -122,10 +123,13 @@ var
 	i: int32;
 	a: int32;
 begin
+  if length(literals) < 1 then
+  	error('Must end on a literal');
+
 	a := length(literals);
   WriteByte(min(a, 15));
   if a >= 15 then
-  	writeVLC(a-15);
+  	writeVLL(a-15);
   if length(literals) > 0 then
 		for i := 0 to length(literals)-1 do
   		writeByte(literals[i]);
@@ -165,7 +169,7 @@ begin
   b := matchLength-MIN_MATCH_LENGTH;
 		
   WriteByte(min(a, 15) + min(b,15) * 16);
-  if a >= 15 then writeVLC(a-15);
+  if a >= 15 then writeVLL(a-15);
 
   if length(literals) > 0 then
 		for i := 0 to length(literals)-1 do
@@ -173,7 +177,7 @@ begin
 
   writeWord(offset);
 
-  if b >= 15 then writeVLC(b-15);
+  if b >= 15 then writeVLL(b-15);
 
   {make sure this worked}
 	{$IFDEF debug}
@@ -657,6 +661,8 @@ begin
     end;
 
   	{check for last byte}
+    if pos > srcLen-1 then
+    	error('Processed too many bytes');
     if pos >= srcLen-1 then begin
     	{we reached the end, just dump the buffer}
       while pos < srcLen do begin
@@ -732,7 +738,7 @@ begin
       end;
 
       {make sure to never match the final byte, so that we end on a literal}
-	    while (literalBuffer.len + bestMatch[i].pos + bestMatch[i].length) >= srcLen-1 do begin
+	    while (literalBuffer.len + pos + bestMatch[i].length) >= srcLen-1 do begin
       	dec(bestMatch[i].length);
         dec(bestMatch[i].gain);
         bestMatch[i].gain := max(bestMatch[i].gain, 0);
@@ -784,6 +790,7 @@ begin
 	      inc(pos);
         dec(copyBytes);
       end;
+
     end else begin    	
 	    {... If not, add a literal and keep going}
       if pos > length(data)-1 then begin
@@ -902,7 +909,7 @@ begin
 	result := bytes[inPos];	
 end;
 
-function readVLC: dword; inline; register;
+function readVLL: dword; inline; register;
 begin
 	result := 0;
 	while peekByte = 255 do
@@ -932,9 +939,15 @@ begin
     {read match length}
     matchLength := b shr 4;
     if numLiterals = 15 then
-    	numLiterals += readVLC;
+    	numLiterals += readVLL;
 
     {copy literals}
+
+    if (inPos + numLiterals) >= length(bytes) then
+    	error('overran input by '+intToStr((inPos + numLiterals)-length(bytes)+1)+' bytes');
+    if (outPos + numLiterals) >= length(buffer) then
+    	error('overran output by '+intToStr((outPos + numLiterals)-length(buffer)+1)+' bytes');
+
     move(bytes[inPos], buffer[outPos], numLiterals);
     inc(inPos, numLiterals);
     inc(outPos, numLiterals);
@@ -950,7 +963,7 @@ begin
     ofs := readword;
 
     if matchLength = 15 then
-    	matchLength += readVLC;
+    	matchLength += readVLL;
     	
     {min match length}
     matchLength += 4;
@@ -1099,46 +1112,6 @@ begin
 
 		jmp @DECODE_LOOP
 
-    (*
-
-    {this is not used anymore}
-  @MOVE:
-
-  	{fast move function, can be used instead of rep movsb
-     looks like it's a bit slower though due to the call overhead
-     and checks at the beginning
-
-  	{
-     ecx=len
-     esi=source
-     edi=dest
-    }
-
-    {short if <4 remain}
-    cmp ecx, 4
-    jb @MOVE_SHORT
-
-    {short if close overlap}
-    mov eax, edi
-    sub eax, esi
-    cmp eax, 4
-    jb @MOVE_SHORT
-
-
-  @MOVE_LONG:
-  	{copy 4 bytes at a time}
-  	
-    push ecx
-    shr ecx, 2
-    rep movsd
-    pop ecx
-    and ecx, $3
-
-  @MOVE_SHORT:
-
-    rep movsb
-    ret *)
-
   @DONE:
 
   	mov eax, edi
@@ -1214,6 +1187,43 @@ var
 const
   testString = 'There once was a fish, with a family of fish, who liked to play.';
 	testData: array[0..18] of byte = (0,3,1,4,1,5,9,2,6,8,3,1,4,1,5,9,3,6,0);
+	testCase1: array of byte =
+  {this used to fail because we ended on a length literal}
+  [152,2,12,3,23,104,38,6,188,34,7,47,30,11,51,68,105,104,2,39,61,0,163,226,5,47,87,
+  55,217,170,35,77,97,37,79,119,165,184,62,185,164,38,69,113,129,75,115,155,77,119,
+  161,30,1,12,26,17,55,22,19,59,18,23,63,14,27,65,9,51,91,13,57,95,19,59,99,181,168,
+  44,45,87,127,49,93,131,53,95,135,202,40,81,182,18,103,146,15,139,108,51,175,93,137,
+  175,149,8,12,10,31,71,6,35,75,2,39,79,1,45,83,217,132,8,29,71,111,33,77,115,37,79,
+  119,166,4,117,65,109,149,69,111,151,56,103,227,97,139,179,2,159,228,107,149,187,69,
+  233,156,35,0,12,5,47,87,11,51,91,13,55,95,17,59,99,41,83,123,47,87,127,49,93,131,53,
+  95,135,77,121,159,81,123,163,49,211,176,91,133,171,113,155,195,119,161,199,179,170,
+  46,213,134,10,127,205,12,198,34,87,162,0,123,111,151,191,113,157,195,70,91,217,32,
+  127,251,145,189,227,37,199,188,34,72,172,93,254,132,131,218,96,167,182,58,64,59,239,
+  28,93,212,3,127,176,39,161,144,255,215,12,54,107,231,16,143,244,125,169,207,53,215
+  ,172,155,197,237,109,238,116,147,202,80,183,166,42,203,146,24,239,110,11,238,74,49,
+  200,38,83,73,195,108,107,231,74,143,248,42,175,212,6,186,235,12,91,253,134,127,222,
+  100,161,186,64,147,187,227,217,130,8,175,215,255,220,58,65,184,22,101,164,2,121,211,
+  253,220,92,69,191,56,107,229,211,180,25,243,224,184,232,110,95,251,218,176,251,239,
+  12,235,114,9,242,78,45,204,42,79,161,205,243,148,15,135,110,49,173,76,87,209,38,121,
+  245,20,141,246,15,179,210,222,100,174,188,64,141,164,42,163,250,208,168,177,172,231,
+  213,136,12,169,207,12,200,38,85,164,2,121,253,216,178,255,212,172,70,89,215,36,127,
+  249,0,163,226,37,197,190,55,219,168,190,148,114,129,220,96,184,142,102,185,164,40,
+  154,112,80,152,108,68,218,54,67,131,251,12,56,105,227,20,141,246,15,179,210,53,215,
+  174,71,235,152,210,168,130,145,204,80,179,170,46,201,148,26,174,132,92,172,128,90,
+  166,124,84,142,102,62,138,96,56,108,51,175,74,87,211,241,186,12,87,251,136,230,188,
+  150,159,188,64,197,152,30,217,132,10,194,152,112,222,60,61,186,144,104,166,2,119,
+  130,31,153,92,67,191,58,103,227,126,84,46,122,80,40,118,76,36,71,233,156,52,154,12,
+  233,116,7,216,172,134,210,168,128,170,8,113,150,11,133,178,136,96,78,83,207,170,128,
+  90,146,104,66,142,100,60,51,213,176,87,249,140,110,68,30,143,206,84,104,60,20,98,56,
+  16,136,200,12,198,36,89,162,0,123,116,72,32,110,68,28,70,93,215,82,40,10,78,36,3,74,
+  32,7,57,219,166,46,4,23,42,0,39,38,5,43,187,162,36,10,31,55,6,37,75,2,39,79,96,18,12,
+  106,64,26,102,60,20,98,56,16,55,217,172,70,28,9,66,24,15,147,202,80,58,16,23,34,7,47,
+  237,110,13,238,74,49,20,19,59,1,43,83,5,47,87,11,51,91,13,55,95,0,34,12,90,48,8,86,
+  44,6,163,186,64,78,36,3,54,12,27,50,8,31,220,58,65,42,0,39,18,23,63,14,27,67,10,31,
+  71,6,37,73,17,61,99,21,63,103,25,67,109,29,71,111,66,64,12,76,32,7,242,78,45,66,24,
+  15,62,20,17,38,3,43,34,7,45,30,11,51,26,15,55,2,39,79,15,179,210,5,47,87,9,51,91,33,
+  75,115,39,81,119,181,168,44,45,87,127];
+
 begin
 
   assertEqual(MatchLength_REF(testData, 0, 10), 0);
@@ -1240,7 +1250,15 @@ begin
 	compressedData := LZ4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData);
   AssertEqual(uncompressedData, inBytes.asBytes);
+  inBytes.free;
 
+  {make sure we don't match on end sequence}
+	inBytes := tStream.create();
+  for i := 0 to length(testCase1)-1 do
+    inBytes.writeByte(testCase1[i]);
+  compressedData := lz4Compress(inBytes.asBytes);
+  uncompressedData := lz4Decompress(compressedData);
+	AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
 end;

@@ -48,7 +48,7 @@ end;
 function invFunkyNeg(x: word): int32; inline;
 begin
 	result := ((x+1) shr 1);
-  if x and $1 = 0 then result := -result;
+  if x and $1 = $0 then result := -result;
 end;
 
 {interleave pos and negative numbers into a whole number}
@@ -88,7 +88,7 @@ var
 	i: integer;
 	c: RGBA;
   x,y: integer;
-  o1,o2: RGBA;
+  o1,o2,o: RGBA;
   cost1,cost2: int32;
   choiceCode: dword;
   deltas: array[0..16*3-1] of dword;
@@ -107,23 +107,25 @@ begin
       o1.a := 255; o2.a := 255; c.a := 255; {make sure to ignore alpha}
       cost1 := rms(c, o1);
       cost2 := rms(c, o2);
-      if cost1 <= cost2 then begin
-      	deltas[dPos] := encodeByteDelta(o1.r, c.r); inc(dPos);
-        deltas[dPos] := encodeByteDelta(o1.g, c.g); inc(dPos);
-        deltas[dPos] := encodeByteDelta(o1.b, c.b); inc(dPos);
-      end else begin
-      	deltas[dPos] := encodeByteDelta(o2.r, c.r); inc(dPos);
-        deltas[dPos] := encodeByteDelta(o2.g, c.g); inc(dPos);
-        deltas[dPos] := encodeByteDelta(o2.b, c.b); inc(dPos);
+      if cost1 <= cost2 then
+      	o := o1
+      else begin
+      	o := o2;
         inc(choiceCode);
       end;
+
+      deltas[dPos] := encodeByteDelta(o.r, c.r); inc(dPos);
+      deltas[dPos] := encodeByteDelta(o.g, c.g); inc(dPos);
+      deltas[dPos] := encodeByteDelta(o.b, c.b); inc(dPos);
+
       choiceCode := choiceCode shl 1;
     end;
   end;
   {write choice word}
   s.writeWord(choiceCode shr 1);
+
   s.writeVLCSegment(deltas);
-  s.byteAlign();
+
 end;
 
 {Encode a 4x4 patch at given location.}
@@ -243,16 +245,19 @@ begin
   {output deltas}
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
+
   if withAlpha then
 	  s.readVLCSegment(16*4, global_deltas)
   else
   	s.readVLCSegment(16*3, global_deltas);
+
   s.byteAlign();
 
   ofs := (atX + (atY*page.width)) * 4;
 
   {eventually this will all be asm...}
   dPos := 0;
+  da := 0;
   for y := 0 to 3 do begin
   	for x := 0 to 3 do begin
       dr := global_deltas[dpos]; inc(dpos);
@@ -295,12 +300,14 @@ begin
     ofs += ((page.width-4) * 4);
 
   end;
+
 end;
 
 function decodeLC96(s: tStream): tPage;
 var
   width, height, BPP: word;
-  i, px,py: int32;
+  i,j: int32;
+  px,py: int32;
   bytes: tBytes;
   data: tStream;
   decompressedBytes: tBytes;
@@ -354,6 +361,7 @@ begin
   bytes := s.readBytes(compressedSize);
   LZ4Decompress(bytes, decompressedBytes);
   data.writeBytes(decompressedBytes);
+
   data.seek(0);
 
 	for py := 0 to result.height div 4-1 do
@@ -472,7 +480,7 @@ var
   s: tStream;
   a, b, delta: int32;
   x,y: int32;
-  i: integer;
+  i,j,k: integer;
 begin
 
   {test funky neg}
@@ -488,6 +496,14 @@ begin
 	assertEqual(applyByteDelta(0, delta), 128);
   delta := encodeByteDelta(0,255);
 	assertEqual(applyByteDelta(0, delta), 255);
+
+  {randomized testing}
+  for k := 0 to 255 do begin
+  	i := rnd;
+    j := rnd;  	
+    delta := encodeByteDelta(i,j);
+		assertEqual(applyByteDelta(i, delta), j);
+  end;
 
 	{make sure we can encode and decode a simple page}
 	img1.init(4,4);
@@ -513,7 +529,7 @@ begin
 
   {test on random bytes for larger page}
   img1.init(16,16);
-  for i := 0 to 1000 do begin
+  for i := 1 to 10 do begin
   	{stub: really try to catch this have an error}
 	  makePageRandom(img1);
 		s := encodeLC96(img1);

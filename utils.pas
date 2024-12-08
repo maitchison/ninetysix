@@ -85,7 +85,7 @@ function bytesToSanStr(bytes: tBytes): string;
 function StrToInt(s: string): integer;
 function Trim(s: string): string;
 
-function bytesForBits(x: integer): integer;
+function bytesForBits(x: int32): int32;
 function toBytes(x: array of dword): tBytes; overload;
 function toBytes(x: array of word): tBytes; overload;
 
@@ -222,7 +222,9 @@ begin
         's': begin
         	case a.VType of
         		vtInteger: result += IntToStr(args[ArgIndex].VInteger);
-	        	vtString: result += string(args[ArgIndex].VString^);
+            vtString: result += string(args[ArgIndex].VString^);
+            vtAnsiString: result += AnsiString(args[ArgIndex].VAnsiString);
+
             else Error('Invalid type:'+IntToStr(a.VType));
           end;
   	    end;
@@ -464,7 +466,7 @@ begin
 end;
 
 {Returns number of bytes required to encode this many bits}
-function bytesForBits(x: integer): integer;
+function bytesForBits(x: int32): int32;
 begin
 	result := (x + 7) div 8;
 end;

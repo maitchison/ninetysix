@@ -128,7 +128,7 @@ type
 function LoadBMP(const FileName: string): TPage;
 procedure makePageRandom(page: tPage);
 
-procedure assertEqual(a, b: RGBA); overload;
+procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 procedure assertEqual(a, b: tPage); overload;
 
 implementation
@@ -927,10 +927,10 @@ begin
 end;
 
 
-procedure assertEqual(a, b: RGBA); overload;
+procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 begin
 	if (a.r <> b.r) or (a.g <> b.g) or (a.b <> b.b) or (a.a <> b.a) then
-  	assertError(Format('Colors do not match, expecting %s but found %s', [a.toString, b.toString]));
+  	assertError(Format('Colors do not match, expecting %s but found %s %s', [a.toString, b.toString,msg]));
 end;
 
 procedure assertEqual(a, b: tPage); overload;
@@ -945,7 +945,7 @@ begin
   end;
   for y := 0 to a.height-1 do
   	for x := 0 to a.width-1 do
-      assertEqual(a.getPixel(x,y), b.getPixel(x,y));
+      assertEqual(a.getPixel(x,y), b.getPixel(x,y), format('at %d,%d ',[x, y]));
 end;
 
 begin

@@ -415,7 +415,7 @@ begin
         isFirst := false;
       end;
 
-    	if (j > 0) and (not importantLines[j-1]) and (importantLines[j]) then begin
+    	if (j > 0) and (j < length(importantLines)) and (not importantLines[j-1]) and (importantLines[j]) then begin
       	{chunk header}
       	textAttr := 8;
         for z := 1 to 14 do
@@ -425,7 +425,8 @@ begin
         outputLn('');
       	textAttr := 7; //cyan}
       end;
-      if importantLines[j] then
+
+      if (j < length(importantLines)) and importantLines[j] then
 	    	outputLn(intToStr(j, 4, '0')+'     '+fix(cur));
 
       inc(i);
