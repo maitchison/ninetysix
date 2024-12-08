@@ -53,7 +53,7 @@ const
 
   64k = ~200-400 ms 		This is way too much latency
   32k = ~100-200 ms			Perhaps a safe trade-off
-  16k = ~50-100 ms			Might be ideal.
+  16k = ~50-100 ms		
   8k  = ~25-50 ms
   4k  = ~12.5-25 ms			This feels about right to me.
 	}
@@ -317,7 +317,6 @@ var
 
 begin
 
-	{todo: do everything in asm, and without any calls}
 	asm
   	cli
     push es
@@ -330,10 +329,6 @@ begin
     mov ds, ax
     mov es, ax
   	end;
-
-  // acknowledge the DSP
-	// $F for 16bit, $E for 8bit
-	readAck := port[SB_BASE + $F];
 
  	startTime := getSec;
   inc(INTERRUPT_COUNTER);
@@ -356,6 +351,12 @@ begin
   currentTC += HALF_BUFFER_SIZE div 4;
 
   lastChunkTime := getSec-startTime;
+
+  // acknowledge the DSP
+	// $F for 16bit, $E for 8bit
+  {note this works better if we ack late. Otherwise we get some
+   distortion with short buffers}
+	readAck := port[SB_BASE + $F];
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
