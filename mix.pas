@@ -56,7 +56,7 @@ uses
 var
   scratchBuffer: array[0..8*1024-1] of tAudioSample;
   scratchBufferF32: array[0..8*1024-1] of tAudioSampleF32;
-  scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32;
+  scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32; {$ALIGN 8}
 
 {-----------------------------------------------------}
 {our big mixdown function}
@@ -65,16 +65,90 @@ var
 }
 
 {$S-,R-,Q-}
+
+procedure clipAndConvert_MMX(bufSamples:int32);
+var
+	srcPtr, dstPtr: pointer;
+  FPUState: array[0..108-1] of byte; {$ALIGN 16}
+begin
+
+	srcPtr := @scratchBufferI32[0];
+	dstPtr := @scratchBuffer[0];
+
+	asm
+  	pushad
+
+
+    lea eax, FPUState
+    fsave [eax]
+
+  	mov ecx, bufSamples
+    mov esi, srcPtr
+    mov edi, dstPtr
+
+  @LOOP:
+
+  	{noise}
+  	xor ebx, ebx
+  	call rnd
+    shr al, 1
+    add bl, al
+    call rnd
+    shr al, 1
+    add bl, al
+    sub ebx, 128								// ebx = noise
+    movd mm1, ebx
+    punpckldq mm1, mm1					// mm1 = noise|noise
+
+    {convert and clip}
+    movq 	mm0, [esi]						// mm0 = LEFT|RIGHT
+    paddd mm0, mm1							// mm0 = LEFT+noise|RIGHT+noise}
+    psrad	mm0, 8								// mm0 = (LEFT+noise)/256|(RIGHT+noise)/256
+    packssdw mm0, mm0						// mm0 = left|right|left|right (16bit)
+
+    movd [edi], mm0
+
+    add esi, 8
+    add edi, 4
+    dec ecx
+  	jnz @LOOP
+
+    lea eax, FPUState
+    frstor [eax]
+
+    popad
+
+  end;
+
+end;
+
+procedure clipAndConvert_REF(bufSamples:int32);
+var
+	i: int32;
+  left,right: int32;
+  noise: int32;
+begin
+ 	for i := 0 to bufSamples-1 do begin
+ 		{adding triangle noise to reduce quantization distortion}
+   	{costs 2ms, for 8ks samples, but I think it's worth it}
+   	noise := ((rnd + rnd) div 2) - 128;
+    left := (scratchBufferI32[i].left + noise) div 256;
+    right := (scratchBufferI32[i].right + noise) div 256;
+    if left > 32767 then left := 32767 else if left < -32768 then left := -32768;
+    if right > 32767 then right := 32767 else if right < -32768 then right := -32768;
+    scratchBuffer[i].left := left;
+    scratchBuffer[i].right := right;
+   end;
+end;
+
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 var
   sfx: tSoundEffect;
   i,j: int32;
-  volume: single = 0.49;
   noise: int32;
   pos,len: int32;
-  sample: pAudioSample;
+  sample,lastSample: pAudioSample;
 	bufSamples: int32;
-  left,right: int32;
 
 begin
 
@@ -86,6 +160,7 @@ begin
 
   bufSamples := bufBytes div 4;
   if bufSamples > (8*1024) then exit;
+  if bufSamples <= 0 then exit;
   if (mixer = nil) then exit;
 
   filldword(scratchBufferI32, bufSamples * 2, 0);
@@ -98,12 +173,14 @@ begin
       len := sfx.length;
       if len <= 0 then continue;
       pos := startTC mod len;
+      sample := pointer(sfx.sample) + (pos * 4);
+      lastSample := pointer(sfx.sample) + (len * 4);
 	  	for i := 0 to bufSamples-1 do begin
-      	sample := pointer(sfx.sample) + (pos * 4);
         scratchBufferI32[i].left += sample^.left*256;
     	  scratchBufferI32[i].right += sample^.right*256;
-        inc(pos);
-        if pos >= len then pos := 0;
+        inc(sample);
+        if sample >= lastSample then
+          sample := pointer(sfx.sample)
 	    end;
 	  end;
   end;
@@ -118,17 +195,7 @@ begin
 			scratchBuffer[i].right := noise*128;
     end;
   end else begin
-  	for i := 0 to bufSamples-1 do begin
-  		{adding triangle noise to reduce quantization distortion}
-    	{costs 2ms, for 8ks samples, but I think it's worth it}
-    	noise := ((rnd + rnd) div 2) - 128;
-      left := (scratchBufferI32[i].left + noise) div 256;
-      right := (scratchBufferI32[i].right + noise) div 256;
-      if left > 32767 then left := 32767 else if left < -32768 then left := -32768;
-      if right > 32767 then right := 32767 else if right < -32768 then right := -32768;
-      scratchBuffer[i].left := left;
-      scratchBuffer[i].right := right;
-    end;
+  	clipAndConvert_MMX(bufSamples);
   end;
 
   result := @scratchBuffer[0];
