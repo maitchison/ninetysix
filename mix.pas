@@ -74,6 +74,7 @@ var
   pos,len: int32;
   sample: pAudioSample;
 	bufSamples: int32;
+  left,right: int32;
 
 begin
 
@@ -121,8 +122,12 @@ begin
   		{adding triangle noise to reduce quantization distortion}
     	{costs 2ms, for 8ks samples, but I think it's worth it}
     	noise := ((rnd + rnd) div 2) - 128;
-			scratchBuffer[i].left := (scratchBufferI32[i].left + noise) div 256;
-			scratchBuffer[i].right := (scratchBufferI32[i].right + noise) div 256;
+      left := (scratchBufferI32[i].left + noise) div 256;
+      right := (scratchBufferI32[i].right + noise) div 256;
+      if left > 32767 then left := 32767 else if left < -32768 then left := -32768;
+      if right > 32767 then right := 32767 else if right < -32768 then right := -32768;
+      scratchBuffer[i].left := left;
+      scratchBuffer[i].right := right;
     end;
   end;
 
