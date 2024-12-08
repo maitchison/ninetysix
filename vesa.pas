@@ -174,11 +174,10 @@ begin
   for i := 0 to length(VesaModes) do begin
     if VesaModes[i] = $FFFF then break;
     with getModeInfo(VesaModes[i]) do begin
-			Writeln(XResolution, ',', YResolution, ',', BitsPerPixel);
     	if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
         mode := VesaModes[i];
         break
-      end;	
+      end;
 	  end;
   end;
 
