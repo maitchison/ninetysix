@@ -190,52 +190,6 @@ begin
 	channel[channelNum].play(soundEffect, volume, pitch, secToTC(getSec+timeOffset));
 end;
 
-(*
-procedure tSoundEffect.play();
-begin
-  if not assigned(mix.mixer) then
-  	error('Mixer has not yet been created.');
-  note('playing sound!  <<---------');
- 	mixer.channel[1].soundEffect := self;	
-end;
-*)
-
-
-(*
-{generate mix for given time}
-{$S-,R-,Q-}
-procedure tSoundMixer.mixDown(startTC: tTimeCode;var buf: array of tAudioSample);
-var
-	leftF32, rightF32: single;
-  left16, right16: word;
-  i,j: int32;
-  numSamples: int32;
-  sample: tAudioSample;
-begin
-
-	numSamples := length(buf);
-
-  for i := 0 to numSamples-1 do begin
-
-  	leftF32 := 0; rightF32 := 0;
-
-		for j := 1 to NUM_CHANNELS do begin
-  		if not assigned(channel[j].soundEffect) then continue;
-      {sample := channel[j].getSample(channel[j].startTime-startTC+i);}
-      sample.left := rnd*64;
-      sample.right := rnd*64;
-      leftF32 += sample.left;
-      rightF32 += sample.right;
-	  end;
-
-    sample.left := clamp(round(leftF32), -32768, 32767);
-    sample.right := clamp(round(rightF32), -32768, 32767);
-    buf[i] := sample;
-  end;
-end;
-{$S+,R+,Q+}
-*)
-
 procedure closeMixer();
 begin
 	note('[close] Mixer');

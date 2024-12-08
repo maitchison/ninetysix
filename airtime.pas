@@ -339,7 +339,7 @@ begin
     mixer.mute := keyDown(key_m);
     mixer.noise := keyDown(key_n);
 
-    if keyDown(key_p) then mainLoop();
+    if keyDown(key_p) and keyDown(key_l) and keyDown(key_y) then mainLoop();
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
   end;
@@ -354,6 +354,9 @@ var
 
 begin
 	note('Main loop started');
+
+  videoDriver.setMode(400,300,32);
+  videoDriver.setLogicalSize(1024,480);
 
   screen.background := trackSprite;
   screen.clear();
@@ -402,20 +405,10 @@ begin
 
 	videoDriver.setMode(640,480,32);
 
-  //videoDriver.setMode(320,240,32);
-  //videoDriver.setLogicalSize(1024,480);
 	S3D := tS3Driver.create();
   screen.create();
 
-  {todo: make mixer.playMusic}
-  (*
-  backgroundMusicPosition := 0;
-  backgroundMusicLength := music.length;
-  backgroundMusicBuffer := music.sample; {set last}
-  *)
   mixer.play(music);
-
-
 
   initMouse();
   initKeyboard();
