@@ -30,6 +30,7 @@ type
   tSoundMixer = class
     {handles mixing of channels}
     channel: array[1..NUM_CHANNELS] of tSoundChannel;
+    noiseBuffer: array[0..64*1024] of int32; {+1 so that we can read 64bytes at a time}
 
     mute: boolean;
     noise: boolean;
@@ -45,6 +46,8 @@ var
 	mixer: tSoundMixer = nil;
 
   inIRQ: boolean = false;
+
+  noiseCounter: dword;
 
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 
@@ -68,16 +71,19 @@ var
 
 procedure clipAndConvert_MMX(bufSamples:int32);
 var
-	srcPtr, dstPtr: pointer;
+	srcPtr, dstPtr, noisePtr: pointer;
   FPUState: array[0..108-1] of byte; {$ALIGN 16}
 begin
 
 	srcPtr := @scratchBufferI32[0];
 	dstPtr := @scratchBuffer[0];
+  noisePtr := @mixer.noiseBuffer[0];
 
 	asm
-  	pushad
 
+  	add noiseCounter, 1997
+
+  	pushad
 
     lea eax, FPUState
     fsave [eax]
@@ -89,16 +95,13 @@ begin
   @LOOP:
 
   	{noise}
-  	xor ebx, ebx
-  	call rnd
-    shr al, 1
-    add bl, al
-    call rnd
-    shr al, 1
-    add bl, al
-    sub ebx, 128								// ebx = noise
-    movd mm1, ebx
-    punpckldq mm1, mm1					// mm1 = noise|noise
+    mov ebx, noiseCounter
+    and ebx, $FFFF
+    shl ebx, 2
+    add ebx, noisePtr
+    movq mm1, qword ptr [ebx]
+
+    add noiseCounter, 97
 
     {convert and clip}
     movq 	mm0, [esi]						// mm0 = LEFT|RIGHT
@@ -242,7 +245,10 @@ begin
 	mute := false;
   noise := false;
 	for i := 1 to NUM_CHANNELS do
-  	channel[i] := tSoundChannel.create();		
+  	channel[i] := tSoundChannel.create();
+	for i := 0 to length(noiseBuffer)-1 do begin
+  	noiseBuffer[i] := ((random(256) + random(256)) div 2) - 128;
+  end;		
 end;
 
 procedure tSoundMixer.play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
