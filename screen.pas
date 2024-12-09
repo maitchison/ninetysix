@@ -40,6 +40,8 @@ type
 
     procedure setViewPort(x,y: int32);
 
+    procedure reset();
+
     {copy commands}
     procedure copyRegion(rect: tRect);
     procedure clearRegion(rect: tRect);
@@ -57,9 +59,17 @@ implementation
 
 constructor tScreen.create();
 begin
-  canvas.init(videoDriver.width, videoDriver.height);
   backgroundColor.init(0,0,0,255);
-  background := nil;	
+  background := nil;
+  {todo: canvas := nil}
+  reset();	
+end;
+
+{must be called whenever a resolution change occurs after creation.}
+procedure tScreen.reset();
+begin
+	{todo: if assigned(canvas) then canvas.done;}
+  canvas.init(videoDriver.width, videoDriver.height);
 end;
 
 function tScreen.width: word;
@@ -175,8 +185,8 @@ begin
 
 	if not assigned(background) then
   	error('background not assigned');
-	if background.page.width < canvas.width then
-  	error('background width must match canvas');
+	if background.page.width <> canvas.width then
+  	error(format('background width must match canvas, %d != %d ', [background.page.width, canvas.width]));
 
 	if (y < 0) or (y >= canvas.height) then exit;
 

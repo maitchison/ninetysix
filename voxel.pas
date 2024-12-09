@@ -515,7 +515,7 @@ begin
 
       pos += deltaX;
     	if c.a > 0 then
-	      canvas.putPixel(x,y, c);
+	      canvas.putPixel(x, y, c);
     end;
   end;
 

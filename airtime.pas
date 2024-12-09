@@ -281,8 +281,6 @@ begin
   screen.clear();
 
   screen.pageFlip();
-  {stub: make this work}
-  //mixer.play(music);
 
   startClock := getSec;
   lastClock := startClock;
@@ -358,6 +356,7 @@ begin
   videoDriver.setMode(400,300,32);
   videoDriver.setLogicalSize(1024,480);
 
+  screen.reset();
   screen.background := trackSprite;
   screen.clear();
   screen.pageFlip();
@@ -414,7 +413,6 @@ begin
   initKeyboard();
 
 	titleScreen();
-	{mainLoop;}
 
   videoDriver.setText();
   printLog();

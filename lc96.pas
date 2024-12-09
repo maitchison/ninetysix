@@ -255,12 +255,6 @@ begin
 
   ofs := (atX + (atY*page.width)) * 4;
 
-  {stub:}
-  for i := 0 to 16*3-1 do if global_deltas[i] > 255 then begin
-  	warn('invalid delta');
-    exit;
-  end;
-
   {eventually this will all be asm...}
   dPos := 0;
   da := 0;
