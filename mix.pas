@@ -21,7 +21,7 @@ type
 		soundEffect: tSoundEffect; 	{the currently playing sound effect}
     volume: single;
     pitch: single;
-    startTime: tTimeCode;      {when the sound should start playing}
+    offset: tTimeCode;       {when the sound should start playing}
     loop: boolean;
     constructor create();
 		procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
@@ -176,7 +176,12 @@ begin
 			sfx := mixer.channel[j].soundEffect;
       len := sfx.length;
       if len <= 0 then continue;
-      pos := startTC mod len;
+
+      {todo: support this case, this just means audio plays later, perhaps
+       even within this chunk}
+      if (startTC - mixer.channel[j].offset < 0) then continue;
+
+      pos := (startTC - mixer.channel[j].offset) mod len;
       sample := pointer(sfx.sample) + (pos * 4);
       lastSample := pointer(sfx.sample) + (len * 4);
 	  	for i := 0 to bufSamples-1 do begin
@@ -224,7 +229,7 @@ begin
   soundEffect := nil;
   volume := 1.0;
   pitch := 1.0;
-  startTime := 0;
+  offset := 0;
   loop := false;		
 end;
 
@@ -233,7 +238,7 @@ begin
 	self.soundEffect := soundEffect;
   self.volume := volume;
   self.pitch := pitch;
-	self.startTime := startTime;
+	self.offset := startTime;
   self.loop := loop;
 end;
 
@@ -255,13 +260,15 @@ end;
 procedure tSoundMixer.play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
 var
 	channelNum: integer;
+  ticksOffset: int32;
 begin
 	{for the moment lock onto the first channel}
   if not assigned(soundEffect) then
   	error('Tried to play invalid sound file');
   note('playing sound!  <<--------- self='+hexStr(@self));
   channelNum := 1;
-	channel[channelNum].play(soundEffect, volume, pitch, secToTC(getSec+timeOffset));
+  ticksOffset := round(timeOffset*44100);
+	channel[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
 end;
 
 procedure initMixer();
