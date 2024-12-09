@@ -57,11 +57,11 @@ implementation
 
 {-------------------------------------------------}
 
-constructor tScreen.create();
+constructor tScreen.Create();
 begin
   backgroundColor.init(0,0,0,255);
   background := nil;
-  {todo: canvas := nil}
+  canvas := nil;
   reset();	
 end;
 
@@ -69,7 +69,8 @@ end;
 procedure tScreen.reset();
 begin
 	{todo: if assigned(canvas) then canvas.done;}
-  canvas.init(videoDriver.width, videoDriver.height);
+  if assigned(canvas) then canvas.Destroy;
+  canvas := tPage.Create(videoDriver.width, videoDriver.height);
 end;
 
 function tScreen.width: word;

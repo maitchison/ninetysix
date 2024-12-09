@@ -125,6 +125,7 @@ var
   screenOfs: uint32;
   imageOfs: uint32;
   cnt: uint16;
+  dstPixels: pointer;
 
   sx1,sx2,dx1,dx2,sy1,sy2,dy1,dy2: integer;
 
@@ -161,6 +162,8 @@ begin
   cnt := (dx2 - dx1);
   if cnt <= 0 then exit;
 
+  dstPixels := dstPage.Pixels;
+
   for y := dy1 to dy2-1 do begin
   	if y > videoDriver.height then exit;
     v := (y - dy1) / (dy2 - dy1);
@@ -173,7 +176,7 @@ begin
 
       mov edi, screenOfs
       shl edi, 2
-      add edi, dstPage.Pixels
+      add edi, dstPixels
 
       movzx ecx, cnt
 

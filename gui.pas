@@ -37,7 +37,7 @@ end;
 
 procedure InitGui();
 begin
-	Info('[init] GUI');
+	info('[init] GUI');
 
   panelSprite := tSprite.Create(LoadBMP('gui/panel.bmp'));
   panelSprite.Border := tBorder.Create(2,2,2,2);
@@ -48,5 +48,5 @@ begin
 end;
 
 begin
-	InitGui();
+	initGui();
 end.

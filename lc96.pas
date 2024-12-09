@@ -345,7 +345,7 @@ begin
   if (verBig <> 0) and (verSmall <> 1) then
   	error(format('Invalid version, expecting 0.1, but found %d.%d',[verBig, verSmall]));
 
-	result.Init(width, height);
+	result := tPage.Create(width, height);
 
   if not (bpp in [24,32]) then
   	Error('Invalid BitPerPixel '+intToStr(bpp));
@@ -507,29 +507,29 @@ begin
   end;
 
 	{make sure we can encode and decode a simple page}
-	img1.init(4,4);
+	img1 := tPage.Create(4,4);
   img1.clear(RGBA.create(255,0,128));
 	s := encodeLC96(img1);
   s.seek(0);
   img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
-  img1.done;
-  img2.done;
+  img1.Destroy;
+  img2.Destroy;
 
   {test on random bytes for larger page}
-	img1.init(4,4);
+	img1 := tPage.Create(4,4);
   makePageRandom(img1);
 	s := encodeLC96(img1);
   s.seek(0);
   img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
-  img1.done;
-  img2.done;
+  img1.Destroy;
+  img2.Destroy;
 
   {test on random bytes for larger page}
-  img1.init(16,16);
+  img1 := tPage.Create(16,16);
   for i := 1 to 10 do begin
   	{stub: really try to catch this have an error}
 	  makePageRandom(img1);
@@ -537,10 +537,10 @@ begin
 	  s.seek(0);
 	  img2 := decodeLC96(s);
 	  assertEqual(img1, img2);
-    img2.done;
+    img2.Destroy;
 	  s.free;
   end;
-  img1.done;
+  img1.Destroy;
 
 end;
 

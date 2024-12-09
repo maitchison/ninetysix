@@ -98,14 +98,16 @@ const
 	ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
 
 type
-	tPage = object
-  	Width, Height, BPP: Word;
-    Pixels: pointer;
+	tPage = class
+  	width, height,bpp: Word;
+    isRef: boolean;
+    pixels: pointer;
     defaultColor: RGBA;
 
-    destructor  Done();
-    constructor Init(AWidth, AHeight: word);
-		constructor InitReference(AWidth, AHeight: word;PixelData: Pointer);
+    destructor  Destroy(); override;
+    constructor Create(); overload;
+    constructor Create(AWidth, AHeight: word); overload;
+		constructor CreateAsReference(AWidth, AHeight: word;PixelData: Pointer);
 
     function GetPixel(x, y: integer): RGBA; inline; overload;
     function GetPixel(fx,fy: single): RGBA; overload;
@@ -408,6 +410,9 @@ var
   BytesRead: int32;
   IOError: word;
 begin
+
+	result := tPage.create();
+
 	FileMode := 0; {read only}
 	Assign(F, FileName);
   {$I-}
@@ -479,35 +484,49 @@ end;
 { TPage }
 {----------------------------------------------------------------}
 
-constructor TPage.Init(AWidth, AHeight: word);
+constructor tPage.Create(); overload;
 begin
-	self.Width := AWidth;
-  self.Height := AHeight;
-  self.BPP := 32;
-  self.Pixels := getMem(AWidth * AHeight * 4);
+	inherited Create;
+	self.width := 0;
+  self.height := 0;
+  self.bpp := 0;
+  self.pixels := nil;
   self.defaultColor := ERR_COL;
-  self.Clear(RGBA.Create(0,0,0));
+  self.isRef := false;
 end;
 
-destructor tPage.Done();
+constructor tPage.Create(AWidth, AHeight: word); overload;
 begin
-	if assigned(self.pixels) then
+	Create;
+	self.width := AWidth;
+  self.height := AHeight;
+  self.bpp := 32;
+  self.pixels := getMem(AWidth * AHeight * 4);
+  self.clear(RGBA.Create(0,0,0));
+end;
+
+constructor tPage.CreateAsReference(AWidth, AHeight: word;PixelData: Pointer);
+{todo: support logical width}
+begin
+	Create;
+	self.width := AWidth;
+  self.height := AHeight;
+  self.bpp := 32;
+  self.pixels := PixelData;
+  self.isRef := true;
+end;
+
+destructor tPage.Destroy();
+begin
+	if (not self.isRef) and assigned(self.pixels) then
 		freeMem(self.pixels, width*height*4);
   self.pixels := nil;
   self.width := 0;
   self.height := 0;
   self.bpp := 0;
+  self.isRef := false;
+  inherited Destroy;
 end;
-
-constructor tPage.InitReference(AWidth, AHeight: word;PixelData: Pointer);
-{todo: support logical width}
-begin
-	self.Width := AWidth;
-  self.Height := AHeight;
-  self.BPP := 32;
-  self.Pixels := PixelData;
-end;
-
 
 function TPage.GetPixel(x, y: Integer): RGBA; overload;
 var
@@ -859,12 +878,14 @@ begin
   end;
 end;
 
-function TPage.Clone(): TPage;
+function tPage.clone(): tPage;
 begin
-	result.Width := self.width;
-  result.Height := self.height;
-  result.BPP := self.BPP;
-  result.Pixels := getMem(self.width*self.height*4);
+	result := tPage.create();
+	result.width := self.width;
+  result.height := self.height;
+  result.bpp := self.bpp;
+  result.pixels := getMem(self.width*self.height*4);
+  result.isRef := false;
   move(self.pixels^, result.pixels^, self.width*self.height*4);
 end;
 
