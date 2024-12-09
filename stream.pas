@@ -386,6 +386,7 @@ procedure tStream.readFromDisk(fileName: string);
 var
 	f: file;
   bytesRead: dword;
+  ioError: word;
 begin
 
 	{$I-}

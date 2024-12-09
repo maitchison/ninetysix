@@ -18,6 +18,7 @@ uses
 	test,
   debug,
 	utils,
+  dos,
   sbDriver;
 
 type
@@ -112,6 +113,7 @@ var
   samples: int32;
   i,j: integer;
   chunkWords: dword;
+  ioError: word;
 
 function wordAlign(x: int32): int32;
   begin
