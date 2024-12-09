@@ -71,6 +71,8 @@ procedure tCar.draw();
 var
 	startTime: double;
   dx, dy: int32;
+const
+  PADDING = 30;
 begin
 
 	{correct for isometric}
@@ -79,11 +81,11 @@ begin
 
 	if not screen.rect.isInside(dx, dy) then exit;
 
-	screen.clearRegion(tRect.create(dx-20, dy-20, 40, 40));
+	screen.clearRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
 	startTime := getSec;
   carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.5);
   carDrawTime := getSec - startTime;
-  screen.copyRegion(tRect.create(dx-20, dy-20, 40, 40));
+  screen.copyRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
 end;
 
 
@@ -112,9 +114,12 @@ var
   targetVelocity: v3d;
   lateralForceCap: single;
 
+  x,y: single;
+
 const
 	mass: single = 1;
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
+  BOUNDARY = 50;
 
 begin
 
@@ -218,6 +223,15 @@ begin
   vel -= dragForce;
 
   {-----------------------------------}
+
+  {boundaries}
+  x := pos.x;
+  y := round(pos.rotated(0.955, 0,0).y);
+
+  if x < BOUNDARY then vel.x += (BOUNDARY-x) * 1.0;
+  if y < BOUNDARY then vel.y += (BOUNDARY-y) * 1.0;
+  if x > 1024-BOUNDARY then vel.x -= (x-(1024-BOUNDARY)) * 1.0;
+  if y > 480-BOUNDARY then vel.y -= (y-(480-BOUNDARY)) * 1.0;
 
   tilt *= decayFactor(0.5);
 end;
