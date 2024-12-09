@@ -226,7 +226,7 @@ begin
   	pusha
 
   	mov ax, $4F06
-    mov bl, $00 // set display start during vsync
+    mov bl, $00
 
     mov cx, [width]
 
@@ -245,7 +245,7 @@ begin
 
   	mov ax, $4F07
     mov bh, $00
-    mov bl, $80 // set display start during vsync
+    mov bl, $00 // not not wait for vsync
 
     mov cx, [x]
     mov dx, [y]

@@ -72,7 +72,7 @@ var
 	startTime: double;
   dx, dy: int32;
 const
-  PADDING = 30;
+  PADDING = 25;
 begin
 
 	{correct for isometric}
@@ -81,13 +81,11 @@ begin
 
 	if not screen.rect.isInside(dx, dy) then exit;
 
-	screen.clearRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
 	startTime := getSec;
   carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.5);
   carDrawTime := getSec - startTime;
-  screen.copyRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
+  screen.markRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
 end;
-
 
 {returns decay factor for with given halflife (in seconds) over current
  elapsed time}
@@ -395,11 +393,18 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 
+    screen.clearAll();
+
     car.update();
-    car.draw();
+
     camX += ((car.pos.x-CamX)*0.05);
     camY += ((car.pos.rotated(0.955, 0,0).y-CamY)*0.05);
+    car.draw();
+
+    // not really needed
+    //screen.waitVSync();
 		screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
+    screen.flipAll();
 
 
     drawGUI();

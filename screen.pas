@@ -45,15 +45,25 @@ type
     {copy commands}
     procedure copyRegion(rect: tRect);
     procedure clearRegion(rect: tRect);
+
     procedure pageFlip();
     procedure clear();
 
+		procedure waitVSync();
 
+    {dirty handling}
+    procedure flipAll();
+    procedure clearAll();
+    procedure markRegion(rect: tRect);
 
   end;
 
 
 implementation
+
+var
+	{todo: change to 8x8 grid}
+	dirtyRegion: tRect;
 
 {-------------------------------------------------}
 
@@ -87,13 +97,6 @@ function tScreen.rect(): tRect;
 begin
 	result := tRect.create(width, height);
 end;
-
-(*
-function tScreen.viewPort: tRect;
-begin
-	result := tRect.create(round(xOffset), round(yOffset), videoDriver.physicalWidth, videoDriver.logicalWidth);
-end;
-*)
 
 {copies region from canvas to screen.}
 procedure tScreen.copyRegion(rect: tRect);
@@ -222,6 +225,39 @@ begin
     end;
 end;
 
+{indicates that region should fliped this frame, and cleared next frame}
+procedure tScreen.markRegion(rect: tRect);
+begin
+	dirtyRegion := rect;
+end;
+
+{clears all parts of the screen marked previously and removes dirty}
+procedure tScreen.clearAll();
+begin	
+	clearRegion(dirtyRegion);
+	dirtyRegion := tRect.create(0,0);	
+end;
+
+
+procedure tScreen.flipAll();
+begin
+	self.copyRegion(dirtyRegion);
+end;
+
+procedure tScreen.waitVSync();
+var
+	counter: int32;
+begin
+	{will throw an overflow error if too slow}	
+	counter := 0;
+  {wait until out of trace}
+  while (portb[$03DA] and $8) <> 0 do inc(counter);
+  {wait until start of retrace}
+  while (portb[$03DA] and $8) = 8 do inc(counter);
+
+end;
+
+
 {clears region on canvas with background color}
 procedure tScreen.clearRegion(rect: tRect);
 var
@@ -282,4 +318,5 @@ end;
 
 
 begin
+	dirtyRegion := tRect.create(0,0);
 end.
