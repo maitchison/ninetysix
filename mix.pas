@@ -9,7 +9,8 @@ uses
 	test,
   debug,
   utils,
-	sound;
+	sound,
+  go32;
 
 CONST
   NUM_CHANNELS = 4;
@@ -263,12 +264,27 @@ begin
 	channel[channelNum].play(soundEffect, volume, pitch, secToTC(getSec+timeOffset));
 end;
 
+procedure initMixer();
+begin
+	note('[init] Mixer');
+  if not lock_data(scratchBuffer, sizeof(scratchBuffer)) then
+  	warn('Could not lock mixer buffer. Audio might stutter.' );
+  if not lock_data(scratchBufferF32, sizeof(scratchBufferF32)) then
+  	warn('Could not lock mixer buffer. Audio might stutter.' );
+  if not lock_data(scratchBufferI32, sizeof(scratchBufferI32)) then
+  	warn('Could not lock mixer buffer. Audio might stutter.' );
+end;
+
 procedure closeMixer();
 begin
 	note('[close] Mixer');
+  unlock_data(scratchBuffer, sizeof(scratchBuffer));
+  unlock_data(scratchBufferF32, sizeof(scratchBufferF32));
+  unlock_data(scratchBufferI32, sizeof(scratchBufferI32));
 end;
 
 begin
   mixer := tSoundMixer.create();
+  initMixer();
   addExitProc(closeMixer);
 end.
