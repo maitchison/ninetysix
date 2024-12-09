@@ -387,8 +387,16 @@ var
 	f: file;
   bytesRead: dword;
 begin
+
+	{$I-}
 	assignFile(f, fileName);
   system.reset(f,1);
+  {$I+}
+
+  IOError := IOResult;
+  if IOError <> 0 then
+  	Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
+
   bytes := nil; {todo, is this needed?}
   system.setLength(bytes, fileSize(f));
   bytesLen := length(bytes);

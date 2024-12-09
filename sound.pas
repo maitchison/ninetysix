@@ -122,8 +122,15 @@ begin
 
 	try
     fileMode := 0;
+    {$I-}
   	assign(f, filename);
     reset(f,1);
+    {$I+}
+
+    IOError := IOResult;
+	  if IOError <> 0 then
+  		Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
+
 
     blockread(f, fileHeader, sizeof(fileHeader));
 

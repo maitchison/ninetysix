@@ -409,7 +409,6 @@ begin
 		screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
     screen.flipAll();
 
-
     drawGUI();
 
   	if keyDown(key_q) or keyDown(key_esc) then break;
