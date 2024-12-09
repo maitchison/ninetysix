@@ -59,13 +59,16 @@ const
 	}
 
   //buffer size in bytes
-  BUFFER_SIZE = 4*1024;
+  BUFFER_SIZE = 2*1024;
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
   	
 
 var
 	debug_dma_ofs: word;
+  debug_dma_page_corrections: int32 = 0;
 
+var
+	DEBUG_NOISE_ON_PAGE_CORRETION: boolean = false;
 
 implementation
 
@@ -239,12 +242,15 @@ var
   startTime: double;
   mixBuffer: pointer;	
   newSamples: int32;
+  expectedBuffer: boolean;
+  requiredCorrection: boolean;
 
 begin
 
   // todo: check we need to pass IRQ along, i.e. it's not for us.
 
 	asm
+  	cld
   	cli
     push es
     push ds
@@ -261,18 +267,36 @@ begin
   inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
 
-  {get DMA position to see where we should be writing to}
+  // acknowledge the DSP
+	// $F for 16bit, $E for 8bit
+	readAck := port[SB_BASE + $F];
+
+  {get DMA count to see where we should be writing to}
   asm
   	pusha
-  	mov dx, $C4
+
+    mov dx, $D8
+    mov al, 0
+    out dx,al		{reset flip flop}
+
+
+  	mov dx, $C6
     in  al, dx
     mov bl, al	
-    inc dx
     in  al, dx
     mov bh, al
     mov [debug_dma_ofs], bx
     popa	
   end;
+
+  {buf0 should be half_buffer_words, buf1 should be buffer_words}
+  expectedBuffer := boolean(trunc(round(debug_dma_ofs / (HALF_BUFFER_SIZE div 2))-1));
+  if currentBuffer <> expectedBuffer then begin
+  	currentBuffer := expectedBuffer;
+		inc(debug_dma_page_corrections);
+    requiredCorrection := true;
+  end else
+  	requiredCorrection := false;
 
 
 	if currentBuffer then
@@ -282,6 +306,7 @@ begin
 
   {Initialize the buffer with the music stream.}
   mixBuffer := nil;
+
   mixBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
   if (mixBuffer <> nil) then begin
 	  dosMemPut(dosSegment, bufOfs, mixBuffer^, HALF_BUFFER_SIZE);
@@ -289,15 +314,36 @@ begin
   	dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
   end;
 
+  if DEBUG_NOISE_ON_PAGE_CORRETION and requiredCorrection then begin
+  	{fill the buffer with noise}
+    asm
+    	pushad
+    	push fs
+
+      mov fs, go32.dosMemSelector
+      mov ecx, BUFFER_SIZE
+      mov edi, dosSegment
+      shl edi, 4
+
+    @LOOP:
+
+      {this will be loud!}
+      call rnd
+      mov fs:[edi], al
+      inc edi
+
+      dec ecx
+      jnz @LOOP
+
+      pop fs
+      popad
+    end;	
+  end;
+
+
   currentTC += HALF_BUFFER_SIZE div 4;
 
   lastChunkTime := getSec-startTime;
-
-  // acknowledge the DSP
-	// $F for 16bit, $E for 8bit
-  {note this works better if we ack late. Otherwise we get some
-   distortion with short buffers}
-	readAck := port[SB_BASE + $F];
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
@@ -381,7 +427,7 @@ begin
 	addr := (dosSegment shl 4);
 
 	port[$D4] := $04+channel_number;	// mask DMA channel
-  port[$D8] := $00;									// any value
+  port[$D8] := $00;									// reset flipflip (any value is fine here)
   port[$D6] := $48+channel_number;	// mode (was $48, but now $59 as channel_number=1
 
   port[$8B] := byte(addr shr 16);		// page address, high bits of address, probably 0
@@ -587,7 +633,10 @@ end;
 procedure closeSound();
 begin
 	note('[done] sound');
+
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
+  if debug_dma_page_corrections > 0 then
+  	warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
   uninstall_ISR();
   stopDMAPlayback();
   delay(10); {make sure SB has stoped reading}
