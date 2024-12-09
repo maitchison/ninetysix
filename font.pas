@@ -74,8 +74,14 @@ begin
 	fillchar(result.chars, sizeof(result.chars), 0);
   fillchar(result.kerning, sizeof(result.kerning), 0);
 	result.bitmap := LoadBMP(filename+'.bmp');
+  {$I-}
   Assign(TextFile, filename+'.fnt');
   Reset(TextFile);
+  {$I+}
+
+  if IOResult <> 0 then
+  	error('Error loading '+filename+'.fnt');
+
   while not Eof(TextFile) do begin
   	ReadLn(TextFile, Line);
     if Pos('char id=', Line) > 0 then begin
