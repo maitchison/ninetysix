@@ -429,10 +429,12 @@ begin
   yMin := min(s1.y,s2.y);
   yMin := min(yMin,s3.y);
   yMin := min(yMin,s4.y);
+  yMin := max(0, yMin);
 
   yMax := max(s1.y,s2.y);
   yMax := max(yMax,s3.y);
   yMax := max(yMax,s4.y);
+  yMax := min(videoDriver.logicalHeight-1, yMax);
 
   {debuging, show corners}
   {

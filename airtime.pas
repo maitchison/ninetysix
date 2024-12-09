@@ -386,11 +386,6 @@ begin
 
   while True do begin
 
-  	camX += trunc((car.pos.x-CamX)*0.1);
-    camY += trunc((car.pos.rotated(0.955, 0,0).y-CamY)*0.1);
-
-    screen.setViewPort(trunc(camX)-(videoDriver.physicalWidth div 2), trunc(camY)-(videoDriver.physicalHeight div 2));
-
   	{time keeping}
   	thisClock := getSec;
     elapsed := thisClock-lastClock;
@@ -402,6 +397,10 @@ begin
 
     car.update();
     car.draw();
+    camX += ((car.pos.x-CamX)*0.05);
+    camY += ((car.pos.rotated(0.955, 0,0).y-CamY)*0.05);
+		screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
+
 
     drawGUI();
 
