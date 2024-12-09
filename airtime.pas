@@ -289,6 +289,9 @@ begin
 	titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
 	titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
+  textOut(titleBackground.page, 640-140+1, 480-25+1, 'v0.1a (09/12/2024)', RGBA.create(0,0,0));
+  textOut(titleBackground.page, 640-140, 480-25, 'v0.1a (09/12/2024)', RGBA.create(250,250,250,240));
+
   screen.background := titleBackground;
   screen.clear();
 
