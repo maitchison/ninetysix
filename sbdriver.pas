@@ -63,6 +63,10 @@ const
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
   	
 
+var
+	debug_dma_ofs: word;
+
+
 implementation
 
 uses
@@ -224,83 +228,6 @@ end;
 
 {$F+,S-,R-,Q-}
 {handle sound buffer refill
-Hybrid mode:
-	- music handled in ISR
-  - mixing must be performed by main loop outside of ISR
-  - this is quite stable but requires a high frame rate for
-   	sfx to not sound choppy.
-}
-procedure soundBlaster_ISR_Hybrid; interrupt;
-var
-  readAck: byte;
-  bufOfs: word;
-  startTime: double;
-  musicBuffer: pointer;	
-  newSamples: int32;
-
-begin
-
-	{todo: do everything in asm, and without any calls}
-	asm
-    push es
-    push ds
-    push fs
-    push gs
-  	pushad
-
-    mov ax, cs:[backupDS]
-    mov ds, ax
-    mov es, ax
-  	end;
-
-  // acknowledge the DSP
-	// $F for 16bit, $E for 8bit
-	readAck := port[SB_BASE + $F];
-
- 	startTime := getSec;
-  inc(INTERRUPT_COUNTER);
-  currentBuffer := not currentBuffer;
-
-	if currentBuffer then
-  	bufOfs := HALF_BUFFER_SIZE
-  else
-  	bufOfs := 0;
-
-  {Initialize the buffer with the music stream.}
-  if (dosSegment <> 0) then begin
-	  if backgroundMusicBuffer <> nil then begin
-  		{todo: hande end case better}		
-	  	newSamples := HALF_BUFFER_SIZE div 4;
-  	  if (backgroundMusicPosition + newSamples) >= backgroundMusicLength then
-    	  backgroundMusicPosition := 0;
-  	  dosMemPut(dosSegment, bufOfs, (backgroundMusicBuffer + (backgroundMusicPosition * 4))^, HALF_BUFFER_SIZE);
-	    backgroundMusicPosition += newSamples;
-	  end else begin
-	  	dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
-	  end;
-	  bufferDirty := true;
-  end;
-
-  lastChunkTime := getSec-startTime;
-
-  // end of interupt
-  // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
-  port[$A0] := $20;
-  port[$20] := $20;
-
-  asm
-  	
-  	popad
-    pop gs
-    pop fs
-    pop ds
-    pop es
-  end;
-end;
-{$F-,S+,R+,Q+}
-
-{$F+,S-,R-,Q-}
-{handle sound buffer refill
 ISR mixing mode:
 	- music handled in ISR
   - mixing must be performed by main loop outside of ISR
@@ -314,6 +241,8 @@ var
   newSamples: int32;
 
 begin
+
+  // todo: check we need to pass IRQ along, i.e. it's not for us.
 
 	asm
   	cli
@@ -331,6 +260,20 @@ begin
  	startTime := getSec;
   inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
+
+  {get DMA position to see where we should be writing to}
+  asm
+  	pusha
+  	mov dx, $C4
+    in  al, dx
+    mov bl, al	
+    inc dx
+    in  al, dx
+    mov bh, al
+    mov [debug_dma_ofs], bx
+    popa	
+  end;
+
 
 	if currentBuffer then
   	bufOfs := HALF_BUFFER_SIZE
@@ -629,6 +572,7 @@ begin
   note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR();
+  delay(1); {not sure if this is needed?}
   initiateDMAPlayback();
 
 end;
