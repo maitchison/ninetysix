@@ -47,6 +47,7 @@ begin
   dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+destinationPath+'_tmp');
   mkDIR(destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
 end;
 
@@ -68,6 +69,7 @@ begin
   mkDIR(destinationPath);
   {$I+}
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath);
 
   assign(t,destinationPath+'/message.txt');
   rewrite(t);
@@ -641,8 +643,9 @@ var
   added,removed,changed: int32;
 begin
 	writeln();
-	workingSpaceFiles := listFiles('*.pas');
-	headFiles := listFiles('$rep\head\*.pas');
+  {todo: proper .gitignore style decision on what to include}
+	workingSpaceFiles := listFiles('*.pas') + listFiles('*.bat');
+	headFiles := listFiles('$rep\head\*.pas') + listFiles('$rep\head\*.bat');
   added := 0;
   removed := 0;
   changed := 0;

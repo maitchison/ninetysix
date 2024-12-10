@@ -10,7 +10,6 @@ uses
   debug,
   utils,
   crt,
-  time,
   graph32,
 	vga;
 
