@@ -14,12 +14,11 @@ set MAIN=airtime
 
 echo Build dir is '%BUILD_DIR%'
 
-:CHOICE /C:YN "Continue? "
-:IF ERRORLEVEL 2 goto :end
-
-IF EXIST %BUILD_DIR% move %BUILD_DIR% %BUILD_DIR%_%DATE%_%TIME%
+: for some reason msdos exist does not work on folders, only filenames.
+IF EXIST %BUILD_DIR%\marker.txt move %BUILD_DIR% %BUILD_DIR%_%DATE%_%TIME%
 
 mkdir %BUILD_DIR%
+type NUL > %BUILD_DIR%\marker.txt
 
 :: ---------------------------------
 :: Builds
@@ -28,13 +27,28 @@ mkdir %BUILD_DIR%
 echo =======================
 echo Building: debug
 echo =======================
-if EXIST tmp deltree tmp
-mkdir tmp
-fpc @fp.cfg -dDEBUG -v -FE"tmp" %MAIN%.pas
+if EXIST _tmp\marker.txt deltree /y _tmp
+mkdir _tmp
+type NUL > _tmp\marker.txt
+fpc @fp.cfg -dDEBUG -B -v0 -vv -vw -FE"_tmp" -CX -XX %MAIN%.pas
+copy fpcdebug.txt %BUILD_DIR%\build_d.txt
 IF ERRORLEVEL 1 goto :buildError
 
-copy tmp\%MAIN%.exe %BUILD_DIR%\%MAIN%d.exe
-deltree tmp
+copy _tmp\%MAIN%.exe %BUILD_DIR%\%MAIN%d.exe
+:deltree /y _tmp
+
+echo =======================
+echo Building: normal
+echo =======================
+if EXIST _tmp\marker.txt deltree /y _tmp
+mkdir _tmp
+type NUL > _tmp\marker.txt
+fpc @fp.cfg -dNORMAL -B -v0 -vv -vw -FE"_tmp" -CX -XX %MAIN%.pas
+copy fpcdebug.txt %BUILD_DIR%\build.txt
+IF ERRORLEVEL 1 goto :buildError
+
+copy _tmp\%MAIN%.exe %BUILD_DIR%\%MAIN%.exe
+:deltree /y _tmp
 
 :: ---------------------------------
 :: Make Folders
@@ -42,7 +56,6 @@ deltree tmp
 
 mkdir "%BUILD_DIR%\gfx"
 mkdir "%BUILD_DIR%\sfx"
-
 
 goto :end
 

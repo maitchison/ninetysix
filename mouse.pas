@@ -2,6 +2,8 @@ unit Mouse;
 
 {todo: come back and clean this one up}
 
+{$MODE fpc}
+
 
 interface
 
@@ -31,7 +33,7 @@ procedure UpdateMouse;
 
 implementation
 
-uses s3Video;
+uses s3;
 
 procedure installMouseProc(userproc : pointer; userproclen : longint); forward;
 procedure removeMouseProc; forward;
@@ -120,7 +122,7 @@ procedure UpdateHardwareCursor(mouse_x, mouse_y: word);
 var
 	counter: dword;
 begin
-	s3Video.S3SetHardwareCursorLocation(mouse_x, mouse_y);
+	s3.S3SetHardwareCursorLocation(mouse_x, mouse_y);
 end;
 
 procedure WriteBit(x,y: integer; value: boolean; plane: byte);
