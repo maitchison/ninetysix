@@ -132,22 +132,22 @@ end;
 {calculate SDF (the slow way)}
 function tVoxelSprite.generateSDF(): tPage;
 var
-	i,j,k: integer;
+	i,j,k: int32;
   minDst: integer;
   d: single;
   c: RGBA;
 begin
   result := vox.clone();
-  {todo: use proper L2 distance, not L1}
 	{note: doing this as largest cubiod make a lot of sense, and it
    lets me trace super fast in many directions}
 	{note, it would be nice to actually have negative for interior... but
   for now just closest is fine}
+
   for i := 0 to fWidth-1 do
   	for j := 0 to fHeight-1 do
     	for k := 0 to fDepth-1 do begin
       	d := getDistance_L2(i,j,k);
-        c.init(trunc(d),trunc(d*4),trunc(d*16),255);
+        c.init(trunc(d),trunc(d*4),trunc(d*16),255);				
         result.setPixel(i,j+k*fHeight, c);
       end;
 end;
@@ -226,6 +226,7 @@ begin
     sdf := result.generateSDF();
 	  saveLC96(filename+'.sdf', sdf);
   end;
+
   result.transferSDF(sdf);
 end;
 
@@ -237,7 +238,7 @@ begin
 	if (x < 0) or (x >= fWidth) then exit;
 	if (y < 0) or (y >= fHeight) then exit;
 	if (z < 0) or (z >= fDepth) then exit;
-  result := vox.getPixel(x,y+z*fWidth);
+  result := vox.getPixel(x,y+z*fHeight);
 end;
 
 {draw voxel sprite.}

@@ -886,6 +886,8 @@ begin
   result.bpp := self.bpp;
   result.pixels := getMem(self.width*self.height*4);
   result.isRef := false;
+  result.defaultColor := self.defaultColor;
+
   move(self.pixels^, result.pixels^, self.width*self.height*4);
 end;
 
