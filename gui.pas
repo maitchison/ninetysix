@@ -39,10 +39,10 @@ procedure InitGui();
 begin
 	info('[init] GUI');
 
-  panelSprite := tSprite.Create(LoadBMP('gui/panel.bmp'));
+  panelSprite := tSprite.Create(LoadBMP('res/panel.bmp'));
   panelSprite.Border := tBorder.Create(2,2,2,2);
 
-  frameSprite := tSprite.Create(LoadBMP('gui/ec_frame.bmp'));
+  frameSprite := tSprite.Create(LoadBMP('res/ec_frame.bmp'));
   frameSprite.Border := tBorder.Create(8,8,8,8);
 
 end;

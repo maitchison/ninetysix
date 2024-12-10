@@ -54,11 +54,8 @@ deltree /y _tmp
 :: Make Folders
 :: ---------------------------------
 
-mkdir %BUILD_DIR%\gfx
-mkdir %BUILD_DIR%\sfx
-copy gfx\*.p96 %BUILD_DIR%\gfx
-copy gfx\*.sdf %BUILD_DIR%\gfx
-copy gfx\*.p96 %BUILD_DIR%\gfx
+mkdir %BUILD_DIR%\res
+copy res\*.* %BUILD_DIR%\res
 
 goto :end
 

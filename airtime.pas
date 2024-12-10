@@ -195,6 +195,7 @@ begin
 
   vel += tractionForce * (elapsed/mass);
 
+
   {-----------------------------------}
   {drag
   	constant is static resistance
@@ -241,7 +242,7 @@ var
 	startTime: double;
 begin
   startTime := getSec;
-	result := tSprite.create(loadLC96('gfx\'+filename+'.p96'));
+	result := tSprite.create(loadLC96('res\'+filename+'.p96'));
   note(format(' -loaded %s (%dx%d) in %fs', [filename, result.width, result.height, getSec-startTime]));
 end;	
 
@@ -253,8 +254,8 @@ begin
   titleBackground := loadSprite('title');
   trackSprite := loadSprite('track1');
 
-  carVox := tVoxelSprite.loadFromFile('gfx\car1', 32);
-	music := tSoundEffect.create('music\music1.wav');
+  carVox := tVoxelSprite.loadFromFile('res\car1', 32);
+	music := tSoundEffect.create('res\music1.wav');
 end;
 
 procedure drawGUI();

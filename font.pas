@@ -186,6 +186,6 @@ end;
 
 begin
 	Info('[init] Font');
-	font1 := LoadFont('fonts/font');
+	font1 := LoadFont('res/font');
 end.
 
