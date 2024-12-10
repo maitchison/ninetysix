@@ -148,7 +148,7 @@ begin
     	for k := 0 to fDepth-1 do begin
       	d := getDistance_L2(i,j,k);
         c.init(trunc(d),trunc(d*4),trunc(d*16),255);
-        result.setPixel(i,j+k*32, c);
+        result.setPixel(i,j+k*fHeight, c);
       end;
 end;
 

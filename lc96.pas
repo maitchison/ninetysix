@@ -8,6 +8,12 @@ unit LC96;
 
   Usage:
 
+
+  Verion history
+
+  v0.1 - first version
+  v0.2 - support for larger images (numPatchs now dword)
+
 }
 
 interface
@@ -29,6 +35,10 @@ function encodeLC96(page: tPage;s: tStream=nil;withAlpha: boolean=False): tStrea
 implementation
 
 uses lz4;
+
+const
+	VER_BIG = 0;
+	VER_SMALL = 2;
 
 {-------------------------------------------------------}
 { Private }
@@ -312,7 +322,7 @@ var
   bytes: tBytes;
   data: tStream;
   decompressedBytes: tBytes;
-  numPatches: word;
+  numPatches: dword;
   compressedSize,uncompressedSize: dword;
   hasAlpha: boolean;
   verBig,verSmall: byte;
@@ -334,7 +344,7 @@ begin
   bpp := s.readWord;
   verSmall := s.readByte;
   verBig := s.readByte;
-  numPatches := s.readWord;
+  numPatches := s.readDWord;
   uncompressedSize := s.readDWord;
   compressedSize := s.readDWord;
 
@@ -342,8 +352,8 @@ begin
   while s.getPos < startPos+32 do
   	s.readByte();
 
-  if (verBig <> 0) and (verSmall <> 1) then
-  	error(format('Invalid version, expecting 0.1, but found %d.%d',[verBig, verSmall]));
+  if (verBig <> VER_BIG) and (verSmall <> VER_SMALL) then
+  	error(format('Invalid version, expecting %d.%d, but found %d.%d',[VER_BIG, VER_SMALL, verBig, verSmall]));
 
 	result := tPage.Create(width, height);
 
@@ -351,6 +361,18 @@ begin
   	Error('Invalid BitPerPixel '+intToStr(bpp));
 
   hasAlpha := bpp = 32;
+
+  {make sure limits are sort of ok}
+  {typically this occurs with a corrupt file}
+  if width > 16384 then
+  	error(format('Image width too large (%d > 16k)', [width]));
+  if height > 16384 then 	
+  	error(format('Image height too large (%d > 16k)', [height]));
+  if numPatches > 256*1024 then
+  	error(format('Image patches too large (%d > 256k)', [numPatches]));
+
+  if uncompressedSize > 16*1024*1024 then
+  	error(format('Image size too large (%d > 16MB)', [uncompressedSize]));
 
   {This is not great, it would be nice to be able decompress from
    part way in a stream.
@@ -387,7 +409,7 @@ var
   cnt: integer;
   data: tStream;
   bpp: byte;
-  numPatches: word;
+  numPatches: dword;
   uncompressedSize: dword;
   compressedSize: dword;
   startPos: int32;
@@ -433,8 +455,9 @@ begin
   s.writeWord(page.Width);
   s.writeWord(page.Height);
   s.writeWord(bpp);
-  s.writeWord($0001);
-  s.writeWord(numPatches);
+  s.writebyte(VER_SMALL);
+  s.writebyte(VER_BIG);
+  s.writeDWord(numPatches);
   s.writeDWord(uncompressedSize);
   s.writeDWord(compressedSize);
 

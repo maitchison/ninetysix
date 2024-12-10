@@ -209,7 +209,11 @@ begin
   id := resourceLibrary.findResourceIndex(dstPath);
   if id >= 0 then begin
     res := resourceLibrary.resource[id];
-    if (res.srcFile = srcPath) and (res.modifiedTime = fileModifiedTime(res.srcFile)) then begin
+    if
+    	(res.srcFile = srcPath) and
+      (res.modifiedTime = fileModifiedTime(res.srcFile)) and
+      exists(dstPath)
+      then begin
     	textAttr := $02;
     	writeln('[skip]');
     	textAttr := $07;
@@ -223,7 +227,7 @@ begin
     modifiedTime := fileModifiedTime(srcFile);
     img := loadBMP(srcFile);
     saveLC96(dstFile, img);
-    textAttr := $06;
+    textAttr := $0A;
 	  writeln(format('[%dx%d]',[img.width, img.height]));
     textAttr := $07;
   end;
@@ -234,10 +238,16 @@ end;
 
 procedure processAll();
 begin
+
+	{game stuff}
   convertBMP('title', 'e:\airtime\title_640.bmp');
 	convertBMP('track1');
 	convertBMP('car1', 'd:\car1.bmp'); // todo: move this to e:\ somehow
 
+  {gui stuff}
+	convertBMP('ec_frame', 'e:\gui\ec_frame.bmp');
+  convertBMP('panel', 'e:\gui\panel.bmp');
+  convertBMP('font', 'e:\font\font.bmp');
 end;
 
 {-------------------------------------------}
@@ -279,7 +289,6 @@ end;
 begin
 	runTests();
 	resourceLibrary := tResourceLibrary.CreateOrLoad('resources.ini');
-  if resourceLibrary.numResources = 0 then exit; {stub}
 	processAll();
   resourceLibrary.serialize('resources.ini');	
   writeln('done.');

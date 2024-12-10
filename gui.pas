@@ -8,6 +8,7 @@ uses
 	debug,
   font,
   sprite,
+  lc96,
 	graph32;
 
 var
@@ -39,10 +40,10 @@ procedure InitGui();
 begin
 	info('[init] GUI');
 
-  panelSprite := tSprite.Create(LoadBMP('res/panel.bmp'));
+  panelSprite := tSprite.Create(LoadLC96('res/panel.p96'));
   panelSprite.Border := tBorder.Create(2,2,2,2);
 
-  frameSprite := tSprite.Create(LoadBMP('res/ec_frame.bmp'));
+  frameSprite := tSprite.Create(LoadLC96('res/ec_frame.p96'));
   frameSprite.Border := tBorder.Create(8,8,8,8);
 
 end;

@@ -8,7 +8,8 @@ uses
   graph2d,
   graph32,
   utils,
-  vga;
+  vga,
+  lc96;
 
 type
 
@@ -73,7 +74,7 @@ var
 begin
 	fillchar(result.chars, sizeof(result.chars), 0);
   fillchar(result.kerning, sizeof(result.kerning), 0);
-	result.bitmap := LoadBMP(filename+'.bmp');
+	result.bitmap := LoadLC96(filename+'.p96');
   {$I-}
   Assign(TextFile, filename+'.fnt');
   Reset(TextFile);
@@ -142,29 +143,6 @@ begin
     prevChar := s[i];
   end;
 end;
-
-(*
-procedure TextOut(page: TPage; atX, atY: integer; s: string);
-var
-	i: integer;
-  tmpx, tmpy: integer;
-  tmp2: char;
-begin
-	for i := 1 to length(s) do begin
-  	tmpX := CursorX;
-    tmpY := CursorY;
-    tmp2 := CursorPrevious;
-    CursorX += 1;
-    CursorY += 1;
-  	CursorCol.init(0,0,0,80);
-  	printChar(s[i]);
-    CursorX := tmpX;
-    CursorY := tmpY;
-    CursorPrevious := tmp2;
-  	CursorCol.init(255,255,255);
-    printChar(s[i]);
-  end;
-end; *)
 
 function TextExtents(s: string): TRect;
 var
