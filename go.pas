@@ -634,6 +634,14 @@ begin
 	result := t1 <> t2;
 end;
 
+function getSourceFiles(path: string): tLines;
+begin
+  {todo: proper .gitignore style decision on what to include}
+  if (length(path) > 0) and (path[length(path)] <> '\') then
+  	path += '\';
+	result := listFiles(path+'*.pas') + listFiles(path+'*.bat');
+end;
+
 {show all changed / added / deleted files}
 procedure status();
 var
@@ -643,9 +651,8 @@ var
   added,removed,changed: int32;
 begin
 	writeln();
-  {todo: proper .gitignore style decision on what to include}
-	workingSpaceFiles := listFiles('*.pas') + listFiles('*.bat');
-	headFiles := listFiles('$rep\head\*.pas') + listFiles('$rep\head\*.bat');
+  workingSpaceFiles := getSourceFiles('');
+	headFiles := getSourceFIles('$rep\head\');
   added := 0;
   removed := 0;
   changed := 0;
@@ -686,8 +693,8 @@ var
   filename: string;
   changed: int32;
 begin
-	workingSpaceFiles := listFiles('*.pas');
-	headFiles := listFiles('$rep\head\*.pas');
+  workingSpaceFiles := getSourceFiles('');
+	headFiles := getSourceFIles('$rep\head\');
   changed := 0;
 
   outputLn('');

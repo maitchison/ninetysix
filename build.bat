@@ -30,12 +30,12 @@ echo =======================
 if EXIST _tmp\marker.txt deltree /y _tmp
 mkdir _tmp
 type NUL > _tmp\marker.txt
-fpc @fp.cfg -dDEBUG -B -v0 -vv -vw -FE"_tmp" -CX -XX %MAIN%.pas
+fpc @fp.cfg -dDEBUG -B -v0 -vv -FE"_tmp" -CX -XX %MAIN%.pas
 copy fpcdebug.txt %BUILD_DIR%\build_d.txt
 IF ERRORLEVEL 1 goto :buildError
 
 copy _tmp\%MAIN%.exe %BUILD_DIR%\%MAIN%d.exe
-:deltree /y _tmp
+deltree /y _tmp
 
 echo =======================
 echo Building: normal
@@ -43,19 +43,22 @@ echo =======================
 if EXIST _tmp\marker.txt deltree /y _tmp
 mkdir _tmp
 type NUL > _tmp\marker.txt
-fpc @fp.cfg -dNORMAL -B -v0 -vv -vw -FE"_tmp" -CX -XX %MAIN%.pas
+fpc @fp.cfg -dNORMAL -B -v0 -vv -FE"_tmp" -CX -XX %MAIN%.pas
 copy fpcdebug.txt %BUILD_DIR%\build.txt
 IF ERRORLEVEL 1 goto :buildError
 
 copy _tmp\%MAIN%.exe %BUILD_DIR%\%MAIN%.exe
-:deltree /y _tmp
+deltree /y _tmp
 
 :: ---------------------------------
 :: Make Folders
 :: ---------------------------------
 
-mkdir "%BUILD_DIR%\gfx"
-mkdir "%BUILD_DIR%\sfx"
+mkdir %BUILD_DIR%\gfx
+mkdir %BUILD_DIR%\sfx
+copy gfx\*.p96 %BUILD_DIR%\gfx
+copy gfx\*.sdf %BUILD_DIR%\gfx
+copy gfx\*.p96 %BUILD_DIR%\gfx
 
 goto :end
 
