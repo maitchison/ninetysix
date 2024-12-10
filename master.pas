@@ -1,0 +1,273 @@
+{read master files and process / compress}
+program import;
+
+{$MODE delphi}
+
+uses
+	utils,
+  test,
+  debug,
+	graph32,
+  dos,
+  lc96;
+
+var
+	img: tPage;
+
+{-----------------------------------------------}
+
+type
+	
+  tResource = record
+  	srcFile: string;
+    dstFile: string;
+    modifiedTime: int64;
+  end;	
+
+	tResourceLibrary = class
+
+  	numResources: word;
+
+  	resource: array[0..63] of tResource;
+
+    procedure addResource(res: tResource);
+
+  	constructor Create(); overload;
+  	constructor Create(filename: string); overload;
+  	constructor LoadOrCreate(filename: string); overload;
+    destructor Destroy;
+
+    procedure serialize(fileName: string);
+    procedure deserialize(fileName: string);
+
+    function findResourceIndex(dstFile: string): integer;
+    procedure updateResource(res: tResource);
+
+  end;
+
+{-----------------------------------------------}
+
+constructor tResourceLibrary.Create(); overload;
+begin
+	inherited Create();
+  numResources := 0;
+  fillchar(resource, sizeOf(resource), 0);
+end;
+
+constructor tResourceLibrary.Create(fileName: string); overload;
+begin
+  Create();
+  deserialize(fileName);
+end;
+
+constructor tResourceLibrary.LoadOrCreate(fileName: string);
+begin
+  if exists(fileName) then
+		tResourceLibrary.Create(fileName)
+  else
+    tResourceLibrary.Create();
+end;
+
+
+destructor tResourceLibrary.Destroy();
+begin
+	inherited Destroy();
+end;
+
+procedure tResourceLibrary.addResource(res: tResource);
+begin
+	if numResources = length(resource) then
+  	error('Too many resources, limit is '+intToStr(length(resource)));
+	resource[numResources] := res;
+  inc(numResources);
+end;
+
+{returns index of resource, or -1 of not found}
+function tResourceLibrary.findResourceIndex(dstFile: string): integer;
+var
+	i: int32;
+begin
+	for i := 0 to length(resource)-1 do
+  	if resource[i].dstFile = dstFile then exit(i);
+  exit(-1);
+end;
+
+{updates or adds resource}
+procedure tResourceLibrary.updateResource(res: tResource);
+var
+	id: int32;
+begin
+	id := findResourceIndex(res.dstFile);
+  if id < 0 then
+  	addResource(res)
+  else
+  	resource[id] := res;	
+end;
+
+procedure tResourceLibrary.serialize(fileName: string);
+var
+	t: text;
+  ioError: word;
+  res: tResource;
+begin
+	assign(t, filename);
+  {$I-}
+  rewrite(t);
+  {$I+}
+  ioError := ioResult;
+  if ioError <> 0 then error('Error writing '+fileName+' (error:'+intToStr(ioError)+')');
+
+  try
+  	for i := 0 to numResources-1 do begin
+    	res := resource[i];
+      writeln(t, '[resource]');
+      writeln(t, 'srcFile=',res.srcFile);
+      writeln(t, 'dstFile=',res.dstFile);
+      writeln(t, 'modifiedTime=',res.modifiedTime);
+      writeln(t);
+    end;
+  finally
+	  close(t);
+  end;
+
+end;
+
+procedure tResourceLibrary.deserialize(fileName: string);
+var
+	t: text;
+  s,k,v: string;
+  ioError: word;
+  res: tResource;
+begin
+	assign(t, filename);
+  {$I-}
+  reset(t);
+  {$I+}
+  ioError := ioResult;
+  if ioError <> 0 then error('Error reading '+fileName+' (error:'+intToStr(ioError)+')');
+
+  try
+
+  	numResources := 0;
+
+  	while not eof(t) do begin
+			readln(t, s);
+      s := trim(s);
+      if s = '[resource]' then begin
+      	if numResources > 0 then
+        	resource[numResources-1] := res;
+      	fillchar(res, sizeof(res), 0);
+      	inc(numResources);
+      end;
+      split(s, '=', k, v);
+      if k = 'srcFile' then begin
+      	res.srcFile := v;
+      end else if k = 'dstFile' then begin
+      	res.dstFile := v;
+      end else if k = 'modifiedTime' then begin
+      	res.modifiedTime := strToInt(v);
+      end else begin
+      	{ignore all others}
+      end;
+    end;
+
+    {write final}
+    if numResources > 0 then
+    	resource[numResources-1] := res;
+
+  finally
+	  close(t);
+  end;
+
+end;
+
+{-----------------------------------------------}
+
+var
+	resourceLibrary: tResourceLibrary;
+
+const
+  DEFAULT_SRC_FOLDER = 'e:\airtime\';
+
+procedure convertBMP(filename: string;srcPath:string='');
+var	
+	res: tResource;
+  id: int32;
+  dstPath: string;
+begin
+
+  if srcPath= '' then
+    srcPath := DEFAULT_SRC_FOLDER+filename+'.bmp';
+  dstPath := 'res\'+filename+'.p96';
+
+	write(filename,': ');
+
+  {check if this is already done}
+  id := resourceLibrary.findResourceIndex(dstPath);
+  if id >= 0 then begin
+    res := resourceLibrary.resource[id];
+    if (res.srcFile = srcPath) and (res.modifiedTime = fileModifiedTime(res.srcFile)) then begin
+    	writeln(' [skip]');
+			exit;    	
+		end;
+  end;
+
+  with res do begin
+    srcFile := srcPath;
+    dstFile := dstPath;
+    modifiedTime := fileModifiedTime(srcFile);
+    img := loadBMP(srcFile);
+    saveLC96(dstFile, img);
+	  writeln(format(' [processed (%dx%d)]',[img.width, img.height]));
+  end;
+
+  resourceLibrary.updateResource(res);
+  resourceLibrary.serialize('resources.ini');
+end;
+
+procedure processAll();
+begin
+  convertBMP('title', 'e:\airtime\title_640.bmp');
+	convertBMP('track1');
+	convertBMP('car1');
+end;
+
+{-------------------------------------------}
+
+procedure runTests();
+var	
+	rl: tResourceLibrary;
+  res: tResource;
+begin
+	rl := tResourceLibrary.Create();
+
+  res.srcFile := 'a';
+  res.dstFile := 'b';
+  res.modifiedTime := 123;
+  rl.addResource(res);
+  rl.serialize('_test.ini');
+  rl.Destroy;
+
+  rl := tResourceLibrary.Create('_test.ini');
+  assertEqual(rl.numResources, 1);
+  res := rl.resource[0];
+  assertEqual(res.srcFile, 'a');
+  assertEqual(res.dstFile, 'b');
+  assertEqual(res.modifiedTime, 123);
+  assertEqual(rl.findResourceIndex('b'), 0);
+  assertEqual(rl.findResourceIndex('c'), -1);
+
+	rl.Destroy;
+
+end;
+
+{-------------------------------------------}
+
+
+begin
+	runTests();
+	resourceLibrary := tResourceLibrary.LoadOrCreate('resources.ini');
+	processAll();
+  resourceLibrary.serialize('resources.ini');	
+  writeln('done.');
+end.

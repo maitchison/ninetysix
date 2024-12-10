@@ -8,6 +8,7 @@ unit utils;
 interface
 
 uses
+	dos,
 	go32;
 
 {todo:
@@ -82,8 +83,10 @@ function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: tBytes): string;
 function bytesToSanStr(bytes: tBytes): string;
-function StrToInt(s: string): integer;
-function Trim(s: string): string;
+function strToInt(s: string): int64;
+function trim(s: string): string;
+function split(s: string; c: char; var left: string; var right: string): boolean;
+
 
 function bytesForBits(x: int32): int32;
 function toBytes(x: array of dword): tBytes; overload;
@@ -96,6 +99,7 @@ function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
+function  fileModifiedTime(fileName: string): longint;
 
 function  GetTickCount(): int64;
 function  GetMSCount(): int64;
@@ -441,28 +445,41 @@ begin
   	result := padding + result;  	
 end;
 
-function StrToInt(s: string): integer;
+function strToInt(s: string): int64;
 var
-	value, code: integer;
+	value: longint;
+  code: word;
 begin
 	{todo: better way to handle errors}
-	Val(s, value, code);
+	val(s, value, code);
   if code <> 0 then debug.Error(Format('Invalid integer "%s"', [s]));
   result := value;
 end;
 
 {remove whitespace from begining and end of string.}
-function Trim(s: string): string;
+function trim(s: string): string;
 var
 	i,j: integer;
   l: integer;
 begin
 	l := length(s);
+  if l = 0 then exit('');
 	i := 1;
   j := l;
-  while (s[i] in [' ', #9]) and (i <= l) do inc(i);
-  while (s[j] in [' ', #9]) and (i >= i) do dec(j);
+  while (s[i] in [' ', #9]) and (i < l) do inc(i);
+  while (s[j] in [' ', #9]) and (j >= i) do dec(j);
   result := copy(s, i, j - i + 1);	
+end;
+
+function split(s: string; c: char; var left: string; var right: string): boolean;
+var
+	charPos: int32;
+begin
+	charPos := pos(c, s);
+  if charPos < 0 then exit(false);
+  left := Copy(s, 1, charPos-1);
+  right := Copy(s, charPos+1, length(s)-charPos);
+  exit(true);
 end;
 
 {Returns number of bytes required to encode this many bits}
@@ -584,6 +601,24 @@ function GetSec(): double; inline;
 begin
     result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
 end;
+
+{returns timestamp for file modified time, or -1 if file not found.}
+function fileModifiedTime(fileName: string): longint;
+var
+	f: file;
+  t: longint;
+begin
+	assign(f, fileName);
+  {$I-}
+  reset(f);
+  {$I+}
+  if IOResult <> 0 then
+  	exit(-1);
+  getFTime(f, t);
+  close(f);
+  exit(t);
+end;
+
 
 {-------------------------------------------------------------------}
 
@@ -711,18 +746,26 @@ end;
 {-------------------------------------------------------------------}
 
 procedure UnitTests();
+var
+	a,b: string;
 begin
   AssertEqual(StrToInt('123'), 123);
   AssertEqual(StrToInt('7'), 7);
   AssertEqual(Trim(' Fish'), 'Fish');
   AssertEqual(Trim(' Fish    '), 'Fish');
   AssertEqual(Trim('Fish'), 'Fish');
+  AssertEqual(Trim('    '), '');
+  AssertEqual(Trim(''), '');
 
   AssertEqual(Format('%s', [5]), '5');
 
   AssertEqual(binToStr(5, 8), '00000101');
   AssertEqual(binToStr(0), '0');
-  AssertEqual(binToStr(1), '1');  	
+  AssertEqual(binToStr(1), '1');
+
+	split('fish=good', '=', a, b);
+  assertEqual(a,'fish');
+  assertEqual(b,'good');
 end;
 
 begin
