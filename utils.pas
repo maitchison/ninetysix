@@ -85,6 +85,7 @@ function bytesToStr(bytes: tBytes): string;
 function bytesToSanStr(bytes: tBytes): string;
 function strToInt(s: string): int64;
 function trim(s: string): string;
+function pad(s: string;len: int32;padding: char=' '): string;
 function split(s: string; c: char; var left: string; var right: string): boolean;
 
 
@@ -471,6 +472,12 @@ begin
   result := copy(s, i, j - i + 1);	
 end;
 
+function pad(s: string;len: int32;padding: char=' '): string;
+begin
+	while length(s) < len do
+  	s += padding;
+  result := s;
+end;
 function split(s: string; c: char; var left: string; var right: string): boolean;
 var
 	charPos: int32;

@@ -8,6 +8,7 @@ uses
   test,
   debug,
 	graph32,
+  crt,
   dos,
   lc96;
 
@@ -34,7 +35,7 @@ type
 
   	constructor Create(); overload;
   	constructor Create(filename: string); overload;
-  	constructor LoadOrCreate(filename: string); overload;
+  	constructor CreateOrLoad(filename: string); overload;
     destructor Destroy;
 
     procedure serialize(fileName: string);
@@ -60,12 +61,12 @@ begin
   deserialize(fileName);
 end;
 
-constructor tResourceLibrary.LoadOrCreate(fileName: string);
+constructor tResourceLibrary.CreateOrLoad(fileName: string);
 begin
   if exists(fileName) then
-		tResourceLibrary.Create(fileName)
-  else
-    tResourceLibrary.Create();
+    Create(fileName)
+	else
+    Create();
 end;
 
 
@@ -87,7 +88,7 @@ function tResourceLibrary.findResourceIndex(dstFile: string): integer;
 var
 	i: int32;
 begin
-	for i := 0 to length(resource)-1 do
+  for i := 0 to numResources-1 do
   	if resource[i].dstFile = dstFile then exit(i);
   exit(-1);
 end;
@@ -158,6 +159,7 @@ begin
         	resource[numResources-1] := res;
       	fillchar(res, sizeof(res), 0);
       	inc(numResources);
+        continue;
       end;
       split(s, '=', k, v);
       if k = 'srcFile' then begin
@@ -200,14 +202,17 @@ begin
     srcPath := DEFAULT_SRC_FOLDER+filename+'.bmp';
   dstPath := 'res\'+filename+'.p96';
 
-	write(filename,': ');
+  textAttr := $07;
+	write(pad(filename,14, ' '));
 
   {check if this is already done}
   id := resourceLibrary.findResourceIndex(dstPath);
   if id >= 0 then begin
     res := resourceLibrary.resource[id];
     if (res.srcFile = srcPath) and (res.modifiedTime = fileModifiedTime(res.srcFile)) then begin
-    	writeln(' [skip]');
+    	textAttr := $02;
+    	writeln('[skip]');
+    	textAttr := $07;
 			exit;    	
 		end;
   end;
@@ -218,7 +223,9 @@ begin
     modifiedTime := fileModifiedTime(srcFile);
     img := loadBMP(srcFile);
     saveLC96(dstFile, img);
-	  writeln(format(' [processed (%dx%d)]',[img.width, img.height]));
+    textAttr := $06;
+	  writeln(format('[%dx%d]',[img.width, img.height]));
+    textAttr := $07;
   end;
 
   resourceLibrary.updateResource(res);
@@ -229,7 +236,8 @@ procedure processAll();
 begin
   convertBMP('title', 'e:\airtime\title_640.bmp');
 	convertBMP('track1');
-	convertBMP('car1');
+	convertBMP('car1', 'd:\car1.bmp'); // todo: move this to e:\ somehow
+
 end;
 
 {-------------------------------------------}
@@ -245,11 +253,15 @@ begin
   res.dstFile := 'b';
   res.modifiedTime := 123;
   rl.addResource(res);
+  res.srcFile := 'x';
+  res.dstFile := 'y';
+  res.modifiedTime := 321;
+  rl.addResource(res);
   rl.serialize('_test.ini');
   rl.Destroy;
 
   rl := tResourceLibrary.Create('_test.ini');
-  assertEqual(rl.numResources, 1);
+  assertEqual(rl.numResources, 2);
   res := rl.resource[0];
   assertEqual(res.srcFile, 'a');
   assertEqual(res.dstFile, 'b');
@@ -266,7 +278,8 @@ end;
 
 begin
 	runTests();
-	resourceLibrary := tResourceLibrary.LoadOrCreate('resources.ini');
+	resourceLibrary := tResourceLibrary.CreateOrLoad('resources.ini');
+  if resourceLibrary.numResources = 0 then exit; {stub}
 	processAll();
   resourceLibrary.serialize('resources.ini');	
   writeln('done.');
