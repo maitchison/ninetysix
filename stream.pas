@@ -13,6 +13,13 @@ uses
 	test;
 
 type
+
+	tPackingMethod = (
+  	PACK_OFF,
+    PACK_FAST,
+    PACK_ALL
+  );
+
 	tStream = class
 
   	{
@@ -51,7 +58,7 @@ type
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
     procedure writeVLCControlCode(value: dword); inline;
-    procedure writeVLCSegment(values: array of dword;allowPacking:boolean=True); inline;
+    procedure writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST);
     function  VLCbits(value: dword): word; inline;
 
 		procedure writeChars(s: string);
@@ -86,7 +93,6 @@ type
 
   end;
 
-
 implementation
 
 {------------------------------------------------------}
@@ -100,8 +106,12 @@ begin
   	2: exit(2);
   	4: exit(3);
   	8: exit(4);
+    {extra ones}
+    3: exit(5);
+    5: exit(6);
+    6: exit(7);
   end;
-  exit(-1);
+  exit(100+nBits); {stub: support all codes}
 end;
 
 {Returns the packing code for given number of bits}
@@ -113,6 +123,10 @@ begin
   	2: exit(2);
   	3: exit(4);
   	4: exit(8);
+    {extra codes}
+    5: exit(3);
+    6: exit(5);
+    7: exit(5);
   end;
   exit(-1);
 end;
@@ -440,6 +454,8 @@ Encoding is as follows
 
 with most signficant nibbles on the right.
 
+(todo: check this is still right)
+
 xxx0 							(0-7)
 xxx1xxx0 					(8-63)
 xxx1xxx1xxx0 			(64-511)
@@ -447,7 +463,7 @@ xxx1xxx1xxx1xxx0	(512-4095)
 
 Note: codes in the form
 
-xxx10000
+0000xxx1
 ...
 
 are out of band, and used for control codes  				
@@ -472,11 +488,16 @@ procedure tStream.writeVLCControlCode(value: dword);
 begin
 	{these codes will never appear in normal VLC encoding as they
    would always be encoded using the smaller length.}
-  if value < 8 then
-	  writeByte($8+value)
-  else
-  	Error('Invalid control code');
-
+  while True do begin
+    if value < 8 then begin
+    	writeNibble($8+value);
+      writeNibble(0);
+      exit;
+    end else begin
+    	writeNibble($8+(value and $7));
+      value := value shr 3;
+    end;	
+  end;
 end;
 
 function packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream;
@@ -702,13 +723,17 @@ written, i.e. by first encoding a VLC length code
 This function can be useful to minimize the worst case, as we can
 make use of 8bit packing with very little loss in efficency.
 }
-procedure tStream.writeVLCSegment(values: array of dword;allowPacking:boolean=True);
+procedure tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST);
 var
 	i: int32;
   maxValue: int32;
   unpackedBits: int32;
   packingCost: int32;
+  packingOptions: set of byte;
   n: integer;
+const
+	FAST_OPTIONS = [0,1,2,4,8];
+	ALL_OPTIONS = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24];
 begin
 	maxValue := 0;
   unpackedBits := 0;
@@ -719,18 +744,23 @@ begin
 
   self.byteAlign();
 
-  if allowPacking then
-    for n in [0,1,2,4,8] do begin
-    	if maxValue < (1 shl n) then begin
-  	    packingCost := (length(values) * n)+8;
-  	    if packingCost < unpackedBits then begin
-          {control-code}
-      		writeVLCControlCode(encodePackingCode(n));
-          packBits(values, n, self);
-  	    	exit;
-        end;
-      end;
+  if packing <> PACK_OFF then begin
+  	if packing = PACK_FAST then
+    	packingOptions := FAST_OPTIONS
+    else
+    	packingOptions := ALL_OPTIONS;
+  	for n in packingOptions do begin
+  		if maxValue < (1 shl n) then begin
+			  packingCost := (length(values) * n)+8;
+			  if packingCost < unpackedBits then begin
+    			{control-code}
+    			writeVLCControlCode(encodePackingCode(n));
+		      packBits(values, n, self);
+			    exit;
+  		  end;
+		  end;
     end;
+	end;
 
 	{just write out the data}
 	for i := 0 to length(values)-1 do

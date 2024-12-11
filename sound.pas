@@ -159,7 +159,6 @@ begin
   	  blockRead(f, chunkHeader, sizeof(chunkHeader));
       with chunkHeader do begin
       	if chunkBlockID <> 'data' then begin
-        	writeln('skipping '+chunkBlockID);
         	seek(f, wordAlign(filePos(f) + chunkSize));
           continue;
         end;

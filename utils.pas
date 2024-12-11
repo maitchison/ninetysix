@@ -88,6 +88,8 @@ function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
 function split(s: string; c: char; var left: string; var right: string): boolean;
 
+function negDecode(x: dword): int32; inline;
+function negEncode(x: int32): dword; inline;
 
 function bytesForBits(x: int32): int32;
 function toBytes(x: array of dword): tBytes; overload;
@@ -626,6 +628,25 @@ begin
   exit(t);
 end;
 
+{interleave pos and negative numbers into a whole number}
+function negDecode(x: dword): int32; inline;
+begin
+	result := ((x+1) shr 1);
+  if x and $1 = $0 then result := -result;
+end;
+
+{interleave pos and negative numbers into a whole number
+ 0 -> 0
++1 -> 1
+-1 -> 2
+...
+}
+function negEncode(x: int32): dword; inline;
+begin
+	result := abs(x)*2;
+  if x > 0 then dec(result);
+end;
+
 
 {-------------------------------------------------------------------}
 
@@ -773,6 +794,11 @@ begin
 	split('fish=good', '=', a, b);
   assertEqual(a,'fish');
   assertEqual(b,'good');
+
+  {test negEncode neg}
+  for i := -256 to +256 do
+  	AssertEqual(negDecode(negEncode(i)), i);
+
 end;
 
 begin

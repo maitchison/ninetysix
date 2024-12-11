@@ -54,20 +54,6 @@ begin
 	result := sqr(a.r-b.r) + sqr(a.g-b.g) + sqr(a.b-b.b) + sqr(a.a-b.a);
 end;
 
-{interleave pos and negative numbers into a whole number}
-function invFunkyNeg(x: word): int32; inline;
-begin
-	result := ((x+1) shr 1);
-  if x and $1 = $0 then result := -result;
-end;
-
-{interleave pos and negative numbers into a whole number}
-function funkyNeg(x: int32): word; inline;
-begin
-	result := abs(x)*2;
-  if x > 0 then dec(result);
-end;
-
 {generates code representing delta to go from a to b}
 function encodeByteDelta(a,b: byte): byte; inline;
 var
@@ -76,11 +62,11 @@ begin
 	{take advantage of 256 wrap around on bytes}
 	delta := int32(b)-a;
 	if delta > 128 then
-		exit(funkyNeg(delta-256))
+		exit(negEncode(delta-256))
   else if delta < -127 then
-	  exit(funkyNeg(delta+256))
+	  exit(negEncode(delta+256))
   else
-  	exit(funkyNeg(delta));
+  	exit(negEncode(delta));
 end;
 
 function applyByteDelta(a, code: byte): byte; inline;
@@ -88,7 +74,7 @@ var
 	delta: integer;
 begin
 	{$R-}
-  result := byte(a)+byte(invFunkyNeg(code));
+  result := byte(a)+byte(negDecode(code));
   {$R+} 	
 end;
 
@@ -511,10 +497,6 @@ var
   x,y: int32;
   i,j,k: integer;
 begin
-
-  {test funky neg}
-  for i := -256 to +256 do
-	  AssertEqual(invFunkyNeg(funkyNeg(i)), i);
 
   {byte deltas}
 	delta := encodeByteDelta(5,3);
