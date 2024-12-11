@@ -637,9 +637,8 @@ begin
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   if debug_dma_page_corrections > 0 then
   	warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
-  uninstall_ISR();
   stopDMAPlayback();
-  delay(10); {make sure SB has stoped reading}
+  uninstall_ISR();
   freeBuffer();
 end;
 
