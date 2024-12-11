@@ -33,66 +33,77 @@ function encodeLA96(sfx: tSoundEffect;s: tStream=nil): tStream;
 var
 	i,j: int32;
 
-  sample: pAudioSample;
-  lastValue,thisValue: int32;
-  delta: int32;
+  samplePtr: pAudioSample;
+  samplesRemaining: dword;
+
+  thisMidValue, lastMidValue, firstMidValue: int32;
+  thisDifValue, lastDifValue, firstDifValue: int32;
+
+  midCodes: array[0..1024-1] of dword;
+  difCodes: array[0..1024-1] of dword;
+
   ds: tStream;
-  codes: array[0..1024-1] of dword;
-  maxCode: dword;
+  bytes: tBytes;
 
 begin
 	
 	if not assigned(s) then s := tStream.create();
   result := s;
 
-  ds := tStream.create();
-
   if sfx.length = 0 then exit;
 
-  sample := sfx.sample;
+  samplePtr := sfx.sample;
+  samplesRemaining := sfx.length;
 
-  lastValue := sample^.left;
-  {$R-}
-  ds.writeWord(word(lastValue));
-  {$R+}
+  lastMidValue := (samplePtr^.left+samplePtr^.right) div 2;
+	lastDifValue := (samplePtr^.left-samplePtr^.right);
 
-  {1M samples, due to memory for the moment}
-  for i := 0 to 512-1 do begin
-  	maxCode := 0;
+  ds := tStream.create();
+
+  while samplesRemaining >= 1024 do begin
+
+  	{unfortunately we can not encode any final partial}
+  	
+    firstMidValue := lastMidValue;
+    firstDifValue := lastDifValue;
+
   	for j := 0 to 1024-1 do begin
     	{dividing by 2 looses quality, but only when stereo}
-	  	thisValue := (sample^.left+sample^.right) div 2;
-	    delta := thisValue - lastValue;
-	    codes[j] := negEncode(delta);
-	    lastValue := thisValue;
-	  	inc(sample);
-      maxCode := max(maxCode, codes[j]);
+	  	thisMidValue := (samplePtr^.left+samplePtr^.right) div 2;
+      thisDifValue := (samplePtr^.left-samplePtr^.right);
 
+      midCodes[j] := negEncode(thisMidValue-lastMidValue);
+      difCodes[j] := negEncode(thisDifValue-lastDifValue);
+
+	    lastMidValue := thisMidValue;
+	    lastDifValue := thisDifValue;
+
+	  	inc(samplePtr);
     end;
-    ds.writeVLCSegment(codes, PACK_ALL);
-    write(maxCode, ' ');
+
+    {prepair playload}
+    ds.reset();
+    ds.writeVLC(negEncode(firstMidValue));
+    ds.writeVLCSegment(midCodes);
+    ds.writeVLC(negEncode(firstDifValue));
+    ds.writeVLCSegment(difCodes);
+    bytes := ds.asBytes;
+
+    {write block header}
+    s.byteAlign();
+    s.writeByte($00); 					{type = 16-bit joint stereo.}
+    s.writeWord(1024); 					{number of samples}
+    s.writeWord(length(bytes)); {compressed size}
+    s.writeBytes(bytes);
+
+    bytes := nil;
+    write(samplesRemaining, ' ');
+
+    dec(samplesRemaining, 1024);
+
   end;
 
-  lastValue := sample^.right;
-  {$R-}
-  ds.writeWord(word(lastValue));
-  {$R+}
-
-  for i := 0 to 512-1 do begin
-  	maxCode := 0;
-  	for j := 0 to 1024-1 do begin
-	  	thisValue := sample^.left-sample^.right;
-	    delta := thisValue - lastValue;
-	    codes[j] := negEncode(delta);
-	    lastValue := thisValue;
-	  	inc(sample);
-      maxCode := max(maxCode, codes[j]);
-    end;
-    ds.writeVLCSegment(codes, PACK_ALL);
-    write(maxCode, ' ');
-  end;
-
-  s.writeBytes(ds.asBytes);
+  ds.Destroy;
 
   writeln(format('Encoded used %fKB',[s.len/1024]));
 
