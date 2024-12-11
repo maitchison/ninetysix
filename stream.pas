@@ -34,7 +34,7 @@ type
   protected
   	bytes: tBytes;   {length(bytes) is the capcity}
     bytesLen: dword; {bytesLen is the number of actual bytes used}
-    pos: int32;
+    pos: int32;			 {current position in stream}
     midByte: boolean;
 
   private
@@ -62,7 +62,7 @@ type
     function  VLCbits(value: dword): word; inline;
 
 		procedure writeChars(s: string);
-    procedure writeBytes(aBytes: tBytes);
+    procedure writeBytes(aBytes: tBytes;aLen:int32=-1);
 
     function  peekByte: byte; inline;
     function  peekWord: word; inline;
@@ -90,6 +90,7 @@ type
 		procedure softReset();
 
     function  asBytes: tBytes;
+    function  getBuffer: tBytes;
 
   end;
 
@@ -280,13 +281,14 @@ begin
   	writeByte(ord(s[i]));	
 end;
 
-procedure tStream.writeBytes(aBytes: tBytes);
+procedure tStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
 begin
-	if length(aBytes) = 0 then exit;
+	if aLen < 0 then aLen := length(aBytes);
+	if aLen = 0 then exit;
   if midByte then error('unaligned write bytes');
-  setLength(pos + length(aBytes));
-  move(aBytes[0], self.bytes[pos], length(aBytes));
-  inc(pos, length(aBytes));
+  setLength(pos + aLen);
+  move(aBytes[0], self.bytes[pos], aLen);
+  inc(pos, aLen);
 end;
 
 function tStream.readNibble: byte; inline;
@@ -798,6 +800,13 @@ begin
   bytesLen := 0;
   seek(0);
 end;
+
+{gets the bytes buffer}
+function tStream.getBuffer(): tBytes;
+begin	
+	exit(bytes);
+end;
+
 
 function tStream.asBytes(): tBytes;
 begin

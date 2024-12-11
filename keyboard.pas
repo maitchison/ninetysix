@@ -121,9 +121,9 @@ const
 procedure initKeyboard;
 procedure closeKeyboard;
 function keyDown(code: byte): boolean;
+function keyDownNoCheck(code: byte): boolean; inline;
 function readkey: char;
 function keyPressed: boolean;
-
 
 implementation
 
@@ -177,6 +177,11 @@ var
 function keyDown(code: byte): boolean;
 begin
 	if dosKey then Error('Key query without keyboard init.');
+  exit(keyPress[code]);
+end;
+
+function keyDownNoCheck(code: byte): boolean; inline;
+begin
   exit(keyPress[code]);
 end;
 

@@ -55,6 +55,7 @@ function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 implementation
 
 uses
+	keyboard, {stub}
 	sbdriver;
 
 var
@@ -145,6 +146,27 @@ begin
    end;
 end;
 
+function fakeULAW(value: int32): int32;
+var
+	sign: int32;
+  x,y: single;
+const
+	MU = 256-1;
+  INV_LOG1P_MU = 0.18021017998;
+begin
+  if value < 0 then sign := -1 else sign := 1;
+  x := value / (256*32*1024); 						// normalize to -1 to 1
+  y := sign * ln(1+MU*abs(x)) / ln(1+MU); // encode (output is also -1 to 1)}
+  y := trunc(y*128) / 128;								// encode as 8bit, including sign
+  x := sign * (power(1 + MU, abs(y)) - 1) / MU;	// decode	
+  result := round(x*256*32*1024);					// we're mixing in 24.8
+end;
+
+function fake8Bit(value: int32): int32;
+begin
+	exit(value div 65536 * 65536);
+end;
+
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 var
   sfx: tSoundEffect;
@@ -193,6 +215,19 @@ begin
 	    end;
 	  end;
   end;
+
+  {stub: simulate 8 bit}
+  if keyDownNoCheck(key_8) then
+  	for i := 0 to bufSamples-1 do begin  	
+			scratchBufferI32[i].left := fake8Bit(scratchBufferI32[i].left);
+			scratchBufferI32[i].right := fake8Bit(scratchBufferI32[i].right);
+    end;
+  {stub: simulate u-law}
+  if keyDownNoCheck(key_u) then
+  	for i := 0 to bufSamples-1 do begin
+			scratchBufferI32[i].left := fakeULAW(scratchBufferI32[i].left);
+		  scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
+	  end;
 
   {mix down}
   if mixer.mute then begin

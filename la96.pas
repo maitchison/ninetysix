@@ -43,7 +43,7 @@ var
   difCodes: array[0..1024-1] of dword;
 
   ds: tStream;
-  bytes: tBytes;
+  counter: int32;
 
 begin
 	
@@ -59,6 +59,7 @@ begin
 	lastDifValue := (samplePtr^.left-samplePtr^.right);
 
   ds := tStream.create();
+  counter := 0;
 
   while samplesRemaining >= 1024 do begin
 
@@ -72,6 +73,10 @@ begin
 	  	thisMidValue := (samplePtr^.left+samplePtr^.right) div 2;
       thisDifValue := (samplePtr^.left-samplePtr^.right);
 
+      {convert to 8-bit}
+      thisMidValue := thisMidValue div 256;
+      thisDifValue := thisDifValue div 256;
+
       midCodes[j] := negEncode(thisMidValue-lastMidValue);
       difCodes[j] := negEncode(thisDifValue-lastDifValue);
 
@@ -82,24 +87,23 @@ begin
     end;
 
     {prepair playload}
-    ds.reset();
+    ds.softReset();
     ds.writeVLC(negEncode(firstMidValue));
     ds.writeVLCSegment(midCodes);
     ds.writeVLC(negEncode(firstDifValue));
     ds.writeVLCSegment(difCodes);
-    bytes := ds.asBytes;
 
     {write block header}
     s.byteAlign();
     s.writeByte($00); 					{type = 16-bit joint stereo.}
     s.writeWord(1024); 					{number of samples}
-    s.writeWord(length(bytes)); {compressed size}
-    s.writeBytes(bytes);
-
-    bytes := nil;
-    write(samplesRemaining, ' ');
+    s.writeWord(ds.len); 				{compressed size}
+    s.writeBytes(ds.getBuffer, ds.len);
+    writeln('>', ds.len);
 
     dec(samplesRemaining, 1024);
+    inc(counter);
+    if counter >= 512 then break; {stub, only process first 512k samples}
 
   end;
 
