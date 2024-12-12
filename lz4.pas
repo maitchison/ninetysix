@@ -671,6 +671,7 @@ begin
       end;
 	 		block.writeEndSequence(literalBuffer.asBytes);
       literalBuffer.free;
+      map.free;
 	    exit(block.asBytes);
 	  end;
 

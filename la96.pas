@@ -1,12 +1,25 @@
-{lossless audio compression library}
+{Audio compression library}
 unit la96;
 
 {$MODE delphi}
 
 {
+
+	LA96 will eventually support the following modes
+
+	16LR Truely lossless								  1.2:1
+  16JS Nearly lossless									2.2:1
+  8JS  Sounds ok for 'retro' music			6.0:1
+
+  Mono can be stored as joint, with very little overhead.
+  Optional LZ4 layer should be around 8:1 on 8JS
+
 	Todo:
-  	make block based
-    support joint audio
+  	- decompress to 8bit audio in memory (mixer needs to support this)
+    - formally define the 'frame' codes
+    - add support for full byte packing (only 5%, maybe skip this)
+    - support lossless modes
+    - add support for a LZ4 compress layer (should be 30%, so worth it)
 }
 
 interface
@@ -44,10 +57,12 @@ var
 
   ds: tStream;
   counter: int32;
+  bytes: tBytes;
 
 begin
-	
-	if not assigned(s) then s := tStream.create();
+
+	{guess that we'll need 1 byte per sample, i.e 4:1 compression vs 16bit stereo}	
+	if not assigned(s) then s := tStream.create(sfx.length);
   result := s;
 
   if sfx.length = 0 then exit;
@@ -57,6 +72,8 @@ begin
 
   lastMidValue := (samplePtr^.left+samplePtr^.right) div 2;
 	lastDifValue := (samplePtr^.left-samplePtr^.right);
+  lastMidValue := lastMidValue div 256;
+  lastDifValue := lastDifValue div 256;
 
   ds := tStream.create();
   counter := 0;
@@ -98,19 +115,19 @@ begin
     s.writeByte($00); 					{type = 16-bit joint stereo.}
     s.writeWord(1024); 					{number of samples}
     s.writeWord(ds.len); 				{compressed size}
+
     s.writeBytes(ds.getBuffer, ds.len);
-    writeln('>', ds.len);
+
+	  write('.');
 
     dec(samplesRemaining, 1024);
     inc(counter);
-    if counter >= 512 then break; {stub, only process first 512k samples}
 
   end;
 
-  ds.Destroy;
-
+  ds.free;
+  writeln();
   writeln(format('Encoded used %fKB',[s.len/1024]));
-
 end;
 
 

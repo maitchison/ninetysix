@@ -48,6 +48,7 @@ type
   public
 
     constructor Create(aInitialCapacity: dword=0);
+    destructor Destroy();
     class function FromFile(filename: string): tStream; static;
 
   	property items[index: dword]: byte read getByte write setByte; default;
@@ -159,12 +160,18 @@ end;
 
 constructor tStream.Create(aInitialCapacity: dword=0);
 begin
-	bytes := nil;
-  pos := 0;
-  bytesLen := 0;
+	inherited Create();
   midByte := False;
   if aInitialCapacity > 0 then
-  	makeCapacity(aInitialCapacity);
+  	makeCapacity(aInitialCapacity)
+  else
+  	system.setLength(bytes, 0);
+end;
+
+destructor tStream.Destroy();
+begin
+	system.setLength(bytes, 0);
+  inherited Destroy;
 end;
 
 class function tStream.FromFile(filename: string): tStream; static;
@@ -827,6 +834,7 @@ begin
   dynamic arrays work. Also, option 1 might not work if the object tries
   to free it's memory.
   }
+
   result := nil;
   system.setLength(result, bytesLen);
   move(bytes[0], result[0], bytesLen);
