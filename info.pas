@@ -10,6 +10,9 @@ uses
 var
 	infoStr: string;
 
+type
+	tProcedure = procedure;
+
 
 procedure testInfo(name: string; description: string);
 begin
@@ -18,6 +21,20 @@ begin
 	writeln('[',name,']');
 	textAttr := $07;
 	infoStr := description;
+end;
+
+{hide debug.info for the moment}
+{todo: use debug.info, but have it print out when in text mode}
+procedure info(s: string);
+begin
+	writeln(s);
+end;
+
+{hide debug.error for the moment}
+procedure error(s: string);
+begin	
+	writeln(s);
+  halt;
 end;
 
 procedure assertTrue(testName: string; value: boolean;msg: string = '');
@@ -104,7 +121,7 @@ end;
 begin
 	testInfo(
   	'FPC Corruption',
-  	'FPC generates invalid iterals when run under limited precision emulation. Long moves will also cause corruption.'
+  	'FPC uses the FPU to perform moves. If run under limited precision FPU emulation, this results in corpution. Two concequences that come up are. 1) Programs compiled under this bug have float literals corupted. 2) Programs run under this bug have MOVE corruption.'
   );
 	d := 4;
 	asm
@@ -120,7 +137,6 @@ begin
   testMove(64);
   testMove(128);
 end;
-
 
 procedure testFloat80();
 var
@@ -151,11 +167,82 @@ begin
   assertNotEqual('80bit float is not 64bit', x-d, 0);
 end;
 
+{emulators tend to give inaccurate results for RDTSC}
+procedure testTiming();
+var
+	tick: int64;
+  startTSC, endTSC: uint64;
+  estimatedMHZ: double;
+begin
+	testInfo(
+  	'Test Timing',
+  	'RDTSC will not be accurate under emulation, so check that here.'
+  );
+	tick := getTickCount;
+  while getTickCount() = tick do;
+  if getTickCount() <> tick+1 then error('tick incremented by more than 1');
+  startTSC := getTSC;
+  while getTickCount() = tick+1 do;
+  endTSC := getTSC;
+  if getTickCount() <> tick+2 then error('tick incremented by more than 1');
+
+  if endTSC = startTSC then error('TSC did not update');
+
+  estimatedMHZ := (endTSC - startTSC) / (1/18.2065);
+
+  info(format('RDTSC runs at %fMHZ', [estimatedMHZ/1000/1000]));
+
+end;
+
+{returns seconds taken to run procedure}
+function bench(var proc: tProcedure): single;
+begin
+	proc();
+  result := 0;		
+end;
+
+{get a sense of how fast CPU is}
+procedure benchCPU();
+var	
+	s: array of single;
+  d: array of double;
+	b: array of byte;
+  i16: array of int16;
+  i32: array of int32;
+  i64: array of int64;
+  i: int32;
+
+const
+	LEN = 1024;
+begin
+	setLength(s, LEN);
+  setLength(d, LEN);
+  setLength(b, LEN);
+  setLength(i16, LEN);
+  setLength(i32, LEN);
+  setLength(i64, LEN);
+
+  for i := 0 to LEN-1 do begin
+  	s[i] := rnd;
+    d[i] := rnd;
+    b[i] := rnd;
+    i16[i] := rnd;
+    i32[i] := rnd;
+    i64[i] := rnd;
+  end;
+	
+  for i := 0 to LEN-1 do begin
+  	i32[i] := i32[i] + 5;
+  end;
+	
+end;
+
 begin
 	gotoxy(1,1);
   clrscr;
 	textAttr := $07;
 	testFloat80();
   testCompilerCorruption();
+  testTiming();
 end.
 
