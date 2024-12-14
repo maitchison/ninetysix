@@ -214,15 +214,16 @@ begin
         	// integer
           case a.VType of
 	          vtInteger: result += IntToStr(a.VInteger);
+	          vtInt64: result += IntToStr(a.VInt64^);
             vtExtended: result += IntToStr(trunc(a.VExtended^));
-            else Error('Invalid type:'+IntToStr(a.VType));
+            else Error('Invalid type for %d:'+IntToStr(a.VType));
           end;
 	      end;
       	'f': begin
         	// float
           case a.VType of
 	          vtExtended: Str(args[ArgIndex].VExtended^:0:1, s);
-            else Error('Invalid type:'+IntToStr(a.VType));
+            else Error('Invalid type for %f:'+IntToStr(a.VType));
           end;
           result += s;
 	      end;
@@ -232,13 +233,13 @@ begin
             vtString: result += string(args[ArgIndex].VString^);
             vtAnsiString: result += AnsiString(args[ArgIndex].VAnsiString);
 
-            else Error('Invalid type:'+IntToStr(a.VType));
+            else Error('Invalid type for %s:'+IntToStr(a.VType));
           end;
   	    end;
         'h': begin
         	case a.VType of
 	        	vtInteger: result += HexStr(args[ArgIndex].VInteger, 4);
-            else Error('Invalid type:'+IntToStr(a.VType));
+            else Error('Invalid type for %h:'+IntToStr(a.VType));
           end;
   	    end;
         else
