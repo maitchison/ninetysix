@@ -13,9 +13,6 @@ var
   timerStartTime: double = -1;
   timerEndTime: double = -1;
 
-type
-	tProcedure = procedure;
-
 {hide debug.error for the moment}
 procedure error(s: string);
 begin	
@@ -26,39 +23,42 @@ end;
 {------------------------------------------------------------}
 
 type tTimerMode = (
-	TM_MIPS			// reports millions of itterations per second.
+	TM_S,					// time in seconds.
+	TM_MS,				// time in milliseconds.
+	TM_MIPS,			// millions of iterations per second.
+  TM_MBPS 			// megabytes per second
 );
 
 {simple timer for measuring how long something takes}
 type tTimer = object
 	mode: tTimerMode;
 	postfix: string;
-	name: string;
-  count: int64;
+	tag: string;
+  value: int64;
 	startTime, endTime: double;
   bias: double;
 
-  constructor create();
+  constructor create(aMode: tTimerMode=TM_S; aValue: int64=1);
 
-  procedure start(aName: string='';aCount: int64=1); inline;
+  procedure start(aTag: string=''); inline;
 	function  elapsed(): double; inline;
   procedure stop(); inline;
   procedure print();
 end;
 
-constructor tTimer.create();
+constructor tTimer.create(aMode: tTimerMode=TM_S; aValue: int64=1);
 begin
-	mode := TM_MIPS;
+	mode := aMode;
+  value := aValue;
 	postfix := '';
 	startTime := -1;
   endTime := -1;
   bias := 0;
 end;
 
-procedure tTimer.start(aName: string='';aCount: int64=1); inline;
+procedure tTimer.start(aTag: string=''); inline;
 begin
-  name := aName;
-  count := aCount;
+  tag := aTag;
 	startTime := getSec();
 end;
 
@@ -76,10 +76,13 @@ end;
 
 procedure tTimer.print();
 begin
-	write(pad(name, 40));
+	write(pad(tag, 40));
   case mode of
-  	TM_MIPS: writeln(format('%fM '+POSTFIX, [(count / elapsed) / 1000 / 1000]));
-    else writeln(format('%fs', [elapsed]));
+	  TM_S: 		writeln(format('%f s', [elapsed]));
+	  TM_MS: 		writeln(format('%f ms', [elapsed*1000]));
+  	TM_MIPS: 	writeln(format('%f M '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
+  	TM_MBPS: 	writeln(format('%f MB/S '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
+    else error('Invalid timer mode');
   end;
 end;
 
@@ -227,8 +230,8 @@ begin
     fstp tbyte ptr [x]
   end;
 
-  assertNotEqual('80bit float is not 32bit', x-s, 0);
-  assertNotEqual('80bit float is not 64bit', x-d, 0);
+  assertNotEqual('80bit float is not reduced to 32bit', x-s, 0);
+  assertNotEqual('80bit float is not reduced to 64bit', x-d, 0);
 end;
 
 {waits until the start of the next tick.}
@@ -286,14 +289,51 @@ procedure benchRAM();
 var
   timer: tTimer;
   a,b: tBytes;
+  aPtr, bPtr: pointer;
 const
 	LEN = 64*1024;
 
 begin
 	setLength(a, LEN);
   setLength(b, LEN);
+  aPtr := @a[0];
+  bPtr := @b[0];
 
-	testInfo('RAM Benchmark', '' );
+  timer.create(TM_MBPS, LEN);
+
+	testInfo('RAM Benchmark', '');
+  timer.start('Move - FPC');
+  move(a[0], b[0], LEN);
+  timer.stop(); timer.print();
+
+  timer.start('Move - Loop');
+  asm
+  	pushad
+  	mov ecx, LEN
+    shr ecx, 2
+    mov esi, aPtr
+    mov edi, bPtr
+  @LOOP:
+  	mov eax, [esi]
+    mov [edi], eax
+    add edi, 4
+  	loop @LOOP
+    popad
+   end;
+  timer.stop(); timer.print();
+
+  timer.start('Move - REP STOSD');
+  asm
+  	pushad
+  	mov ecx, LEN
+    shr ecx, 2
+    mov esi, aPtr
+    mov edi, bPtr
+    rep movsd
+    popad
+   end;
+  timer.stop(); timer.print();
+
 end;
 
 {get a sense of how fast CPU is}
@@ -304,11 +344,11 @@ const
 	LEN = 1024;
 begin
 
-	timer.create();
+	timer.create(TM_MIPS, LEN);
 
 	testInfo('CPU Benchmark', '');
 
-  timer.start('Empty Loop', LEN);	
+  timer.start('Empty Loop');	
   asm
   	pushad
   	mov ecx, LEN
@@ -319,8 +359,10 @@ begin
   timer.stop(); timer.print();
 	{subtract empty loop for for all subsequent tests}
   timer.bias := timer.elapsed;
+
+  { Integer }
 	
-  timer.start('ADD (I32)', LEN);	
+  timer.start('IADD');	
   asm
   	pushad
   	mov ecx, LEN
@@ -329,9 +371,9 @@ begin
   	loop @LOOP
     popad
    end;
-   timer.stop(); timer.print();
+  timer.stop(); timer.print();
 
-  timer.start('MUL (I32)', LEN);	
+  timer.start('IMUL');	
   asm
   	pushad
   	mov ecx, LEN
@@ -340,9 +382,9 @@ begin
   	loop @LOOP
     popad
    end;
-   timer.stop(); timer.print();
+  timer.stop(); timer.print();
 
-  timer.start('DIV (I32)', LEN);	
+  timer.start('IDIV');	
   asm
   	pushad
   	mov ecx, LEN
@@ -351,8 +393,54 @@ begin
   	loop @LOOP
     popad
    end;
-   timer.stop(); timer.print();
+  timer.stop(); timer.print();
 
+	{ Float }
+	
+  timer.start('FADD');	
+  asm
+  	pushad
+  	mov ecx, LEN
+    FLD1
+    FLD1
+  @LOOP:
+  	fadd
+  	loop @LOOP
+		FSTP ST(0)
+    FSTP ST(0)
+    popad
+   end;
+  timer.stop(); timer.print();
+
+  timer.start('FMUL');	
+  asm
+  	pushad
+  	mov ecx, LEN
+    FLD1
+    FLD1
+  @LOOP:
+		fmul  	
+  	loop @LOOP
+    FSTP ST(0)		
+    FSTP ST(0)
+    popad
+   end;
+  timer.stop(); timer.print();
+
+  timer.start('FDIV');	
+  asm
+  	pushad
+  	mov ecx, LEN
+    FLD1
+    FLD1
+  @LOOP:
+		fdiv
+  	loop @LOOP
+    FSTP ST(0)	
+    FSTP ST(0)
+    popad
+   end;
+  timer.stop(); timer.print();
 
 end;
 
@@ -437,6 +525,7 @@ begin
 	textAttr := $07;
   printCpuInfo();
 	benchCPU();
+  benchRAM();
   testFloat80();
   testCompilerCorruption();
   testTiming();
