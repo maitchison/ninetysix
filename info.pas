@@ -10,9 +10,80 @@ uses
 
 var
 	infoStr: string;
+  timerStartTime: double = -1;
+  timerEndTime: double = -1;
 
 type
 	tProcedure = procedure;
+
+{hide debug.error for the moment}
+procedure error(s: string);
+begin	
+	writeln(s);
+  halt;
+end;
+
+{------------------------------------------------------------}
+
+type tTimerMode = (
+	TM_MIPS			// reports millions of itterations per second.
+);
+
+{simple timer for measuring how long something takes}
+type tTimer = object
+	mode: tTimerMode;
+	postfix: string;
+	name: string;
+  count: int64;
+	startTime, endTime: double;
+  bias: double;
+
+  constructor create();
+
+  procedure start(aName: string='';aCount: int64=1); inline;
+	function  elapsed(): double; inline;
+  procedure stop(); inline;
+  procedure print();
+end;
+
+constructor tTimer.create();
+begin
+	mode := TM_MIPS;
+	postfix := '';
+	startTime := -1;
+  endTime := -1;
+  bias := 0;
+end;
+
+procedure tTimer.start(aName: string='';aCount: int64=1); inline;
+begin
+  name := aName;
+  count := aCount;
+	startTime := getSec();
+end;
+
+function tTimer.elapsed(): double; inline;
+begin
+	if startTime = -1 then error('Please call timer.start first');
+	if endTime = -1 then error('Please call timer.stop first');
+	result := (endTime - startTime) - bias;
+end;
+
+procedure tTimer.stop(); inline;
+begin
+	endTime := getSec();
+end;
+
+procedure tTimer.print();
+begin
+	write(pad(name, 40));
+  case mode of
+  	TM_MIPS: writeln(format('%fM '+POSTFIX, [(count / elapsed) / 1000 / 1000]));
+    else writeln(format('%fs', [elapsed]));
+  end;
+end;
+
+{------------------------------------------------------------}
 
 procedure testInfo(name: string; description: string);
 begin
@@ -28,13 +99,6 @@ end;
 procedure info(s: string);
 begin
 	writeln(s);
-end;
-
-{hide debug.error for the moment}
-procedure error(s: string);
-begin	
-	writeln(s);
-  halt;
 end;
 
 procedure assertTrue(testName: string; value: boolean;msg: string = '');
@@ -212,53 +276,84 @@ begin
 
 end;
 
-{returns seconds taken to run procedure}
-function bench(var proc: tProcedure): single;
-begin
-	proc();
-  result := 0;		
-end;
-
-{get a sense of how fast CPU is}
-procedure benchCPU();
-var	
-	s: array of single;
-  d: array of double;
-	b: array of byte;
-  i16: array of int16;
-  i32: array of int32;
-  i64: array of int64;
-  i: int32;
-
-const
-	LEN = 1024;
-begin
-	setLength(s, LEN);
-  setLength(d, LEN);
-  setLength(b, LEN);
-  setLength(i16, LEN);
-  setLength(i32, LEN);
-  setLength(i64, LEN);
-
-  for i := 0 to LEN-1 do begin
-  	s[i] := rnd;
-    d[i] := rnd;
-    b[i] := rnd;
-    i16[i] := rnd;
-    i32[i] := rnd;
-    i64[i] := rnd;
-  end;
-	
-  for i := 0 to LEN-1 do begin
-  	i32[i] := i32[i] + 5;
-  end;
-	
-end;
-
 procedure showFlag(flag: string; value: string); overload;
 begin
 	textAttr := $07;
 	writeln(pad(flag,40), value);
+end;
+
+procedure benchRAM();
+var
+  timer: tTimer;
+  a,b: tBytes;
+const
+	LEN = 64*1024;
+
+begin
+	setLength(a, LEN);
+  setLength(b, LEN);
+
+	testInfo('RAM Benchmark', '' );
+end;
+
+{get a sense of how fast CPU is}
+procedure benchCPU();
+var
+  timer: tTimer;
+const
+	LEN = 1024;
+begin
+
+	timer.create();
+
+	testInfo('CPU Benchmark', '');
+
+  timer.start('Empty Loop', LEN);	
+  asm
+  	pushad
+  	mov ecx, LEN
+  @LOOP:
+  	loop @LOOP
+    popad
+   end;
+  timer.stop(); timer.print();
+	{subtract empty loop for for all subsequent tests}
+  timer.bias := timer.elapsed;
+	
+  timer.start('ADD (I32)', LEN);	
+  asm
+  	pushad
+  	mov ecx, LEN
+  @LOOP:
+  	add eax, eax
+  	loop @LOOP
+    popad
+   end;
+   timer.stop(); timer.print();
+
+  timer.start('MUL (I32)', LEN);	
+  asm
+  	pushad
+  	mov ecx, LEN
+  @LOOP:
+  	imul eax
+  	loop @LOOP
+    popad
+   end;
+   timer.stop(); timer.print();
+
+  timer.start('DIV (I32)', LEN);	
+  asm
+  	pushad
+  	mov ecx, LEN
+  @LOOP:
+  	idiv eax
+  	loop @LOOP
+    popad
+   end;
+   timer.stop(); timer.print();
+
+
 end;
 
 procedure showFlag(flag: string; value: boolean); overload;
@@ -341,9 +436,9 @@ begin
   clrscr;
 	textAttr := $07;
   printCpuInfo();
+	benchCPU();
   testFloat80();
   testCompilerCorruption();
   testTiming();
-
 end.
 
