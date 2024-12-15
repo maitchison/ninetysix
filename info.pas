@@ -4,6 +4,7 @@ program info;
 {$MODE delphi}
 
 uses
+	cpu,
 	utils,
 	crt;
 
@@ -12,7 +13,6 @@ var
 
 type
 	tProcedure = procedure;
-
 
 procedure testInfo(name: string; description: string);
 begin
@@ -255,12 +255,95 @@ begin
 	
 end;
 
+procedure showFlag(flag: string; value: string); overload;
+begin
+	textAttr := $07;
+	writeln(pad(flag,40), value);
+end;
+
+procedure showFlag(flag: string; value: boolean); overload;
+begin
+	textAttr := $07;
+	write(pad(flag, 40));
+  if value then begin
+		textAttr := $05;
+  	writeln('[YES]')
+  end else begin
+	  textAttr := $04;
+  	writeln('[NO]');
+  end;
+  textAttr := $07;
+end;
+
+function getCPUName(): string;
+var
+	reax: dword;
+  cpuName: string;
+  family, model, stepping: word;
+begin
+  if not cpu.cpuid_support then exit('');
+
+	asm
+  	pushad
+  	mov eax, 1
+    cpuid
+    mov [reax], eax
+    popad
+	  end;	
+  		
+  family := (reax shr 8) and $f;
+  model := (reax shr 4) and $f;
+  stepping :=(reax shr 0) and $f;
+
+  case family of
+  	3: cpuName := '386';
+  	4: case model of
+    	0,1,4: cpuName := '486DX';
+    	2: cpuName := '486SX';
+    	3: cpuName := '486DX2';
+    	5: cpuName := '486SX2';
+    	7: cpuName := '486DX4';
+    	else cpuName := '486';
+    end;
+  	5: case model of
+    	3: cpuName := 'Pentium Overdrive';
+    	4: cpuName := 'Pentium MMX';
+      else cpuName := 'Pentium';
+    end;
+  	6: case model of
+    	1: cpuName := 'Pentium Pro';
+    	3: cpuName := 'Pentium II';
+    	6: cpuName := 'Pentium III';
+    	else cpuName := 'Pentium Pro/II/III';
+    end;
+    else cpuName := 'Unknown ('+intToStr(family)+')';
+  end;
+	result := cpuName;
+end;
+
+procedure printCpuInfo();
+var
+  cpuBrand: string;
+begin	
+	cpuBrand := cpu.CPUBrandString;
+  if cpuBrand = '' then cpuBrand := '<blank>';
+	showFlag('CPUID' ,cpu.cpuid_support);
+  showFlag('CPU Name' ,getCPUName());
+  showFlag('CPU Brand' ,cpuBrand);
+  showFlag('CMOV', cpu.CMOVSupport);
+  showFlag('MMX', cpu.MMXSupport);
+  showFlag('SSE3', cpu.SSE3Support);
+  showFlag('AVX', cpu.AVXSupport);
+end;
+
 begin
 	gotoxy(1,1);
   clrscr;
 	textAttr := $07;
-	testFloat80();
+  printCpuInfo();
+  testFloat80();
   testCompilerCorruption();
   testTiming();
+
 end.
 
