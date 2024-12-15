@@ -231,12 +231,14 @@ begin
   end;
   assertEqual('FILD Move', a, b);
   asm
-  	fldpi	
+  	fld1
+    fld1
+    fadd
+    fsqrt    	
     fst dword ptr [s]
     fst qword ptr [d]
     fstp tbyte ptr [x]
   end;
-
   assertNotEqual('80bit float is not reduced to 32bit', x-s, 0);
   assertNotEqual('80bit float is not reduced to 64bit', x-d, 0);
 end;
