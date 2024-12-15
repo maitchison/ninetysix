@@ -5,6 +5,7 @@ program info;
 
 uses
 	cpu,
+  mmx,
 	utils,
 	crt;
 
@@ -25,8 +26,9 @@ end;
 type tTimerMode = (
 	TM_S,					// time in seconds.
 	TM_MS,				// time in milliseconds.
+	TM_CYCLES,		// estimated number of cycles per iteration.
 	TM_MIPS,			// millions of iterations per second.
-  TM_MBPS 			// megabytes per second
+  TM_MBPS 			// megabytes per second.
 );
 
 {simple timer for measuring how long something takes}
@@ -80,6 +82,7 @@ begin
   case mode of
 	  TM_S: 		writeln(format('%f s', [elapsed]));
 	  TM_MS: 		writeln(format('%f ms', [elapsed*1000]));
+	  TM_CYCLES:writeln(format('~%f cycles', [elapsed/value*(getEstimatedMHZ*1000*1000)]));
   	TM_MIPS: 	writeln(format('%f M '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
   	TM_MBPS: 	writeln(format('%f MB/S '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
     else error('Invalid timer mode');
@@ -188,7 +191,11 @@ end;
 begin
 	testInfo(
   	'FPC Corruption',
-  	'FPC uses the FPU to perform moves. If run under limited precision FPU emulation, this results in corpution. Two concequences that come up are. 1) Programs compiled under this bug have float literals corupted. 2) Programs run under this bug have MOVE corruption.'
+  	'FPC uses the FPU to perform moves. '+
+    'If run under limited precision FPU emulation, this results in corpution.' +
+    'Two concequences that come up are. '+
+    '1) Programs compiled under this bug have float literals corupted.'+
+    '2) Programs run under this bug have MOVE corruption'
   );
 	d := 4;
 	asm
@@ -442,6 +449,21 @@ begin
    end;
   timer.stop(); timer.print();
 
+  {this should be just a few cycles}
+  timer.mode := TM_CYCLES;
+  timer.start('EMMS');	
+  asm
+  	pushad
+  	mov ecx, LEN
+  @LOOP:
+		emms	
+
+  	loop @LOOP
+    popad
+   end;
+  timer.stop(); timer.print();
+
+
 end;
 
 procedure showFlag(flag: string; value: boolean); overload;
@@ -508,14 +530,10 @@ procedure printCpuInfo();
 var
   cpuBrand: string;
 begin	
-	cpuBrand := cpu.CPUBrandString;
-  if cpuBrand = '' then cpuBrand := '<blank>';
 	showFlag('CPUID' ,cpu.cpuid_support);
   showFlag('CPU Name' ,getCPUName());
-  showFlag('CPU Brand' ,cpuBrand);
-  showFlag('CMOV', cpu.CMOVSupport);
-  showFlag('MMX', cpu.MMXSupport);
-  showFlag('SSE3', cpu.SSE3Support);
+  showFlag('MMX', mmx.is_mmx_cpu);
+  showFlag('SSE', mmx.is_sse_cpu);
   showFlag('AVX', cpu.AVXSupport);
 end;
 

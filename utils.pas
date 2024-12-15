@@ -104,9 +104,9 @@ function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
 function  fileModifiedTime(fileName: string): longint;
 
-function  GetTickCount(): int64;
-function  GetMSCount(): int64;
-
+function  getTickCount(): int64;
+function  getMSCount(): int64;
+function 	getEstimatedMHZ: double;
 
 implementation
 
@@ -770,6 +770,11 @@ begin
 	result := IntToStr(h, 2) + sep + IntToStr(m, 2) + sep + IntToStr(s, 2);
 end;
 
+{returns the estimated clock rate of the machine.}
+function getEstimatedMHZ: double;
+begin
+  result := (1.0 / INV_CLOCK_FREQ) / 1000 / 1000;
+end;
 
 {-------------------------------------------------------------------}
 
@@ -823,6 +828,7 @@ begin
 	updateRDTSCRate();
   programStartTSC := getTSC();
   SEED := 97;
+  info(format('Estimated clock rate %fMHZ',[getEstimatedMHZ]));
 end;
 
 begin
