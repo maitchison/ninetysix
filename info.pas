@@ -5,7 +5,9 @@ program info;
 
 uses
 	cpu,
+  {$IFDEF VER3_2_2}
   mmx,
+  {$ENDIF}
 	utils,
 	crt;
 
@@ -20,6 +22,10 @@ begin
 	writeln(s);
   halt;
 end;
+
+{will be set later}
+var
+	HAS_MMX: boolean = false;
 
 {------------------------------------------------------------}
 
@@ -462,20 +468,19 @@ begin
   timer.stop(); timer.print();
 
   {this should be just a few cycles}
-  timer.mode := TM_CYCLES;
-  timer.start('EMMS');	
-  asm
-  	pushad
-  	mov ecx, LEN
-  @LOOP:
-		emms	
-
-  	loop @LOOP
-    popad
-   end;
-  timer.stop(); timer.print();
-
-
+  if HAS_MMX then begin
+	  timer.mode := TM_CYCLES;
+	  timer.start('EMMS');	
+	  asm
+	  	pushad
+	  	mov ecx, LEN
+	  @LOOP:
+			emms	
+	  	loop @LOOP
+	    popad
+	   end;
+	  timer.stop(); timer.print();
+	end;
 end;
 
 procedure showFlag(flag: string; value: boolean); overload;
@@ -545,8 +550,15 @@ begin
 	testInfo('CPUINFO','');
 	showFlag('CPUID' ,cpu.cpuid_support);
   showFlag('CPU Name' ,getCPUName());
+  {$IFDEF VER3_2_2}
+  HAS_MMX := mmx.is_mmx_cpu;
   showFlag('MMX', mmx.is_mmx_cpu);
   showFlag('SSE', mmx.is_sse_cpu);
+  {$ELSE}
+  HAS_MMX := cpu.MMXSupport;
+  showFlag('MMX', cpu.MMXSupport);
+  showFlag('SSE3', cpu.SSE3SUpport);
+  {$ENDIF}
   showFlag('AVX', cpu.AVXSupport);
 end;
 
