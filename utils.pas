@@ -118,10 +118,9 @@ var
 	SEED: byte;
   programStartTSC: uint64 = 0;
 
-const
-	CLOCK_FREQ = 166*1000*1000;	
-  INV_CLOCK_FREQ: double = 1.0 / CLOCK_FREQ;
-
+var
+	{updated on initialization, but fall back to 166MHZ on error}
+  INV_CLOCK_FREQ: double = 1.0/(166*1000*1000);
 
 {----------------------------------------------------------}
 
@@ -774,7 +773,24 @@ end;
 
 {-------------------------------------------------------------------}
 
-procedure UnitTests();
+procedure updateRDTSCRate();
+var
+	tick: int64;
+  startTSC, endTSC: uint64;
+begin
+	tick := getTickCount();
+  while getTickCount() = tick do;
+  startTSC := getTSC;
+  while getTickCount() = tick+1 do;
+  endTSC := getTSC;
+  if (endTSC = startTSC) then
+  	warn(format('RDTSC seems to not be working, assuming default of %fMHZ', [(1/INV_CLOCK_FREQ)/1000/1000]))
+  else
+	  INV_CLOCK_FREQ := (1/18.2065) / (endTSC - startTSC);
+end;
+
+
+procedure runTests();
 var
 	a,b: string;
 begin
@@ -802,8 +818,14 @@ begin
 
 end;
 
+procedure initUtils;
 begin
-	programStartTSC := getTSC();
-	SEED := 97;
-	UnitTests();
+	updateRDTSCRate();
+  programStartTSC := getTSC();
+  SEED := 97;
+end;
+
+begin
+	initUtils();
+	runTests();
 end.

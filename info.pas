@@ -128,7 +128,7 @@ begin
   	fld qword ptr [d]
     fistp a
   end;
-  assertEqual('No literal coruption bug', a, 4);
+  assertEqual('No literal corruption bug', a, 4);
 
   testMove(1);
   testMove(4);
@@ -167,30 +167,48 @@ begin
   assertNotEqual('80bit float is not 64bit', x-d, 0);
 end;
 
+{waits until the start of the next tick.}
+procedure waitForNextTick();
+var
+	tick: int64;
+begin
+	tick := getTickCount();
+  while getTickCount() = tick do;
+  if getTickCount() <> tick+1 then error('tick incremented by more than 1');
+end;
+
 {emulators tend to give inaccurate results for RDTSC}
 procedure testTiming();
 var
-	tick: int64;
   startTSC, endTSC: uint64;
+  startSec, endSec: double;
+  startTick, endTick: double;
   estimatedMHZ: double;
 begin
 	testInfo(
   	'Test Timing',
   	'RDTSC will not be accurate under emulation, so check that here.'
   );
-	tick := getTickCount;
-  while getTickCount() = tick do;
-  if getTickCount() <> tick+1 then error('tick incremented by more than 1');
+  waitForNextTick();
   startTSC := getTSC;
-  while getTickCount() = tick+1 do;
+  waitForNextTick();
   endTSC := getTSC;
-  if getTickCount() <> tick+2 then error('tick incremented by more than 1');
 
   if endTSC = startTSC then error('TSC did not update');
 
   estimatedMHZ := (endTSC - startTSC) / (1/18.2065);
 
   info(format('RDTSC runs at %fMHZ', [estimatedMHZ/1000/1000]));
+
+  {Measure time using both RDTSC and TickCounter, and make sure we don't drift}
+  waitForNextTick();
+  startTick := getTickCount() * 0.0549254;
+  startSec := getSec();
+  delay(1000);
+  endTick := getTickCount() * 0.0549254;
+  endSec := getSec();
+
+  info(format('RDTSC drift is %f%%', [(100 * (endSec-startSec) / (endTick-startTick)) - 100]));
 
 end;
 
