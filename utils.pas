@@ -86,6 +86,7 @@ function bytesToSanStr(bytes: tBytes): string;
 function strToInt(s: string): int64;
 function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
+function lpad(s: string;len: int32;padding: char=' '): string;
 function split(s: string; c: char; var left: string; var right: string): boolean;
 
 function negDecode(x: dword): int32; inline;
@@ -480,6 +481,15 @@ begin
   	s += padding;
   result := s;
 end;
+
+
+function lpad(s: string;len: int32;padding: char=' '): string;
+begin
+	while length(s) < len do
+  	s := padding + s;
+  result := s;
+end;
+
 function split(s: string; c: char; var left: string; var right: string): boolean;
 var
 	charPos: int32;

@@ -28,6 +28,7 @@ type tTimerMode = (
 	TM_MS,				// time in milliseconds.
 	TM_CYCLES,		// estimated number of cycles per iteration.
 	TM_MIPS,			// millions of iterations per second.
+  TM_MIPS_CYCLES,	// show both MIPS and cycle estimate.
   TM_MBPS 			// megabytes per second.
 );
 
@@ -77,13 +78,22 @@ begin
 end;
 
 procedure tTimer.print();
+var
+	cycles: string;
+  mips: string;
 begin
+
 	write(pad(tag, 40));
+
+  cycles := lpad(format('~%f', [elapsed/value*(getEstimatedMHZ*1000*1000)]), 6)+' cycles';
+  mips := lpad(format('%f', [(value / elapsed) / 1000 / 1000]), 6)+' M';
+
   case mode of
 	  TM_S: 		writeln(format('%f s', [elapsed]));
 	  TM_MS: 		writeln(format('%f ms', [elapsed*1000]));
-	  TM_CYCLES:writeln(format('~%f cycles', [elapsed/value*(getEstimatedMHZ*1000*1000)]));
-  	TM_MIPS: 	writeln(format('%f M '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
+    TM_CYCLES: writelN(cycles);
+  	TM_MIPS: 	writeln(mips); 	
+  	TM_MIPS_CYCLES: writeln(cycles + ' ' + mips);
   	TM_MBPS: 	writeln(format('%f MB/S '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
     else error('Invalid timer mode');
   end;
@@ -353,10 +363,11 @@ const
 	LEN = 1024;
 begin
 
-	timer.create(TM_MIPS, LEN);
+	timer.create(TM_MIPS_CYCLES, LEN);
 
 	testInfo('CPU Benchmark', '');
 
+	{subtract empty loop for for all subsequent tests}
   timer.start('Empty Loop');	
   asm
   	pushad
@@ -365,8 +376,7 @@ begin
   	loop @LOOP
     popad
    end;
-  timer.stop(); timer.print();
-	{subtract empty loop for for all subsequent tests}
+  timer.stop();
   timer.bias := timer.elapsed;
 
   { Integer }
@@ -532,6 +542,7 @@ procedure printCpuInfo();
 var
   cpuBrand: string;
 begin	
+	testInfo('CPUINFO','');
 	showFlag('CPUID' ,cpu.cpuid_support);
   showFlag('CPU Name' ,getCPUName());
   showFlag('MMX', mmx.is_mmx_cpu);
