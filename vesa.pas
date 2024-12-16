@@ -14,6 +14,9 @@ uses
   vga;
 
 type tVesaDriver = class(tVGADriver)
+    fMappedPhysicalAddress: dword;
+  protected
+    procedure allocateLFB(physicalAddress:dWord);
   public
     procedure setMode(width, height, BPP: word); override;
     procedure setLogicalSize(width, height: word); override;
@@ -56,7 +59,7 @@ type TVesaModeInfo = packed record
   not_used: array[1..205] of byte;
 end;
 
-type TVesaInfo = packed record
+type tVesaInfo = packed record
   {----------- VBE 1.0 -----------------}
   Signature: array[1..4] of Char;
   Version: Word;
@@ -72,7 +75,7 @@ type TVesaInfo = packed record
 end;
 
 var
-  VesaInfo: TVesaInfo;
+  vesaInfo: tVesaInfo;
   Regs: tRealRegs;
   dosSel, dosSeg: word;
 
@@ -127,25 +130,38 @@ end;
 
 {----------------------------------------------------------------}
 
+procedure tVesaDriver.allocateLFB(physicalAddress: dword);
+const
+  {S3 says we have a 64MB window here (even if only 4MB ram)}
+  VIDEO_MEMORY = 64*1024*1024;
+var
+  linearAddress: dword;
+begin
+
+  {Map to linear}
+  linearAddress := get_linear_addr(physicalAddress, VIDEO_MEMORY);
+
+  {Set Permissions}
+  fLFB_SEG := Allocate_LDT_Descriptors(1);
+  if not set_segment_base_address(fLFB_SEG, LinearAddress) then
+    error('Error setting LFB segment base address.');
+  if not set_segment_limit(fLFB_SEG, VIDEO_MEMORY-1) then
+    error('Error setting LFB segment limit.');
+
+  info('Mapped LFB to segment $' + HexStr(fLFB_SEG, 4));
+  fMappedPhysicalAddress := physicalAddress;
+
+end;
+
 {Set graphics mode. Once complete the framebuffer can be accessed via
  the LFB pointer}
 procedure tVesaDriver.setMode(width, height, bpp: word);
 var
   i: integer;
-
-  VesaModes: array[0..64] of word;
-  Mode: word;
-  Rights: dword;
-
-  PhysicalAddress: dword;
-  LinearAddress: dword;
-
-  didWork: boolean;
-
-const
-  {S3 says we have a 64MB window here (even if only 4MB ram)}
-  VIDEO_MEMORY = 64*1024*1024;
-
+  vesaModes: array[0..63] of word;
+  mode: word;
+  rights: dword;
+  physicalAddress: dWord;
 begin
 
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
@@ -153,7 +169,7 @@ begin
   {vesa stuff}
   dosAlloc(dosSel, dosSeg, 512);
   VesaInfo.Signature := 'VBE2';
-  dosmemput(dosSeg, 0, VesaInfo, sizeof(VesaInfo));
+  dosmemput(dosSeg, 0, vesaInfo, sizeof(vesaInfo));
 
   with regs do begin
     ax := $4F00;
@@ -162,16 +178,17 @@ begin
     realintr($10, regs);
   end;
 
-  DosMemGet(dosSeg, 0, VesaInfo, sizeof(TVesaInfo));
+  DosMemGet(dosSeg, 0, vesaInfo, sizeof(tVesaInfo));
 
   { get list of video modes }
+  {todo: this looks wrong}
   DosMemGet(
     word(VesaInfo.VideoModePtr shr 16),
     word(VesaInfo.VideoModePtr),
-    VesaModes, sizeof(VesaModes));
+    vesaModes, sizeof(vesaModes));
 
   Mode := 0;
-  for i := 0 to length(VesaModes) do begin
+  for i := 0 to length(VesaModes)-1 do begin
     if VesaModes[i] = $FFFF then break;
     with getModeInfo(VesaModes[i]) do begin
       if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
@@ -184,7 +201,6 @@ begin
   if Mode = 0 then
     Error(Format('Error: graphics mode %dx%dx%d not available.', [width,height,bpp]));
 
-
   {Set mode}
   with regs do begin
     ax := $4F02;
@@ -195,21 +211,21 @@ begin
   dosFree(dosSel);
 
   {Find our physical address}
-  PhysicalAddress := dword(getModeInfo(mode).PhysBasePtr);
-  if PhysicalAddress <> $E0000000 then
+  physicalAddress := dword(getModeInfo(mode).PhysBasePtr);
+  if physicalAddress <> $E0000000 then
     Warn('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
 
-  {Map to linear}
-  LinearAddress := get_linear_addr(PhysicalAddress, VIDEO_MEMORY);
-
-  {Set Permissions}
-  fLFB_SEG := Allocate_LDT_Descriptors(1);
-  if not set_segment_base_address(fLFB_SEG, LinearAddress) then
-    Error('Error setting LFB segment base address.');
-  if not set_segment_limit(fLFB_SEG, VIDEO_MEMORY-1) then
-    Error('Error setting LFB segment limit.');
-
-  Info('Mapped LFB to segment $' + HexStr(fLFB_SEG, 4));
+  if fMappedPhysicalAddress = 0 then begin
+    {allocate for the first time}
+    allocateLFB(physicalAddress);
+  end else if fMappedPhysicalAddress <> physicalAddress then begin
+    {address moved, this is a bit weird}
+    Warn(format(
+      'Physical address moved, was at $%s and is now at $%s $',
+      [hexStr(fMappedPhysicalAddress, 8), hexStr(physicalAddress, 8)]
+    ));
+    allocateLFB(physicalAddress);
+  end;
 
   fPhysicalWidth := width;
   fPhysicalHeight := height;
