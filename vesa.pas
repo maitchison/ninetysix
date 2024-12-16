@@ -126,7 +126,9 @@ end;
 
 constructor tVesaDriver.create();
 begin
+  inherited create();
   vesaInfo := getVesaInfo();
+  logInfo();
 end;
 
 procedure tVesaDriver.logInfo();
@@ -143,7 +145,7 @@ end;
 procedure tVesaDriver.logModes();
 var
   i: integer;
-  vesaModes: array[0..63] of word;
+  vesaModes: array[0..64] of word;
   postfix: string;
 begin
   dosMemGet(
@@ -189,19 +191,21 @@ function tVesaDriver.getVesaInfo(): tVesaInfo;
 var
   sel,seg: word;
   regs: tRealRegs;
+  info: tVesaInfo;
 begin
-  fillchar(result, sizeof(result), 0);
+  fillchar(info, sizeof(info), 0);
   dosAlloc(sel, seg, 512);
-  result.Signature := 'VBE2';
-  dosmemput(seg, 0, result, sizeof(vesaInfo));
+  info.signature := 'VBE2';
+  dosmemput(seg, 0, info, sizeof(info));
   with regs do begin
     ax := $4F00;
     es := seg;
     di := 0;
     realintr($10, regs);
   end;
-  dosMemGet(seg, 0, result, sizeof(tVesaInfo));
+  dosMemGet(seg, 0, info, sizeof(info));
   dosFree(sel);
+  result := info;
 end;
 
 {Set graphics mode. Once complete the framebuffer can be accessed via
@@ -209,7 +213,7 @@ end;
 procedure tVesaDriver.setMode(width, height, bpp: word);
 var
   i: integer;
-  vesaModes: array[0..63] of word;
+  vesaModes: array[0..64] of word;
   mode: word;
   rights: dword;
   physicalAddress: dWord;
@@ -217,6 +221,8 @@ var
   dosSeg, dosSel: word;
 begin
 
+  {stub:}
+  writeln('self',hexStr(dword(self), 8));
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
 
   { get list of video modes }
@@ -257,7 +263,7 @@ begin
     allocateLFB(physicalAddress);
   end else if mappedPhysicalAddress <> physicalAddress then begin
     {address moved, this is a bit weird}
-    Warn(format(
+    warn(format(
       'Physical address moved, was at $%s and is now at $%s $',
       [hexStr(mappedPhysicalAddress, 8), hexStr(physicalAddress, 8)]
     ));
@@ -303,7 +309,6 @@ begin
     mov cx, [x]
     mov dx, [y]
 
-
     int $10
     popa
   end;
@@ -313,12 +318,4 @@ end;
 {----------------------------------------------------------------}
 
 begin
-
-{
-var
-  vesaInfo: tVesaInfo;
-  Regs: tRealRegs;
-  dosSel, dosSeg: word;
-
-}
 end.

@@ -50,7 +50,7 @@ type
 
 implementation
 
-uses utils;
+uses debug, utils;
 
 {--------------------------------------------------------}
 
@@ -185,6 +185,9 @@ var
   a,b: tRect;
   r: tRect;
 begin
+
+  note('[test] Graph2d');
+
   r := tRect.create(10,10,50,50);
   AssertEqual(r.toString, '(10,10 50x50)');
 

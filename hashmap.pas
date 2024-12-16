@@ -44,6 +44,8 @@ function hashD2W(key: dword): word; register; inline; assembler;
 
 implementation
 
+uses debug;
+
 {----------------------------------------}
 
 function hashW2B(x:word): byte; register; inline; assembler;
@@ -254,6 +256,8 @@ procedure runTests();
 var
   map: tSparseMap;
 begin
+
+  note('[test] Hashmap');
 
   map := tSparseMap.create();
   assertEqual(map.getValue(97), 0);

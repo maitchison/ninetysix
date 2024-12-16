@@ -768,7 +768,7 @@ begin
   {clipping}
   if word(y) >= self.Height then exit;
   if x1 < 0 then x1 := 0;
-  if x2 > self.Width then x2 := self.Width;
+  if x2 > self.width then x2 := self.width;
   count := x2-x1;
   if count <= 0 then exit;
 
@@ -783,9 +783,7 @@ begin
   {alpha blending path}
   asm
 
-    push esi
-    push edi
-    push ecx
+    pushad
 
     mov esi, self
 
@@ -846,9 +844,7 @@ begin
     dec ecx
     jnz @LOOP
 
-    pop ecx
-    pop esi
-    pop edi
+    popad
 
     emms
 

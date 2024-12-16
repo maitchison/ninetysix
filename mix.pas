@@ -74,7 +74,9 @@ var
 procedure clipAndConvert_MMX(bufSamples:int32);
 var
   srcPtr, dstPtr, noisePtr: pointer;
+  x: byte;
   FPUState: array[0..108-1] of byte; {$ALIGN 16}
+  y: byte;
 begin
 
   srcPtr := @scratchBufferI32[0];
@@ -87,8 +89,8 @@ begin
 
     pushad
 
-    lea eax, FPUState
-    fsave [eax]
+    fsave FPUState
+    fwait
 
     mov ecx, bufSamples
     mov esi, srcPtr
@@ -118,11 +120,9 @@ begin
     dec ecx
     jnz @LOOP
 
-    lea eax, FPUState
-    frstor [eax]
+    frstor FPUState
 
     popad
-
   end;
 
 end;

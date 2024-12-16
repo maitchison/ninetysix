@@ -54,7 +54,7 @@ procedure PrintLog(maxEntries: integer=20);
 
 function GetIOError(code: word): string;
 
-procedure Assert(condition: boolean; msg: string);
+procedure Assert(condition: boolean; msg: string='');
 procedure RunError(code: word);
 procedure RunErrorSkipFrame(code: word);
 
@@ -81,6 +81,7 @@ end;
 procedure Log(s: string; level: byte=LOG_NOTE);
 var
   Entry: TLogEntry;
+  isText: boolean;
 begin
   SetLength(LogEntries, LogCount+1);
 
@@ -91,12 +92,12 @@ begin
   {Save to memory}
   LogEntries[LogCount] := entry;
   {Write to disk}
-  If WRITE_TO_LOG and LogFileOpen then begin
+  If WRITE_TO_LOG and logFileOpen then begin
     writeln(logFile, entry.time.YYMMDD + ' ' +entry.time.HHMMSS + ' ' + entry.toString);
     flush(logFile);
   end;
 
-  if WRITE_TO_SCREEN then begin
+  if WRITE_TO_SCREEN and assigned(videoDriver) and videoDriver.isText then begin
     writeln(entry.toString);
   end;
 
@@ -124,7 +125,7 @@ begin
   Log(s, LOG_INFO);
 end;
 
-procedure Assert(condition: boolean; msg: string);
+procedure Assert(condition: boolean; msg: string='');
 begin
   if not condition then
     Error('Assertion failure:' + msg);

@@ -5,7 +5,9 @@ unit Vertex;
 
 interface
 
-uses utils;
+uses
+  debug,
+  utils;
 
 type V2D = record
     x, y: single;
@@ -352,6 +354,9 @@ const
   degrees45 = 0.785398; {45 degrees in radians}
 
 begin
+
+  note('[test] Vertex');
+
   p := V3D.create(rnd,rnd,rnd);
   p := p.normed();
   pInitial := p;

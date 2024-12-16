@@ -8,7 +8,6 @@ uses
   graph2d,
   graph32,
   utils,
-  vga,
   lc96;
 
 type
@@ -22,9 +21,9 @@ type
   end;
 
 
-  TFont = object
-    bitmap: TPage;
-    chars: array[0..255] of TChar;
+  tFont = object
+    bitmap: tPage;
+    chars: array[0..255] of tChar;
     {a bit wasteful... but I'll just take the hit}
     {note: this means fonts should be passed by reference}
     {todo: put this and chars both on the heep}
@@ -166,4 +165,3 @@ begin
   Info('[init] Font');
   font1 := LoadFont('res/font');
 end.
-

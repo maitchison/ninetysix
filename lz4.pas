@@ -1267,6 +1267,7 @@ end;
 
 procedure runTests();
 begin
+  note('[test] LZ4');
   runTests_BPE();
   runTests_LZ4();
 end;

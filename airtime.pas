@@ -23,7 +23,6 @@ uses
   screen,
   mix,
   font,
-  s3,
   sound;
 
 var
@@ -43,8 +42,6 @@ var
   frameCount: dword = 0;
 
   carDrawTime: double = 0;
-
-  S3D: tS3Driver;
 
 procedure mainLoop(); forward;
 
@@ -399,6 +396,7 @@ begin
 
   while True do begin
 
+
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
@@ -429,14 +427,14 @@ end;
 
 begin
 
+  note('Units have loaded');
+
   loadResources();
 
   videoDriver := tVesaDriver.create();
   videoDriver.setMode(640,480,32);
 
-  S3D := tS3Driver.create();
   screen.create();
-
   mixer.play(music);
 
   initMouse();

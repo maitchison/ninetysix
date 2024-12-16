@@ -48,7 +48,7 @@ type
   public
 
     constructor Create(aInitialCapacity: dword=0);
-    destructor Destroy();
+    destructor Destroy(); override;
     class function FromFile(filename: string): tStream; static;
 
     property items[index: dword]: byte read getByte write setByte; default;
@@ -879,6 +879,8 @@ const
   {this will get packed}
   testData3: array of dword = [15, 14, 0, 15, 15, 12, 11];
 begin
+
+  note('[test] Stream');
 
   {check pack and unpack}
   for bits := 7 to 15 do begin

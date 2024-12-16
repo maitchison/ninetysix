@@ -21,7 +21,6 @@ type
  (except the direct ones)}
 procedure directNoise(s: double);
 procedure directPCMData(buffer: tWords);
-procedure playPCMData(buffer: tWords);
 
 {-----------------------------------------------------}
 
@@ -75,7 +74,6 @@ implementation
 uses
   mix,
   sound;
-
 {-----------------------------------------------------}
 
 var
@@ -92,6 +90,7 @@ var
   IS_DMA_ACTIVE: boolean = false;
   DSPVersion: byte = 0;
   dosSegment: word = 0;
+  dosOffset: word = 0;
 
 
 const
@@ -261,9 +260,9 @@ begin
     mov ax, cs:[backupDS]
     mov ds, ax
     mov es, ax
-    end;
+  end;
 
-   startTime := getSec;
+  startTime := getSec;
   inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
 
@@ -300,18 +299,19 @@ begin
 
 
   if currentBuffer then
-    bufOfs := HALF_BUFFER_SIZE
+    bufOfs := dosOffset + HALF_BUFFER_SIZE
   else
-    bufOfs := 0;
+    bufOfs := dosOffset;
 
   {Initialize the buffer with the music stream.}
   mixBuffer := nil;
 
   mixBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
+
   if (mixBuffer <> nil) then begin
     dosMemPut(dosSegment, bufOfs, mixBuffer^, HALF_BUFFER_SIZE);
   end else begin
-    dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
+    dosMemFillChar(dosSegment, bufOfs, HALF_BUFFER_SIZE, #0);
   end;
 
   if DEBUG_NOISE_ON_PAGE_CORRETION and requiredCorrection then begin
@@ -324,6 +324,7 @@ begin
       mov ecx, BUFFER_SIZE
       mov edi, dosSegment
       shl edi, 4
+      add edi, dosOffset
 
     @LOOP:
 
@@ -340,7 +341,6 @@ begin
     end;
   end;
 
-
   currentTC += HALF_BUFFER_SIZE div 4;
 
   lastChunkTime := getSec-startTime;
@@ -352,7 +352,6 @@ begin
   port[$20] := $20;
 
   asm
-
     popad
     pop gs
     pop fs
@@ -427,35 +426,6 @@ begin
   DSPWrite(hi(word(length-1)));
 end;
 
-{program DMA channel 5 for 16-bit DMA
-  length: Number of words to transfer}
-procedure programDMA(length:dword);
-var
-  len: word;
-  addr: dword;
-const
-  channel_number = 1; // DMA 5 is 16bit version of channel 1.
-begin
-
-  {note: 16bit transfers have address div 2, i.e. * 16 / 2}
-  addr := (dosSegment shl 4);
-
-  port[$D4] := $04+channel_number;  // mask DMA channel
-  port[$D8] := $00;                  // reset flipflip (any value is fine here)
-  port[$D6] := $48+channel_number;  // mode (was $48, but now $59 as channel_number=1
-
-  port[$8B] := byte(addr shr 16);    // page address, high bits of address, probably 0
-
-  port[$C4] := lo(word(addr shr 1));
-  port[$C4] := hi(word(addr shr 1));
-
-  port[$C6] := lo(word(length-1));  // length is words -1
-  port[$C6] := hi(word(length-1));
-
-  port[$D4] := $01;    // unmask DMA channel 5}
-
-end;
-
 {----------------------------------------------------------}
 
 {play noise directly (blocking) for s seconds.}
@@ -508,29 +478,6 @@ begin
   end;
 end;
 
-{play PCM audio using DMA.
-Input should be stero 16-bit, and 44.1kh.}
-procedure playPCMData(buffer: tWords);
-var
-  bytes: dword;
-  samples: dword;
-begin
-  bytes := length(buffer)*2;
-  samples := bytes div 4; {16-bit stereo}
-  if bytes > 65536 then
-    Error('Buffer too long');
-  if length(buffer) = 0 then
-    Error('Buffer is empty');
-
-  {copy to dos memory}
-  dosMemPut(dosSegment, 0, buffer[0], bytes);
-
-  programDMA(bytes shr 1);
-  startPlayback(bytes shr 1);
-
-  delay(samples*1000/44100);
-end;
-
 {Start IRQ and DMA to handle audio in background.}
 procedure initiateDMAPlayback();
 var
@@ -556,7 +503,7 @@ begin
   DSPReset();
 
   {start with an empty buffer}
-  dosMemFillWord(dosSegment, 0, BUFFER_SIZE div 2, 0);
+  dosMemFillChar(dosSegment, dosOffset, BUFFER_SIZE , #0);
 
   currentBuffer := True;
 
@@ -568,7 +515,7 @@ begin
 
   words := BUFFER_SIZE div 2;           // number of words in buffer.
   halfWords := HALF_BUFFER_SIZE div 2;  // number of words in halfbuffer.
-  addr := (dosSegment shl 4);
+  addr := (dosSegment shl 4) + dosOffset;
 
   {check address does not span 64K}
   if (addr shr 16) <> ((addr + words*2) shr 16) then
@@ -645,10 +592,11 @@ begin
   addr := (dosSegment shl 4);
   if getPage(addr) <> getPage(addr + BUFFER_SIZE) then begin
     warn('SB Buffer allocation spanned a page, so I moved it.');
-    dosSegment += (BUFFER_SIZE shr 4);
-  end;
+    dosOffset := BUFFER_SIZE;
+  end else
+    dosOffset := 0;
 
-  note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
+  note(format('Successfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR(DSPIrq);
   initiateDMAPlayback();
@@ -658,6 +606,7 @@ procedure freeBuffer();
 begin
   global_dos_free(dosSelector);
   dosSegment := 0;
+  dosOffset := 0;
   dosSelector := 0;
 end;
 

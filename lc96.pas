@@ -34,7 +34,8 @@ function encodeLC96(page: tPage;s: tStream=nil;withAlpha: boolean=False): tStrea
 
 implementation
 
-uses lz4;
+uses
+  lz4;
 
 const
   VER_BIG = 0;
@@ -497,6 +498,8 @@ var
   x,y: int32;
   i,j,k: integer;
 begin
+
+  note('[test] LC96');
 
   {byte deltas}
   delta := encodeByteDelta(5,3);

@@ -625,6 +625,9 @@ var
   x,y,i: integer;
   a,b: integer;
 begin
+
+  note('[init] Patch');
+
   for x := 0 to 3 do
     for y := 0 to 3 do
       PatchA.pixels[x,y] := RGBA.Random();

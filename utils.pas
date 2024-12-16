@@ -809,6 +809,9 @@ procedure runTests();
 var
   a,b: string;
 begin
+
+  note('[init] Utils');
+
   AssertEqual(StrToInt('123'), 123);
   AssertEqual(StrToInt('7'), 7);
   AssertEqual(Trim(' Fish'), 'Fish');
