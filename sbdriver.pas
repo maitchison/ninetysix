@@ -616,6 +616,7 @@ begin
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   if debug_dma_page_corrections > 0 then
     warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
+  DSPWrite($D3); // mute the speaker so we don't get crackle.
   stopDMAPlayback();
   uninstall_ISR();
   freeBuffer();
