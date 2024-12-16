@@ -65,6 +65,10 @@ const
 
 implementation
 
+uses
+  vga;
+
+
 function TLogEntry.ToString(): String;
 begin
   result :=
@@ -175,21 +179,7 @@ const
   MAX_FRAMES = 16;
 begin
 
-  {Set text mode if needed}
-  asm
-
-    mov ax, $0F00
-    int $10
-
-    cmp al, $03
-    je @SKIP
-
-    mov ax,$03
-    int $10
-
-  @SKIP:
-  end;
-
+  if assigned(videoDriver) then videoDriver.setText();
 
   Writeln('An error has occured!');
 

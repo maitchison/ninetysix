@@ -118,7 +118,6 @@ begin
   pixels := canvas.pixels;
 
   for y := rect.top to rect.bottom-1 do begin
-    {todo: one asm loop}
     ofs := (rect.left + (y * canvas.width))*4;
     len := rect.width;
     asm
@@ -140,7 +139,6 @@ begin
       pop esi
       pop edi
       pop es
-
     end;
   end;
 end;
@@ -159,7 +157,7 @@ begin
 
   pixels := canvas.pixels;
   ofs := (x1 + (y * canvas.width))*4;
-  len := (x2-x1)+1;
+  len := x2-x1; {todo: check this is right}
   if len <= 0 then exit;
 
   asm
@@ -204,6 +202,7 @@ begin
   if len <= 0 then exit;
 
   asm
+    pushad
     push edi
     push esi
     push eax
@@ -222,6 +221,7 @@ begin
     pop eax
     pop esi
     pop edi
+    popad
     end;
 end;
 
@@ -315,7 +315,6 @@ begin
 end;
 
 {-------------------------------------------------}
-
 
 begin
   dirtyRegion := tRect.create(0,0);

@@ -195,7 +195,6 @@ begin
 
   vel += tractionForce * (elapsed/mass);
 
-
   {-----------------------------------}
   {drag
     constant is static resistance
@@ -369,7 +368,7 @@ var
 begin
   note('Main loop started');
 
-  videoDriver.setMode(400,300,32);
+  videoDriver.setMode(320,240,32);
   videoDriver.setLogicalSize(1024,480);
 
   screen.reset();

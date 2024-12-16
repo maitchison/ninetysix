@@ -58,7 +58,7 @@ type
   end;
 
 var
-  videoDriver: tVideoDriver;
+  videoDriver: tVideoDriver = nil;
 
 implementation
 
@@ -161,7 +161,7 @@ begin
     mov ax, $1112
     mov bl, 0
     int $10
-  end else
+  end;
 end;
 
 {--------------------------------------------------------------}

@@ -953,7 +953,7 @@ end;
 procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 begin
   if (a.r <> b.r) or (a.g <> b.g) or (a.b <> b.b) or (a.a <> b.a) then
-    assertError(Format('Colors do not match, expecting %s but found %s %s', [a.toString, b.toString,msg]));
+    assertError(Format('Colors do not match, expecting %s but found %s %s', [a.toString, b.toString, msg]));
 end;
 
 procedure assertEqual(a, b: tPage); overload;
