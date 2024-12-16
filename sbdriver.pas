@@ -347,7 +347,7 @@ begin
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
-  if SB_INT >= $70 then
+  if SB_IRQ >= 8 then
     port[$A0] := $20;
   port[$20] := $20;
 
@@ -391,8 +391,8 @@ begin
   irqStopMask := 1 shl (SB_IRQ mod 8);
   irqStartMask := not IRQStopMask;
 
-  get_pm_interrupt(SB_IRQ, oldIntVec);
-  set_pm_interrupt(SB_IRQ, newIntVec);
+  get_pm_interrupt(SB_INT, oldIntVec);
+  set_pm_interrupt(SB_INT, newIntVec);
 
   if SB_IRQ >= 8 then
     port[$A1] := port[$A1] and IRQStartMask
@@ -411,7 +411,7 @@ begin
     port[$A1] := port[$A1] or IRQStopMask
   else
     port[$21] := port[$21] or IRQStopMask;
-  set_pm_interrupt(SB_IRQ, oldIntVec);
+  set_pm_interrupt(SB_INT, oldIntVec);
   hasInstalledInt := false;
 end;
 
