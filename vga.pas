@@ -48,7 +48,7 @@ type
     procedure setLogicalSize(width, height: word); virtual; abstract;
     procedure setDisplayStart(x, y: word); virtual; abstract;
     procedure setText(); virtual; abstract;
-
+    function  isText(): boolean;
   end;
 
   tVGADriver = class(tVideoDriver)
@@ -120,6 +120,12 @@ begin
   result := fLFB_SEG;
 end;
 
+function tVideoDriver.isText(): boolean;
+begin
+  {educated guess}
+  result := (fPhysicalWidth * fPhysicalHeight) < 32000;
+end;
+
 {--------------------------------------------------------------}
 { tVGADriver }
 {--------------------------------------------------------------}
@@ -137,7 +143,6 @@ begin
     self.fLogicalWidth := width;
     self.fLogicalHeight := height;
     self.fBpp := bpp;
-    self.fLFB_SEG := 0;
   end else begin
     error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
   end;
@@ -145,6 +150,7 @@ end;
 
 procedure tVGADriver.setText();
 begin
+
   {set mode, but only if we have to}
   asm
     mov ax, $0F00
@@ -155,13 +161,21 @@ begin
     int $10
   @SKIP:
   end;
-  if USE_80x50 then
-  asm
-    {switch to 8x8 font}
-    mov ax, $1112
-    mov bl, 0
-    int $10
-  end;
+
+  if USE_80x50 then begin
+    asm
+      {switch to 8x8 font}
+      mov ax, $1112
+      mov bl, 0
+      int $10
+    end;
+    fPhysicalHeight := 50;
+  end else
+    fPhysicalHeight := 25;
+
+  fPhysicalWidth := 80;
+  fLogicalWidth := fPhysicalWidth;
+  fLogicalHeight := fPhysicalHeight;
 end;
 
 {--------------------------------------------------------------}
