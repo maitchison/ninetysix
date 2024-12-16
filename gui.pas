@@ -5,14 +5,14 @@ Unit gui;
 interface
 
 uses
-	debug,
+  debug,
   font,
   sprite,
   lc96,
-	graph32;
+  graph32;
 
 var
-	panelSprite: tSprite = nil;
+  panelSprite: tSprite = nil;
   frameSprite: tSprite = nil;
 
 procedure GUILabel(page: tPage; atX, atY: integer; s: string);
@@ -21,12 +21,12 @@ implementation
 
 procedure GUILabel(page: tPage; atX, atY: integer; s: string);
 var
-	padX, padY: integer;
+  padX, padY: integer;
 begin
-	if not assigned(panelSprite) or not assigned(frameSprite) then
-  	error('Tried to draw gui component before InitGUI called.');
+  if not assigned(panelSprite) or not assigned(frameSprite) then
+    error('Tried to draw gui component before InitGUI called.');
 
-	FrameSprite.NineSlice(page, atX, atY, 300, 22);
+  FrameSprite.NineSlice(page, atX, atY, 300, 22);
   atX += panelSprite.border.left;
   atY += panelSprite.border.top;
   {Custom positioning}
@@ -38,7 +38,7 @@ end;
 
 procedure InitGui();
 begin
-	info('[init] GUI');
+  info('[init] GUI');
 
   panelSprite := tSprite.Create(LoadLC96('res/panel.p96'));
   panelSprite.Border := tBorder.Create(2,2,2,2);
@@ -49,5 +49,5 @@ begin
 end;
 
 begin
-	initGui();
+  initGui();
 end.

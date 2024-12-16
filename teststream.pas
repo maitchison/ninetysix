@@ -1,17 +1,17 @@
 uses
-	test,
-	stream,
+  test,
+  stream,
   utils;
 
 var
-	startTime, endTime: double;
+  startTime, endTime: double;
 
 
 
 begin
 
 
-	runBenchmark();
+  runBenchmark();
   runTests();
 
 end.

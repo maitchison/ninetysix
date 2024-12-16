@@ -6,17 +6,17 @@ unit vga;
 interface
 
 uses
-	debug,
+  debug,
   utils,
-	go32,
+  go32,
   graph2d,
   crt;
 
 type
-	tVideoDriver = class
-  	
+  tVideoDriver = class
+
   protected
-  	{the resolution of the screen}
+    {the resolution of the screen}
     fPhysicalWidth,fPhysicalHeight:word;
     {logical dimensions, which may be larger when uing fullscreen scrolling}
     fLogicalWidth,fLogicalHeight:word;
@@ -31,39 +31,39 @@ type
     function getLFB_SEG: word;
 
   public
-  	constructor create();
+    constructor create();
 
     property width:word read getLogicalWidth;
     property height:word read getLogicalHeight;
 
     property logicalWidth:word read getLogicalWidth;
     property logicalHeight:word read getLogicalHeight;
-		property physicalWidth:word read getPhysicalWidth;
+    property physicalWidth:word read getPhysicalWidth;
     property physicalHeight:word read getPhysicalHeight;
 
-		property BPP:word read getBPP;
-		property LFB_SEG:word read getLFB_SEG;
+    property BPP:word read getBPP;
+    property LFB_SEG:word read getLFB_SEG;
 
-  	procedure setMode(width, height, BPP: word); virtual; abstract;
+    procedure setMode(width, height, BPP: word); virtual; abstract;
     procedure setLogicalSize(width, height: word); virtual; abstract;
     procedure setDisplayStart(x, y: word); virtual; abstract;
     procedure setText(); virtual; abstract;
 
   end;
 
-	tVGADriver = class(tVideoDriver)
-  	{basic VGA driver}
-  	procedure setMode(width, height, BPP: word); override;
+  tVGADriver = class(tVideoDriver)
+    {basic VGA driver}
+    procedure setMode(width, height, BPP: word); override;
     procedure setText(); override;
   end;
 
 var
-	videoDriver: tVideoDriver;
+  videoDriver: tVideoDriver;
 
 implementation
 
 CONST
-	USE_80x50: boolean = True;
+  USE_80x50: boolean = True;
 
 
 var
@@ -82,9 +82,9 @@ var
 
 constructor tVideoDriver.create();
 begin
-	fPhysicalWidth := 0;
+  fPhysicalWidth := 0;
   fPhysicalHeight := 0;
-	fLogicalWidth := 0;
+  fLogicalWidth := 0;
   fLogicalHeight := 0;
   fBPP := 0;
   fLFB_SEG := 0;
@@ -92,32 +92,32 @@ end;
 
 function tVideoDriver.getPhysicalWidth: word;
 begin
-	result := fPhysicalWidth;
+  result := fPhysicalWidth;
 end;
 
 function tVideoDriver.getPhysicalHeight: word;
-begin	
-	result := fPhysicalHeight;
+begin
+  result := fPhysicalHeight;
 end;
 
 function tVideoDriver.getLogicalWidth: word;
 begin
-	result := fLogicalWidth;
+  result := fLogicalWidth;
 end;
 
 function tVideoDriver.getLogicalHeight: word;
-begin	
-	result := fLogicalHeight;
+begin
+  result := fLogicalHeight;
 end;
 
 function tVideoDriver.getBPP: word;
 begin
-	result := fBPP;
+  result := fBPP;
 end;
 
 function tVideoDriver.getLFB_SEG: word;
 begin
-	result := fLFB_SEG;
+  result := fLFB_SEG;
 end;
 
 {--------------------------------------------------------------}
@@ -126,20 +126,20 @@ end;
 
 procedure tVGADriver.setMode(width, height, bpp: word);
 begin
-	{VGA knows only one mode}
-	if (width = 320) and (height = 200) and (bpp = 8) then begin
-  	asm
-    	mov ax, $0013
+  {VGA knows only one mode}
+  if (width = 320) and (height = 200) and (bpp = 8) then begin
+    asm
+      mov ax, $0013
       int $10
       end;
-	  self.fPhysicalWidth := width;
-	  self.fPhysicalHeight := height;
-	  self.fLogicalWidth := width;
-	  self.fLogicalHeight := height;
-	  self.fBpp := bpp;
-	  self.fLFB_SEG := 0;      	
+    self.fPhysicalWidth := width;
+    self.fPhysicalHeight := height;
+    self.fLogicalWidth := width;
+    self.fLogicalHeight := height;
+    self.fBpp := bpp;
+    self.fLFB_SEG := 0;
   end else begin
-  	error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
+    error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
   end;
 end;
 
@@ -147,18 +147,18 @@ procedure tVGADriver.setText();
 begin
   {set mode, but only if we have to}
   asm
-  	mov ax, $0F00
+    mov ax, $0F00
     int $10
     cmp al, $03
-    je @SKIP  	
-		mov ax,$03
-	  int $10
+    je @SKIP
+    mov ax,$03
+    int $10
   @SKIP:
-	end;
+  end;
   if USE_80x50 then
-	asm
-  	{switch to 8x8 font}
-  	mov ax, $1112
+  asm
+    {switch to 8x8 font}
+    mov ax, $1112
     mov bl, 0
     int $10
   end else
@@ -167,5 +167,5 @@ end;
 {--------------------------------------------------------------}
 
 begin
-	videoDriver := tVGADriver.create();
+  videoDriver := tVGADriver.create();
 end.

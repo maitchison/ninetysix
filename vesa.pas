@@ -6,19 +6,19 @@ unit vesa;
 interface
 
 uses
-	test,
-	debug,
+  test,
+  debug,
   utils,
   graph2d,
-	go32,
-	vga;
+  go32,
+  vga;
 
 type tVesaDriver = class(tVGADriver)
-	public	
-		procedure setMode(width, height, BPP: word); override;
+  public
+    procedure setMode(width, height, BPP: word); override;
     procedure setLogicalSize(width, height: word); override;
     procedure setDisplayStart(x, y: word); override;
-	end;
+  end;
 
 implementation
 
@@ -48,7 +48,7 @@ type TVesaModeInfo = packed record
   NumberOfImagePanes: byte;
   Reserved1: byte;
   // direct color data}
-	colorData: array[1..9] of byte;
+  colorData: array[1..9] of byte;
   {Vesa 2.0}
   PhysBasePtr: Pointer;
   OffScreenMemOffset: dword;
@@ -58,7 +58,7 @@ end;
 
 type TVesaInfo = packed record
   {----------- VBE 1.0 -----------------}
-	Signature: array[1..4] of Char;
+  Signature: array[1..4] of Char;
   Version: Word;
   OemStringPtr: dWord;
   Capabilities: dWord;
@@ -74,7 +74,7 @@ end;
 var
   VesaInfo: TVesaInfo;
   Regs: tRealRegs;
-	dosSel, dosSeg: word;
+  dosSel, dosSeg: word;
 
 {Alllocates dos memory
 seg:ofs, where ofs is always 0.
@@ -82,29 +82,29 @@ selector can be used to free the memory.
 }
 procedure dosAlloc(var selector: word; var segment: word; size: longint);
 var
-	ptr: longint;
+  ptr: longint;
 begin
-	ptr := global_dos_alloc(size);
+  ptr := global_dos_alloc(size);
   selector := word(ptr);
   segment := word(ptr shr 16);
 end;
 
 procedure dosFree(selector: word);
 begin
-	global_dos_free(selector);
+  global_dos_free(selector);
 end;
 
 
 function getModeInfo(mode: word): TVesaModeInfo;
 var
-	regs: tRealRegs;
+  regs: tRealRegs;
   sel, seg: word;
 begin
 
   dosAlloc(sel, seg, sizeof(TVesaModeInfo));
 
-	with regs do begin
-  	ax := $4f01;
+  with regs do begin
+    ax := $4f01;
     cx := mode;
     es := seg;
     di := 0;
@@ -121,8 +121,8 @@ end;
 {Set the display page (zero indexed)}
 procedure SetDisplayPage(page: integer);
 begin
-{	SetDisplayStart(0, SCREEN_HEIGHT*page);}
-end;	
+{  SetDisplayStart(0, SCREEN_HEIGHT*page);}
+end;
 
 
 {----------------------------------------------------------------}
@@ -143,20 +143,20 @@ var
   didWork: boolean;
 
 const
-	{S3 says we have a 64MB window here (even if only 4MB ram)}
-	VIDEO_MEMORY = 64*1024*1024;
+  {S3 says we have a 64MB window here (even if only 4MB ram)}
+  VIDEO_MEMORY = 64*1024*1024;
 
 begin
 
-	info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
-	
+  info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
+
   {vesa stuff}
-	dosAlloc(dosSel, dosSeg, 512);
+  dosAlloc(dosSel, dosSeg, 512);
   VesaInfo.Signature := 'VBE2';
   dosmemput(dosSeg, 0, VesaInfo, sizeof(VesaInfo));
-	
-	with regs do begin
-  	ax := $4F00;
+
+  with regs do begin
+    ax := $4F00;
     es := dosSeg;
     di := 0;
     realintr($10, regs);
@@ -174,20 +174,20 @@ begin
   for i := 0 to length(VesaModes) do begin
     if VesaModes[i] = $FFFF then break;
     with getModeInfo(VesaModes[i]) do begin
-    	if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
+      if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
         mode := VesaModes[i];
         break
       end;
-	  end;
+    end;
   end;
 
   if Mode = 0 then
-  	Error(Format('Error: graphics mode %dx%dx%d not available.', [width,height,bpp]));
+    Error(Format('Error: graphics mode %dx%dx%d not available.', [width,height,bpp]));
 
 
   {Set mode}
-	with regs do begin
-  	ax := $4F02;
+  with regs do begin
+    ax := $4F02;
     bx := mode + $4000;
     realintr($10, regs);
   end;
@@ -205,9 +205,9 @@ begin
   {Set Permissions}
   fLFB_SEG := Allocate_LDT_Descriptors(1);
   if not set_segment_base_address(fLFB_SEG, LinearAddress) then
-  	Error('Error setting LFB segment base address.');
-	if not set_segment_limit(fLFB_SEG, VIDEO_MEMORY-1) then
-	  Error('Error setting LFB segment limit.');
+    Error('Error setting LFB segment base address.');
+  if not set_segment_limit(fLFB_SEG, VIDEO_MEMORY-1) then
+    Error('Error setting LFB segment limit.');
 
   Info('Mapped LFB to segment $' + HexStr(fLFB_SEG, 4));
 
@@ -221,11 +221,11 @@ end;
 {Sets the logical screen width, allowing for smooth scrolling}
 procedure tVesaDriver.setLogicalSize(width, height: word);
 begin
-	info(format('Setting logical size: %dx%d', [width, height]));
-	asm
-  	pusha
+  info(format('Setting logical size: %dx%d', [width, height]));
+  asm
+    pusha
 
-  	mov ax, $4F06
+    mov ax, $4F06
     mov bl, $00
 
     mov cx, [width]
@@ -240,10 +240,10 @@ end;
 {Set display start address (in pixels)}
 procedure tVesaDriver.setDisplayStart(x, y: word);
 begin
-	asm
-  	pusha
+  asm
+    pusha
 
-  	mov ax, $4F07
+    mov ax, $4F07
     mov bh, $00
     mov bl, $00 // not not wait for vsync
 

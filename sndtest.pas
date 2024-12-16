@@ -1,16 +1,16 @@
 program sndTest;
 
 uses
-	la96,
+  la96,
   stream,
-	sound;
+  sound;
 
 var
-	sfx: tSoundEffect;
+  sfx: tSoundEffect;
   s: tStream;
 
 begin
-	sfx := tSoundEffect.create();
+  sfx := tSoundEffect.create();
   sfx.LoadFromWave('res\music1.wav');
   s := encodeLA96(sfx);
 

@@ -7,18 +7,18 @@ unit graph2d;
 interface
 
 uses
-	test;
+  test;
 
 type
 
-	tPoint = record
-  	x, y: int32;
+  tPoint = record
+    x, y: int32;
     class operator add(a,b: TPoint): tPoint;
     constructor Create(x, y: int32);
   end;
 
-	tRect = record
-  	x,y: int32;
+  tRect = record
+    x,y: int32;
     width, height: int32;
 
     constructor create(width, height: int32); overload;
@@ -56,13 +56,13 @@ uses utils;
 
 class operator tPoint.add(a,b: TPoint): TPoint;
 begin
-	result.x := a.x + b.x;
+  result.x := a.x + b.x;
   result.y := a.y + b.y;
 end;
 
 constructor tPoint.Create(x, y: int32);
 begin
-	self.x := x;
+  self.x := x;
   self.y := y;
 end;
 
@@ -71,7 +71,7 @@ end;
 
 constructor tRect.create(width, height: int32); overload;
 begin
-	self.x := 0;
+  self.x := 0;
   self.y := 0;
   self.width := width;
   self.height := height;
@@ -79,15 +79,15 @@ end;
 
 constructor tRect.create(left, top, width, height: int32); overload;
 begin
-	self.x := left;
-	self.y := top;
+  self.x := left;
+  self.y := top;
   self.width := width;
   self.height := height;
 end;
 
 class operator tRect.Explicit(a: TRect): ShortString;
 begin
-	result := a.toString;
+  result := a.toString;
 end;
 
 {
@@ -99,10 +99,10 @@ Note: 0 means width/height if used for x2 or y2.
 }
 class function tRect.Inset(Other: TRect;x1, y1, x2, y2: int32): TRect; static;
 begin
-	if x1 < 0 then x1 := Other.Width+x1;
-	if y1 < 0 then y1 := Other.Height+y1;
-	if x2 <= 0 then x2 := Other.Width+x2;
-	if y2 <= 0 then y2 := Other.Height+y2;
+  if x1 < 0 then x1 := Other.Width+x1;
+  if y1 < 0 then y1 := Other.Height+y1;
+  if x2 <= 0 then x2 := Other.Width+x2;
+  if y2 <= 0 then y2 := Other.Height+y2;
   result.x := x1+Other.X;
   result.y := y1+Other.Y;
   result.width := x2-x1;
@@ -113,44 +113,44 @@ end;
 
 function tRect.area: int32;
 begin
-	result := width * height;
+  result := width * height;
 end;
 
 function tRect.topLeft: TPoint;
 begin
-	result.x := left;
+  result.x := left;
   result.y := top;
 end;
 
 function tRect.bottomRight: TPoint;
 begin
-	result.x := right;
+  result.x := right;
   result.y := bottom;
 end;
 
 function tRect.top: int32; inline;
 begin
-	result := y;
+  result := y;
 end;
 
 function tRect.left: int32; inline;
 begin
-	result := x;
+  result := x;
 end;
 
 function tRect.bottom: int32; inline;
 begin
-	result := y + height;
+  result := y + height;
 end;
 
 function tRect.right: int32; inline;
 begin
-	result := x + width;
+  result := x + width;
 end;
 
 procedure tRect.clear();
 begin
-	x := 0; y := 0;
+  x := 0; y := 0;
   width := 0; height := 0;
 end;
 
@@ -158,11 +158,11 @@ end;
 if two rectangles do not intersect sets rect to (0,0,0,0)}
 procedure tRect.clip(const other: tRect);
 var
-	ox, oy: int32;
+  ox, oy: int32;
 begin
-	ox := x; oy := y;
-	x := max(x, other.x);
-	y := max(y, other.y);
+  ox := x; oy := y;
+  x := max(x, other.x);
+  y := max(y, other.y);
   width := min(width-(x-ox), other.x-x+other.width);
   height := min(height-(y-oy), other.y-y+other.height);
   if (width <= 0) or (height <= 0) then clear();
@@ -170,22 +170,22 @@ end;
 
 function tRect.isInside(x,y: int32): boolean;
 begin
-	result := (x >= left) and (y >= top) and (x < right) and (y < bottom);
+  result := (x >= left) and (y >= top) and (x < right) and (y < bottom);
 end;
 
 function tRect.toString(): string;
 begin
-	result := format('(%d,%d %dx%d)',[x,y,width,height]);
+  result := format('(%d,%d %dx%d)',[x,y,width,height]);
 end;
 
 {--------------------------------------------------}
 
 procedure runTests();
-var	
-	a,b: tRect;
+var
+  a,b: tRect;
   r: tRect;
 begin
-	r := tRect.create(10,10,50,50);
+  r := tRect.create(10,10,50,50);
   AssertEqual(r.toString, '(10,10 50x50)');
 
   a := tRect.create(0,0,50,50);
@@ -197,5 +197,5 @@ begin
 end;
 
 begin
-	runTests();
+  runTests();
 end.

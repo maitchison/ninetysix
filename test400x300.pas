@@ -2,14 +2,14 @@
 program test400x300;
 
 uses
-	vga,
-	vesa,
+  vga,
+  vesa,
   utils,
   crt;
 
 begin
-	videoDriver := tVesaDriver.create();
-	videoDriver.setMode(400,300,32);
+  videoDriver := tVesaDriver.create();
+  videoDriver.setMode(400,300,32);
   readkey;
   videoDriver.setText();
 end.

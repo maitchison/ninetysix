@@ -4,11 +4,11 @@ program airtime;
 {$MODE delphi}
 
 uses
-	vga,
+  vga,
   vesa,
   graph32,
   graph2d,
-	debug,
+  debug,
   test,
   utils,
   sbDriver,
@@ -17,22 +17,22 @@ uses
   vertex,
   sprite,
   gui,
-	lc96,
+  lc96,
   voxel,
   screen,
   mix,
   font,
   s3,
-	sound;
+  sound;
 
 var
 
-	{screen}
-	screen: tScreen;
+  {screen}
+  screen: tScreen;
 
   {resources}
   titleBackground: tSprite;
-	music: tSoundEffect;
+  music: tSoundEffect;
   trackSprite: tSprite;
   carVox: tVoxelSprite;
 
@@ -48,8 +48,8 @@ var
 procedure mainLoop(); forward;
 
 type
-	tCar = class
-  	pos: V3D;
+  tCar = class
+    pos: V3D;
     vel: V3D;
     zAngle: single;
     tilt: single;
@@ -61,27 +61,27 @@ type
 
 constructor tCar.create();
 begin
-	pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
+  pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
   vel := V3D.create(0,0,0);
-	zAngle := 0;
+  zAngle := 0;
   tilt := 0;
 end;
 
 procedure tCar.draw();
 var
-	startTime: double;
+  startTime: double;
   dx, dy: int32;
 const
   PADDING = 25;
 begin
 
-	{correct for isometric}
-	dx := round(pos.x);
-	dy := round(pos.rotated(0.955, 0,0).y);
+  {correct for isometric}
+  dx := round(pos.x);
+  dy := round(pos.rotated(0.955, 0,0).y);
 
-	if not screen.rect.isInside(dx, dy) then exit;
+  if not screen.rect.isInside(dx, dy) then exit;
 
-	startTime := getSec;
+  startTime := getSec;
   carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.5);
   carDrawTime := getSec - startTime;
   screen.markRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
@@ -91,15 +91,15 @@ end;
  elapsed time}
 function decayFactor(const decayTime: single): single;
 var
-	rate: single;
+  rate: single;
 begin
-	rate := ln(2.0) / decayTime;
+  rate := ln(2.0) / decayTime;
   result := exp(-rate*elapsed);
 end;
 
 procedure tCar.update();
 var
-	drag, coefficent: single;
+  drag, coefficent: single;
   slipAngle: single;
 
   dir: v3d;
@@ -115,28 +115,28 @@ var
   x,y: single;
 
 const
-	mass: single = 1;
+  mass: single = 1;
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
   BOUNDARY = 50;
 
 begin
 
-	dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
-	dragForce := v3d.create(0,0,0);
-	engineForce := v3d.create(0,0,0);
+  dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+  dragForce := v3d.create(0,0,0);
+  engineForce := v3d.create(0,0,0);
   lateralForce := v3d.create(0,0,0);
 
-	{process input}
-	if keyDown(key_left) then begin
-  	zAngle -= elapsed*2.5;
-  	tilt += elapsed*1.0;
+  {process input}
+  if keyDown(key_left) then begin
+    zAngle -= elapsed*2.5;
+    tilt += elapsed*1.0;
   end;
-	if keyDown(key_right) then begin
-  	zAngle += elapsed*2.5;
-  	tilt -= elapsed*1.0;
+  if keyDown(key_right) then begin
+    zAngle += elapsed*2.5;
+    tilt -= elapsed*1.0;
   end;
-	if keyDown(key_up) then
-  	engineForce := dir * 500;
+  if keyDown(key_up) then
+    engineForce := dir * 500;
 
   {movement from last rame}
   {note: we correct for isometric projection here}
@@ -159,9 +159,9 @@ begin
    decrease after a point}
   lateralForceCap := min(slipAngle, slipThreshold) * 40000;
   if keyDown(key_x) then
-  	lateralForceCap := 0;
+    lateralForceCap := 0;
   if keyDown(key_z) then
-  	lateralForceCap := 99999999999;
+    lateralForceCap := 99999999999;
 
   targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
 
@@ -173,22 +173,22 @@ begin
 
   screen.clearRegion(tRect.create(300, 300, 200, 20));
   textOut(screen.canvas, 300, 300, format('%f %f %f',[log2(1+abs(tractionForce.x)), log2(1+abs(tractionForce.y)), log2(1+tractionForce.z)]), RGBA.create(255,255,255));
-	screen.copyRegion(tRect.create(300, 300, 200, 20));
+  screen.copyRegion(tRect.create(300, 300, 200, 20));
 
- 	tractionForce := tractionForce.rotated(0,0,+zAngle);
+   tractionForce := tractionForce.rotated(0,0,+zAngle);
 
-	vel += tractionForce * (1/mass);
+  vel += tractionForce * (1/mass);
   *)
 
   {simplified model}
   targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
   tractionForce := ((targetVelocity-vel)*mass);
   if keyDown(key_x) then begin
-  	{perfect traction}
+    {perfect traction}
   end else if keyDown(key_z) then begin
-		tractionForce.clip(0) {no traction}  	
+    tractionForce.clip(0) {no traction}
   end else begin
-  	{standard traction}
+    {standard traction}
     {note: tires are usually better than engine in terms of acceleration}
     tractionForce.clip(1000);
   end;
@@ -198,27 +198,27 @@ begin
 
   {-----------------------------------}
   {drag
-  	constant is static resistance
-  	linear is rolling sitance nad internal friction
-  	quadratic is due to air resistance
+    constant is static resistance
+    linear is rolling sitance nad internal friction
+    quadratic is due to air resistance
   }
 
   (*
   drag := 30000.0 + 100.0*vel.abs + 10.0*vel.abs2;
   if (drag*elapsed/mass > vel.abs) then
-  	vel *= 0
+    vel *= 0
   else begin
-	  dragForce := vel.normed() * drag;
-	  vel -= dragForce * (elapsed/mass);
+    dragForce := vel.normed() * drag;
+    vel -= dragForce * (elapsed/mass);
   end;
   *)
 
   {again a simpler model}
   drag := 3.0 + 1.5 * vel.abs;
-	dragForce := vel.normed() * drag;
+  dragForce := vel.normed() * drag;
   dragForce *= (elapsed/mass);
   dragForce.clip(vel.abs);
-	
+
   vel -= dragForce;
 
   {-----------------------------------}
@@ -239,56 +239,56 @@ end;
 
 function loadSprite(filename: shortstring): tSprite;
 var
-	startTime: double;
+  startTime: double;
 begin
   startTime := getSec;
-	result := tSprite.create(loadLC96('res\'+filename+'.p96'));
+  result := tSprite.create(loadLC96('res\'+filename+'.p96'));
   note(format(' -loaded %s (%dx%d) in %fs', [filename, result.width, result.height, getSec-startTime]));
-end;	
+end;
 
 procedure loadResources();
 begin
 
-	note('Loading Resources.');
+  note('Loading Resources.');
 
   titleBackground := loadSprite('title');
   trackSprite := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('res\car1', 32);
-	music := tSoundEffect.create('res\music1.wav');
+  music := tSoundEffect.create('res\music1.wav');
 end;
 
 procedure drawGUI();
 var
-	fps: double;
-	tpf: double;
+  fps: double;
+  tpf: double;
   mixerCpuUsage: double;
 begin
 
-	if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
+  if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
 
   if lastChunkTime > 0 then
-		mixerCpuUsage := 100 * lastChunkTime / (HALF_BUFFER_SIZE/4/44100)  	
-	else
-  	mixerCpuUsage := -1;
+    mixerCpuUsage := 100 * lastChunkTime / (HALF_BUFFER_SIZE/4/44100)
+  else
+    mixerCpuUsage := -1;
 
-	GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
+  GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
 end;
 
 procedure titleScreen();
 var
-	thisClock, startClock, lastClock: double;
+  thisClock, startClock, lastClock: double;
   startTime: double;
   xAngle, zAngle: single; {in degrees}
   xTheta, zTheta: single; {in radians}
   k: single;
 begin
-	note('Title screen started');
+  note('Title screen started');
 
   titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
-	titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
-	titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
+  titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
+  titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
   textOut(titleBackground.page, 640-140+1, 480-25+1, 'v0.1a (09/12/2024)', RGBA.create(0,0,0));
   textOut(titleBackground.page, 640-140, 480-25, 'v0.1a (09/12/2024)', RGBA.create(250,250,250,240));
@@ -303,20 +303,20 @@ begin
 
   while True do begin
 
-  	if keyDown(key_1) then
-    	VX_GHOST_MODE := not keyDown(key_leftshift);
-  	if keyDown(key_2) then
-    	VX_SHOW_TRACE_EXITS := not keyDown(key_leftshift);
+    if keyDown(key_1) then
+      VX_GHOST_MODE := not keyDown(key_leftshift);
+    if keyDown(key_2) then
+      VX_SHOW_TRACE_EXITS := not keyDown(key_leftshift);
 
-  	{time keeping}
-  	thisClock := getSec;
+    {time keeping}
+    thisClock := getSec;
     elapsed := thisClock-lastClock;
     if keyDown(key_space) then
-    	elapsed /= 100;
+      elapsed /= 100;
     gameTime += elapsed;
     lastClock := thisClock;
     inc(frameCount);
-		
+
     {subRegion.blit(screen.canvas, 320-30, 360-30);}
 
     if mouse_b and $1 = $1 then begin
@@ -327,27 +327,27 @@ begin
       zAngle := gameTime*150;
     end;
 
-		xTheta := xAngle / 180 * 3.1415;
-		zTheta := zAngle / 180 * 3.1415;
+    xTheta := xAngle / 180 * 3.1415;
+    zTheta := zAngle / 180 * 3.1415;
 
     if mouse_b and $2 = $2 then begin
-    	{round to k-degree increments}
+      {round to k-degree increments}
       k := 45;
-			xTheta := round(xAngle/k)*k / 180 * 3.1415;
-      zTheta := round(zAngle/k)*k / 180 * 3.1415;	
+      xTheta := round(xAngle/k)*k / 180 * 3.1415;
+      zTheta := round(zAngle/k)*k / 180 * 3.1415;
     end else begin
-			xTheta := xAngle / 180 * 3.1415;
-			zTheta := zAngle / 180 * 3.1415;
+      xTheta := xAngle / 180 * 3.1415;
+      zTheta := zAngle / 180 * 3.1415;
     end;
 
     screen.clearRegion(tRect.create(320-30, 360-30, 60, 60));
 
     startTime := getSec;
-	  carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
+    carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
     carDrawTime := getSec - startTime;
     drawGUI();
 
-		screen.copyRegion(tRect.create(10, 10, 300, 25));
+    screen.copyRegion(tRect.create(10, 10, 300, 25));
     screen.copyRegion(tRect.create(320-30, 360-30, 60, 60));
 
     mixer.mute := keyDown(key_m);
@@ -355,19 +355,19 @@ begin
 
     if keyDown(key_p) and keyDown(key_l) and keyDown(key_y) then mainLoop();
 
-  	if keyDown(key_q) or keyDown(key_esc) then break;
+    if keyDown(key_q) or keyDown(key_esc) then break;
   end;
 end;
 
 procedure mainLoop();
 var
-	startClock,lastClock,thisClock: double;
+  startClock,lastClock,thisClock: double;
   startTime: double;
   car: tCar;
   camX, camY: single;
 
 begin
-	note('Main loop started');
+  note('Main loop started');
 
   videoDriver.setMode(400,300,32);
   videoDriver.setLogicalSize(1024,480);
@@ -388,11 +388,11 @@ begin
 
   while True do begin
 
-  	{time keeping}
-  	thisClock := getSec;
+    {time keeping}
+    thisClock := getSec;
     elapsed := thisClock-lastClock;
     if keyDown(key_space) then
-    	elapsed /= 100;
+      elapsed /= 100;
     gameTime += elapsed;
     lastClock := thisClock;
     inc(frameCount);
@@ -407,25 +407,25 @@ begin
 
     // not really needed
     //screen.waitVSync();
-		screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
+    screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
     screen.flipAll();
 
     drawGUI();
 
-  	if keyDown(key_q) or keyDown(key_esc) then break;
+    if keyDown(key_q) or keyDown(key_esc) then break;
   end;
 end;
 
 begin
 
-	{use svga driver}
-	videoDriver := tVesaDriver.create();
+  {use svga driver}
+  videoDriver := tVesaDriver.create();
 
   loadResources();
 
-	videoDriver.setMode(640,480,32);
+  videoDriver.setMode(640,480,32);
 
-	S3D := tS3Driver.create();
+  S3D := tS3Driver.create();
   screen.create();
 
   mixer.play(music);
@@ -433,7 +433,7 @@ begin
   initMouse();
   initKeyboard();
 
-	titleScreen();
+  titleScreen();
 
   videoDriver.setText();
   printLog();

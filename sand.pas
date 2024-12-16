@@ -7,24 +7,24 @@ simulations on a p166
 
 
 uses
-	crt,
-	graph32,
+  crt,
+  graph32,
   screen,
   time,
   graph3d;
 
 
 const
-	GRID_WIDTH = 256;
-	GRID_HEIGHT = 192;
-	CHUNK_SIZE = 16;
-	CHUNK_SHIFT = 4;
+  GRID_WIDTH = 256;
+  GRID_HEIGHT = 192;
+  CHUNK_SIZE = 16;
+  CHUNK_SHIFT = 4;
   CHUNKS_WIDTH = GRID_WIDTH div CHUNK_SIZE;
   CHUNKS_HEIGHT = GRID_HEIGHT div CHUNK_SIZE;
 
 
 type TStats = record
-	updates: int32;
+  updates: int32;
   startTime: double;
   endTime: Double;
   chunksUpdated: int32;
@@ -32,8 +32,8 @@ type TStats = record
 end;
 
 var
-	grid: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of byte;
-	timer: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of int32; {used for movement speed}
+  grid: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of byte;
+  timer: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of int32; {used for movement speed}
   speed: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of int32; {used for movement speed}
 
 
@@ -49,13 +49,13 @@ var
     ofs: int32;
 begin
 
-	if (x < 0) or (x >= 320) then exit;
-	if (y < 0) or (y >= 200) then exit;
+  if (x < 0) or (x >= 320) then exit;
+  if (y < 0) or (y >= 200) then exit;
 
-	ofs := x + (y * 320);
+  ofs := x + (y * 320);
 
-	asm
-		push es
+  asm
+    push es
     mov edi, ofs
     mov ax, LFB
     mov es, ax
@@ -69,7 +69,7 @@ begin
 
     mov es:[edi*1], eax
     pop es
-  	end
+    end
 end;
 
 procedure putPixel(x, y: int32; col:byte);
@@ -78,10 +78,10 @@ var
     ofs: int32;
 begin
 
-	if (x < 0) or (x >= 320) then exit;
-	if (y < 0) or (y >= 200) then exit;
+  if (x < 0) or (x >= 320) then exit;
+  if (y < 0) or (y >= 200) then exit;
 
-	ofs := x + (y * 320);
+  ofs := x + (y * 320);
 
   Mem[$A000:ofs] := col
 
@@ -89,34 +89,34 @@ end;
 
 procedure drawGrid();
 var
-	x,y: int32;
+  x,y: int32;
   ofs: int32;
   id: byte;
   col: byte;
 begin
-	for y := 0 to GRID_HEIGHT-1 do begin
-{  	ofs := $A0000 + y * 320;
-  	asm
+  for y := 0 to GRID_HEIGHT-1 do begin
+{    ofs := $A0000 + y * 320;
+    asm
       mov esi, ofs
       mov ecx, 255
       mov edi, y
       shl edi, 8
 
     @LOOP:
-    	mov al, es:[grid + edi]
-    	mov fs:[esi], al
+      mov al, es:[grid + edi]
+      mov fs:[esi], al
       inc esi
       inc edi
-    	dec ecx
+      dec ecx
       jnz @LOOP
 
     end;}
 
-  	for x := 0 to GRID_WIDTH-1 do begin
-    	col := 0;
+    for x := 0 to GRID_WIDTH-1 do begin
+      col := 0;
       col := col + grid[y, x];
       //col := col + chunkStatus[y shr CHUNK_SHIFT, x shr CHUNK_SHIFT] * 4;
-    	
+
       putPixel(x, y, col );
     end;
 
@@ -126,13 +126,13 @@ end;
 
 procedure initGrid();
 var
-	x,y: integer;
+  x,y: integer;
   id: byte;
 begin
-	fillchar(chunk, sizeof(chunk), 0);
-	for y := 0 to GRID_HEIGHT-1 do begin
-  	for x := 0 to GRID_WIDTH-1 do begin
-    	id := byte(round(int(Random * 1.5)));
+  fillchar(chunk, sizeof(chunk), 0);
+  for y := 0 to GRID_HEIGHT-1 do begin
+    for x := 0 to GRID_WIDTH-1 do begin
+      id := byte(round(int(Random * 1.5)));
       grid[y,x] := id;
       if (id > 0) then inc(chunk[y shr CHUNK_SHIFT, x shr CHUNK_SHIFT]);
     end;
@@ -159,26 +159,26 @@ What about with chunks?
 }
 procedure updateGrid_BASE();
 var
-	x,y: int32;
+  x,y: int32;
   id: byte;
 begin
-	for y := 126 downto 0 do begin
-  	for x := 0 to 255 do begin
-  		id := grid[y,x];
-		  if id = 0 then continue;
-		  if id = 1 then begin      	
-				if grid[y+1, x] = 0 then begin
-		  		grid[y+1, x] := grid[y, x];
-					grid[y, x] := 0;
-		    end else if (x > 0) and (grid[y+1, x-1] = 0) then begin
-		  		grid[y+1, x-1] := grid[y, x];
-					grid[y, x] := 0;
-		    end else if (x < 255) and (grid[y+1, x+1] = 0) then begin
-		  		grid[y+1, x+1] := grid[y, x];
-					grid[y, x] := 0;
-		    end;
+  for y := 126 downto 0 do begin
+    for x := 0 to 255 do begin
+      id := grid[y,x];
+      if id = 0 then continue;
+      if id = 1 then begin
+        if grid[y+1, x] = 0 then begin
+          grid[y+1, x] := grid[y, x];
+          grid[y, x] := 0;
+        end else if (x > 0) and (grid[y+1, x-1] = 0) then begin
+          grid[y+1, x-1] := grid[y, x];
+          grid[y, x] := 0;
+        end else if (x < 255) and (grid[y+1, x+1] = 0) then begin
+          grid[y+1, x+1] := grid[y, x];
+          grid[y, x] := 0;
+        end;
       end;
-	  end;
+    end;
   end;
 end;
 
@@ -211,14 +211,14 @@ it's much simpler to update when we stay within a chunk. Also, make chunks 16x16
 }
 procedure updateGrid_CHUNKS();
 var
-	cx, cy, dx, dy, x, y: int32;
+  cx, cy, dx, dy, x, y: int32;
   i: int32;
   id: byte;
 
 
-	function isLocked(cy, cx: int32): boolean; inline;
+  function isLocked(cy, cx: int32): boolean; inline;
   begin
-  	if cx < 0 then exit(true);
+    if cx < 0 then exit(true);
     if cy < 0 then exit(true);
     if cx >= CHUNKS_WIDTH then exit(true);
     if cy >= CHUNKS_HEIGHT then exit(true);
@@ -227,7 +227,7 @@ var
 
   function isFull(cy, cx: int32): boolean; inline;
   begin
-  	if cx < 0 then exit(true);
+    if cx < 0 then exit(true);
     if cy < 0 then exit(true);
     if cx >= CHUNKS_WIDTH then exit(true);
     if cy >= CHUNKS_HEIGHT then exit(true);
@@ -239,7 +239,7 @@ var
   procedure processInternalRow(y, x : int32); assembler; inline;
   asm
 
-    	mov edi, y
+      mov edi, y
       shl edi, 8
       add edi, x
       inc edi {start at x+1}
@@ -247,7 +247,7 @@ var
 
     @Loop:
 
-    	mov al, grid[edi]
+      mov al, grid[edi]
 
       cmp al, 0
       je @Done
@@ -262,7 +262,7 @@ var
       mov ax, word ptr grid[edi+256]
       cmp al, 0
       jne @SKIP_T1_DOWN
-    	mov grid[edi], 0
+      mov grid[edi], 0
       mov grid[edi+256], 1
 
       jmp @Done
@@ -272,7 +272,7 @@ var
       mov al, grid[edi+256-1]
       cmp al, 0
       jne @SKIP_T1_LEFT
-    	mov grid[edi], 0
+      mov grid[edi], 0
       mov grid[edi+256-1], 1
 
       jmp @Done
@@ -281,21 +281,21 @@ var
 
       cmp ah, 0
       jne @SKIP_T1_RIGHT
-    	mov grid[edi], 0
+      mov grid[edi], 0
       mov grid[edi+256+1], 1
 
       jmp @Done
 
     @SKIP_T1_RIGHT:
 
-			jmp @Done
+      jmp @Done
 
 
     @Skip1:
 
     @Done:
-      inc edi    	
-    	dec ecx
+      inc edi
+      dec ecx
       jnz @Loop
 
 
@@ -303,17 +303,17 @@ var
 
   {note: expects cx, cy to be set correctly}
   procedure processCell(y, x: int32); inline;
-  begin	
-		if grid[y,x] = 1 then begin
-    	{decrement timer}
-    	timer[y,x] -= speed[y,x];
+  begin
+    if grid[y,x] = 1 then begin
+      {decrement timer}
+      timer[y,x] -= speed[y,x];
       {increment speed}
       speed[y,x] += 25;
-      if (timer[y,x] > 0) then exit;	
-		
-	    if grid[y+1, x] = 0 then begin
-				grid[y, x] := 0;
-		  	grid[y+1, x] := 1;
+      if (timer[y,x] > 0) then exit;
+
+      if grid[y+1, x] = 0 then begin
+        grid[y, x] := 0;
+        grid[y+1, x] := 1;
         timer[y+1, x] := timer[y,x] + 1000;
 
         dec(chunk[cy, cx]);
@@ -321,28 +321,28 @@ var
         exit;
       end;
 
-	    if (grid[y+1, x-1] = 0) and (x > 0) then begin
-		  	grid[y+1, x-1] := 1;
-				grid[y, x] := 0;
+      if (grid[y+1, x-1] = 0) and (x > 0) then begin
+        grid[y+1, x-1] := 1;
+        grid[y, x] := 0;
         timer[y+1, x-1] := timer[y,x] + 1000;
-      	dec(chunk[cy, cx]);
+        dec(chunk[cy, cx]);
         inc(chunk[(y+1) shr CHUNK_SHIFT, (x-1) shr CHUNK_SHIFT]);
         exit;
-	    end;
-      	
-  	  if (grid[y+1, x+1] = 0) and (x < GRID_WIDTH-1) then begin
-		  	grid[y+1, x+1] := 1;
-				grid[y, x] := 0;
+      end;
+
+      if (grid[y+1, x+1] = 0) and (x < GRID_WIDTH-1) then begin
+        grid[y+1, x+1] := 1;
+        grid[y, x] := 0;
         timer[y+1, x+1] := timer[y, x] + 1000;
         dec(chunk[cy, cx]);
         inc(chunk[(y+1) shr CHUNK_SHIFT, (x+1) shr CHUNK_SHIFT]);
         exit;
-			end;
+      end;
 
-	    {sitting on something, so stop us and push other down..}
-	    speed[y+1,x] += speed[y,x];
-  	  speed[y,x] := 0;
-		
+      {sitting on something, so stop us and push other down..}
+      speed[y+1,x] += speed[y,x];
+      speed[y,x] := 0;
+
     end;
 
   end;
@@ -351,12 +351,12 @@ var
 begin
 
 
-	{calculate chunk status}
+  {calculate chunk status}
   {0.02ms}
   for cy := CHUNKS_HEIGHT-1 downto 0 do begin
     for cx := 0 to CHUNKS_WIDTH-1 do begin
-    	if chunk[cy, cx] = 0 then begin
-      	chunkStatus[cy, cx] := 0;
+      if chunk[cy, cx] = 0 then begin
+        chunkStatus[cy, cx] := 0;
         continue;
       end;
 
@@ -365,73 +365,73 @@ begin
 
       if chunk[cy, cx] = CHUNK_SIZE*CHUNK_SIZE then begin
 
-        // the cx+1 ones are wrong... as we have not checked them yet.		
+        // the cx+1 ones are wrong... as we have not checked them yet.
         {These chunks update before us, so check if they are blocked}
         if not isLocked(cy, cx-1) then continue;
         if not isLocked(cy+1, cx-1) then continue;
         if not isLocked(cy+1, cx) then continue;
         if not isLocked(cy+1, cx+1) then continue;
-				{this chunk updates after us, so just need to know if it is full}
+        {this chunk updates after us, so just need to know if it is full}
         {note: technically just the right needs to be full...}
         if not isFull(cy, cx+1) then continue;
 
-      	chunkStatus[cy, cx] := 2;      		
+        chunkStatus[cy, cx] := 2;
         continue;
       end;
 
     end;
   end;
 
-	for y := GRID_HEIGHT-2 downto 0 do begin
-	  cy := y shr CHUNK_SHIFT;
+  for y := GRID_HEIGHT-2 downto 0 do begin
+    cy := y shr CHUNK_SHIFT;
     for cx := 0 to CHUNKS_WIDTH-1 do begin
-    	if chunkStatus[cy, cx] <> 1 then begin
-      	inc(stats.chunksSkipped);
-      	continue;
+      if chunkStatus[cy, cx] <> 1 then begin
+        inc(stats.chunksSkipped);
+        continue;
       end;
       inc(stats.chunksUpdated);
       x := cx shl CHUNK_SHIFT;
 
       for i := 0 to CHUNK_SIZE-1 do
-	  		processCell(y, x+i);
+        processCell(y, x+i);
 
-			{
+      {
       if (y and (CHUNK_SIZE-1)) = (CHUNK_SIZE-1) then begin
-      	for i := 0 to CHUNK_SIZE-1 do
-	  			processCell(y, x+i);
+        for i := 0 to CHUNK_SIZE-1 do
+          processCell(y, x+i);
       end else begin
-				processCell(y, x);
+        processCell(y, x);
         processInternalRow(y, x);
-				processCell(y, x+CHUNK_SIZE-1);
-      end;}	
-      	
-	  end;
+        processCell(y, x+CHUNK_SIZE-1);
+      end;}
+
+    end;
   end;
 end;
 
 
 
 var
-	i: integer;
+  i: integer;
   msPerUpdate: double;
 
 begin
 
-	randomize();
-	init_320x200x8();
+  randomize();
+  init_320x200x8();
 
   initGrid();
 
-	drawGrid();
+  drawGrid();
 
 
   stats.startTime := getSec();
 
   for i := 0 to 400 do begin
-  	updateGrid_CHUNKS();
-	  {drawGrid(); }
-		stats.updates := stats.updates + 1;
-  end; 	
+    updateGrid_CHUNKS();
+    {drawGrid(); }
+    stats.updates := stats.updates + 1;
+  end;
 
   stats.endTime := getSec();
 
@@ -441,13 +441,13 @@ begin
 
 
   msPerUpdate := (stats.endTime - stats.startTime) * 1000 / stats.updates;
-	
+
   asm
-  	mov ax,03
+    mov ax,03
     int $10
     end;
   writeln('MS per update ', msPerUpdate:0:2);
   writeln('Chunks skipped ', (stats.chunksSkipped/(stats.chunksUpdated+stats.chunksSkipped)):0:2);
 
-  	 	
+
 end.

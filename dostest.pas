@@ -2,7 +2,7 @@
 program dosTest;
 
 begin
-	info('progam starting');
+  info('progam starting');
   sleep(100);
 
 end.

@@ -1,8 +1,8 @@
 var
-	x: single;
+  x: single;
   i: int32;
 
 begin
-	i := trunc(x);
+  i := trunc(x);
   i := integer(x);
 end.

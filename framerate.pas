@@ -3,25 +3,25 @@ program framerate;
 
 uses
 
-	utils,
-	keyboard,
-	vga, vesa,
+  utils,
+  keyboard,
+  vga, vesa,
   sbDriver,
-	screen;
+  screen;
 
 var
-	lfb_seg: word;
+  lfb_seg: word;
   counter: int32;
   rate: integer = 60;
 
 begin
-	videoDriver := tVesaDriver.create();
-	videoDriver.setMode(320,240,32);
-	videoDriver.setLogicalSize(320,480);
+  videoDriver := tVesaDriver.create();
+  videoDriver.setMode(320,240,32);
+  videoDriver.setLogicalSize(320,480);
   lfb_seg := videoDriver.LFB_SEG;
 
   asm
-  	pushad
+    pushad
     push es
 
     mov es, lfb_seg
@@ -53,13 +53,13 @@ begin
   rate := 80;
 
   while not keyDown(key_q) do begin
-  	{pass}
+    {pass}
     {videoDriver.setDisplayStart(0, counter mod 240);}
     videoDriver.setDisplayStart(0, 240);
-		if counter mod 27 = 0 then
-	    directNoise(0.01);
+    if counter mod 27 = 0 then
+      directNoise(0.01);
     if counter mod 27 = 2 then begin
-	    videoDriver.setDisplayStart(0, 0);
+      videoDriver.setDisplayStart(0, 0);
     end;
     inc(counter);
     delay(1000/rate);

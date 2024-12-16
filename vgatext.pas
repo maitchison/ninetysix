@@ -24,16 +24,16 @@ Options
 }
 
 uses
-	utils,
-	s3video,
+  utils,
+  s3video,
   mouse,
   graph32,
   crt,
   debug,
-	screen;
+  screen;
 
 var
-	c: rgba;
+  c: rgba;
   videoWords: dword;
   s3: tS3Driver;
   i: integer;
@@ -47,9 +47,9 @@ begin
 
   s3.fgColor.init(0,0,0);
 
-	for i := 0 to 100 do begin
+  for i := 0 to 100 do begin
     s3.fgColor.b := rnd;
-  	s3.fillRect(10,10,600,600);
+    s3.fillRect(10,10,600,600);
     delay(20);
   end;
 

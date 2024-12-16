@@ -4,7 +4,7 @@ unit sound;
 {$MODE delphi}
 
 {todo:
-	support load load of wave files (via getsample)
+  support load load of wave files (via getsample)
   support pitch and volume (via get sample)
   support fade and and fade out (via get sample)
 
@@ -15,44 +15,44 @@ unit sound;
 interface
 
 uses
-	test,
+  test,
   debug,
-	utils,
+  utils,
   dos,
   sbDriver;
 
 type
-	{time in samples from start of application.}
+  {time in samples from start of application.}
   tTimeCode = int64;
 
   tAudioSample = packed record
   {16 bit stereo sample}
   case byte of
-		0: (left,right: int16);
-  	1: (value: dword);
+    0: (left,right: int16);
+    1: (value: dword);
   end;
 
   pAudioSample = ^tAudioSample;
 
   tAudioSampleF32 = packed record
   {32 bit stereo sample, used for mixing}
-		left,right: single;
+    left,right: single;
   end;
   tAudioSampleI32 = packed record
   {32 bit stereo sample, used for mixing}
-		left,right: int32;
+    left,right: int32;
   end;
 
-	tSoundEffect = class
+  tSoundEffect = class
 
-  	{todo: switch back to dynamic array}
+    {todo: switch back to dynamic array}
 
-  	sample: pAudioSample;
+    sample: pAudioSample;
     length: int32;
 
     constructor create(filename: string='');
 
-  	procedure loadFromWave(filename: string);
+    procedure loadFromWave(filename: string);
     procedure loadFromLA96(filename: string);
     procedure saveToLA96(filename: string);
     procedure saveToWave(filename: string);
@@ -62,11 +62,11 @@ type
 implementation
 
 uses
-	mix;
+  mix;
 
 type
-	tWaveFileHeader = packed record
-  	fileTypeBlockID: array[0..3] of char;
+  tWaveFileHeader = packed record
+    fileTypeBlockID: array[0..3] of char;
     fileSize: dword;
     fileFormatId: array[0..3] of char;
     formatBlockID: array[0..3] of char;
@@ -80,7 +80,7 @@ type
   end;
 
   tChunkHeader = packed record
-  	chunkBlockID: array[0..3] of char;
+    chunkBlockID: array[0..3] of char;
     chunkSize: dword;
   end;
 
@@ -89,17 +89,17 @@ type
 {create soundfile, optionally loading it from disk.}
 constructor tSoundEffect.create(filename: string='');
 var
-	extension: string;
+  extension: string;
 begin
 
-	sample := nil;
+  sample := nil;
   length := 0;
 
-	extension := getExtension(filename);
+  extension := getExtension(filename);
   if extension = 'wav' then
-  	loadFromWave(filename)
+    loadFromWave(filename)
   else if extension = 'la9' then
-  	loadFromLA96(filename);
+    loadFromLA96(filename);
 end;
 
 
@@ -107,7 +107,7 @@ end;
 
 procedure tSoundEffect.loadFromWave(filename: string);
 var
-	f: file;
+  f: file;
   fileHeader: tWaveFileHeader;
   chunkHeader: tChunkHeader;
   samples: int32;
@@ -117,66 +117,66 @@ var
 
 function wordAlign(x: int32): int32;
   begin
-  	result := (x+1) div 2 * 2;
+    result := (x+1) div 2 * 2;
   end;
 
 begin
 
-	try
+  try
     fileMode := 0;
     {$I-}
-  	assign(f, filename);
+    assign(f, filename);
     reset(f,1);
     {$I+}
 
     IOError := IOResult;
-	  if IOError <> 0 then
-  		Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
+    if IOError <> 0 then
+      Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
 
 
     blockread(f, fileHeader, sizeof(fileHeader));
 
     with fileHeader do begin
-  	  if fileTypeBlockID <> 'RIFF' then
-    		Error('Invalid BlockID '+fileTypeBLockID);
+      if fileTypeBlockID <> 'RIFF' then
+        Error('Invalid BlockID '+fileTypeBLockID);
 
-  	  if fileFormatID <> 'WAVE' then
-      	Error('Invalid FormatID '+fileFormatID);
+      if fileFormatID <> 'WAVE' then
+        Error('Invalid FormatID '+fileFormatID);
 
       if formatBlockID <> 'fmt ' then
-      	Error('Invalid formatBlockID '+formatBlockID);
+        Error('Invalid formatBlockID '+formatBlockID);
 
       if numChannels <> 2 then
-      	Error('numChannels must be 2');
+        Error('numChannels must be 2');
 
       if frequency <> 44100 then
-      	Error('frequency must be 44100');
+        Error('frequency must be 44100');
 
-  	end;
+    end;
 
     {process the chunks}
     while True do begin
-  	  blockRead(f, chunkHeader, sizeof(chunkHeader));
+      blockRead(f, chunkHeader, sizeof(chunkHeader));
       with chunkHeader do begin
-      	if chunkBlockID <> 'data' then begin
-        	seek(f, wordAlign(filePos(f) + chunkSize));
+        if chunkBlockID <> 'data' then begin
+          seek(f, wordAlign(filePos(f) + chunkSize));
           continue;
         end;
         chunkWords := chunkSize div 2;
         length := min(chunkWords div 2, 16*1024*1024);
         if (length < chunkWords div 2) then
-        	warn(format('Wave file too large to read (%f MB), reading partial file.', [chunkSize/1024/1024]));
-      	sample := getMem(length*4);
+          warn(format('Wave file too large to read (%f MB), reading partial file.', [chunkSize/1024/1024]));
+        sample := getMem(length*4);
         blockRead(f, sample^, length*4);
 
         break;
       end;
     end;
 
-  finally      	
-	  close(f);
+  finally
+    close(f);
   end;
-	
+
 end;
 
 procedure tSoundEffect.loadFromLA96(filename: string);
@@ -201,5 +201,5 @@ end;
 {----------------------------------------------------------}
 
 begin
-	runTests();
+  runTests();
 end.

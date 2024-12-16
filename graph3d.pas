@@ -11,14 +11,14 @@ uses
     crt;
 
 type RGBA = packed record
-	r,g,b,a: byte;
+  r,g,b,a: byte;
 
   constructor create(r,g,b,a: byte); overload;
   constructor create(r,g,b: byte); overload;
   end;
 
 type RGBA32 = packed record
-	r,g,b,a: single;
+  r,g,b,a: single;
 
   function toRGBA(): RGBA;
   end;
@@ -47,14 +47,14 @@ implementation
 
 function clip(x: single; a,b: integer): integer;
 begin
-	if x <= a then exit(a);
+  if x <= a then exit(a);
   if x >= b then exit(b);
   result := trunc(x);
 end;
 
 constructor RGBA.create(r,g,b,a: byte); overload;
 begin
-	self.a := a;
+  self.a := a;
   self.r := r;
   self.g := g;
   self.b := b;
@@ -63,7 +63,7 @@ end;
 
 constructor RGBA.create(r,g,b: byte); overload;
 begin
-	self.a := 255;
+  self.a := 255;
   self.r := r;
   self.g := g;
   self.b := b;
@@ -72,7 +72,7 @@ end;
 
 function RGBA32.toRGBA(): RGBA;
 begin
-	result.r := clip(self.r * 255, 0, 255);
+  result.r := clip(self.r * 255, 0, 255);
   result.g := clip(self.g * 255, 0, 255);
   result.b := clip(self.b * 255, 0, 255);
   result.a := clip(self.a * 255, 0, 255);
@@ -92,10 +92,10 @@ begin
   page := LoadBMP(filename);
   for i := 0 to 63 do
     for j := 0 to 63 do begin
-    	texels[i, j].r := page.getPixel(i,j).r;
-    	texels[i, j].g := page.getPixel(i,j).g;
-    	texels[i, j].b := page.getPixel(i,j).b;
-    	texels[i, j].a := page.getPixel(i,j).a;
+      texels[i, j].r := page.getPixel(i,j).r;
+      texels[i, j].g := page.getPixel(i,j).g;
+      texels[i, j].b := page.getPixel(i,j).b;
+      texels[i, j].a := page.getPixel(i,j).a;
     end;
 end;
 

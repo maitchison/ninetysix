@@ -6,38 +6,38 @@ unit Debug;
 interface
 
 uses
-	utils,
+  utils,
   crt;
 
 var
-	oldErrorProc: Pointer;
+  oldErrorProc: Pointer;
   i: integer;
   x: byte;
 
 CONST
-	HOOK_EXIT: boolean = True;
+  HOOK_EXIT: boolean = True;
 
 CONST
-	LOG_NOTE = 1;
+  LOG_NOTE = 1;
   LOG_INFO = 2;
   LOG_WARNING = 3;
   LOG_ERROR = 4;
 
   LOG_COLOR : array[LOG_NOTE..LOG_ERROR] of byte = (
-  	LightGray, Green, Yellow, Red
+    LightGray, Green, Yellow, Red
   );
 
 type
 
-	TLogEntry = record
-		Time: TMyDateTime;
-		Msg: string;
+  TLogEntry = record
+    Time: TMyDateTime;
+    Msg: string;
     level: byte;
     function ToString(): String;
-	end;
+  end;
 
 var
-	LogEntries: array of TLogEntry;
+  LogEntries: array of TLogEntry;
   LogCount: integer;
 
   LogFile: Text;
@@ -59,7 +59,7 @@ procedure RunError(code: word);
 procedure RunErrorSkipFrame(code: word);
 
 const
-	IO_FILE_NOT_FOUND = 2;
+  IO_FILE_NOT_FOUND = 2;
   IO_PATH_NOT_FOUND = 3;
   IO_ACCESS_DENIED = 5;
 
@@ -67,21 +67,21 @@ implementation
 
 function TLogEntry.ToString(): String;
 begin
-	result :=
-  	time.YYMMDD + ' '+
+  result :=
+    time.YYMMDD + ' '+
 {todo: add time}
-{  	FormatDateTime('HH:NN', self.Time) + ' - '+}
-    self.Msg;  	
+{    FormatDateTime('HH:NN', self.Time) + ' - '+}
+    self.Msg;
 end;
 
 {write entry to log}
 procedure Log(s: string; level: byte=LOG_NOTE);
 var
-	Entry: TLogEntry;
+  Entry: TLogEntry;
 begin
-	SetLength(LogEntries, LogCount+1);
+  SetLength(LogEntries, LogCount+1);
 
-	Entry.Time := Now;
+  Entry.Time := Now;
   Entry.Msg := s;
   Entry.Level := level;
 
@@ -89,8 +89,8 @@ begin
   LogEntries[LogCount] := entry;
   {Write to disk}
   If LogFileOpen then begin
-	  WriteLn(LogFile, entry.ToString);
-	  Flush(LogFile);
+    WriteLn(LogFile, entry.ToString);
+    Flush(LogFile);
   end;
 
   Inc(LogCount);
@@ -98,68 +98,68 @@ end;
 
 procedure Warn(s: string);
 begin
-	Log(s, LOG_WARNING);
+  Log(s, LOG_WARNING);
 end;
 
 procedure Error(s: string; code: byte=100);
 begin
-	Log(s, LOG_ERROR);
+  Log(s, LOG_ERROR);
   RunErrorSkipFrame(code);
 end;
 
 procedure Note(s: string);
 begin
-	Log(s, LOG_NOTE);
+  Log(s, LOG_NOTE);
 end;
 
 procedure Info(s: string);
 begin
-	Log(s, LOG_INFO);
+  Log(s, LOG_INFO);
 end;
 
 procedure Assert(condition: boolean; msg: string);
 begin
-	if not condition then
-  	Error('Assertion failure:' + msg);
+  if not condition then
+    Error('Assertion failure:' + msg);
 end;
 
 procedure PrintLog(MaxEntries: integer = 20);
 var
-	i: integer;
+  i: integer;
   oldTextAttr: byte;
   firstEntry: integer;
 
   begin
 
-	firstEntry := LogCount-MaxEntries;
+  firstEntry := LogCount-MaxEntries;
   if firstEntry < 0 then firstEntry := 0;
 
   if firstEntry > 0 then
-  	writeln('...');
+    writeln('...');
 
-	oldTextAttr := textAttr and $0F;
-	for i := firstEntry to LogCount-1 do begin
-  	textAttr := LOG_COLOR[LogEntries[i].level];
-  	writeln(LogEntries[i].ToString());
+  oldTextAttr := textAttr and $0F;
+  for i := firstEntry to LogCount-1 do begin
+    textAttr := LOG_COLOR[LogEntries[i].level];
+    writeln(LogEntries[i].ToString());
   end;
   textAttr := oldTextAttr;
 end;
 
 procedure BasicPrintLog();
 begin
-	for i := 0 to LogCount-1 do
-  	writeln(LogEntries[i].msg);
+  for i := 0 to LogCount-1 do
+    writeln(LogEntries[i].msg);
 end;
 
 
 function GetIOError(code: word): string;
 begin
-	case code of
-  	IO_FILE_NOT_FOUND: result := 'File not found';
+  case code of
+    IO_FILE_NOT_FOUND: result := 'File not found';
     IO_PATH_NOT_FOUND: result := 'Path not found';
     IO_ACCESS_DENIED: result := 'Access Denied';
-  	else result := '('+IntToStr(code)+')';
-  end;	
+    else result := '('+IntToStr(code)+')';
+  end;
 end;
 
 
@@ -172,23 +172,23 @@ var
   RunError: string;
 
 const
-	MAX_FRAMES = 16;
+  MAX_FRAMES = 16;
 begin
 
-	{Set text mode if needed}
-	asm
+  {Set text mode if needed}
+  asm
 
-  	mov ax, $0F00
+    mov ax, $0F00
     int $10
 
     cmp al, $03
     je @SKIP
-  	
-		mov ax,$03
-	  int $10
+
+    mov ax,$03
+    int $10
 
   @SKIP:
-	end;
+  end;
 
 
   Writeln('An error has occured!');
@@ -201,8 +201,8 @@ begin
 
 
   case ErrNo of
-  	100: RunError := 'General Error (100)';
-  	215: RunError := 'Arithmetic Overflow (215)';
+    100: RunError := 'General Error (100)';
+    215: RunError := 'Arithmetic Overflow (215)';
     else RunError := 'Runtime error '+IntToStr(ErrNo);
   end;
 
@@ -218,7 +218,7 @@ begin
 
 
   if Assigned(OldErrorProc) then
-  	TErrorProc(OldErrorProc)(ErrNo, Address, Frame);
+    TErrorProc(OldErrorProc)(ErrNo, Address, Frame);
 
   Halt(ErrorCode);
 
@@ -233,23 +233,23 @@ This is needed, as the built in RunError does not call ErrorProc
 }
 procedure RunError(code: word);
 var
-	Address: CodePointer;
+  Address: CodePointer;
   Frame: Pointer;
 begin
-	asm
+  asm
   // FPC will complain that this is not a valid way to access parameters,
   // but I'm instead looking at the stack frame.
 
   // [MA] Actually this might be wrong.. need to check this out.
-	mov  eax, [ebp+4]		// get current frame pointer
+  mov  eax, [ebp+4]    // get current frame pointer
   mov  [Address], eax
 
   // get callers return address
   mov  eax, ebp
   mov  [frame], eax
-	end;
+  end;
   CustomErrorProc(code, Address, Frame);
-end;	
+end;
 
 {
 A drop-in replacement for RunError with a few changes.
@@ -258,49 +258,49 @@ Removes one entry of the stack frame.
 }
 procedure RunErrorSkipFrame(code: word);
 var
-	Address: CodePointer;
+  Address: CodePointer;
   Frame: Pointer;
 begin
-	asm
-	mov  eax, [ebp]		// get current frame pointer
-  mov  ebx, [eax]		// get caller's pointer
+  asm
+  mov  eax, [ebp]    // get current frame pointer
+  mov  ebx, [eax]    // get caller's pointer
   mov  [Frame], ebx
 
   // get callers return address
   mov  eax, [eax+4]
   mov  [Address], eax
-	end;
+  end;
   CustomErrorProc(code, Address, Frame);
-end;	
+end;
 
 
 procedure CustomExceptProc(obj: TObject; Address:CodePointer; Frame: Pointer);
 begin
-	CustomErrorProc(255, Address, Frame);
+  CustomErrorProc(255, Address, Frame);
 end;
 
 procedure ShutdownLog();
 begin
-	Info('[close] Logging');
-	Close(LogFile);
+  Info('[close] Logging');
+  Close(LogFile);
   LogFileOpen := False;
 end;
 
 
 var
-	small: integer;
+  small: integer;
 
 begin
 
-	if assigned(ExceptProc) then begin
-  	{
+  if assigned(ExceptProc) then begin
+    {
     sysutils removes runerrors, making it so that I can not hook the errorProc.
     I could try to support exceptions, but for the moment just exit.
     Also, we don't really want sysutils because...
-    	1. It's really big
+      1. It's really big
       2. It's not in the 'stuff from 1996' theme
     }
-  	warn('Sysutils has been detected, but not not compatiable with the debug unit.');
+    warn('Sysutils has been detected, but not not compatiable with the debug unit.');
   end;
 
   // Open Log File
@@ -310,14 +310,14 @@ begin
 
   if HOOK_EXIT then begin
 
-		// Install Error Hooks
-		ErrorProc := @CustomErrorProc;
-	  {This shouldn't be needed, but will help in the future if we want to
-	   support exceptions.}
-	  ExceptProc := @CustomExceptProc;
+    // Install Error Hooks
+    ErrorProc := @CustomErrorProc;
+    {This shouldn't be needed, but will help in the future if we want to
+     support exceptions.}
+    ExceptProc := @CustomExceptProc;
 
-	  // Make sure to clean up log when we shutdow.
-  	AddExitProc(@shutdownLog);
+    // Make sure to clean up log when we shutdow.
+    AddExitProc(@shutdownLog);
   end;
 
   Info('[init] Logging');

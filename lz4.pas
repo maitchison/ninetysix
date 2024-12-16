@@ -1,7 +1,7 @@
 unit LZ4;
 
 {todo:
-	Clean this unit up
+  Clean this unit up
 }
 
 {$MODE Delphi}
@@ -11,48 +11,48 @@ unit LZ4;
 interface
 
 uses
-	test,
+  test,
   debug,
-	hashmap,
-	stream,
-	utils;
+  hashmap,
+  stream,
+  utils;
 
 type
-	tCompressionProfile = record
-  	lookahead: byte; {2 for best quality, 0 for fastest}
+  tCompressionProfile = record
+    lookahead: byte; {2 for best quality, 0 for fastest}
     maxBinSize: integer; {-1 for unlimited}
   end;
 
 const
   LZ96_FAST: tCompressionProfile = (
-  	lookahead:	0;
-    maxBinSize:	1;
-  	);
-	LZ96_STANDARD: tCompressionProfile = (
-  	lookahead:	0;
-    maxBinSize:	32;
-  	);
-	LZ96_HIGH: tCompressionProfile = (
-  	lookahead:	1;
-    maxBinSize:	128;
-  	);
-	LZ96_VERYHIGH: tCompressionProfile = (
-  	lookahead:	2;
-    maxBinSize:	1024;
-  	);
+    lookahead:  0;
+    maxBinSize:  1;
+    );
+  LZ96_STANDARD: tCompressionProfile = (
+    lookahead:  0;
+    maxBinSize:  32;
+    );
+  LZ96_HIGH: tCompressionProfile = (
+    lookahead:  1;
+    maxBinSize:  128;
+    );
+  LZ96_VERYHIGH: tCompressionProfile = (
+    lookahead:  2;
+    maxBinSize:  1024;
+    );
   LZ96_MAXIMUM: tCompressionProfile = (
-  	lookahead:	2;
-    maxBinSize:	0;
-	  );
+    lookahead:  2;
+    maxBinSize:  0;
+    );
 
 type
 
   tLZ4Stream = class(tStream)
-	
-	private
-  	procedure writeVLL(value: int32);
+
+  private
+    procedure writeVLL(value: int32);
   public
-  	class function getSequenceSize(matchLength: integer;numLiterals: word): word;
+    class function getSequenceSize(matchLength: integer;numLiterals: word): word;
     procedure writeSequence(matchLength: integer;offset: word;const literals: array of byte);
     procedure writeEndSequence(const literals: array of byte);
   end;
@@ -67,12 +67,12 @@ implementation
 {---------------------------------------------------------------}
 
 const
-	MIN_MATCH_LENGTH = 4;
+  MIN_MATCH_LENGTH = 4;
   MAX_BLOCK_SIZE = 256*1024;
 
 type
-	TMatchRecord = record
-  	gain: int32;
+  TMatchRecord = record
+    gain: int32;
     length: int32;
     pos: int32;
   end;
@@ -82,35 +82,35 @@ type
 {returns the number of bytes required to encode block}
 class function tLZ4Stream.GetSequenceSize(matchLength: integer;numLiterals: word): word;
 var
-	a,b: int32;
+  a,b: int32;
   bytesRequired: word;
 begin
-	bytesRequired := 1; {for token}
+  bytesRequired := 1; {for token}
   a := numLiterals;
   b := matchLength - MIN_MATCH_LENGTH;
   {looks wrong, but is right}
   a -= 14;
   while a > 0 do begin
-  	inc(bytesRequired);
+    inc(bytesRequired);
     a -= 255;
   end;
   b -= 14;
   while b > 0 do begin
-  	inc(bytesRequired);
+    inc(bytesRequired);
     b -= 255;
   end;
 
   bytesRequired += numLiterals;
   bytesRequired += 2; {offset}
-  result := bytesRequired;	
+  result := bytesRequired;
 end;
 
 {variable length length}
 procedure tLZ4Stream.writeVLL(value: int32);
 begin
-	while True do begin
-		if value < 255 then begin
-    	writeByte(value);
+  while True do begin
+    if value < 255 then begin
+      writeByte(value);
       exit;
     end;
     writeByte(255);
@@ -120,91 +120,91 @@ end;
 
 procedure tLZ4Stream.writeEndSequence(const literals: array of byte);
 var
-	i: int32;
-	a: int32;
+  i: int32;
+  a: int32;
 begin
   if length(literals) < 1 then
-  	error('Must end on a literal');
+    error('Must end on a literal');
 
-	a := length(literals);
+  a := length(literals);
   WriteByte(min(a, 15));
   if a >= 15 then
-  	writeVLL(a-15);
+    writeVLL(a-15);
   if length(literals) > 0 then
-		for i := 0 to length(literals)-1 do
-  		writeByte(literals[i]);
+    for i := 0 to length(literals)-1 do
+      writeByte(literals[i]);
 end;
 
 procedure tLZ4Stream.writeSequence(matchLength: integer;offset: word;const literals: array of byte);
 var
-	numLiterals: word;
+  numLiterals: word;
   a,b: int32;
   i: word;
   startSize: int32;
 begin
 
-	startSize := pos;
+  startSize := pos;
 
-	{note: literals may be empty, but match and offset may not}
-	{
-	write('Block: ');
+  {note: literals may be empty, but match and offset may not}
+  {
+  write('Block: ');
   if length(literals) > 0 then
-	  for i := 0 to length(literals)-1 do
-	  	write(sanitize(literals[i]))
+    for i := 0 to length(literals)-1 do
+      write(sanitize(literals[i]))
   else
-  	write(' <empty>');
+    write(' <empty>');
   write(' + copy ', matchLength, ' bytes from ', offset);
   writeln();
   }
 
-	numLiterals := length(literals);
+  numLiterals := length(literals);
 
   if matchLength < 4 then begin
-  	writeln('Invalid match length!');  	
-  	halt;
+    writeln('Invalid match length!');
+    halt;
   end;
 
 
   a := numLiterals;
   b := matchLength-MIN_MATCH_LENGTH;
-		
+
   WriteByte(min(a, 15) + min(b,15) * 16);
   if a >= 15 then writeVLL(a-15);
 
   if length(literals) > 0 then
-		for i := 0 to length(literals)-1 do
-  		writeByte(literals[i]);
+    for i := 0 to length(literals)-1 do
+      writeByte(literals[i]);
 
   writeWord(offset);
 
   if b >= 15 then writeVLL(b-15);
 
   {make sure this worked}
-	{$IFDEF debug}
+  {$IFDEF debug}
   if (pos - startSize) <> getSequenceSize(matchLength, length(literals)) then
-  	writeln('Invalid block length!');
+    writeln('Invalid block length!');
   {$ENDIF}
 end;
 
 {Returns the number of bytes that match at given positions.
 
-	data: Bytes to match on
+  data: Bytes to match on
   a,b: Two indices into the bytes
   returns: number of bytes matched.
 }
 function MatchLength(const data: array of byte; a,b: dword): dword; inline;
 var
-	dataPtr: pointer;
+  dataPtr: pointer;
   maxLen: int32;
   tmp: dword;
 begin
-	dataPtr := @data[0];
+  dataPtr := @data[0];
   maxLen := length(data) - max(a,b);
   if maxLen = 0 then exit(0);
 asm
-	{todo: switch to compare dword?}
+  {todo: switch to compare dword?}
 
-	push esi
+  push esi
   push edi
 
   {setup}
@@ -232,12 +232,12 @@ asm
   inc eax
 
 @SKIP:
-	
+
   pop edi
   pop esi
   {eax is match length}
   mov [result], eax
-	end;
+  end;
 
 end;
 
@@ -248,7 +248,7 @@ end;
 
 function findMostFrequentPair_REF(bytes:tBytes;out freq:word): word;
 var
-	i, value: word;
+  i, value: word;
   allPairsFreq: array[0..255,0..255] of word;
 begin
   fillword(allPairsFreq, sizeof(allPairsFreq) div 2, 0);
@@ -258,9 +258,9 @@ begin
     inc(allPairsFreq[bytes[i], bytes[i+1]]);
     value := allPairsFreq[bytes[i], bytes[i+1]];
     if value > freq then begin
-    	freq := value;
+      freq := value;
       result := pWord(@bytes[i])^;
-  	end;  	
+    end;
   end;
 end;
 
@@ -284,15 +284,15 @@ begin
   allPairsPtr := @allPairsFreq;
 
   asm
-  	pushad
-  	{
+    pushad
+    {
     ax = bestFreq
     bx = pair
     cx = loop counter
     dx = count(pair)
     }
-  	xor eax, eax
-    xor ecx, ecx	
+    xor eax, eax
+    xor ecx, ecx
     mov cx, [bytesLength]
     dec ecx
     xor edx, edx
@@ -304,8 +304,8 @@ begin
 
   @LOOP:
 
-  	mov bx, [edi]				//bx <- pair
-    mov dx, [esi+ebx*2]		//dx <- count(pair)	
+    mov bx, [edi]        //bx <- pair
+    mov dx, [esi+ebx*2]    //dx <- count(pair)
     inc dx
     mov [esi+ebx*2], dx
 
@@ -317,13 +317,13 @@ begin
 
   @SKIP:
 
-  	inc edi  	
-  	dec ecx
-  	jnz @LOOP
+    inc edi
+    dec ecx
+    jnz @LOOP
 
     {
     ax is maxFreq
-		[pair] is pair
+    [pair] is pair
     }
     mov [bestFreq], ax
 
@@ -337,21 +337,21 @@ end;
 
 function replacePair(bytes: tBytes;pair:word;useByte:byte): tBytes;
 var
-	srcPtr, dstPtr, srcStopPtr: pointer;
+  srcPtr, dstPtr, srcStopPtr: pointer;
   srcLen: dword;
   actualLength: dword;
 begin
-	result := nil;
+  result := nil;
   srcLen := length(bytes);
   setLength(result, srcLen);
   srcPtr := @bytes[0];
   srcStopPtr := @bytes[srcLen-2]; {stop at penaltimate byte}
   dstPtr := @result[0];
   asm
-  	pushad
+    pushad
 
-	  mov esi, [srcPtr]
-	  mov edi, [dstPtr]
+    mov esi, [srcPtr]
+    mov edi, [dstPtr]
     mov ecx, [srcLen]
     mov bx, [pair]
     mov dl, [useByte]
@@ -362,15 +362,15 @@ begin
     dl=useByte
     }
 
-	@LOOP:
+  @LOOP:
 
-  	{could do a resonablly fast MMX check if any words match, i.e. check
+    {could do a resonablly fast MMX check if any words match, i.e. check
     4 at a time, then if one matches do them the slow way... would be fast
     for spare matches}
     {could also do a scan for the first byte I guess? but then we can't
      copy as we go}
 
-  	mov ax, [esi]
+    mov ax, [esi]
     cmp ax, bx
     jne @SKIPCODE
 
@@ -381,7 +381,7 @@ begin
 
   @SKIPCODE:
 
-  	mov [edi], al
+    mov [edi], al
     inc edi
     inc esi
     dec ecx
@@ -390,7 +390,7 @@ begin
 
     ja @LOOP
 
-  	// process final byte
+    // process final byte
     cmp ecx, 0
     je @SKIPSETLASTBYTE
 
@@ -402,7 +402,7 @@ begin
     inc esi
     inc edi
 
-	@SKIPSETLASTBYTE:
+  @SKIPSETLASTBYTE:
 
     mov eax, edi
     sub eax, [dstPtr]
@@ -424,39 +424,39 @@ begin
   pair := findMostFrequentPair(bytes, freq);
 
   if freq < minFreq then begin
-  	{it costs ~2 tokens to output the BPE code, so if we get 2 or fewer
+    {it costs ~2 tokens to output the BPE code, so if we get 2 or fewer
      matches, then this conversion is not worthwhile}
     a := -1;
     b := -1;
     exit(bytes);
   end else begin
-  	a := pair and $ff;
-  	b := pair shr 8;
+    a := pair and $ff;
+    b := pair shr 8;
   end;
 
-	result := replacePair(bytes,pair,useByte);  	
+  result := replacePair(bytes,pair,useByte);
 end;
 
 function firstFreeByte(data: tBytes): int16; pascal;
 var
-	used: array[0..255] of byte;
+  used: array[0..255] of byte;
   dataPtr: pointer;
   usedPtr: pointer;
   value: int16;
   i: integer;
   len: dword;
 begin
-	dataPtr := @data[0];
+  dataPtr := @data[0];
   usedPtr := @used;
   value := 101;
   len := length(data);
-	asm
-  	pushad
+  asm
+    pushad
 
-	{---- clear buffer ----------}
+  {---- clear buffer ----------}
 
 
-  	mov edi, [usedPtr]
+    mov edi, [usedPtr]
     mov eax, 0
     mov ecx, 256/4
     cld
@@ -472,11 +472,11 @@ begin
 
   @LOOP:
 
-  	mov al, byte ptr esi[edx]
-		mov	byte ptr [edi+eax], 1   	
-  	
+    mov al, byte ptr esi[edx]
+    mov  byte ptr [edi+eax], 1
+
     inc edx
-  	dec ecx
+    dec ecx
     jnz @LOOP
 
 
@@ -487,8 +487,8 @@ begin
 
   @SCAN:
 
-  	mov al, byte ptr edi[edx]
-  	cmp al, 0
+    mov al, byte ptr edi[edx]
+    cmp al, 0
     jne @SKIP
 
     mov [value], dx
@@ -496,16 +496,16 @@ begin
 
 
   @SKIP:
-  	
-  	inc edx
+
+    inc edx
     dec ecx
-  	jnz @SCAN
+    jnz @SCAN
 
     mov [value], -1
 
 
   @FINISH:
-  	popad  	
+    popad
   end;
   result := value;
 end;
@@ -515,14 +515,14 @@ end;
  256 codewords have been used.}
 function firstFreeByte_REF(data: tBytes): integer;
 var
-	i: int32;
-	used: array[0..255] of boolean;
+  i: int32;
+  used: array[0..255] of boolean;
 begin
   fillchar(used, sizeof(used), False);
-	for i := 0 to length(data)-1 do
-  	used[data[i]] := True;
-	for i := 0 to 255 do
-  	if not used[i] then exit(i);
+  for i := 0 to length(data)-1 do
+    used[data[i]] := True;
+  for i := 0 to 255 do
+    if not used[i] then exit(i);
   exit(-1);
 end;
 
@@ -530,7 +530,7 @@ end;
 function doBPE(bytes: tBytes; maxReplacements: integer=256): tBytes;
 var
 
-	i: int32;
+  i: int32;
   numReplacements: integer;
   useByte: int32;
 
@@ -542,53 +542,53 @@ var
 
 begin
 
-	if maxReplacements <= 0 then exit(bytes);
+  if maxReplacements <= 0 then exit(bytes);
 
   {initialization}
-	outStream := tStream.Create();
+  outStream := tStream.Create();
   numReplacements := 0;
 
-	{work out which byte to use in substitutions}
-	useByte := firstFreeByte(bytes);
+  {work out which byte to use in substitutions}
+  useByte := firstFreeByte(bytes);
 
   {no free codespace for BPE}
-	if useByte < 0 then begin
-		findMostFrequentPair(bytes, freq);
+  if useByte < 0 then begin
+    findMostFrequentPair(bytes, freq);
     writeln('No codespace for BPE, but if we had space first substitution would have saved ~',freq, ' bytes');
-	  exit(bytes);
+    exit(bytes);
   end;
 
-	while (numReplacements < maxReplacements) do begin
-  	
-		bytes := bytePairEncode(bytes, useByte, a, b);
+  while (numReplacements < maxReplacements) do begin
+
+    bytes := bytePairEncode(bytes, useByte, a, b);
     if a < 0 then
-    	{no more good pairs}
-    	break;
+      {no more good pairs}
+      break;
 
     {write out the substitution we just performed}
     outStream.writeByte(useByte);
     outStream.writeByte(a);
     outStream.writeByte(b);
 
-	  useByte := firstFreeByte(bytes);
+    useByte := firstFreeByte(bytes);
 
     if useByte < 0 then break;
 
-    inc(numReplacements);	
+    inc(numReplacements);
   end;
 
   writeln('Added ', numReplacements, ' new tokens');
 
   outStream.writeBytes(bytes);
   result := outStream.asBytes;
-  outStream.free;	
+  outStream.free;
 end;
 
 {---------------------------------------------------------------}
 
 function LZ4Compress(data: tBytes): tBytes;
 begin
-	result := LZ4Compress(data, LZ96_HIGH);
+  result := LZ4Compress(data, LZ96_HIGH);
 end;
 
 function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes;
@@ -611,33 +611,33 @@ var
   a,b: int32;
 
   block: tLZ4Stream;
-	map: tHashMap;
+  map: tHashMap;
 
 
 function getCode(pos: int32): word; inline;
 begin
-	// hash on first 4 bytes, starting from position
-	result := hashD2W(pDWord(@data[pos])^);
+  // hash on first 4 bytes, starting from position
+  result := hashD2W(pDWord(@data[pos])^);
 end;
 
 procedure addRef(pos: int32); inline;
 var
-	code: word;
+  code: word;
 begin
-	if pos < 0 then exit;
+  if pos < 0 then exit;
   map.AddReference(getCode(pos), pos);
 end;
 
 begin
 
-	{note: assume 5 <= blocksize <= 64k}
+  {note: assume 5 <= blocksize <= 64k}
 
-	{todo: special case for short TBytes (i.e length <= 5)}
+  {todo: special case for short TBytes (i.e length <= 5)}
 
   map := tHashMap.create(level.maxBinSize);
   srcLen := length(data);
 
-	{greedy approach}
+  {greedy approach}
 
   {push first character}
   pos := 0;
@@ -654,26 +654,26 @@ begin
 
   while True do begin
 
-  	{remove stale matches}
+    {remove stale matches}
     if (level.maxBinSize > 0) and (pos > 64*1024) and ((pos - lastClean) > 32*1024) then begin
-    	map.trim(pos-32*1024);
-    	lastClean := pos;
+      map.trim(pos-32*1024);
+      lastClean := pos;
     end;
 
-  	{check for last byte}
+    {check for last byte}
     if pos > srcLen-1 then
-    	error('Processed too many bytes');
+      error('Processed too many bytes');
     if pos >= srcLen-1 then begin
-    	{we reached the end, just dump the buffer}
+      {we reached the end, just dump the buffer}
       while pos < srcLen do begin
-	    	literalBuffer.writeByte(data[pos]);
+        literalBuffer.writeByte(data[pos]);
         inc(pos);
       end;
-	 		block.writeEndSequence(literalBuffer.asBytes);
+       block.writeEndSequence(literalBuffer.asBytes);
       literalBuffer.free;
       map.free;
-	    exit(block.asBytes);
-	  end;
+      exit(block.asBytes);
+    end;
 
 
     fillchar(thisMatch, sizeof(thisMatch), 0);
@@ -681,23 +681,23 @@ begin
 
     for i := 0 to level.lookahead do begin
 
-    	{we're going to do a lookahead, to see if we get a better match
+      {we're going to do a lookahead, to see if we get a better match
        if we delay a short amount}
 
       {todo: also do this for words and dwords I guess? - as they might not be in buffer}
       {check match on previous character as special case}
 
       if pos+i > 0 then begin
-	      thisMatch.length := MatchLength(data, pos+i, pos+i-1);
+        thisMatch.length := MatchLength(data, pos+i, pos+i-1);
         thisMatch.pos := pos+i-1;
         thisMatch.gain := int32(thisMatch.length) - 3;
       end else
-      	thisMatch.length := 0;
+        thisMatch.length := 0;
 
       if thisMatch.length >= 4 then begin
-      	bestMatch[i] := thisMatch;
+        bestMatch[i] := thisMatch;
       end;
-      	
+
       {See if we can get a match from here...}
       {note: we can not do matching when near end as
        matches must be atleast 4 bytes}
@@ -709,11 +709,11 @@ begin
         {fast path}
         (*
         if map.match[code] > 0 then begin
-	        thisMatch.pos := map.match[code];
-        	thisMatch.length := matchLength(data, pos+i, thisMatch.pos);
+          thisMatch.pos := map.match[code];
+          thisMatch.length := matchLength(data, pos+i, thisMatch.pos);
           thisMatch.gain := int32(thisMatch.length) - 3;
           if thisMatch.gain > 0 then
-          	bestMatch[i] := thisMatch;
+            bestMatch[i] := thisMatch;
         end;*)
 
         fillchar(thisMatch, sizeof(thisMatch), 0);
@@ -722,40 +722,40 @@ begin
         if assigned(matches) then begin
           for j := 0 to length(matches)-1 do begin
 
-          	if (pos - matches[j]) > 65535 then
-            	{outside of window}
-            	continue;
+            if (pos - matches[j]) > 65535 then
+              {outside of window}
+              continue;
 
-        		thisMatch.length := MatchLength(data, pos+i, matches[j]);
+            thisMatch.length := MatchLength(data, pos+i, matches[j]);
             thisMatch.pos := matches[j];
 
             if thisMatch.length < 4 then continue;
             thisMatch.gain := int32(thisMatch.length) - 3;
 
             if thisMatch.gain > bestMatch[i].gain then
-            	bestMatch[i] := thisMatch;
+              bestMatch[i] := thisMatch;
           end;
         end;
       end;
 
       {make sure to never match the final byte, so that we end on a literal}
-	    while (literalBuffer.len + pos + bestMatch[i].length) >= srcLen-1 do begin
-      	dec(bestMatch[i].length);
+      while (literalBuffer.len + pos + bestMatch[i].length) >= srcLen-1 do begin
+        dec(bestMatch[i].length);
         dec(bestMatch[i].gain);
         bestMatch[i].gain := max(bestMatch[i].gain, 0);
       end;
 
-    	if (i = 0) and (bestMatch[0].gain = 0) then
-      	{no reason for lookahead if we're not performing a match}
-      	break;
+      if (i = 0) and (bestMatch[0].gain = 0) then
+        {no reason for lookahead if we're not performing a match}
+        break;
     end;
 
     {consider the matches, and work out what to do...}
     if (bestMatch[0].gain = 0) then begin
-    	{nothing gained from matching here...}
-    	doMatch := False;
+      {nothing gained from matching here...}
+      doMatch := False;
     end else begin
-    	{
+      {
       ok.. so we defer the match under the following conditions...
 
       there is a better match in the future, AND
@@ -764,13 +764,13 @@ begin
       }
       doMatch := True;
       if level.lookahead > 0 then begin
-      	{calculte oportunity cost... which is quite complicated for long
+        {calculte oportunity cost... which is quite complicated for long
          lookahead}
         {ok, just ignore if there's a better one}
-	      for i := 1 to level.lookahead do begin
-  	    	if (bestMatch[i].gain > bestMatch[0].gain) then
-						doMatch := False;
-      	end;
+        for i := 1 to level.lookahead do begin
+          if (bestMatch[i].gain > bestMatch[0].gain) then
+            doMatch := False;
+        end;
       end;
     end;
 
@@ -779,7 +779,7 @@ begin
      skip the match, and reprocess... otherwise we'll find a 'greedy'
      option in the horizon}
     if doMatch then begin
-	  	{... If so, output the match, along with the literal buffer}
+      {... If so, output the match, along with the literal buffer}
       {write out buffer}
       {writeln('match ', pos, ' ',literalBuffer.len, ' ', bestMatch[0].length);}
       block.writeSequence(bestMatch[0].length, int32(pos) - bestMatch[0].pos, literalBuffer.asBytes);
@@ -787,19 +787,19 @@ begin
       {add references for the copied bytes we just output}
       copyBytes := bestMatch[0].length;
       while copyBytes > 0 do begin
-      	addRef(pos);
-	      inc(pos);
+        addRef(pos);
+        inc(pos);
         dec(copyBytes);
       end;
 
-    end else begin    	
-	    {... If not, add a literal and keep going}
+    end else begin
+      {... If not, add a literal and keep going}
       if pos > length(data)-1 then begin
         writeln(length(data), ' ', srcLen, ' ', pos, ' ',literalBuffer.len);
         error('ops');
       end;
 
-  	  literalBuffer.writeByte(data[pos]);
+      literalBuffer.writeByte(data[pos]);
       addRef(pos);
       inc(pos);
     end;
@@ -809,29 +809,29 @@ end;
 
 procedure printStats(bytes: tBytes);
 var
-	entropy: double;
+  entropy: double;
   ACLimit: double;
   counts: array[0..255] of int32;
   i: int32;
-	total: int32;
+  total: int32;
   p: double;
   smallBins, smallest: integer;
 begin
-	fillchar(counts, sizeof(counts), 0);
-	for i := 0 to length(bytes)-1 do
-  	inc(counts[bytes[i]]);
+  fillchar(counts, sizeof(counts), 0);
+  for i := 0 to length(bytes)-1 do
+    inc(counts[bytes[i]]);
 
   smallBins := 0;
   smallest := 9999;
   entropy := 0;
   total := length(bytes);
   for i := 0 to 255 do begin
-  	if counts[i] < 10 then
-    	inc(smallBins);
+    if counts[i] < 10 then
+      inc(smallBins);
     smallest := min(smallest, counts[i]);
-		p := counts[i] / total;
+    p := counts[i] / total;
     if p > 0 then
-    	entropy -= p * ln(p)    	  	
+      entropy -= p * ln(p)
   end;
 
   // put entropy in bits rather than nats.
@@ -840,8 +840,8 @@ begin
   // in theory we could get this level of compression with an
   // entropy encoder. (e.g. arithmetic encoding)
   ACLimit := 8 / entropy;
-	
-	writeln(Format('Length: %d entropy: %f theory: %f smallest: %d short_bins: %d',[length(bytes), entropy, ACLimit, smallest, smallBins]));
+
+  writeln(Format('Length: %d entropy: %f theory: %f smallest: %d short_bins: %d',[length(bytes), entropy, ACLimit, smallest, smallBins]));
 end;
 
 {-------------------------------------------------------}
@@ -851,35 +851,35 @@ end;
 {Returns the number of bytes that match at given positions}
 function MatchLength_REF(const data: array of byte; a,b: word): dword;
 var
-	l,s: dword;
+  l,s: dword;
 begin
-	{todo: switch to using rep cmps}
+  {todo: switch to using rep cmps}
   s := 0;
-	l := length(data);
-	while (a < l) and (b < l) and (data[a] = data[b]) do begin
-  	inc(a);
+  l := length(data);
+  while (a < l) and (b < l) and (data[a] = data[b]) do begin
+    inc(a);
     inc(b);
     inc(s);
   end;
-	result := s;	
+  result := s;
 end;
 
 
 function bytesToStr(bytes: tBytes): string;
 var
-	i: integer;
+  i: integer;
   b: byte;
   s: string;
 begin
-	s := '';
-	for i := 0 to length(bytes)-1 do begin
-  	b := bytes[i];
+  s := '';
+  for i := 0 to length(bytes)-1 do begin
+    b := bytes[i];
     if (b >= 32) and (b < 128) then
-    	s += chr(b)
+      s += chr(b)
     else
-    	s += '#('+intToStr(b)+')';
+      s += '#('+intToStr(b)+')';
   end;
-  result := s;  	
+  result := s;
 end;
 
 {reference implementation of lz4 decompress with debug printing}
@@ -895,59 +895,59 @@ var
 
 function readByte: byte; inline; register;
 begin
-	result := bytes[inPos];	
-	inc(inPos);
+  result := bytes[inPos];
+  inc(inPos);
 end;
 
 function readWord: word; inline; register;
 begin
-	result := bytes[inPos] + (bytes[inPos+1] shl 8);	
-	inc(inPos, 2);
+  result := bytes[inPos] + (bytes[inPos+1] shl 8);
+  inc(inPos, 2);
 end;
 
 function peekByte: byte; inline; register;
 begin
-	result := bytes[inPos];	
+  result := bytes[inPos];
 end;
 
 function readVLL: dword; inline; register;
 begin
-	result := 0;
-	while peekByte = 255 do
-  	result += readByte;
+  result := 0;
+  while peekByte = 255 do
+    result += readByte;
   result += readByte;
 end;
 
 function eof: boolean; inline;
 begin
-	result := inPos >= length(bytes)-1;
+  result := inPos >= length(bytes)-1;
 end;
 
 begin
 
-	{ignore buffer}
-	buffer := nil;
+  {ignore buffer}
+  buffer := nil;
   setLength(buffer, MAX_BLOCK_SIZE);
   bufferPtr := @buffer[0];
 
-	inPos := 0;
+  inPos := 0;
   outPos := 0;
-	while True do begin
-  	{read token}
+  while True do begin
+    {read token}
     b := readByte;
-		numLiterals := b and $f;
+    numLiterals := b and $f;
 
     {read match length}
     matchLength := b shr 4;
     if numLiterals = 15 then
-    	numLiterals += readVLL;
+      numLiterals += readVLL;
 
     {copy literals}
 
     if (inPos + numLiterals) >= length(bytes) then
-    	error('overran input by '+intToStr((inPos + numLiterals)-length(bytes)+1)+' bytes');
+      error('overran input by '+intToStr((inPos + numLiterals)-length(bytes)+1)+' bytes');
     if (outPos + numLiterals) >= length(buffer) then
-    	error('overran output by '+intToStr((outPos + numLiterals)-length(buffer)+1)+' bytes');
+      error('overran output by '+intToStr((outPos + numLiterals)-length(buffer)+1)+' bytes');
 
     move(bytes[inPos], buffer[outPos], numLiterals);
     inc(inPos, numLiterals);
@@ -955,45 +955,45 @@ begin
 
     {check for terminal sequence}
     if eof then begin
-    	if print then
-	      writeln(format('Final Token (lit:%d)',[numLiterals]));
-    	break;
+      if print then
+        writeln(format('Final Token (lit:%d)',[numLiterals]));
+      break;
     end;
 
     {preform match}
     ofs := readword;
 
     if matchLength = 15 then
-    	matchLength += readVLL;
-    	
+      matchLength += readVLL;
+
     {min match length}
     matchLength += 4;
 
     if print then
-	    {writeln(Format('inpos:%d outpos:%d - #lit:%d match_len:%d ofs:%d', [inPos, outPos, numLiterals, matchLength, ofs]));}
+      {writeln(Format('inpos:%d outpos:%d - #lit:%d match_len:%d ofs:%d', [inPos, outPos, numLiterals, matchLength, ofs]));}
       writeln(format('Token (lit:%d matchs:%d @:%d)',[numLiterals,matchLength,ofs]));
 
     {copy from buffer}
     {note: move is not safe if regions overlap, and I've seen it do the wrong thing
      for even with offset around t-12}
     if ofs > matchLength then
-	    move(buffer[outPos-ofs], buffer[outPos], matchLength)
+      move(buffer[outPos-ofs], buffer[outPos], matchLength)
     else
-    	for i := 0 to matchLength-1 do
-      	buffer[outPos+i] := buffer[outPos-ofs+i];
-    	
+      for i := 0 to matchLength-1 do
+        buffer[outPos+i] := buffer[outPos-ofs+i];
+
     inc(outPos, matchLength);
-    	
-  end;	
+
+  end;
 
   if print then
-  	writeln('Output is ',outPos, ' bytes');
+    writeln('Output is ',outPos, ' bytes');
 
   {trim unused space}
   setLength(buffer, outPos);
   if assigned(ref) then begin
-  	writeln('>>>> here', length(buffer), length(ref));
-  	assertEqual(buffer, ref);
+    writeln('>>>> here', length(buffer), length(ref));
+    assertEqual(buffer, ref);
   end;
 
   result := buffer;
@@ -1002,34 +1002,34 @@ end;
 
 function lz4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
 var
-	bytesPtr: pointer;
-	bytesLen: dword;
+  bytesPtr: pointer;
+  bytesLen: dword;
   bytesEnd: pointer;
   bufferPtr: pointer;
   bufferLen: dword;
   hadBuffer: boolean;
 begin
 
-	if not assigned(bytes) then
-  	exit(nil);
+  if not assigned(bytes) then
+    exit(nil);
 
-	bytesPtr := @bytes[0];
+  bytesPtr := @bytes[0];
   bytesLen := length(bytes);
   bytesEnd := bytesPtr + bytesLen;
   hadBuffer := assigned(buffer);
   if not hadBuffer then
-	  setLength(buffer, MAX_BLOCK_SIZE);
+    setLength(buffer, MAX_BLOCK_SIZE);
   bufferPtr := @buffer[0];
   asm
-  	{
-    	esi: bytes
-    	edi: buffer
+    {
+      esi: bytes
+      edi: buffer
      }
     cld
 
     pushad
-    	
-  	mov esi, bytesPtr
+
+    mov esi, bytesPtr
     mov edi, bufferPtr
 
     xor eax, eax
@@ -1038,10 +1038,10 @@ begin
     xor edx, edx
 
   @DECODE_LOOP:
-  	
-  	// al <- token
+
+    // al <- token
     lodsb
-    mov dl, al 		// remember for later
+    mov dl, al     // remember for later
 
     // ecx <- numLiterals
     xor ecx,ecx
@@ -1054,7 +1054,7 @@ begin
     xor eax, eax
 
   @READ_NL:
-  	lodsb
+    lodsb
     add ecx, eax
     cmp al, $ff
     je @READ_NL
@@ -1071,7 +1071,7 @@ begin
     xor ebx, ebx
 
   @SKIP_NL:
-  	
+
     // copy literals
     rep movsb
 
@@ -1093,15 +1093,15 @@ begin
     xor eax, eax
 
   @READ_ML:
-  	lodsb
+    lodsb
     add ecx, eax
     cmp al, $ff
     je @READ_ML
 
-  @SKIP_ML:	
+  @SKIP_ML:
 
-  	add ecx, 4	 	// a match_length of 4 is recorded as 0
-  	
+    add ecx, 4     // a match_length of 4 is recorded as 0
+
     // copy matches
     push esi
 
@@ -1111,25 +1111,25 @@ begin
 
     pop esi
 
-		jmp @DECODE_LOOP
+    jmp @DECODE_LOOP
 
   @DONE:
 
-  	mov eax, edi
+    mov eax, edi
     sub eax, bufferPtr
-    mov [bufferLen], eax  	
+    mov [bufferLen], eax
 
     popad
 
   end;
 
   if bufferLen > length(buffer) then
-  	Error(Format('Supplied buffer did not have enough bytes, wanted %d but only had %d', [bufferLen, length(buffer)]));
+    Error(Format('Supplied buffer did not have enough bytes, wanted %d but only had %d', [bufferLen, length(buffer)]));
   if hadBuffer and (bufferLen < length(buffer)) then
     Error(Format('Supplied buffer did not match decode length, expected %d but only had %d', [length(buffer), bufferLen]));
 
   if not hadBuffer then
-	  setLength(buffer, bufferLen);
+    setLength(buffer, bufferLen);
   result := buffer;
 end;
 
@@ -1137,22 +1137,22 @@ end;
 
 procedure runTests_BPE();
 var
-	i: integer;
+  i: integer;
   a,b: int32;
-	inBytes,outBytes,slnBytes: tBytes;
+  inBytes,outBytes,slnBytes: tBytes;
   pair, freq: word;
 const
-	TEST_X: array[0..9] of byte = (0,1,2,3,3,5,3,5,2,1);
-	TEST_Y: array[0..7] of byte = (0,1,2,3,255,255,2,1);
+  TEST_X: array[0..9] of byte = (0,1,2,3,3,5,3,5,2,1);
+  TEST_Y: array[0..7] of byte = (0,1,2,3,255,255,2,1);
 begin
 
-	{setup}
-	inBytes := nil;
+  {setup}
+  inBytes := nil;
   outBytes := nil;
   slnBytes := nil;
   setLength(slnBytes, length(TEST_Y));
   move(TEST_Y[0], slnBytes[0], length(TEST_Y));
-	setLength(inBytes, length(TEST_X));
+  setLength(inBytes, length(TEST_X));
   move(TEST_X, inBytes[0], length(TEST_X));
 
   {MostFrequentPair}
@@ -1168,7 +1168,7 @@ begin
   assertEqual(firstFreeByte(inBytes), 4);
 
   {BPE}
-	outBytes := bytePairEncode(inBytes, 255, a, b, 1);
+  outBytes := bytePairEncode(inBytes, 255, a, b, 1);
   assertEqual(outBytes, slnBytes);
   assertEqual(a, 3);
   assertEqual(b, 5);
@@ -1177,18 +1177,18 @@ end;
 
 procedure runTests_LZ4();
 var
-	inBytes: tStream;
+  inBytes: tStream;
   compressedData: tBytes;
   uncompressedData: tBytes;
   MBs: double;
   fileSize: int32;
-	i: integer;
+  i: integer;
   a,b: int32;
   pair, freq: word;
 const
   testString = 'There once was a fish, with a family of fish, who liked to play.';
-	testData: array[0..18] of byte = (0,3,1,4,1,5,9,2,6,8,3,1,4,1,5,9,3,6,0);
-	testCase1: array of byte =
+  testData: array[0..18] of byte = (0,3,1,4,1,5,9,2,6,8,3,1,4,1,5,9,3,6,0);
+  testCase1: array of byte =
   {this used to fail because we ended on a length literal}
   [152,2,12,3,23,104,38,6,188,34,7,47,30,11,51,68,105,104,2,39,61,0,163,226,5,47,87,
   55,217,170,35,77,97,37,79,119,165,184,62,185,164,38,69,113,129,75,115,155,77,119,
@@ -1228,38 +1228,38 @@ const
 begin
 
   assertEqual(MatchLength_REF(testData, 0, 10), 0);
-	assertEqual(MatchLength_REF(testData, 1, 10), 6);
-	assertEqual(MatchLength_REF(testData, 0, 3), 0);
-	assertEqual(MatchLength_REF(testData, 0, 0), 19);
+  assertEqual(MatchLength_REF(testData, 1, 10), 6);
+  assertEqual(MatchLength_REF(testData, 0, 3), 0);
+  assertEqual(MatchLength_REF(testData, 0, 0), 19);
 
   assertEqual(MatchLength(testData, 0, 10), 0);
-	assertEqual(MatchLength(testData, 1, 10), 6);
-	assertEqual(MatchLength(testData, 0, 3), 0);
-	assertEqual(MatchLength(testData, 0, 0), 19);
+  assertEqual(MatchLength(testData, 1, 10), 6);
+  assertEqual(MatchLength(testData, 0, 3), 0);
+  assertEqual(MatchLength(testData, 0, 0), 19);
 
-	inBytes := tStream.create();
+  inBytes := tStream.create();
   for i := 1 to length(testString) do
-  	inBytes.writeByte(ord(testString[i]));
+    inBytes.writeByte(ord(testString[i]));
   compressedData := lz4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData);
-	AssertEqual(uncompressedData, inBytes.asBytes);
+  AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
   inBytes := tStream.create();
   for i := 0 to 100 do
-  	inBytes.writeByte(ord('x'));
-	compressedData := LZ4Compress(inBytes.asBytes);
+    inBytes.writeByte(ord('x'));
+  compressedData := LZ4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData);
   AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
   {make sure we don't match on end sequence}
-	inBytes := tStream.create();
+  inBytes := tStream.create();
   for i := 0 to length(testCase1)-1 do
     inBytes.writeByte(testCase1[i]);
   compressedData := lz4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData);
-	AssertEqual(uncompressedData, inBytes.asBytes);
+  AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
 end;
@@ -1267,11 +1267,11 @@ end;
 
 procedure runTests();
 begin
-	runTests_BPE();
+  runTests_BPE();
   runTests_LZ4();
 end;
 
 
 begin
-	runTests();
+  runTests();
 end.

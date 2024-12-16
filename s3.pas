@@ -6,24 +6,24 @@ unit s3;
 interface
 
 uses
-	go32,
+  go32,
   debug,
   utils,
   crt,
   graph32,
-	vga;
+  vga;
 
 type
-	tS3Driver = class
-  	
+  tS3Driver = class
+
     fgColor: RGBA;
     bgCOlor: RGBA;
 
   public
     constructor create();
 
-		procedure uploadScreen(pixels: pointer);
-		procedure fillRect(x1,y1,width,height:int16);    	
+    procedure uploadScreen(pixels: pointer);
+    procedure fillRect(x1,y1,width,height:int16);
   end;
 
 
@@ -35,28 +35,28 @@ var
   HAS_MMIO: boolean = False;
 
 const
-	STATUS_0  = $03C2;
-	STATUS_1  = $03DA;
+  STATUS_0  = $03C2;
+  STATUS_1  = $03DA;
 
   CRTC_ADR  = $03D4;
   CRTC_DATA = $03D5;
 
 
-	ATR_ADR   = $03C0;
-	ATR_DATA  = $03C1;
+  ATR_ADR   = $03C0;
+  ATR_DATA  = $03C1;
 
   CR = CRTC_ADR;
 
 
 procedure WriteReg(Address: Word; Index, Value: byte);
 var
-	tmp: Byte;
+  tmp: Byte;
 begin
-	if Address <> ATR_ADR then begin
-  	outportb(Address, Index);
+  if Address <> ATR_ADR then begin
+    outportb(Address, Index);
     outportb(Address+1, Value);
-	end else begin
-  	tmp := inportb(STATUS_1);
+  end else begin
+    tmp := inportb(STATUS_1);
     outportb(ATR_ADR, (inportb(ATR_ADR) and $E0) or (Index and $1F));
     outportb(ATR_ADR, Value);
   end;
@@ -65,13 +65,13 @@ end;
 
 function ReadReg(Address: Word; Index: byte): Byte;
 var
-	tmp: Byte;
+  tmp: Byte;
 begin
-	if Address <> ATR_ADR then begin
-  	outportb(Address, Index);
+  if Address <> ATR_ADR then begin
+    outportb(Address, Index);
     result := inportb(Address+1)
   end else begin
-  	tmp := inportb(STATUS_1);
+    tmp := inportb(STATUS_1);
     outportb(ATR_ADR, (inportb(ATR_ADR) and $E0) or (Index and $1F));
     result := inportb(ATR_ADR);
   end;
@@ -80,7 +80,7 @@ end;
 function testVgaRegister(port, index, mask: integer): boolean;
 var old, nw1, nw2: integer;
 begin
-	old := ReadReg(port, index);
+  old := ReadReg(port, index);
   WriteReg(port, index ,old and mask);
   nw1 := ReadReg(port, index) and mask;
   WriteReg(port, index ,old or mask);
@@ -92,41 +92,41 @@ end;
 
 function S3Detect(): boolean;
 var
-	old: integer;
+  old: integer;
 begin
-	result := False;
+  result := False;
   old := ReadReg(Cr, $38);
   WriteReg(CR, $38, 0);
   if (not TestVgaRegister(CR, $35, $F)) then begin
-  	WriteReg(CR, $38, $48);
+    WriteReg(CR, $38, $48);
     if (TestVgaRegister(CR, $35, $F)) then
-    	result := True;
+      result := True;
   end;
 end;
 
 procedure S3UnlockRegs();
 begin
-	writeReg(CR, $38, $48);
+  writeReg(CR, $38, $48);
   writeReg(CR, $39, $A0);
 end;
 
 procedure S3LockRegs();
 begin
-	writeReg(CR, $38, $00);
+  writeReg(CR, $38, $00);
   writeReg(CR, $39, $00);
 end;
 
 
 procedure S3ForceEnhancedModeMappings();
 begin
-	S3UnlockRegs();
+  S3UnlockRegs();
   WriteReg(CR, $31, ReadReg(CR, $31) or $09);
   S3LockRegs();
 end;
 
 procedure S3EnableLinearAddressing();
 begin
-	S3UnlockRegs();
+  S3UnlockRegs();
   WriteReg(CR, $58, ReadReg(CR, $58) and $EC); // Disable LFB
   WriteReg(CR, $59, $03);
   WriteReg(CR, $5A, $00);
@@ -139,12 +139,12 @@ end;
 procedure S3EnableMMIO();
 begin
 
-	{
+  {
   Trio64 MMIO
-	Set bits 4,3 to 10b
+  Set bits 4,3 to 10b
   Image writes made to A0000 to $A7FFF
 
-	New MMIO (V+1)
+  New MMIO (V+1)
   Set bits 4,3 to 01b
 
   But looks like we can do them both by setting 11b
@@ -152,18 +152,18 @@ begin
   Also we want bit 5 to be 0
   }
 
-	S3UnlockRegs();
+  S3UnlockRegs();
   WriteReg(CR, $53, (ReadReg(CR, $53) and %11000111) or %00011000);
-  S3LockRegs();	
+  S3LockRegs();
   HAS_MMIO := true;
 end;
 
 procedure S3DisableMMIO();
 begin
-	S3UnlockRegs();
+  S3UnlockRegs();
   WriteReg(CR, $53, (ReadReg(CR, $53) and %11000111) or %00000000);
   S3LockRegs();
-  HAS_MMIO := true;  	
+  HAS_MMIO := true;
 end;
 
 procedure S3SetClipping(x1,y1,x2,y2: int16);
@@ -177,11 +177,11 @@ CONST
   FRGD_COLOR = 8124;
   FRGD_MIX = 8136;
   PIXEL_CNTL = 8140;
-	ALT_CURXY = 8102;
+  ALT_CURXY = 8102;
   ALT_PCNT = 8148;
   CMD = 8118;
 }
-	FRGD_COLOR = $A6E8;
+  FRGD_COLOR = $A6E8;
   FRGD_MIX = $BAE8;
   CUR_X = $86E8;
   CUR_Y = $82E8;
@@ -208,8 +208,8 @@ CONST
 
 procedure writew(addr:word;value:word); pascal;
 begin
-	asm
-  	mov dx, addr
+  asm
+    mov dx, addr
     mov ax, value
     out dx, ax
   end;
@@ -217,8 +217,8 @@ end;
 
 procedure writed(addr:word;value:dword); pascal;
 begin
-	asm
-  	mov dx, addr
+  asm
+    mov dx, addr
     mov eax, value
     out dx, eax
   end;
@@ -226,9 +226,9 @@ end;
 
 procedure writel(addr:word;value:dword); pascal;
 begin
-	asm
-  	{depends on flag, either we write twice, or we use eax...}
-  	mov dx, addr
+  asm
+    {depends on flag, either we write twice, or we use eax...}
+    mov dx, addr
     mov eax, value
     out dx, ax
     shr eax, 16
@@ -238,8 +238,8 @@ end;
 
 procedure writew(addr:word;indx:word;value:word); pascal;
 begin
-	asm
-  	mov dx, addr
+  asm
+    mov dx, addr
     mov ax, indx  {weird that we need to write a word here?}
     out dx, ax
     inc dx
@@ -249,13 +249,13 @@ begin
 end;
 
 const
-	MIX_CURRENT = %0000;
-	MIX_ZERO = %0001;
+  MIX_CURRENT = %0000;
+  MIX_ZERO = %0001;
   MIX_ONE  = %0010;
   MIX_NEW  = %0111;
 
   MIX_BG   = %00 shl 5;
-  MIX_FG	 = %01 shl 5;
+  MIX_FG   = %01 shl 5;
   MIX_CPU  = %10 shl 5;
   MIX_DISPLAY = %11 shl 5;
 
@@ -263,58 +263,58 @@ const
   PCR_CPU_DATA = %10 shl 7;
   PCR_DISPLAY = %11 shl 7;
 
-  CMD_ON     			= $0001; {always on}
-  CMD_MULTIPLANE 	= $0002;
-  CMD_LASTPOF 		= $0004;
-  CMD_RADIAL			= $0008;
-  CMD_DRAW 				= $0010;
+  CMD_ON           = $0001; {always on}
+  CMD_MULTIPLANE   = $0002;
+  CMD_LASTPOF     = $0004;
+  CMD_RADIAL      = $0008;
+  CMD_DRAW         = $0010;
 
-  CMD_XNEG 				= $0000;
-  CMD_XPOS 				= $0020;
-  CMD_XMAJ 				= $0000;
-  CMD_YMAJ 				= $0040;
-  CMD_YNEG 				= $0000;
-  CMD_YPOS 				= $0080;
+  CMD_XNEG         = $0000;
+  CMD_XPOS         = $0020;
+  CMD_XMAJ         = $0000;
+  CMD_YMAJ         = $0040;
+  CMD_YNEG         = $0000;
+  CMD_YPOS         = $0080;
 
-  CMD_CPU 		 		= $0100; {use CPU data}
-  CMD_BUS_8    		= $0000;
-  CMD_BUS_16   		= $0200;
-  CMD_BUS_32   		= $0400;
-  CMD_BUS_X    		= $0600; {used for accross the plane}
+  CMD_CPU          = $0100; {use CPU data}
+  CMD_BUS_8        = $0000;
+  CMD_BUS_16       = $0200;
+  CMD_BUS_32       = $0400;
+  CMD_BUS_X        = $0600; {used for accross the plane}
 
-  CMD_SWAP 				= $1000;
+  CMD_SWAP         = $1000;
 
-	CMD_NOP 				= $0000;
-  CMD_LINE				= $2000;
-  CMD_FILL				= $4000;
-  CMD_BLIT		 	  = $C000;
+  CMD_NOP         = $0000;
+  CMD_LINE        = $2000;
+  CMD_FILL        = $4000;
+  CMD_BLIT         = $C000;
 
 
 {Wait for hardware to finish.}
 procedure S3Wait(); inline;
 CONST
-	HW_BUSY = 1 SHL 9;
+  HW_BUSY = 1 SHL 9;
   ALL_FIFO_EMPTY = 1 SHL 10;
   TIMEOUT = 1*1000*1000;
 var
-	status: word;
+  status: word;
   i: dword;
 
 begin
-	i := 0;
+  i := 0;
   repeat
-  	if i > TIMEOUT then
-    	halt(99);
-  	status := inportw(CMD);
+    if i > TIMEOUT then
+      halt(99);
+    status := inportw(CMD);
     i += 1;
     {
-    	Bits 0-7 = FIFO status Trio32
+      Bits 0-7 = FIFO status Trio32
       Bit 8 = Reserved
       Bit 9 = HW_BUSY
       Bit 10 = All FIFO empty
-      Bits 11-15 = Additional FIFO status bits for Trio64}    	
-  	until
-    	((status and ALL_FIFO_EMPTY) = ALL_FIFO_EMPTY) and
+      Bits 11-15 = Additional FIFO status bits for Trio64}
+    until
+      ((status and ALL_FIFO_EMPTY) = ALL_FIFO_EMPTY) and
       ((status and HW_BUSY) = 0);
 end;
 
@@ -323,20 +323,20 @@ procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16); pascal;
 var x1,y1,x2,y2: int16;
 
 var
-	XPOS: boolean;
+  XPOS: boolean;
   YPOS: boolean;
   commandCode: word;
 
 begin
 
-	xPos := True;
+  xPos := True;
   yPos := True;
 
-	S3UnlockRegs();
+  S3UnlockRegs();
 
   S3Wait;
 
-	{scissors}
+  {scissors}
 
   writew($BEE8, SCISSORS_T SHL 12 + 0);
   writew($BEE8, SCISSORS_L SHL 12 + 0);
@@ -345,7 +345,7 @@ begin
 
   S3Wait;
 
-	writew(FRGD_MIX, MIX_NEW + MIX_DISPLAY);
+  writew(FRGD_MIX, MIX_NEW + MIX_DISPLAY);
 
   {this part is taken from the manual (with some simplifications)}
 
@@ -355,13 +355,13 @@ begin
   y2 := dsty;
 
   if srcx < dstx then begin
-  	XPOS := False;
+    XPOS := False;
     srcx := x1 + width - 1;
     dstx := x2 + width - 1;
   end;
 
   if srcy < dsty then begin
-  	YPOS := False;
+    YPOS := False;
     srcy := y1 + height - 1;
     dsty := y2 + height - 1;
   end;
@@ -394,11 +394,11 @@ end;
 procedure S3Upload(); pascal;
 begin
 
-	S3UnlockRegs();
+  S3UnlockRegs();
 
   S3Wait;
 
-	{scissors}
+  {scissors}
 
   writew($BEE8, SCISSORS_T SHL 12 + 0);
   writew($BEE8, SCISSORS_L SHL 12 + 0);
@@ -407,7 +407,7 @@ begin
 
   S3Wait;
 
-	writew(FRGD_MIX, MIX_NEW + MIX_FG);
+  writew(FRGD_MIX, MIX_NEW + MIX_FG);
   writel(FRGD_COLOR, c);
   writew($BEE8, PCR_ONLY_FG + (PIX_CNTL shl 12));
   writew(CUR_X, x1);
@@ -426,7 +426,7 @@ end; *)
 
 
 var
-	i: dword;
+  i: dword;
   startTime,endTime: double;
   callsPerSecond: double;
   cnt: integer;
@@ -435,20 +435,20 @@ var
 
 procedure UploadScreen_ASM();
 var
-	pixelsPtr: pointer;
+  pixelsPtr: pointer;
   lfb_seg: word;
 begin
-	pixelsPtr := @pixels;
+  pixelsPtr := @pixels;
   lfb_seg := videoDriver.LFB_SEG;
-	asm
-  	push es
+  asm
+    push es
     push ds
     push esi
     push edi
     push ecx
     push eax
 
-  	mov es, [lfb_seg]
+    mov es, [lfb_seg]
     mov edi, 0
 
     mov esi, PixelsPtr
@@ -469,22 +469,22 @@ end;
 
 procedure UploadScreen_MMX();
 var
-	pixelsPtr: pointer;
+  pixelsPtr: pointer;
   lfb_seg: word;
 begin
-	pixelsPtr := @pixels;
+  pixelsPtr := @pixels;
   lfb_seg := videoDriver.LFB_SEG;
-	asm
-  	push es
+  asm
+    push es
     push ds
     push esi
     push edi
     push ecx
     push eax
-    	
+
     mov ax, lfb_seg
 
-  	mov es, ax
+    mov es, ax
     mov edi, 0
 
     mov esi, PixelsPtr
@@ -494,10 +494,10 @@ begin
 
   @LOOP:
 
-  	movq mm0, ds:[esi]
-  	movq mm1, ds:[esi+8]
-		movq es:[edi], mm0
-		movq es:[edi+8], mm1
+    movq mm0, ds:[esi]
+    movq mm1, ds:[esi+8]
+    movq es:[edi], mm0
+    movq es:[edi+8], mm1
     add esi, 16
     add edi, 16
 
@@ -519,17 +519,17 @@ end;
 {uses ports and Image Transfer to upload... probably very slow...}
 procedure UploadScreen_PORT();
 var
-	pixelsPtr: pointer;
+  pixelsPtr: pointer;
 begin
 
-	pixelsPtr := @pixels;
+  pixelsPtr := @pixels;
 
 
   S3UnlockRegs();
 
   S3Wait;
 
-	{scissors}
+  {scissors}
 
   writew($BEE8, SCISSORS_T SHL 12 + 0);
   writew($BEE8, SCISSORS_L SHL 12 + 0);
@@ -538,7 +538,7 @@ begin
 
   S3Wait;
 
-	writew(FRGD_MIX, MIX_NEW + MIX_CPU);
+  writew(FRGD_MIX, MIX_NEW + MIX_CPU);
   writew($BEE8, $A000); {PIXEL_CNTL}
 
   writew(CUR_X, 0);
@@ -549,16 +549,16 @@ begin
   S3Wait;
 
 
-	writew(
-  	CMD,
+  writew(
+    CMD,
     CMD_FILL + CMD_BUS_32 + CMD_CPU + CMD_DRAW + CMD_ON +
-		CMD_XPOS + CMD_YPOS
+    CMD_XPOS + CMD_YPOS
   );
 
   S3LockRegs();
 
-	asm
-  	push es
+  asm
+    push es
     push ds
     push esi
     push edi
@@ -570,7 +570,7 @@ begin
     mov ecx, 640*480
 
   @LOOP:
-  	mov eax, ds:[esi]
+    mov eax, ds:[esi]
 
     mov dx, PIX_TRANS_A
     out dx, ax
@@ -578,9 +578,9 @@ begin
     mov dx, PIX_TRANS_B
     out dx, ax
 
-  	add esi, 4
+    add esi, 4
 
-  	dec ecx
+    dec ecx
     jnz @LOOP
 
     pop eax
@@ -597,13 +597,13 @@ begin
 end;
 
 var
-	MMIO_SEG: word;
+  MMIO_SEG: word;
 
 {max is 32k bytes = 8k dwords}
 procedure pushMMIO(p: pointer;cnt:dword); pascal;
-begin	
-	asm
-  	push es
+begin
+  asm
+    push es
     push ds
     push esi
     push edi
@@ -620,7 +620,7 @@ begin
 
     mov ecx, cnt
     rep movsd
-    	
+
     pop eax
     pop ecx
     pop edi
@@ -629,26 +629,26 @@ begin
     pop es
 
   end;
-	
+
 end;
 
 procedure MapMMIO();
 var
-	VideoLinearAddress: DWord;
+  VideoLinearAddress: DWord;
   rights: dword;
   base: dword;
 begin
-	MMIO_SEG := Allocate_LDT_Descriptors(1);
+  MMIO_SEG := Allocate_LDT_Descriptors(1);
   {Map $A0000}
   VideoLinearAddress := get_linear_addr($A0000, 65536);
   set_segment_base_address(MMIO_SEG, VideoLinearAddress);
-	set_segment_limit(MMIO_SEG, 65536-1);
+  set_segment_limit(MMIO_SEG, 65536-1);
 end;
 
 procedure S3SetHardwareCursorLocation(x,y: int16);
 begin
 
-	S3UnlockRegs();
+  S3UnlockRegs();
   S3Wait;
 
   Port[$3D4] := $46;
@@ -670,23 +670,23 @@ end;
 
 constructor tS3Driver.create();
 begin
-	info('[init] S3');
+  info('[init] S3');
   {todo: implement s3 detection}
-{	if not detectS3() then
-  	Error('No S3 detected');}
+{  if not detectS3() then
+    Error('No S3 detected');}
   fgColor.init(255,255,255);
   bgColor.init(0,0,0);
 
   {enable MMIO}
   {todo: enable MMIO by default}
   {
-	S3EnableMMIO();
+  S3EnableMMIO();
   MapMMIO();
   }
 end;
 
 (*
-	{scissors}
+  {scissors}
   writew($BEE8, SCISSORS_T SHL 12 + 0);
   writew($BEE8, SCISSORS_L SHL 12 + 0);
   writew($BEE8, SCISSORS_B SHL 12 + 480);
@@ -699,15 +699,15 @@ var
   counter: dword;
   i: dword;
 const
-	{number of pixels to transfer at a time, max is 8k}
-	BLOCK_SIZE = 8*1024;
+  {number of pixels to transfer at a time, max is 8k}
+  BLOCK_SIZE = 8*1024;
 begin
 
   S3UnlockRegs();
 
   S3Wait;
 
-	{scissors}
+  {scissors}
 
   writew($BEE8, SCISSORS_T SHL 12 + 0);
   writew($BEE8, SCISSORS_L SHL 12 + 0);
@@ -716,7 +716,7 @@ begin
 
   S3Wait;
 
-	writew(FRGD_MIX, MIX_NEW + MIX_CPU);
+  writew(FRGD_MIX, MIX_NEW + MIX_CPU);
   writew($BEE8, $A000); {PIXEL_CNTL}
 
   writew(CUR_X, 0);
@@ -727,10 +727,10 @@ begin
   S3Wait;
 
 
-	writew(
-  	CMD,
+  writew(
+    CMD,
     CMD_FILL + CMD_BUS_32 + CMD_CPU + CMD_DRAW + CMD_ON +
-		CMD_XPOS + CMD_YPOS
+    CMD_XPOS + CMD_YPOS
   );
 
   S3LockRegs();
@@ -740,12 +740,12 @@ begin
   {640x480 = 37.5 8k blocks}
 
   while counter > 0 do begin
-  	if counter <= BLOCK_SIZE then begin
-    	pushMMIO(pixels, counter);
+    if counter <= BLOCK_SIZE then begin
+      pushMMIO(pixels, counter);
       counter := 0;
     end else begin
-    	pushMMIO(pixels, BLOCK_SIZE);
-    	counter -= BLOCK_SIZE;
+      pushMMIO(pixels, BLOCK_SIZE);
+      counter -= BLOCK_SIZE;
       pixels += BLOCK_SIZE * 4;
     end;
   end;
@@ -756,10 +756,10 @@ end;
 procedure tS3Driver.fillRect(x1,y1,width,height:int16);
 begin
 
-	S3UnlockRegs();
+  S3UnlockRegs();
   S3Wait;
-	writew(FRGD_MIX, MIX_NEW + MIX_FG);
-	writed(FRGD_COLOR, fgColor.to32);
+  writew(FRGD_MIX, MIX_NEW + MIX_FG);
+  writed(FRGD_COLOR, fgColor.to32);
   writew($BEE8, $A000); {PIXEL_CNTL}
   writew(CUR_X, x1);
   writew(CUR_Y, y1);
@@ -782,15 +782,15 @@ end;
 {-------------------------------------------------------------}
 
 begin
-{	S3ForceEnhancedModeMappings();
-	S3EnableMMIO();
+{  S3ForceEnhancedModeMappings();
+  S3EnableMMIO();
   MapMMIO();}
 
-	{---------------------}
+  {---------------------}
     (*
   fillchar(pixels, sizeof(pixels), 127);
   for i := 0 to 640*480-1 do begin
-  	pixels[i div 640, i mod 640] := rnd+rnd*256+rnd*256*256;
+    pixels[i div 640, i mod 640] := rnd+rnd*256+rnd*256*256;
   end;
 
 
@@ -800,16 +800,16 @@ begin
   MapMMIO();
 
 
-	StartTime := GetSec;
+  StartTime := GetSec;
 
   cnt := 0;
 
-	for i := 0 to 5 do begin
-  	{S3CopyRect(0, 0, 0, 1, 640, 480);}
+  for i := 0 to 5 do begin
+    {S3CopyRect(0, 0, 0, 1, 640, 480);}
     UploadScreen_MMIO();
     {UploadScreen_FPU();}
 
-	  cnt += 1;
+    cnt += 1;
   end;
 
   S3Wait;
@@ -829,8 +829,8 @@ begin
 
   System->Video (ASM) = 7.05M (this is a bit slower than I expected, ~22 FPS)
   System->Video (MMX) = 7.34M
-  System->FPU (MMX) 	= 6.58M
-	System->Video (ImageTransfer_PORT) = 0.26 (oh dear...)
+  System->FPU (MMX)   = 6.58M
+  System->Video (ImageTransfer_PORT) = 0.26 (oh dear...)
   System->Video (ImageTransfer_MMIO) = 16.53 (this is probably worth it, ~45 FPS)
   System->Video (ImageTransfer_MMIO_MMX) = 12.77 (yeah slower...)
 

@@ -3,23 +3,23 @@ program image;
 
 {$MODE delphi}
 
-uses	
-	crt, {remove}
+uses
+  crt, {remove}
   stream,
   utils,
-	debug,
+  debug,
   test,
   screen,
   graph32,
   lc96,
-	lz4;
+  lz4;
 
 
 function deltaModulate24(bytes: tBytes): tBytes;
 var
-	i: integer;
+  i: integer;
 begin
-	result := nil;
+  result := nil;
   setLength(result, length(bytes));
 
   result[0] := bytes[0];
@@ -28,7 +28,7 @@ begin
 
   {$R-}
   for i := 3 to length(bytes) do begin
-  	result[i] := byte(bytes[i]-bytes[i-3])
+    result[i] := byte(bytes[i]-bytes[i-3])
   end;
   {$R+}
 
@@ -36,22 +36,22 @@ end;
 
 procedure printStats(imgBMP: tPage; s: shortstring; nBytes:int32);
 begin
-	writeln(Format('%s %fx', [s,imgBMP.width*imgBMP.height*3/nBytes]));
+  writeln(Format('%s %fx', [s,imgBMP.width*imgBMP.height*3/nBytes]));
 end;
 
 
 procedure testImages();
 
-var	
-	imgBytes24: tBytes;
-	imgBytes32: tBytes;
+var
+  imgBytes24: tBytes;
+  imgBytes32: tBytes;
   lcBytes: tBytes;
   s: tStream;
   imgBMP, imgDecoded: tPage;
   startTime, elapsed: double;
 begin
 
-	writeln('Loading BMP');
+  writeln('Loading BMP');
 
   startTime := getSec;
   imgBMP := LoadBMP('video\frames_0001.bmp');
@@ -93,9 +93,9 @@ begin
 end;
 
 begin
-	textAttr := 15;
+  textAttr := 15;
   writeln();
-	testImages();
+  testImages();
   writeln();
   writeln('Logs');
   writeln('------------');

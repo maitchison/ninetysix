@@ -4,38 +4,38 @@ program import;
 {$MODE delphi}
 
 uses
-	utils,
+  utils,
   test,
   debug,
-	graph32,
+  graph32,
   crt,
   dos,
   lc96;
 
 var
-	img: tPage;
+  img: tPage;
 
 {-----------------------------------------------}
 
 type
-	
+
   tResource = record
-  	srcFile: string;
+    srcFile: string;
     dstFile: string;
     modifiedTime: int64;
-  end;	
+  end;
 
-	tResourceLibrary = class
+  tResourceLibrary = class
 
-  	numResources: word;
+    numResources: word;
 
-  	resource: array[0..63] of tResource;
+    resource: array[0..63] of tResource;
 
     procedure addResource(res: tResource);
 
-  	constructor Create(); overload;
-  	constructor Create(filename: string); overload;
-  	constructor CreateOrLoad(filename: string); overload;
+    constructor Create(); overload;
+    constructor Create(filename: string); overload;
+    constructor CreateOrLoad(filename: string); overload;
     destructor Destroy;
 
     procedure serialize(fileName: string);
@@ -50,7 +50,7 @@ type
 
 constructor tResourceLibrary.Create(); overload;
 begin
-	inherited Create();
+  inherited Create();
   numResources := 0;
   fillchar(resource, sizeOf(resource), 0);
 end;
@@ -65,53 +65,53 @@ constructor tResourceLibrary.CreateOrLoad(fileName: string);
 begin
   if exists(fileName) then
     Create(fileName)
-	else
+  else
     Create();
 end;
 
 
 destructor tResourceLibrary.Destroy();
 begin
-	inherited Destroy();
+  inherited Destroy();
 end;
 
 procedure tResourceLibrary.addResource(res: tResource);
 begin
-	if numResources = length(resource) then
-  	error('Too many resources, limit is '+intToStr(length(resource)));
-	resource[numResources] := res;
+  if numResources = length(resource) then
+    error('Too many resources, limit is '+intToStr(length(resource)));
+  resource[numResources] := res;
   inc(numResources);
 end;
 
 {returns index of resource, or -1 of not found}
 function tResourceLibrary.findResourceIndex(dstFile: string): integer;
 var
-	i: int32;
+  i: int32;
 begin
   for i := 0 to numResources-1 do
-  	if resource[i].dstFile = dstFile then exit(i);
+    if resource[i].dstFile = dstFile then exit(i);
   exit(-1);
 end;
 
 {updates or adds resource}
 procedure tResourceLibrary.updateResource(res: tResource);
 var
-	id: int32;
+  id: int32;
 begin
-	id := findResourceIndex(res.dstFile);
+  id := findResourceIndex(res.dstFile);
   if id < 0 then
-  	addResource(res)
+    addResource(res)
   else
-  	resource[id] := res;	
+    resource[id] := res;
 end;
 
 procedure tResourceLibrary.serialize(fileName: string);
 var
-	t: text;
+  t: text;
   ioError: word;
   res: tResource;
 begin
-	assign(t, filename);
+  assign(t, filename);
   {$I-}
   rewrite(t);
   {$I+}
@@ -119,8 +119,8 @@ begin
   if ioError <> 0 then error('Error writing '+fileName+' (error:'+intToStr(ioError)+')');
 
   try
-  	for i := 0 to numResources-1 do begin
-    	res := resource[i];
+    for i := 0 to numResources-1 do begin
+      res := resource[i];
       writeln(t, '[resource]');
       writeln(t, 'srcFile=',res.srcFile);
       writeln(t, 'dstFile=',res.dstFile);
@@ -128,19 +128,19 @@ begin
       writeln(t);
     end;
   finally
-	  close(t);
+    close(t);
   end;
 
 end;
 
 procedure tResourceLibrary.deserialize(fileName: string);
 var
-	t: text;
+  t: text;
   s,k,v: string;
   ioError: word;
   res: tResource;
 begin
-	assign(t, filename);
+  assign(t, filename);
   {$I-}
   reset(t);
   {$I+}
@@ -149,36 +149,36 @@ begin
 
   try
 
-  	numResources := 0;
+    numResources := 0;
 
-  	while not eof(t) do begin
-			readln(t, s);
+    while not eof(t) do begin
+      readln(t, s);
       s := trim(s);
       if s = '[resource]' then begin
-      	if numResources > 0 then
-        	resource[numResources-1] := res;
-      	fillchar(res, sizeof(res), 0);
-      	inc(numResources);
+        if numResources > 0 then
+          resource[numResources-1] := res;
+        fillchar(res, sizeof(res), 0);
+        inc(numResources);
         continue;
       end;
       split(s, '=', k, v);
       if k = 'srcFile' then begin
-      	res.srcFile := v;
+        res.srcFile := v;
       end else if k = 'dstFile' then begin
-      	res.dstFile := v;
+        res.dstFile := v;
       end else if k = 'modifiedTime' then begin
-      	res.modifiedTime := strToInt(v);
+        res.modifiedTime := strToInt(v);
       end else begin
-      	{ignore all others}
+        {ignore all others}
       end;
     end;
 
     {write final}
     if numResources > 0 then
-    	resource[numResources-1] := res;
+      resource[numResources-1] := res;
 
   finally
-	  close(t);
+    close(t);
   end;
 
 end;
@@ -186,14 +186,14 @@ end;
 {-----------------------------------------------}
 
 var
-	resourceLibrary: tResourceLibrary;
+  resourceLibrary: tResourceLibrary;
 
 const
   DEFAULT_SRC_FOLDER = 'e:\airtime\';
 
 procedure convertBMP(filename: string;srcPath:string='');
-var	
-	res: tResource;
+var
+  res: tResource;
   id: int32;
   dstPath: string;
 begin
@@ -203,22 +203,22 @@ begin
   dstPath := 'res\'+filename+'.p96';
 
   textAttr := $07;
-	write(pad(filename,14, ' '));
+  write(pad(filename,14, ' '));
 
   {check if this is already done}
   id := resourceLibrary.findResourceIndex(dstPath);
   if id >= 0 then begin
     res := resourceLibrary.resource[id];
     if
-    	(res.srcFile = srcPath) and
+      (res.srcFile = srcPath) and
       (res.modifiedTime = fileModifiedTime(res.srcFile)) and
       exists(dstPath)
       then begin
-    	textAttr := $02;
-    	writeln('[skip]');
-    	textAttr := $07;
-			exit;    	
-		end;
+      textAttr := $02;
+      writeln('[skip]');
+      textAttr := $07;
+      exit;
+    end;
   end;
 
   with res do begin
@@ -228,7 +228,7 @@ begin
     img := loadBMP(srcFile);
     saveLC96(dstFile, img);
     textAttr := $0A;
-	  writeln(format('[%dx%d]',[img.width, img.height]));
+    writeln(format('[%dx%d]',[img.width, img.height]));
     textAttr := $07;
   end;
 
@@ -239,13 +239,13 @@ end;
 procedure processAll();
 begin
 
-	{game stuff}
+  {game stuff}
   convertBMP('title', 'e:\airtime\title_640.bmp');
-	convertBMP('track1');
-	convertBMP('car1', 'd:\car1.bmp'); // todo: move this to e:\ somehow
+  convertBMP('track1');
+  convertBMP('car1', 'd:\car1.bmp'); // todo: move this to e:\ somehow
 
   {gui stuff}
-	convertBMP('ec_frame', 'e:\gui\ec_frame.bmp');
+  convertBMP('ec_frame', 'e:\gui\ec_frame.bmp');
   convertBMP('panel', 'e:\gui\panel.bmp');
   convertBMP('font', 'e:\font\font.bmp');
 end;
@@ -253,11 +253,11 @@ end;
 {-------------------------------------------}
 
 procedure runTests();
-var	
-	rl: tResourceLibrary;
+var
+  rl: tResourceLibrary;
   res: tResource;
 begin
-	rl := tResourceLibrary.Create();
+  rl := tResourceLibrary.Create();
 
   res.srcFile := 'a';
   res.dstFile := 'b';
@@ -279,7 +279,7 @@ begin
   assertEqual(rl.findResourceIndex('b'), 0);
   assertEqual(rl.findResourceIndex('c'), -1);
 
-	rl.Destroy;
+  rl.Destroy;
 
 end;
 
@@ -287,9 +287,9 @@ end;
 
 
 begin
-	runTests();
-	resourceLibrary := tResourceLibrary.CreateOrLoad('resources.ini');
-	processAll();
-  resourceLibrary.serialize('resources.ini');	
+  runTests();
+  resourceLibrary := tResourceLibrary.CreateOrLoad('resources.ini');
+  processAll();
+  resourceLibrary.serialize('resources.ini');
   writeln('done.');
 end.

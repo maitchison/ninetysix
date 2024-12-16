@@ -8,14 +8,14 @@ unit sbDriver;
 interface
 
 uses
-	dos,
+  dos,
   test,
   debug,
   utils,
   go32;
 
 type
-	tWords = array of word;
+  tWords = array of word;
 
 {todo: remove these, and handle through mixer
  (except the direct ones)}
@@ -31,8 +31,8 @@ var
   INTERRUPT_COUNTER: int32 = 0;
   LOOP_MUSIC: boolean = True;
 
-	{number of seconds it took to process the last audio chunk}
-	lastChunkTime: double = -1;
+  {number of seconds it took to process the last audio chunk}
+  lastChunkTime: double = -1;
   currentTC: uint64 = 0;
 
   backgroundMusicBuffer: pointer = nil;
@@ -40,9 +40,9 @@ var
   backgroundMusicLength: int32 = 0;
 
 var
-	bufferDirty: boolean = false;
+  bufferDirty: boolean = false;
   dosSelector: word = 0;
-  currentBuffer: boolean;			// True = BufferA, False = BufferB
+  currentBuffer: boolean;      // True = BufferA, False = BufferB
 
 const
 
@@ -51,51 +51,51 @@ const
   (note: there's a little extra delay due to having to wait one frame,
    this will add around 16ms
 
-  64k = ~200-400 ms 		This is way too much latency
-  32k = ~100-200 ms			Perhaps a safe trade-off
-  16k = ~50-100 ms		
+  64k = ~200-400 ms     This is way too much latency
+  32k = ~100-200 ms      Perhaps a safe trade-off
+  16k = ~50-100 ms
   8k  = ~25-50 ms
-  4k  = ~12.5-25 ms			This feels about right to me.
-	}
+  4k  = ~12.5-25 ms      This feels about right to me.
+  }
 
   //buffer size in bytes
   BUFFER_SIZE = 2*1024;
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
-  	
+
 
 var
-	debug_dma_ofs: word;
+  debug_dma_ofs: word;
   debug_dma_page_corrections: int32 = 0;
 
 var
-	DEBUG_NOISE_ON_PAGE_CORRETION: boolean = false;
+  DEBUG_NOISE_ON_PAGE_CORRETION: boolean = false;
 
 implementation
 
 uses
-	mix,
-	sound;
+  mix,
+  sound;
 
 {-----------------------------------------------------}
 
 var
-	{during IRQ our segements will sometime be wrong, so we need to
+  {during IRQ our segements will sometime be wrong, so we need to
    reference a copy of it}
-	backupDS: word = 0;
+  backupDS: word = 0;
 
 const
 {72?}
-	SB_IRQ = $72; {INT10 in protected mode is $70+IRQ-8}
+  SB_IRQ = $72; {INT10 in protected mode is $70+IRQ-8}
 
 var
-	sbGood: boolean = false;
+  sbGood: boolean = false;
   IS_DMA_ACTIVE: boolean = false;
   DSPVersion: byte = 0;
   dosSegment: word = 0;
 
 
 const
-	SB_BASE = $220;
+  SB_BASE = $220;
   DSP_RESET = SB_BASE + $6;
   DSP_READ_DATA = SB_BASE + $A;
   DSP_WRITE_DATA = SB_BASE + $C;
@@ -109,50 +109,50 @@ const
 
 function DSPReadyToWrite(): boolean;
 begin
-	result := (port[DSP_WRITE_STATUS] and $80) = 0;
+  result := (port[DSP_WRITE_STATUS] and $80) = 0;
 end;
 
 function DSPDataAvailable(): boolean;
 begin
-	result := (port[DSP_DATA_AVAIL] and $80) <> 0;
+  result := (port[DSP_DATA_AVAIL] and $80) <> 0;
 end;
 
 procedure DSPWaitForWrite(timeout: double=1);
-var	
-	timeLimit: double;
+var
+  timeLimit: double;
 begin
-	timeLimit := getSec+timeout;
-	while not DSPReadyToWrite do
-  	if (getSec > timeLimit) then Error('Timeout waiting for DSPWrite');
+  timeLimit := getSec+timeout;
+  while not DSPReadyToWrite do
+    if (getSec > timeLimit) then Error('Timeout waiting for DSPWrite');
 end;
 
 procedure DSPWrite(command: byte);
-var	
-	timeout: double;
+var
+  timeout: double;
 begin
-	DSPWaitForWrite();
+  DSPWaitForWrite();
   port[DSP_WRITE_DATA] := command;
 end;
 
 procedure DSPStop();
-begin	
-	DSPWrite($D9);
+begin
+  DSPWrite($D9);
 end;
 
 function DSPRead(): byte;
-var	
-	timeout: double;
+var
+  timeout: double;
 begin
-	timeout := getSec+1;
+  timeout := getSec+1;
   while not DSPDataAvailable do
-  	if (getSec > timeout) then Error('Timeout waiting for DSPRead');
+    if (getSec > timeout) then Error('Timeout waiting for DSPRead');
   result := port[DSP_READ_DATA];
 end;
 
 {Reset DSP, return if successful}
 function DSPReset(): boolean;
 begin
-	port[DSP_RESET] := $1;
+  port[DSP_RESET] := $1;
   sleep(1);
   port[DSP_RESET] := $0;
   sleep(1);
@@ -168,10 +168,10 @@ end;
 
 function DSPIrq(): integer;
 var
-	value: byte;
+  value: byte;
 begin
-	asm
-  	mov dx, SB_BASE
+  asm
+    mov dx, SB_BASE
     add dx, 4
     mov al, $80
     out dx, al
@@ -182,7 +182,7 @@ begin
   end;
 
   case value of
-  	1: exit(2);
+    1: exit(2);
     2: exit(5);
     4: exit(7);
     8: exit(10);
@@ -195,24 +195,24 @@ end;
 {----------------------------------------------------------}
 
 CONST
-	{for channel 5}
+  {for channel 5}
   {words}
-	ISA_StartAddress = $C4;
-	ISA_CountRegister = $C6;
+  ISA_StartAddress = $C4;
+  ISA_CountRegister = $C6;
   {bytes}
-	ISA_STATUS = $D0;
-	ISA_COMMAND = $D0;
-	ISA_MODE = $D6;
-	ISA_FLIP_FLOP = $D8;
-	ISA_SINGLE_CHANNEL_MASK = $D4;
-	ISA_CH5_PAGE = $8B;
+  ISA_STATUS = $D0;
+  ISA_COMMAND = $D0;
+  ISA_MODE = $D6;
+  ISA_FLIP_FLOP = $D8;
+  ISA_SINGLE_CHANNEL_MASK = $D4;
+  ISA_CH5_PAGE = $8B;
 
 const
-	SB_OUTPUT = $41;
-	SB_INPUT 	= $42;
+  SB_OUTPUT = $41;
+  SB_INPUT   = $42;
 
-	SB_OUTPUT_8BIT = $C0;
-	SB_OUTPUT_16BIT = $B0;
+  SB_OUTPUT_8BIT = $C0;
+  SB_OUTPUT_16BIT = $B0;
 
   SB_MONO_16BIT_SIGNED_PCM = $10;
   SB_STEREO_16BIT_SIGNED_PCM = $30;
@@ -220,19 +220,19 @@ const
 {length is samples? or words?}
 procedure startPlayback(length: word);
 begin
-	DSPWrite(SB_OUTPUT);
+  DSPWrite(SB_OUTPUT);
   DSPWrite($AC);              // 44.1 HZ (according to manual)
   DSPWrite($44);
-  DSPWrite(SB_OUTPUT_16BIT); 	
+  DSPWrite(SB_OUTPUT_16BIT);
   DSPWrite(SB_STEREO_16BIT_SIGNED_PCM);
   DSPWrite(lo(word(length-1)));
-  DSPWrite(hi(word(length-1)));	
+  DSPWrite(hi(word(length-1)));
 end;
 
 {$F+,S-,R-,Q-}
 {handle sound buffer refill
 ISR mixing mode:
-	- music handled in ISR
+  - music handled in ISR
   - mixing must be performed by main loop outside of ISR
 }
 procedure soundBlaster_ISR; interrupt;
@@ -240,7 +240,7 @@ var
   readAck: byte;
   bufOfs: word;
   startTime: double;
-  mixBuffer: pointer;	
+  mixBuffer: pointer;
   newSamples: int32;
   expectedBuffer: boolean;
   requiredCorrection: boolean;
@@ -249,76 +249,76 @@ begin
 
   // todo: check we need to pass IRQ along, i.e. it's not for us.
 
-	asm
-  	cld
-  	cli
+  asm
+    cld
+    cli
     push es
     push ds
     push fs
     push gs
-  	pushad
+    pushad
 
     mov ax, cs:[backupDS]
     mov ds, ax
     mov es, ax
-  	end;
+    end;
 
- 	startTime := getSec;
+   startTime := getSec;
   inc(INTERRUPT_COUNTER);
   currentBuffer := not currentBuffer;
 
   // acknowledge the DSP
-	// $F for 16bit, $E for 8bit
-	readAck := port[SB_BASE + $F];
+  // $F for 16bit, $E for 8bit
+  readAck := port[SB_BASE + $F];
 
   {get DMA count to see where we should be writing to}
   asm
-  	pusha
+    pusha
 
     mov dx, $D8
     mov al, 0
-    out dx,al		{reset flip flop}
+    out dx,al    {reset flip flop}
 
 
-  	mov dx, $C6
+    mov dx, $C6
     in  al, dx
-    mov bl, al	
+    mov bl, al
     in  al, dx
     mov bh, al
     mov [debug_dma_ofs], bx
-    popa	
+    popa
   end;
 
   {buf0 should be half_buffer_words, buf1 should be buffer_words}
   expectedBuffer := boolean(trunc(round(debug_dma_ofs / (HALF_BUFFER_SIZE div 2))-1));
   if currentBuffer <> expectedBuffer then begin
-  	currentBuffer := expectedBuffer;
-		inc(debug_dma_page_corrections);
+    currentBuffer := expectedBuffer;
+    inc(debug_dma_page_corrections);
     requiredCorrection := true;
   end else
-  	requiredCorrection := false;
+    requiredCorrection := false;
 
 
-	if currentBuffer then
-  	bufOfs := HALF_BUFFER_SIZE
+  if currentBuffer then
+    bufOfs := HALF_BUFFER_SIZE
   else
-  	bufOfs := 0;
+    bufOfs := 0;
 
   {Initialize the buffer with the music stream.}
   mixBuffer := nil;
 
   mixBuffer := mixDown(currentTC, HALF_BUFFER_SIZE);
   if (mixBuffer <> nil) then begin
-	  dosMemPut(dosSegment, bufOfs, mixBuffer^, HALF_BUFFER_SIZE);
+    dosMemPut(dosSegment, bufOfs, mixBuffer^, HALF_BUFFER_SIZE);
   end else begin
-  	dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
+    dosMemFillWord(dosSegment, bufOfs, HALF_BUFFER_SIZE div 2, 0);
   end;
 
   if DEBUG_NOISE_ON_PAGE_CORRETION and requiredCorrection then begin
-  	{fill the buffer with noise}
+    {fill the buffer with noise}
     asm
-    	pushad
-    	push fs
+      pushad
+      push fs
 
       mov fs, go32.dosMemSelector
       mov ecx, BUFFER_SIZE
@@ -337,7 +337,7 @@ begin
 
       pop fs
       popad
-    end;	
+    end;
   end;
 
 
@@ -351,8 +351,8 @@ begin
   port[$20] := $20;
 
   asm
-  	
-  	popad
+
+    popad
     pop gs
     pop fs
     pop ds
@@ -364,26 +364,26 @@ end;
 
 
 var
-	oldIntVec: tSegInfo;
+  oldIntVec: tSegInfo;
   newIntVec: tSegInfo;
 
 var
-	irqStartMask,
+  irqStartMask,
   irqStopMask: byte;
 
 var
-	hasInstalledInt: boolean=False;
+  hasInstalledInt: boolean=False;
 
 procedure install_ISR();
 begin
-	note('Installing music interupt');	
-	newIntVec.offset := @soundBlaster_ISR;
+  note('Installing music interupt');
+  newIntVec.offset := @soundBlaster_ISR;
   newIntVec.segment := get_cs;
 
   irqStopMask := 1 shl (10 mod 8);
   irqStartMask := not IRQStopMask;
 
-	get_pm_interrupt(SB_IRQ, oldIntVec);
+  get_pm_interrupt(SB_IRQ, oldIntVec);
   set_pm_interrupt(SB_IRQ, newIntVec);
 
   port[$A1] := port[$A1] and IRQStartMask;
@@ -394,27 +394,27 @@ end;
 
 procedure uninstall_ISR;
 begin
-	if not hasInstalledInt then exit;
-	note('Removing music interupt');
+  if not hasInstalledInt then exit;
+  note('Removing music interupt');
   port[$A1] := port[$A1] or IRQStopMask;
-	set_pm_interrupt(SB_IRQ, oldIntVec);
+  set_pm_interrupt(SB_IRQ, oldIntVec);
   hasInstalledInt := false;
 end;
 
 
 procedure startAutoPlayback(length: word);
 begin
-	DSPWrite(SB_OUTPUT);
+  DSPWrite(SB_OUTPUT);
   DSPWrite($AC);              // 44.1 HZ (according to manual)
   DSPWrite($44);
-  DSPWrite(SB_OUTPUT_16BIT); 	
+  DSPWrite(SB_OUTPUT_16BIT);
   DSPWrite(SB_STEREO_16BIT_SIGNED_PCM);
   DSPWrite(lo(word(length-1)));
   DSPWrite(hi(word(length-1)));
 end;
 
 {program DMA channel 5 for 16-bit DMA
-	length: Number of words to transfer}
+  length: Number of words to transfer}
 procedure programDMA(length:dword);
 var
   len: word;
@@ -422,24 +422,24 @@ var
 const
   channel_number = 1; // DMA 5 is 16bit version of channel 1.
 begin
-	
+
   {note: 16bit transfers have address div 2, i.e. * 16 / 2}
-	addr := (dosSegment shl 4);
+  addr := (dosSegment shl 4);
 
-	port[$D4] := $04+channel_number;	// mask DMA channel
-  port[$D8] := $00;									// reset flipflip (any value is fine here)
-  port[$D6] := $48+channel_number;	// mode (was $48, but now $59 as channel_number=1
+  port[$D4] := $04+channel_number;  // mask DMA channel
+  port[$D8] := $00;                  // reset flipflip (any value is fine here)
+  port[$D6] := $48+channel_number;  // mode (was $48, but now $59 as channel_number=1
 
-  port[$8B] := byte(addr shr 16);		// page address, high bits of address, probably 0
+  port[$8B] := byte(addr shr 16);    // page address, high bits of address, probably 0
 
-  port[$C4] := lo(word(addr shr 1));	
+  port[$C4] := lo(word(addr shr 1));
   port[$C4] := hi(word(addr shr 1));
 
-  port[$C6] := lo(word(length-1));	// length is words -1
+  port[$C6] := lo(word(length-1));  // length is words -1
   port[$C6] := hi(word(length-1));
 
-  port[$D4] := $01;		// unmask DMA channel 5}
-  	
+  port[$D4] := $01;    // unmask DMA channel 5}
+
 end;
 
 {----------------------------------------------------------}
@@ -447,14 +447,14 @@ end;
 {play noise directly (blocking) for s seconds.}
 procedure directNoise(s: double);
 var
-	timeLimit: double;
+  timeLimit: double;
   x: word;
 begin
-	timeLimit := getSec + s;
+  timeLimit := getSec + s;
   DSPWrite($D1); // turn on speaker
   while getSec < timeLimit do begin
-	  DSPWrite($10); // direct 8bit mino 'pc speaker'
-	  DSPWrite(rnd);
+    DSPWrite($10); // direct 8bit mino 'pc speaker'
+    DSPWrite(rnd);
   end;
   DSPWrite($D3); // end playback
 end;
@@ -469,14 +469,14 @@ var
   i: int32;
   j: int32;
   startTime: double;
-	{used for 16-8bit dithering}
+  {used for 16-8bit dithering}
   sample: int32;
   hiSample,loSample: int32;
 
 begin
   startTime := getSec;
   for i := 0 to length(buffer)-1 do begin
-  	DSPWrite($10); // direct 8bit mono 'pc speaker'}
+    DSPWrite($10); // direct 8bit mono 'pc speaker'}
     sample := int16(buffer[i]);
     //write(sample, ' ');
     sample := sample + (32*1024);
@@ -498,17 +498,17 @@ end;
 Input should be stero 16-bit, and 44.1kh.}
 procedure playPCMData(buffer: tWords);
 var
-	bytes: dword;
+  bytes: dword;
   samples: dword;
 begin
-	bytes := length(buffer)*2;
+  bytes := length(buffer)*2;
   samples := bytes div 4; {16-bit stereo}
-	if bytes > 65536 then
-  	Error('Buffer too long');
+  if bytes > 65536 then
+    Error('Buffer too long');
   if length(buffer) = 0 then
-  	Error('Buffer is empty');
+    Error('Buffer is empty');
 
-	{copy to dos memory}
+  {copy to dos memory}
   dosMemPut(dosSegment, 0, buffer[0], bytes);
 
   programDMA(bytes shr 1);
@@ -520,7 +520,7 @@ end;
 {Start IRQ and DMA to handle audio in background.}
 procedure initiateDMAPlayback();
 var
-	bytestoCopy: dword;
+  bytestoCopy: dword;
   samples: dword;
   len: word;
   addr: dword;
@@ -532,12 +532,12 @@ var
 
 begin
 
-	if IS_DMA_ACTIVE then
-  	error('DMA transfer is already active');
+  if IS_DMA_ACTIVE then
+    error('DMA transfer is already active');
 
   note('Setting up DMA transfer.');
   if not assigned(mixer) then
-  	error('A mixer has not yet been assigned.');
+    error('A mixer has not yet been assigned.');
 
   DSPReset();
 
@@ -552,32 +552,32 @@ begin
   SB should be told to use half the buffer as the blocksize, this way
   we get an interupt halfway through the block}
 
-  words := BUFFER_SIZE div 2; 					// number of words in buffer.
-  halfWords := HALF_BUFFER_SIZE div 2;	// number of words in halfbuffer.
-	addr := (dosSegment shl 4);
+  words := BUFFER_SIZE div 2;           // number of words in buffer.
+  halfWords := HALF_BUFFER_SIZE div 2;  // number of words in halfbuffer.
+  addr := (dosSegment shl 4);
 
   {check address does not span 64K}
   if (addr shr 16) <> ((addr + words*2) shr 16) then
-  	error('DMA destination buffer spans 64k boundary');
+    error('DMA destination buffer spans 64k boundary');
 
   {1. reset}
-	DSPReset();
+  DSPReset();
   port[$D4] := $05; // mask DMA channel
-  port[$D8] := $01;	// any value
+  port[$D8] := $01;  // any value
   port[$D6] := $59; // single mode, auto-initialize, write
-  port[$8B] := byte(addr shr 16);	// page address, high bits of address, probably 0
-  port[$C4] := lo(word(addr shr 1));	
+  port[$8B] := byte(addr shr 16);  // page address, high bits of address, probably 0
+  port[$C4] := lo(word(addr shr 1));
   port[$C4] := hi(word(addr shr 1));
-  port[$C6] := lo(word(words-1));	// length is words -1
+  port[$C6] := lo(word(words-1));  // length is words -1
   port[$C6] := hi(word(words-1));
-  port[$D4] := $01;		// unmask DMA channel 5}
+  port[$D4] := $01;    // unmask DMA channel 5}
   {6. time constant}
-  DSPWrite($41); 		
+  DSPWrite($41);
   DSPWrite(hi(44100));              // 44.1 HZ (according to manual)
   DSPWrite(lo(44100));
 
-  DSPWrite($B6);	// 16-bit output mode.
-  DSPWrite($30);	// 16-bit stereo signed PCM input.
+  DSPWrite($B6);  // 16-bit output mode.
+  DSPWrite($30);  // 16-bit stereo signed PCM input.
 
   // according to manual, this must be half the DMA size.
   // since we using 16-bit audio, these are words
@@ -586,13 +586,13 @@ begin
   DSPWrite(hi(word(halfWords-1)));
 
   IS_DMA_ACTIVE := true;
-  	
+
 end;
 
 procedure stopDMAPlayback();
 begin
-	{does this actually stop playback?}
-	DSPStop();
+  {does this actually stop playback?}
+  DSPStop();
   IS_DMA_ACTIVE := false;
 end;
 
@@ -600,21 +600,21 @@ end;
 
 procedure initSound();
 var
-	res: longint;
+  res: longint;
 begin
-	note('[init] Sound');
+  note('[init] Sound');
   sbGood := DSPReset();
 
   if sbGood then
-	  info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
+    info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
   else
-  	warn('No SoundBlaster detected');
+    warn('No SoundBlaster detected');
 
-	res := Global_Dos_Alloc(BUFFER_SIZE);
+  res := Global_Dos_Alloc(BUFFER_SIZE);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
-  	error('Failed to allocate dos memory');
+    error('Failed to allocate dos memory');
   note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR();
@@ -632,11 +632,11 @@ end;
 
 procedure closeSound();
 begin
-	note('[done] sound');
+  note('[done] sound');
 
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   if debug_dma_page_corrections > 0 then
-  	warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
+    warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
   stopDMAPlayback();
   uninstall_ISR();
   freeBuffer();
@@ -652,9 +652,9 @@ end;
 
 begin
 
-	backupDS := get_ds();
+  backupDS := get_ds();
 
-	runTests();
+  runTests();
 
   initSound();
 

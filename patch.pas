@@ -5,23 +5,23 @@ Unit Patch;
 interface
 
 uses
-	test,
+  test,
   debug,
-	utils,
+  utils,
   stream,
-	graph32;
+  graph32;
 
 
 type
 
-	TPatchColors = packed array[0..3] of RGBA;
+  TPatchColors = packed array[0..3] of RGBA;
   TPatchIndexes = packed array[0..3, 0..3] of byte;
 
   TPatchColorDepth = (PCD_24,PCD_16);
 
-	TPatch = record
+  TPatch = record
 
-  	ColorDepth: TPatchColorDepth;
+    ColorDepth: TPatchColorDepth;
 
     atX,atY: integer;
     LastSSE: int32;
@@ -46,7 +46,7 @@ type
     procedure InterpolateColors();
     function  GetError(x,y: integer): integer; inline;
 
-    procedure SolveMinMax();		
+    procedure SolveMinMax();
     procedure SolveIterative(temperature: double=1.0);
     procedure SolveDescent(steps: integer=30;momentium:single=0.9);
     procedure SolveAllPairs();
@@ -58,7 +58,7 @@ implementation
 
 Constructor TPatch.Create(img: TPage; atX, aty: integer; AColorDepth: TPatchColorDepth=PCD_24);
 begin
-	ColorDepth := AColorDepth;
+  ColorDepth := AColorDepth;
   ReadFrom(img, atX, atY);
 end;
 
@@ -67,51 +67,51 @@ procedure TPatch.writeBytes(dst: tStream);
 var
   i: integer;
 begin
-	{note: patch bytes exclude type, as this it stored elsewher}
+  {note: patch bytes exclude type, as this it stored elsewher}
 
-  case ColorDepth of  	
-	  PCD_24:
-    	for i := 0 to 1 do begin
-      	{todo: try interleaving these}
-      	dst.writeByte(color[i].r);
+  case ColorDepth of
+    PCD_24:
+      for i := 0 to 1 do begin
+        {todo: try interleaving these}
+        dst.writeByte(color[i].r);
         dst.writeByte(color[i].g);
         dst.writeByte(color[i].b);
       end;
-	  PCD_16:
-    	for i := 0 to 1 do
-	    	dst.writeWord(color[i].to16);
+    PCD_16:
+      for i := 0 to 1 do
+        dst.writeWord(color[i].to16);
   end;
 
   for i := 0 to 3 do
-  	dst.writeByte(idx[i,0] or (idx[i,1] shl 2) or (idx[i,2] shl 4) or (idx[i,3] shl 6));
+    dst.writeByte(idx[i,0] or (idx[i,1] shl 2) or (idx[i,2] shl 4) or (idx[i,3] shl 6));
 
 end;
 
 
 procedure TPatch.InterpolateColors();
 var
-	r,g,b: integer;
-	i: integer;
+  r,g,b: integer;
+  i: integer;
 begin
 
   {apply quantization here}
   {note: interpolated colors need not be quantized}
   case ColorDepth of
-  	PCD_24: {pass};
+    PCD_24: {pass};
     PCD_16: begin
-			for i := 0 to 1 do begin
-      	color[i].r := color[i].r shr 3 shl 3;
-      	color[i].g := color[i].g shr 2 shl 2;
-      	color[i].b := color[i].b shr 3 shl 3;
-      end;	
+      for i := 0 to 1 do begin
+        color[i].r := color[i].r shr 3 shl 3;
+        color[i].g := color[i].g shr 2 shl 2;
+        color[i].b := color[i].b shr 3 shl 3;
+      end;
     end;
   end;
 
-	{compute 0.33 * a + 0.67 * b, but in integer math}
-	color[2].r := (color[0].r * 85 + color[1].r * 171) shr 8;
+  {compute 0.33 * a + 0.67 * b, but in integer math}
+  color[2].r := (color[0].r * 85 + color[1].r * 171) shr 8;
   color[2].g := (color[0].g * 85 + color[1].g * 171) shr 8;
   color[2].b := (color[0].b * 85 + color[1].b * 171) shr 8;
-	color[3].r := (color[0].r * 171 + color[1].r * 85) shr 8;
+  color[3].r := (color[0].r * 171 + color[1].r * 85) shr 8;
   color[3].g := (color[0].g * 171 + color[1].g * 85) shr 8;
   color[3].b := (color[0].b * 171 + color[1].b * 85) shr 8;
   color[2].a := 255;
@@ -122,49 +122,49 @@ end;
 
 function sqr(x: integer): integer; inline;
 begin
-	result := x*x;
+  result := x*x;
 end;
 
 function max(a,b: int32): int32; inline;
 begin
-	result := a;
-	if b > a then result := b;
+  result := a;
+  if b > a then result := b;
 end;
 
 function min(a,b: int32): int32; inline;
 begin
-	result := a;
-	if b < a then result := b;
+  result := a;
+  if b < a then result := b;
 end;
 
 {picks two colors to use for this patch}
 procedure TPatch.SolveMinMax();
 var
-	cMin, cMax: RGBA;
+  cMin, cMax: RGBA;
   r,g,b: integer;
   x,y: integer;
   l: integer;
   lMin, lMax: integer;
   c: RGBA;
 begin
-	{simple strategy, sort by brightness and take min/max}
+  {simple strategy, sort by brightness and take min/max}
   r := 0; g := 0; b := 0;
   lMin := 999;
   lMax := -1;
   for y := 0 to 3 do
-  	for x := 0 to 3 do begin
-    	c := Pixels[y,x];
+    for x := 0 to 3 do begin
+      c := Pixels[y,x];
       l := c.r+c.g+c.b;
       if l > lMax then begin
-      	lMax := l;
+        lMax := l;
         cMax := c;
       end;
       if l < lMin then begin
-      	lMin := l;
+        lMin := l;
         cMin := c;
       end;
     end;
-	color[0] := cMin;
+  color[0] := cMin;
   color[1] := cMax;
 
   InterpolateColors();
@@ -173,31 +173,31 @@ end;
 {returns a random integer from -15 to +15}
 function jitter: integer;
 begin
-	result := rnd and $0f;
-	if rnd and $1 = $1 then result := -result;
+  result := rnd and $0f;
+  if rnd and $1 = $1 then result := -result;
 end;
 
 function bump(c: RGBA): rgba;
 begin
-	result.init(c.r+jitter, c.g+jitter, c.b+jitter);
+  result.init(c.r+jitter, c.g+jitter, c.b+jitter);
 end;
 
 {Try all color pairs, and set the best one}
 procedure TPatch.SolveAllPairs();
 var
-	i,j: integer;
+  i,j: integer;
   ThisError, BestError: int32;
   bestColors: TPatchColors;
 begin
-	BestError := 999999;
-	for i := 0 to 15 do begin
-  	color[0] := self.pixels[i and $3, i shr 2];
-  	for j := i to 15 do begin
-    	color[1] := self.pixels[j and $3, j shr 2];
+  BestError := 999999;
+  for i := 0 to 15 do begin
+    color[0] := self.pixels[i and $3, i shr 2];
+    for j := i to 15 do begin
+      color[1] := self.pixels[j and $3, j shr 2];
       self.InterpolateColors();
       ThisError := EvaluateSSE(self.color);
       if ThisError < BestError then begin
-      	BestError := ThisError;
+        BestError := ThisError;
         BestColors := self.color;
       end;
     end;
@@ -222,7 +222,7 @@ Start: 8k / second.
 {Move colors around a little to see if we can improve things}
 procedure TPatch.SolveIterative(temperature: double=1.0);
 var
-	oldColors: TPatchColors;
+  oldColors: TPatchColors;
   oldSSE, newSSE: integer;
   probKeep: double;
   roll: double;
@@ -232,12 +232,12 @@ begin
   oldColors := color;
   oldSSE := self.LastSSE;
   case rnd mod 6 of
-  	0: color[0].init(color[0].r+jitter, color[0].g, color[0].b);
-  	1: color[0].init(color[0].r, color[0].g+jitter, color[0].b);
-  	2: color[0].init(color[0].r, color[0].g, color[0].b+jitter);
-  	3: color[1].init(color[1].r+jitter, color[1].g, color[1].b);
-  	4: color[1].init(color[1].r, color[1].g+jitter, color[1].b);
-  	5: color[1].init(color[1].r, color[1].g, color[1].b+jitter);
+    0: color[0].init(color[0].r+jitter, color[0].g, color[0].b);
+    1: color[0].init(color[0].r, color[0].g+jitter, color[0].b);
+    2: color[0].init(color[0].r, color[0].g, color[0].b+jitter);
+    3: color[1].init(color[1].r+jitter, color[1].g, color[1].b);
+    4: color[1].init(color[1].r, color[1].g+jitter, color[1].b);
+    5: color[1].init(color[1].r, color[1].g, color[1].b+jitter);
   end;
   self.InterpolateColors();
 
@@ -246,18 +246,18 @@ begin
   delta := newSSE - oldSSE;
 
   if delta <= 0 then begin
-  	keep := True;
+    keep := True;
   end else begin
-  	{Error got worse... so consider taking this only if temp is high.}
+    {Error got worse... so consider taking this only if temp is high.}
     probKeep := exp(-(delta / temperature));
     roll := Random(1000000) / 1000000;
     keep := roll < probKeep;
   end;
 
   if keep then begin
-  	self.idx := self.proposedIdx;
+    self.idx := self.proposedIdx;
   end else begin
-  	{reject move}
+    {reject move}
     self.color := oldColors;
     self.lastSSE := oldSSE;
   end;
@@ -266,28 +266,28 @@ end;
 {returns squared error between two colors, with 0 being an exact match.}
 function SE(a, b: RGBA): int32; inline;
 begin
-	result := sqr(a.r-b.r) + sqr(a.g-b.g) + sqr(a.b-b.b);
+  result := sqr(a.r-b.r) + sqr(a.g-b.g) + sqr(a.b-b.b);
 end;
 
 procedure TPatch.Map();
 begin
-	{evaluation proposes ids, so just use those}
-	self.EvaluateSSE(self.color);
+  {evaluation proposes ids, so just use those}
+  self.EvaluateSSE(self.color);
   self.idx := self.ProposedIdx;
 end;
 
 function TPatch.GetError(x,y: integer): int32;
 var
-	s, d: RGBA;
+  s, d: RGBA;
   err: int32;
 begin
-	s := pixels[y,x];
-	d := color[idx[y,x]];
+  s := pixels[y,x];
+  d := color[idx[y,x]];
   err := 0;
-	err += sqr(int32(s.r) - d.r);
+  err += sqr(int32(s.r) - d.r);
   err += sqr(int32(s.g) - d.g);
   err += sqr(int32(s.b) - d.b);
-	result := err;
+  result := err;
 end;
 
 
@@ -296,7 +296,7 @@ end;
  what would have been used}
 function EvaluateSSE_REF(var patch: TPatch; newColors: TPatchColors): int32;
 var
-	x,y: integer;
+  x,y: integer;
   i: integer;
   col: RGBA;
   Score: int32;
@@ -304,21 +304,21 @@ var
   BestI: byte;
   TotalError: int32;
 begin
-	fillchar(patch.grad, sizeof(patch.grad), 0);
-	fillchar(patch.counts, sizeof(patch.counts), 0);
-	TotalError := 0;
-	for y := 0 to 3 do
-  	for x := 0 to 3 do begin
+  fillchar(patch.grad, sizeof(patch.grad), 0);
+  fillchar(patch.counts, sizeof(patch.counts), 0);
+  TotalError := 0;
+  for y := 0 to 3 do
+    for x := 0 to 3 do begin
 
-    	col := patch.pixels[y,x];
+      col := patch.pixels[y,x];
       BestScore := $FFFFFF;
 
       BestI := 0;
 
       for i := 0 to 3 do begin
-	      Score := SE(patch.color[i], col);
-  	    BestScore := min(BestScore, Score);
-    	  if Score = BestScore then BestI := i;
+        Score := SE(patch.color[i], col);
+        BestScore := min(BestScore, Score);
+        if Score = BestScore then BestI := i;
       end;
 
       patch.proposedIdx[y,x] := BestI;
@@ -341,7 +341,7 @@ var
   MMXRegister: uint64; {note: would be good to 8byte align this}
   MMXDeltas: uint64;
   PixelsAddr: pointer; {todo: figure out how I can avoid these pointers}
-	ColorsAddr: pointer;
+  ColorsAddr: pointer;
   GradAddr: pointer;
   ProIdxAddr: pointer;
   BestError: dword;
@@ -349,28 +349,28 @@ var
   BestI: dword;
 begin
 
-	{todo: test this for overflows, especially when delta is < -127}
+  {todo: test this for overflows, especially when delta is < -127}
 
   fillchar(self.grad, sizeof(self.grad), 0);
 
-	PixelsAddr := @self.pixels;
+  PixelsAddr := @self.pixels;
   ColorsAddr := @NewColors;
   ProIdxAddr := @self.proposedIdx;
   GradAddr := @self.grad;
 
-	TotalError := 0;
+  TotalError := 0;
 
-	asm
-  	pusha
+  asm
+    pusha
 
     mov ecx, 16
 
     mov edi, [PixelsAddr]
 
     {
-    	EAX: pixel
+      EAX: pixel
       EDX: color
-    	ECX: Loop
+      ECX: Loop
 
       EDI: Pixels[y,x]
 
@@ -381,35 +381,35 @@ begin
 
   @OUTER_LOOP:
 
-  	push ecx
+    push ecx
 
     mov eax, $FFFFFF
     mov [BestError], eax
 
-  	{read pixel}
+    {read pixel}
     mov eax, edi[ecx*4-4]
 
     mov ecx, 4
 
     {set MM2 with packed pixel colors}
-    movd 			mm2, eax			// MM2 <-  0000|ARGB
-    punpcklbw mm2, mm0			// MM2 <-  0A0R|0G0B (d)
+    movd       mm2, eax      // MM2 <-  0000|ARGB
+    punpcklbw mm2, mm0      // MM2 <-  0A0R|0G0B (d)
 
   @INNER_LOOP:
 
     {calculate sum of squared error for this option}
     mov edx, NewColors[ecx*4-4]
-    movd 			mm1, edx			// MM1 <-  0000|ARGB
-    punpcklbw mm1, mm0			// MM1 <-  0A0R|0G0B (s)
+    movd       mm1, edx      // MM1 <-  0000|ARGB
+    punpcklbw mm1, mm0      // MM1 <-  0A0R|0G0B (s)
     psubw     mm1, mm2      // MM1 <-  s-d
     {absolute difference means we won't run into overflow when we square}
     {an alternative would be to do the full 32bit multiply}
-    movq			mm4, mm1			// MM4 <- s-d (save for later)
-    movq			mm3, mm1
-  	psraw			mm3, 15				// get sign bit
-    pxor			mm1, mm3			
-    psubw			mm1, mm3
-		pmullw		mm1, mm1			// (s-d)^2
+    movq      mm4, mm1      // MM4 <- s-d (save for later)
+    movq      mm3, mm1
+    psraw      mm3, 15        // get sign bit
+    pxor      mm1, mm3
+    psubw      mm1, mm3
+    pmullw    mm1, mm1      // (s-d)^2
     {horizontal sum}
     movq [MMXRegister], mm1
     movzx eax, word ptr [MMXRegister+0]
@@ -427,13 +427,13 @@ begin
     mov [BestError], eax
     xor ebx, ebx
     mov bl, cl
-    dec	bl
+    dec  bl
     mov [BestI], ebx
-    movq mm5, mm4						// MM5 <- (s-d) for best selection
+    movq mm5, mm4            // MM5 <- (s-d) for best selection
 
   @SKIP_SET:
 
-  	dec ecx
+    dec ecx
     jnz @INNER_LOOP
 
     {---- house keeping... ---}
@@ -449,9 +449,9 @@ begin
 
     {update grad}
     {
-    	ebx=BestI
+      ebx=BestI
       mm5=(s-d) (for best color)
-    }	
+    }
     mov   edi, [GradAddr]
     paddw mm5, [edi+ebx*8]
     movq  [edi+ebx*8], mm5
@@ -465,8 +465,8 @@ begin
 
     dec ecx
     jnz @OUTER_LOOP
-    	
-  	emms
+
+    emms
     popa
   end;
 
@@ -475,17 +475,17 @@ end;
 
 function TPatch.EvaluateSSE(newColors: TPatchColors): int32;
 begin
-	lastSSE := EvaluateSSE_Asm(self, newColors);
+  lastSSE := EvaluateSSE_Asm(self, newColors);
   result := lastSSE;
 end;
 
 procedure TPatch.SolveDescent(steps: integer=30; momentium: single=0.9);
 var
-	n: integer;
+  n: integer;
   orgPos: array[0..1] of RGBA32;
   currentPos: array[0..1] of RGBA32;
   currentGrad: array[0..1] of RGBA32;
-	velocity: array[0..1] of RGBA32;
+  velocity: array[0..1] of RGBA32;
   i: integer;
   j: integer;
   lr: single;
@@ -494,30 +494,30 @@ var
   bestSSE: dword;
   bestColors: TPatchColors;
 const weights: array[0..1, 0..3] of single = (
-	(1, 0, 1/3, 2/3),
+  (1, 0, 1/3, 2/3),
   (0, 1, 2/3, 1/2)
 );
 
-	
+
 begin
-	
+
   BestSSE := $FFFFFF;
 
-	for i := 0 to 1 do begin
-		currentPos[i] := self.color[i];
+  for i := 0 to 1 do begin
+    currentPos[i] := self.color[i];
     orgPos[i] := currentPos[i];
   end;
 
   fillchar(momentium, sizeof(momentium), 0);
 
-	for n := 0 to steps-1 do begin
+  for n := 0 to steps-1 do begin
 
-  	{calculate gradient}
+    {calculate gradient}
     EvaluateSSE(self.color);
 
     {memorize the best result}
     if self.LastSSE < BestSSE then begin
-    	BestSSE := self.LastSSE;
+      BestSSE := self.LastSSE;
       BestColors := self.Color;
     end;
 
@@ -527,36 +527,36 @@ begin
     {this is because we have 4 colors, but we can only move 2 of them}
     fillchar(currentGrad, sizeof(currentGrad), 0);
     for i := 0 to 1 do
-    	for j := 0 to 3 do
-		    currentGrad[i] += RGBA32(grad[j]) * weights[i][j];
+      for j := 0 to 3 do
+        currentGrad[i] += RGBA32(grad[j]) * weights[i][j];
 
     {apply gradient}
     if momentium <= 0 then begin
-    	{standard sgd}
-	    for i := 0 to 1 do
-		    currentPos[i] += currentGrad[i] * -lr;
+      {standard sgd}
+      for i := 0 to 1 do
+        currentPos[i] += currentGrad[i] * -lr;
     end else begin
-    	{momentium}
+      {momentium}
       for i := 0 to 1 do begin
-      	if n = 1 then
-        	velocity[i] := currentGrad[i]
+        if n = 1 then
+          velocity[i] := currentGrad[i]
         else
-  	    	velocity[i] := (velocity[i] * momentium) + currentGrad[i];
-  	    currentPos[i] += velocity[i] * -lr;
+          velocity[i] := (velocity[i] * momentium) + currentGrad[i];
+        currentPos[i] += velocity[i] * -lr;
       end;
     end;
 
     {logging}
     (*
     for i := 0 to 0 do begin
-	    {Info(Format('[%d] P:%s V:%s L:%d', [n, currentPos[i].ToString, momentium[i].ToString, self.LastSSE]));}
-	    Info(Format('[%d] %d %d', [n, BestSSE, self.LastSSE]));
+      {Info(Format('[%d] P:%s V:%s L:%d', [n, currentPos[i].ToString, momentium[i].ToString, self.LastSSE]));}
+      Info(Format('[%d] %d %d', [n, BestSSE, self.LastSSE]));
     end;
     *)
 
     {round to nearest color}
-		for i := 0 to 1 do
-    	self.color[i] := currentPos[i];
+    for i := 0 to 1 do
+      self.color[i] := currentPos[i];
     self.InterpolateColors();
 
   end;
@@ -564,73 +564,73 @@ begin
   {final evaluation}
   EvaluateSSE(self.color);
   if self.LastSSE >= BestSSE then begin
-	  {restore best color}
-	  self.color := BestColors;
-	  self.lastSSE := BestSSE;
+    {restore best color}
+    self.color := BestColors;
+    self.lastSSE := BestSSE;
   end;
 
 end;
 
 procedure TPatch.ReadFrom(img: Tpage; atX, atY: integer);
 var
-	x,y: integer;
+  x,y: integer;
 begin
-	self.atX := atX;
+  self.atX := atX;
   self.atY := atY;
-	for y := 0 to 3 do
-  	for x := 0 to 3 do
-    	pixels[y,x] := img.GetPixel(atX+x, atY+y);
+  for y := 0 to 3 do
+    for x := 0 to 3 do
+      pixels[y,x] := img.GetPixel(atX+x, atY+y);
 end;
 
 procedure TPatch.WriteTo(img: Tpage); overload;
 begin
-	writeTo(img, self.atX, self.atY);
+  writeTo(img, self.atX, self.atY);
 end;
 
 procedure TPatch.WriteTo(img: Tpage; atX, atY: integer); overload;
 var
-	x,y: integer;
+  x,y: integer;
 begin
-	for y := 0 to 3 do
-  	for x := 0 to 3 do
-    	img.PutPixel(atX + x,atY + y, color[idx[y,x]]);
+  for y := 0 to 3 do
+    for x := 0 to 3 do
+      img.PutPixel(atX + x,atY + y, color[idx[y,x]]);
 end;
 
 procedure TPatch.WriteErrorTo(img: Tpage); overload;
 begin
-	WriteErrorTo(img, self.atX, self.atY);
+  WriteErrorTo(img, self.atX, self.atY);
 end;
 
 procedure TPatch.WriteErrorTo(img: Tpage; atX, atY: integer); overload;
 var
-	x,y: integer;
+  x,y: integer;
   c: RGBA;
   err: dword;
   sse: integer;
 begin
-	LastSSE := 0;
-	for y := 0 to 3 do
-  	for x := 0 to 3 do begin
-    	err := getError(x, y);
+  LastSSE := 0;
+  for y := 0 to 3 do
+    for x := 0 to 3 do begin
+      err := getError(x, y);
       LastSSE += err;
       c.init(err, err shr 4, err shr 8);
-    	img.PutPixel(atX + x,atY + y, c);
+      img.PutPixel(atX + x,atY + y, c);
     end;
 end;
 
 
 procedure runTests();
 var
-	PatchA, PatchB: TPatch;
+  PatchA, PatchB: TPatch;
   x,y,i: integer;
   a,b: integer;
 begin
-	for x := 0 to 3 do
-  	for y := 0 to 3 do
-    	PatchA.pixels[x,y] := RGBA.Random();
+  for x := 0 to 3 do
+    for y := 0 to 3 do
+      PatchA.pixels[x,y] := RGBA.Random();
 
   for i := 0 to 3 do
-  	PatchA.color[i] := RGBA.Random();
+    PatchA.color[i] := RGBA.Random();
 
   PatchB := PatchA;
 
@@ -639,24 +639,24 @@ begin
 
   {show grads}
   for i := 0 to 3 do
-  	Info(Format('%s', [ShortString(RGBA32(PatchA.grad[i]))]));
+    Info(Format('%s', [ShortString(RGBA32(PatchA.grad[i]))]));
   Info('');
   for i := 0 to 3 do
-  	Info(Format('%s', [ShortString(RGBA32(PatchB.grad[i]))]));
+    Info(Format('%s', [ShortString(RGBA32(PatchB.grad[i]))]));
 
   AssertEqual(b, a);
 
   for x := 0 to 3 do
-  	for y := 0 to 3 do
-    	AssertEqual(PatchB.ProposedIdx[y,x], PatchA.ProposedIdx[y,x]);
+    for y := 0 to 3 do
+      AssertEqual(PatchB.ProposedIdx[y,x], PatchA.ProposedIdx[y,x]);
 
   {Note: gradient may sometimes not match as I never specified how to break
    ties, and I didn't check if both algorithms apply the same method.}
   for i := 0 to 3 do
-  	AssertEqual(PatchB.grad[i].r, PatchA.grad[i].r);
+    AssertEqual(PatchB.grad[i].r, PatchA.grad[i].r);
 
 end;
 
 begin
-	runTests();
+  runTests();
 end.

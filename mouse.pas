@@ -8,19 +8,19 @@ unit Mouse;
 interface
 
 uses
-	debug,
-	crt,
-	go32,
+  debug,
+  crt,
+  go32,
   utils,
-	vga;
+  vga;
 
 var
-	{These only update when UpdateMouse is called}
-	MouseX, MouseY: Word;
+  {These only update when UpdateMouse is called}
+  MouseX, MouseY: Word;
   MouseButtons: Word;
 
 var
-	{ current mouse x and y coordinates, updated automatically. }
+  { current mouse x and y coordinates, updated automatically. }
   mouse_x, mouse_y : Word;
   { button state }
   mouse_b : Word;
@@ -40,9 +40,9 @@ procedure removeMouseProc; forward;
 procedure userproc; forward;
 
 var
-	{ supplied register structure to the callback }
+  { supplied register structure to the callback }
   mouse_regs    : trealregs; external name '___v2prt0_rmcb_regs';
-	userProcLength: int32;
+  userProcLength: int32;
 
 
 const
@@ -51,9 +51,9 @@ const
 
 
 function DetectMouse(): boolean; assembler;
-asm	
-	mov ax, 0
-	mov bx, 0
+asm
+  mov ax, 0
+  mov bx, 0
   mov cx, 0
   mov dx, 0
   int $33
@@ -62,8 +62,8 @@ end;
 
 procedure SetBoundary(x1, y1, x2, y2: integer);
 begin
-	asm
-  	mov ax, $07
+  asm
+    mov ax, $07
     mov cx, x1
     mov dx, x2
     int $33
@@ -77,8 +77,8 @@ end;
 {Set mouse location.}
 procedure SetPosition(x, y: word);
 begin
-	asm
-  	mov ax, $04
+  asm
+    mov ax, $04
     mov cx, x
     mov dx, y
     int $33
@@ -87,9 +87,9 @@ end;
 
 procedure UpdateMousePosition();
 begin
-	asm
-  	pusha
-  	mov ax, $03
+  asm
+    pusha
+    mov ax, $03
 
     int $33
     mov MouseX, cx
@@ -101,9 +101,9 @@ end;
 
 procedure EnableHardwareCursor();
 var
-	startAddress: word;
+  startAddress: word;
 const
-	S3_ENABLE = 1;
+  S3_ENABLE = 1;
 begin
   {enable cursor}
   Port[$3D4] := $45;
@@ -120,35 +120,35 @@ end;
 
 procedure UpdateHardwareCursor(mouse_x, mouse_y: word);
 var
-	counter: dword;
+  counter: dword;
 begin
-	s3.S3SetHardwareCursorLocation(mouse_x, mouse_y);
+  s3.S3SetHardwareCursorLocation(mouse_x, mouse_y);
 end;
 
 procedure WriteBit(x,y: integer; value: boolean; plane: byte);
 var
-	Address: dword;
-	WordAddress: dword;
-	BitWithinWord: integer;
+  Address: dword;
+  WordAddress: dword;
+  BitWithinWord: integer;
   BitMask: byte;
-	b: byte;
+  b: byte;
   lfb_seg: word;
 begin
-	{The images are word interleaved.
+  {The images are word interleaved.
   i.e. AND word 0, XOR word 0, AND word 1, XOR word 1, ... }
 
-	wordAddress := ((y * 64 + x) div 16) * 2 + plane;
+  wordAddress := ((y * 64 + x) div 16) * 2 + plane;
   bitWithinWord := (x mod 16);
 
   address := (BASE_ADDRESS * 1024) + wordAddress * 2;
   if bitWithinWord >= 8 then
-  	address += 1;
+    address += 1;
 
   bitMask := $80 shr (bitWithinWord mod 8);    // e.g. 00100000b
-	lfb_seg := videoDriver.LFB_SEG;
+  lfb_seg := videoDriver.LFB_SEG;
 
-	asm
-  	pusha
+  asm
+    pusha
     push es
 
     mov es, lfb_seg
@@ -162,12 +162,12 @@ begin
   end;
 
   if value then
-  	b := b or bitmask
-	else
-	  b := b and (not bitmask);
+    b := b or bitmask
+  else
+    b := b and (not bitmask);
 
-	asm
-  	pusha
+  asm
+    pusha
     push es
     mov es, LFB_SEG
     mov edi, address
@@ -177,70 +177,70 @@ begin
     pop es
     popa
   end;
-    	
+
 end;
 
 procedure WriteCursorBit(x,y: integer;value:byte);
 begin
-	WriteBit(x,y,(value and 1) = 1, 0);
-  WriteBit(x,y,(value and 2) = 2, 1);	
+  WriteBit(x,y,(value and 1) = 1, 0);
+  WriteBit(x,y,(value and 2) = 2, 1);
 end;
 
 procedure SetHardwareCursorSprite();
 {todo: allow this to use custom graphics}
 const
-	MouseCursor: array[0..15] of string[16] =
+  MouseCursor: array[0..15] of string[16] =
   (
-  	'*...............',
-  	'**..............',
-  	'*#*.............',
-  	'*##*............',
+    '*...............',
+    '**..............',
+    '*#*.............',
+    '*##*............',
     '*###*...........',
-  	'*####*..........',
-  	'*#####*.........',
-  	'*######*........',
-  	'*#######*.......',
-  	'*########*......',
-  	'*#########*.....',
-  	'*###********....',
-  	'*##*............',
-  	'*#*.............',
-  	'**..............',
-		'*...............'
+    '*####*..........',
+    '*#####*.........',
+    '*######*........',
+    '*#######*.......',
+    '*########*......',
+    '*#########*.....',
+    '*###********....',
+    '*##*............',
+    '*#*.............',
+    '**..............',
+    '*...............'
   );
 var
-	x,y: integer;
+  x,y: integer;
   c: char;
 const
-	CURSOR_BACKGROUND = 0;
-	CURSOR_SCREEN = 1;
-	CURSOR_FOREGROUND = 2;
-	CURSOR_NOT_SCREEN = 3;
+  CURSOR_BACKGROUND = 0;
+  CURSOR_SCREEN = 1;
+  CURSOR_FOREGROUND = 2;
+  CURSOR_NOT_SCREEN = 3;
 begin
 
-	for x := 0 to 63 do
-  	for y := 0 to 63 do begin
-    	if (x > 15) or (y > 15) then
-	    	WriteCursorBit(x, y, CURSOR_SCREEN)
+  for x := 0 to 63 do
+    for y := 0 to 63 do begin
+      if (x > 15) or (y > 15) then
+        WriteCursorBit(x, y, CURSOR_SCREEN)
       else begin
-      	c := MouseCursor[y][x+1];
+        c := MouseCursor[y][x+1];
         if c = '.' then
-	      	WriteCursorBit(x, y, CURSOR_SCREEN);
+          WriteCursorBit(x, y, CURSOR_SCREEN);
         if c = '*' then
-	      	WriteCursorBit(x, y, CURSOR_BACKGROUND);
+          WriteCursorBit(x, y, CURSOR_BACKGROUND);
         if c = '#' then
-	      	WriteCursorBit(x, y, CURSOR_FOREGROUND);
+          WriteCursorBit(x, y, CURSOR_FOREGROUND);
         if c = '_' then
-	      	WriteCursorBit(x, y, CURSOR_NOT_SCREEN);
-      end;	
+          WriteCursorBit(x, y, CURSOR_NOT_SCREEN);
+      end;
     end;
 end;
 
 {Call after mode set}
 procedure InitMouse();
 begin
-	Info('[init] Mouse');
-	DetectMouse();
+  Info('[init] Mouse');
+  DetectMouse();
   EnableHardwareCursor();
   SetHardwareCursorSprite();
   installMouseProc(@userproc, userProcLength);
@@ -251,13 +251,13 @@ end;
 
 procedure CloseMouse();
 begin
-	Info('[close] Mouse');
-	removeMouseProc();
+  Info('[close] Mouse');
+  removeMouseProc();
 end;
 
 procedure UpdateMouse();
 begin
-	UpdateMousePosition();
+  UpdateMousePosition();
   UpdateHardwareCursor(MouseX, MouseY);
 end;
 
@@ -274,7 +274,7 @@ var
         mouse_seginfo : tseginfo;
 
 const
-				mouseint = $33;
+        mouseint = $33;
 
 var
         { number of mouse buttons }
@@ -326,11 +326,11 @@ procedure mouse_dummy; begin end;
 
 procedure userproc;
 begin
-	{ the mouse_regs record contains the real mode registers now }
+  { the mouse_regs record contains the real mode registers now }
   mouse_b := mouse_regs.bx;
   mouse_x := mouse_regs.cx;
   mouse_y := mouse_regs.dx;
-	UpdateHardwareCursor(mouse_x, mouse_y);
+  UpdateHardwareCursor(mouse_x, mouse_y);
 end;
 
 procedure mouse_dummy2; begin end;
@@ -346,7 +346,7 @@ begin
   { mouse driver reset }
   r.eax := $0; realintr(mouseint, r);
   if (r.eax <> $FFFF) then begin
-  	error(format('Microsoft compatible mouse not found code:%d',[r.eax]));
+    error(format('Microsoft compatible mouse not found code:%d',[r.eax]));
   end;
   { obtain number of mouse buttons }
   if (r.bx = $ffff) then mouse_numbuttons := 2
@@ -355,14 +355,14 @@ begin
   { check for additional user procedure, and install it if
   available }
   if (userproc <> nil) then begin
-  	userproc_proc := userproc;
+    userproc_proc := userproc;
     userproc_installed := true;
     userproc_length := userproclen;
     { lock code for user procedure }
     lock_code(userproc_proc, userproc_length);
   end else begin
   { clear variables }
-	  userproc_proc := nil;
+    userproc_proc := nil;
     userproc_length := 0;
     userproc_installed := false;
   end;
@@ -392,7 +392,7 @@ end;
 
 procedure removeMouseProc();
 var
-	r : trealregs;
+  r : trealregs;
 begin
 
   { hide mouse cursor }
@@ -405,7 +405,7 @@ begin
   { check if additional userproc is installed, and clean up if
   needed }
   if (userproc_installed) then begin
-  	unlock_code(userproc_proc, userproc_length);
+    unlock_code(userproc_proc, userproc_length);
     userproc_proc := nil;
     userproc_length := 0;
     userproc_installed := false;
@@ -430,14 +430,14 @@ end;
 
 begin
 
-	userProc_Installed := False;
+  userProc_Installed := False;
   userProcLength := dword(@mouse_dummy2)-dword(@userProc);
 
-	addExitProc(@CloseMouse);
+  addExitProc(@CloseMouse);
 
   Mouse_X := 0;
   Mouse_Y := 0;
-	Mouse_B := 0;
+  Mouse_B := 0;
 
   {todo: remove}
   MouseX := 0;

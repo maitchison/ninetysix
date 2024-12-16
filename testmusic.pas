@@ -2,37 +2,37 @@
 program music;
 
 uses
-	screen,
+  screen,
   graph32,
-	debug,
+  debug,
   test,
   utils,
   sbDriver,
   mouse,
   keyboard,
   sprite,
-	sound;
+  sound;
 
 var
-	sfx: tSoundFile;
+  sfx: tSoundFile;
 
   background: tSprite;
   canvas: tPage;
 
 procedure loadResources();
 begin
-	note('Loading graphics');
+  note('Loading graphics');
   background := tSprite.create(loadBMP('e:\airtime\title_640.bmp'));
   note('Loading music');
-	sfx := tSoundFile.create('music\music2.wav');
+  sfx := tSoundFile.create('music\music2.wav');
 end;
 
 procedure flipCanvas();
 begin
   {flip page}
   asm
-  	pusha
-  	push es
+    pusha
+    push es
     mov es,  LFB_SEG
     mov edi,  0
     mov esi, canvas.pixels
@@ -45,14 +45,14 @@ end;
 
 procedure mainLoop();
 begin
-	note('Main loop started');
+  note('Main loop started');
 
   background.draw(canvas, 0, 0);
 
       {flip page}
     asm
-    	pusha
-    	push es
+      pusha
+      push es
       mov es,  LFB_SEG
       mov edi,  0
       mov esi, canvas.pixels
@@ -65,8 +65,8 @@ begin
 
   while True do begin
 
-  	if keyDown(key_q) or keyDown(key_esc) then break;
-  	
+    if keyDown(key_q) or keyDown(key_esc) then break;
+
   end;
 end;
 
@@ -74,7 +74,7 @@ begin
 
   loadResources();
 
-	setMode(640,480,32);
+  setMode(640,480,32);
   canvas := tPage.create(SCREEN_WIDTH, SCREEN_HEIGHT);
 
   initKeyboard();

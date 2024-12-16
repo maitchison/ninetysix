@@ -3,8 +3,8 @@
 
 
 uses
-	sysUtils,
-	crt,
+  sysUtils,
+  crt,
   math,
   other,
   font,
@@ -20,7 +20,7 @@ var i: dword;
 
 
 var
-	{setup screen}
+  {setup screen}
   c: RGBA;
 
   StartTime: Double;
@@ -34,9 +34,9 @@ var
 
 begin
 
-	{LoadGFX();}
+  {LoadGFX();}
 
-	SetMode(640, 480, 32);
+  SetMode(640, 480, 32);
 
   Buffer := TPage.Create(640, 480);
 
@@ -50,32 +50,32 @@ begin
 
   {
 
-  	putPixel, solid, buffer = 2.30M
-    	-> 28.25M (switch to fillchar, rep stosd is the same)
+    putPixel, solid, buffer = 2.30M
+      -> 28.25M (switch to fillchar, rep stosd is the same)
     putPixel, solid, screen = 1.83M
-    	-> 6.8M
+      -> 6.8M
 
     putPixel, alpha, buffer = 1.1M
-    	-> 18.28M (switched to MMX, wow! this is fast)
-    	
-    putPixel, alpha, screen = 0.30M
-    	-> 0.73M (switch to MMX, I think we're bandwidth capped)
+      -> 18.28M (switched to MMX, wow! this is fast)
 
-	}
+    putPixel, alpha, screen = 0.30M
+      -> 0.73M (switch to MMX, I think we're bandwidth capped)
+
+  }
   {
   for i := 0 to 65535 do begin
-  	c.a := i and $FF;
-  	Screen.PutPixel(i and $FF, i shr 8, c);
+    c.a := i and $FF;
+    Screen.PutPixel(i and $FF, i shr 8, c);
   end;}
 
   EndTime := GetSec;
 
 
 
-{	PanelSprite.NineSlice(10,10,200,200);
+{  PanelSprite.NineSlice(10,10,200,200);
 
 
-	ButtonSprite.NineSlice(100,100,150,40);
+  ButtonSprite.NineSlice(100,100,150,40);
 
   cursorX := 100+(150-Extents('Start').width) div 2;
   cursorY := 111;
@@ -87,18 +87,18 @@ begin
   i := 0;
 
   (*
-	
+
   while True do begin
 
-  	i := i + 1;
+    i := i + 1;
 
     SetDisplayStart(Mouse_X, Mouse_Y);
 
-{  	PanelSprite.NineSlice(5,205,150,25);
-  	cursorX := 10;
+{    PanelSprite.NineSlice(5,205,150,25);
+    cursorX := 10;
     cursorY := 208;
     cursorCol := RGBA.create(20,20,20,200);
-  	print(IntToStr(Mouse_X)+','+IntToStr(Mouse_Y)+' '+IntToStr(Mouse_B)+' '+IntToStr(i*640));
+    print(IntToStr(Mouse_X)+','+IntToStr(Mouse_Y)+' '+IntToStr(Mouse_B)+' '+IntToStr(i*640));
  }
     sleep(10);
 
@@ -110,7 +110,7 @@ begin
 
   readkey;
 
-	TextMode();
+  TextMode();
 
   CallsPerSecond := 640*480 / (EndTime-StartTime);
 

@@ -6,10 +6,10 @@ unit mix;
 interface
 
 uses
-	test,
+  test,
   debug,
   utils,
-	sound,
+  sound,
   go32;
 
 CONST
@@ -17,14 +17,14 @@ CONST
 
 type
 
-	tSoundChannel = class
-		soundEffect: tSoundEffect; 	{the currently playing sound effect}
+  tSoundChannel = class
+    soundEffect: tSoundEffect;   {the currently playing sound effect}
     volume: single;
     pitch: single;
     offset: tTimeCode;       {when the sound should start playing}
     loop: boolean;
     constructor create();
-		procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
+    procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
   end;
 
 
@@ -43,8 +43,8 @@ type
 
 
 var
-	{our global mixer}
-	mixer: tSoundMixer = nil;
+  {our global mixer}
+  mixer: tSoundMixer = nil;
 
   inIRQ: boolean = false;
 
@@ -55,8 +55,8 @@ function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 implementation
 
 uses
-	keyboard, {stub}
-	sbdriver;
+  keyboard, {stub}
+  sbdriver;
 
 var
   scratchBuffer: array[0..8*1024-1] of tAudioSample;
@@ -73,30 +73,30 @@ var
 
 procedure clipAndConvert_MMX(bufSamples:int32);
 var
-	srcPtr, dstPtr, noisePtr: pointer;
+  srcPtr, dstPtr, noisePtr: pointer;
   FPUState: array[0..108-1] of byte; {$ALIGN 16}
 begin
 
-	srcPtr := @scratchBufferI32[0];
-	dstPtr := @scratchBuffer[0];
+  srcPtr := @scratchBufferI32[0];
+  dstPtr := @scratchBuffer[0];
   noisePtr := @mixer.noiseBuffer[0];
 
-	asm
+  asm
 
-  	add noiseCounter, 1997
+    add noiseCounter, 1997
 
-  	pushad
+    pushad
 
     lea eax, FPUState
     fsave [eax]
 
-  	mov ecx, bufSamples
+    mov ecx, bufSamples
     mov esi, srcPtr
     mov edi, dstPtr
 
   @LOOP:
 
-  	{noise}
+    {noise}
     mov ebx, noiseCounter
     and ebx, $FFFF
     shl ebx, 2
@@ -106,17 +106,17 @@ begin
     add noiseCounter, 97
 
     {convert and clip}
-    movq 	mm0, [esi]						// mm0 = LEFT|RIGHT
-    paddd mm0, mm1							// mm0 = LEFT+noise|RIGHT+noise}
-    psrad	mm0, 8								// mm0 = (LEFT+noise)/256|(RIGHT+noise)/256
-    packssdw mm0, mm0						// mm0 = left|right|left|right (16bit)
+    movq   mm0, [esi]            // mm0 = LEFT|RIGHT
+    paddd mm0, mm1              // mm0 = LEFT+noise|RIGHT+noise}
+    psrad  mm0, 8                // mm0 = (LEFT+noise)/256|(RIGHT+noise)/256
+    packssdw mm0, mm0            // mm0 = left|right|left|right (16bit)
 
     movd [edi], mm0
 
     add esi, 8
     add edi, 4
     dec ecx
-  	jnz @LOOP
+    jnz @LOOP
 
     lea eax, FPUState
     frstor [eax]
@@ -129,14 +129,14 @@ end;
 
 procedure clipAndConvert_REF(bufSamples:int32);
 var
-	i: int32;
+  i: int32;
   left,right: int32;
   noise: int32;
 begin
- 	for i := 0 to bufSamples-1 do begin
- 		{adding triangle noise to reduce quantization distortion}
-   	{costs 2ms, for 8ks samples, but I think it's worth it}
-   	noise := ((rnd + rnd) div 2) - 128;
+   for i := 0 to bufSamples-1 do begin
+     {adding triangle noise to reduce quantization distortion}
+     {costs 2ms, for 8ks samples, but I think it's worth it}
+     noise := ((rnd + rnd) div 2) - 128;
     left := (scratchBufferI32[i].left + noise) div 256;
     right := (scratchBufferI32[i].right + noise) div 256;
     if left > 32767 then left := 32767 else if left < -32768 then left := -32768;
@@ -148,23 +148,23 @@ end;
 
 function fakeULAW(value: int32): int32;
 var
-	sign: int32;
+  sign: int32;
   x,y: single;
 const
-	MU = 256-1;
+  MU = 256-1;
   INV_LOG1P_MU = 0.18021017998;
 begin
   if value < 0 then sign := -1 else sign := 1;
-  x := value / (256*32*1024); 						// normalize to -1 to 1
+  x := value / (256*32*1024);             // normalize to -1 to 1
   y := sign * ln(1+MU*abs(x)) / ln(1+MU); // encode (output is also -1 to 1)}
-  y := trunc(y*128) / 128;								// encode as 8bit, including sign
-  x := sign * (power(1 + MU, abs(y)) - 1) / MU;	// decode	
-  result := round(x*256*32*1024);					// we're mixing in 24.8
+  y := trunc(y*128) / 128;                // encode as 8bit, including sign
+  x := sign * (power(1 + MU, abs(y)) - 1) / MU;  // decode
+  result := round(x*256*32*1024);          // we're mixing in 24.8
 end;
 
 function fake8Bit(value: int32): int32;
 begin
-	exit(value div 65536 * 65536);
+  exit(value div 65536 * 65536);
 end;
 
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
@@ -174,14 +174,14 @@ var
   noise: int32;
   pos,len: int32;
   sample,lastSample: pAudioSample;
-	bufSamples: int32;
+  bufSamples: int32;
 
 begin
 
-	result := nil;
+  result := nil;
 
-	{The budget here is about 10ms (for 8ksamples).
-  	Even 20MS is sort of ok, as we'd just reduce halve the block size
+  {The budget here is about 10ms (for 8ksamples).
+    Even 20MS is sort of ok, as we'd just reduce halve the block size
     and 10% CPU to audio is probably ok on a P166}
 
   bufSamples := bufBytes div 4;
@@ -193,9 +193,9 @@ begin
 
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
-  	if mixer.mute or mixer.noise then continue;
-	  if assigned(mixer.channel[j].soundEffect) then begin
-			sfx := mixer.channel[j].soundEffect;
+    if mixer.mute or mixer.noise then continue;
+    if assigned(mixer.channel[j].soundEffect) then begin
+      sfx := mixer.channel[j].soundEffect;
       len := sfx.length;
       if len <= 0 then continue;
 
@@ -206,40 +206,40 @@ begin
       pos := (startTC - mixer.channel[j].offset) mod len;
       sample := pointer(sfx.sample) + (pos * 4);
       lastSample := pointer(sfx.sample) + (len * 4);
-	  	for i := 0 to bufSamples-1 do begin
+      for i := 0 to bufSamples-1 do begin
         scratchBufferI32[i].left += sample^.left*256;
-    	  scratchBufferI32[i].right += sample^.right*256;
+        scratchBufferI32[i].right += sample^.right*256;
         inc(sample);
         if sample >= lastSample then
           sample := pointer(sfx.sample)
-	    end;
-	  end;
+      end;
+    end;
   end;
 
   {stub: simulate 8 bit}
   if keyDownNoCheck(key_8) then
-  	for i := 0 to bufSamples-1 do begin  	
-			scratchBufferI32[i].left := fake8Bit(scratchBufferI32[i].left);
-			scratchBufferI32[i].right := fake8Bit(scratchBufferI32[i].right);
+    for i := 0 to bufSamples-1 do begin
+      scratchBufferI32[i].left := fake8Bit(scratchBufferI32[i].left);
+      scratchBufferI32[i].right := fake8Bit(scratchBufferI32[i].right);
     end;
   {stub: simulate u-law}
   if keyDownNoCheck(key_u) then
-  	for i := 0 to bufSamples-1 do begin
-			scratchBufferI32[i].left := fakeULAW(scratchBufferI32[i].left);
-		  scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
-	  end;
+    for i := 0 to bufSamples-1 do begin
+      scratchBufferI32[i].left := fakeULAW(scratchBufferI32[i].left);
+      scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
+    end;
 
   {mix down}
   if mixer.mute then begin
     filldword(scratchBuffer, bufSamples, 0);
   end else if mixer.noise then begin
-  	for i := 0 to bufSamples-1 do begin
-    	noise := ((rnd + rnd) div 2) - 128;
-			scratchBuffer[i].left := noise*128;
-			scratchBuffer[i].right := noise*128;
+    for i := 0 to bufSamples-1 do begin
+      noise := ((rnd + rnd) div 2) - 128;
+      scratchBuffer[i].left := noise*128;
+      scratchBuffer[i].right := noise*128;
     end;
   end else begin
-  	clipAndConvert_MMX(bufSamples);
+    clipAndConvert_MMX(bufSamples);
   end;
 
   result := @scratchBuffer[0];
@@ -252,28 +252,28 @@ end;
 {converts from seconds since app launch, to timestamp code}
 function secToTC(s: double): tTimeCode;
 begin
-	{note, we do not allow fractional samples when converting}
-	result := round(s * 44100);
+  {note, we do not allow fractional samples when converting}
+  result := round(s * 44100);
 end;
 
 
 {-----------------------------------------------------}
 
 constructor tSoundChannel.create();
-begin	
+begin
   soundEffect := nil;
   volume := 1.0;
   pitch := 1.0;
   offset := 0;
-  loop := false;		
+  loop := false;
 end;
 
 procedure tSoundChannel.play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
 begin
-	self.soundEffect := soundEffect;
+  self.soundEffect := soundEffect;
   self.volume := volume;
   self.pitch := pitch;
-	self.offset := startTime;
+  self.offset := startTime;
   self.loop := loop;
 end;
 
@@ -281,45 +281,45 @@ end;
 
 constructor tSoundMixer.create();
 var
-	i: integer;
+  i: integer;
 begin
-	mute := false;
+  mute := false;
   noise := false;
-	for i := 1 to NUM_CHANNELS do
-  	channel[i] := tSoundChannel.create();
-	for i := 0 to length(noiseBuffer)-1 do begin
-  	noiseBuffer[i] := ((random(256) + random(256)) div 2) - 128;
-  end;		
+  for i := 1 to NUM_CHANNELS do
+    channel[i] := tSoundChannel.create();
+  for i := 0 to length(noiseBuffer)-1 do begin
+    noiseBuffer[i] := ((random(256) + random(256)) div 2) - 128;
+  end;
 end;
 
 procedure tSoundMixer.play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
 var
-	channelNum: integer;
+  channelNum: integer;
   ticksOffset: int32;
 begin
-	{for the moment lock onto the first channel}
+  {for the moment lock onto the first channel}
   if not assigned(soundEffect) then
-  	error('Tried to play invalid sound file');
+    error('Tried to play invalid sound file');
   note('playing sound!  <<--------- self='+hexStr(@self));
   channelNum := 1;
   ticksOffset := round(timeOffset*44100);
-	channel[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
+  channel[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
 end;
 
 procedure initMixer();
 begin
-	note('[init] Mixer');
+  note('[init] Mixer');
   if not lock_data(scratchBuffer, sizeof(scratchBuffer)) then
-  	warn('Could not lock mixer buffer. Audio might stutter.' );
+    warn('Could not lock mixer buffer. Audio might stutter.' );
   if not lock_data(scratchBufferF32, sizeof(scratchBufferF32)) then
-  	warn('Could not lock mixer buffer. Audio might stutter.' );
+    warn('Could not lock mixer buffer. Audio might stutter.' );
   if not lock_data(scratchBufferI32, sizeof(scratchBufferI32)) then
-  	warn('Could not lock mixer buffer. Audio might stutter.' );
+    warn('Could not lock mixer buffer. Audio might stutter.' );
 end;
 
 procedure closeMixer();
 begin
-	note('[close] Mixer');
+  note('[close] Mixer');
   unlock_data(scratchBuffer, sizeof(scratchBuffer));
   unlock_data(scratchBufferF32, sizeof(scratchBufferF32));
   unlock_data(scratchBufferI32, sizeof(scratchBufferI32));

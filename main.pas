@@ -601,14 +601,14 @@ end;
 
 procedure cls(col: RGBA);
 begin
-	filldword(BUFFER, 320*200, 0);
+  filldword(BUFFER, 320*200, 0);
 end;
 
 
 procedure flip();
 begin
 asm
-		push es
+    push es
 
     mov ecx, 320*240
     lea edi, BUFFER
@@ -690,9 +690,9 @@ var
     py: integer;
     col: byte;
 begin
-	for x := 0 to width do begin
-  	for y := 0 to height do begin
-    	px := clip(x, 8, width);
+  for x := 0 to width do begin
+    for y := 0 to height do begin
+      px := clip(x, 8, width);
       py := clip(y, 8, height);
       col := getPixel(px, py);
       putPixel(drawX+x, drawY+y, col);
@@ -1027,14 +1027,14 @@ type SpriteArray = array[0..6, 0..6] of byte;
 
 procedure drawSprite(x,y: integer; arr: SpriteArray);
 var
-	i,j: integer;
-	col: RGBA;
+  i,j: integer;
+  col: RGBA;
 begin
-	col.r := 255;
+  col.r := 255;
   for i := 0 to 6 do begin
-  	for j := 0 to 6 do begin
-    	if (arr[j, i] <> 0) then
-	      putpixel(x+i, y+j, col);
+    for j := 0 to 6 do begin
+      if (arr[j, i] <> 0) then
+        putpixel(x+i, y+j, col);
       end;
   end;
 end;

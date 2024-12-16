@@ -35,7 +35,7 @@ type V3D = record
 
     constructor create(x, y, z: single);
 
-		function rotated(thetaX, thetaY, thetaZ: single): V3D;
+    function rotated(thetaX, thetaY, thetaZ: single): V3D;
     function dot(other: V3D): single;
     procedure clip(maxLen: single);
 
@@ -46,8 +46,8 @@ type V3D = record
     end;
 
 type
-	tMatrix3x3 = record	
-  	data: array[1..9] of single;
+  tMatrix3x3 = record
+    data: array[1..9] of single;
 
     function M(i,j: integer): single; inline;
 
@@ -129,9 +129,9 @@ end;
 
 function V3D.Normed(): V3D;
 var
-	len: single;
+  len: single;
 begin
-	len := self.Abs();
+  len := self.Abs();
   if len = 0 then exit;
   result.x := x / len;
   result.y := y / len;
@@ -171,12 +171,12 @@ end;
 
 function V3D.rotated(thetaX, thetaY, thetaZ: single): V3D;
 var
-	nX,nY,nZ: single;
-	tX,tY,tZ: single;
+  nX,nY,nZ: single;
+  tX,tY,tZ: single;
 
 begin
 
-	tx := x;
+  tx := x;
   ty := y;
   tz := z;
 
@@ -200,7 +200,7 @@ end;
 
 function V3D.dot(other: V3D): single;
 begin
-	result := x*other.x + y*other.y + z*other.z;
+  result := x*other.x + y*other.y + z*other.z;
 end;
 
 constructor V3D.Create(x, y, z: single);
@@ -212,15 +212,15 @@ end;
 
 procedure V3D.clip(maxLen: single);
 begin
-	if self.abs2 > maxLen*maxLen then	
-  	self := self.normed()*maxLen;
+  if self.abs2 > maxLen*maxLen then
+    self := self.normed()*maxLen;
 end;
 
 {---------------------------------------------------}
 
 function tMatrix3x3.M(i,j: integer): single; inline;
 begin
-	result := data[i+(j-1)*3];
+  result := data[i+(j-1)*3];
 end;
 
 function tMatrix3x3.apply(p: V3D): V3D;
@@ -232,23 +232,23 @@ end;
 
 procedure tMatrix3X3.applyScale(factor: single);
 var
-	i: integer;
+  i: integer;
 begin
-	for i := 1 to 9 do
+  for i := 1 to 9 do
     data[i] *= factor;
 end;
 
 procedure tMatrix3X3.rotationZYX(thetaZ, thetaY, thetaX: single);
 var
-	cosX,sinX,cosY,sinY,cosZ,sinZ: single;
+  cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
-	{Byran angles... maybe should have used euler?}
-	sinX := sin(thetaX);
-	cosX := cos(thetaX);
-	sinY := sin(thetaY);
-	cosY := cos(thetaY);
-	sinZ := sin(thetaZ);
-	cosZ := cos(thetaZ);
+  {Byran angles... maybe should have used euler?}
+  sinX := sin(thetaX);
+  cosX := cos(thetaX);
+  sinY := sin(thetaY);
+  cosY := cos(thetaY);
+  sinZ := sin(thetaZ);
+  cosZ := cos(thetaZ);
   data[1] := cosX*cosY;
   data[2] := cosX*sinY*sinZ-sinX*cosZ;
   data[3] := cosX*sinY*cosZ+sinX*sinZ;
@@ -262,14 +262,14 @@ end;
 
 procedure tMatrix3X3.rotationXYZ(thetaX, thetaY, thetaZ: single);
 var
-	cosX,sinX,cosY,sinY,cosZ,sinZ: single;
+  cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
-	sinX := sin(thetaX);
-	cosX := cos(thetaX);
-	sinY := sin(thetaY);
-	cosY := cos(thetaY);
-	sinZ := sin(thetaZ);
-	cosZ := cos(thetaZ);
+  sinX := sin(thetaX);
+  cosX := cos(thetaX);
+  sinY := sin(thetaY);
+  cosY := cos(thetaY);
+  sinZ := sin(thetaZ);
+  cosZ := cos(thetaZ);
   data[1] := cosY*cosZ;
   data[2] := sinX*sinY*cosZ-cosX*sinZ;
   data[3] := cosX*sinY*cosZ+sinX*sinZ;
@@ -282,10 +282,10 @@ begin
 end;
 
 procedure tMatrix3X3.rotationX(theta: single);
-var	
-	cs,sn: single;
+var
+  cs,sn: single;
 begin
-	cs := cos(theta);
+  cs := cos(theta);
   sn := sin(theta);
   data[1] := 1;
   data[2] := 0;
@@ -300,15 +300,15 @@ end;
 
 {matrix multiplication}
 function tMatrix3X3.MM(other: tMatrix3x3): tMatrix3x3;
-var	
-	i,j,k: integer;
+var
+  i,j,k: integer;
   value: single;
 begin
-	for i := 1 to 3 do
-  	for j := 1 to 3 do begin
-    	value := 0;
+  for i := 1 to 3 do
+    for j := 1 to 3 do begin
+      value := 0;
       for k := 1 to 3 do
-      	value += M(i,k) * other.M(k,j);
+        value += M(i,k) * other.M(k,j);
       result.data[i+((j-1)*3)] := value;
     end;
 end;
@@ -334,48 +334,48 @@ end;
 
 function tMatrix3X3.toString(): string;
 var
-	i: integer;
+  i: integer;
 begin
-	result := '';
+  result := '';
   for i := 0 to 2 do
-		result += format('%f %f %f', [data[i*3+1],data[i*3+2],data[i*3+3]]) + #13#10;
+    result += format('%f %f %f', [data[i*3+1],data[i*3+2],data[i*3+3]]) + #13#10;
 end;
 
 {-----------------------------------------------------}
 procedure runTests();
 var
-	p, pInitial: V3D;
+  p, pInitial: V3D;
   target: single;
   A,B,C: tMatrix3x3;
   i,j: integer;
 const
-	degrees45 = 0.785398; {45 degrees in radians}
+  degrees45 = 0.785398; {45 degrees in radians}
 
 begin
-	p := V3D.create(rnd,rnd,rnd);
+  p := V3D.create(rnd,rnd,rnd);
   p := p.normed();
   pInitial := p;
   assert(abs(p.abs-1) < 0.01);
 
   {rotate 45 degrees}
   A.rotationZYX(degrees45,degrees45,degrees45);
-	p := A.apply(pInitial);
-	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
+  p := A.apply(pInitial);
+  assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {rotate random degrees}
   A.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
-	p := A.apply(pInitial);
-	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
+  p := A.apply(pInitial);
+  assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {rotate random degrees}
   A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
-	p := A.apply(pInitial);
-	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
+  p := A.apply(pInitial);
+  assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {check transpose looks ok}
   A.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
-	p := A.transposed().apply(pInitial);
-	assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
+  p := A.transposed().apply(pInitial);
+  assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
 
   {make sure inverses kind of work}
   A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
@@ -383,14 +383,14 @@ begin
   B := A.transposed();
   C := A.MM(B);
   for i := 1 to 3 do
-  	for j := 1 to 3 do begin
-    	if i=j then target := 1 else target := 0;
-    	assert(abs(C.M(i,j)-target) < 0.01, 'Inversion did not work: '+#10#13+C.toString);
+    for j := 1 to 3 do begin
+      if i=j then target := 1 else target := 0;
+      assert(abs(C.M(i,j)-target) < 0.01, 'Inversion did not work: '+#10#13+C.toString);
     end;
 
 
 end;
 
 begin
-	runTests();
+  runTests();
 end.

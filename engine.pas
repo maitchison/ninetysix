@@ -3,14 +3,14 @@ unit engine;
 interface
 
 const
-	GRID_WIDTH = 256;
-	GRID_HEIGHT = 192;
+  GRID_WIDTH = 256;
+  GRID_HEIGHT = 192;
 
 var
-	impact: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
-	impactTMP: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
+  impact: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
+  impactTMP: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
   iImpact: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of int16;
-	iImpactTMP: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of int16;
+  iImpactTMP: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of int16;
 
 
 procedure UpdateImpact_Method1_Reference;
@@ -28,23 +28,23 @@ Reference implementation...
 211ms
 }
 var
-	x,y: integer;
+  x,y: integer;
   dx,dy: integer;
 const
   kernel: array[-1..1, -1..1] of single = (
-  	(1/16, 1/8, 1/16),
-		(1/8,  1/4, 1/8),
+    (1/16, 1/8, 1/16),
+    (1/8,  1/4, 1/8),
     (1/16, 1/8, 1/16)
   );
 begin
-	impactTMP := impact;
+  impactTMP := impact;
 
-	for y := 1 to GRID_HEIGHT-2 do begin
-  	for x := 1 to GRID_WIDTH-2 do begin
-    	impact[y,x] := 0;
+  for y := 1 to GRID_HEIGHT-2 do begin
+    for x := 1 to GRID_WIDTH-2 do begin
+      impact[y,x] := 0;
       for dy := -1 to 1 do
-      	for dx := -1 to 1 do
-      		impact[y,x] += impactTMP[y+dy,x+dx] * kernel[dy,dx];
+        for dx := -1 to 1 do
+          impact[y,x] += impactTMP[y+dy,x+dx] * kernel[dy,dx];
     end;
   end;
 end;
@@ -57,23 +57,23 @@ Faster implementation...
 - No copy, with two passes.
 }
 var
-	x,y: integer;
+  x,y: integer;
   dx,dy: integer;
   prev, this, next: single;
 begin
-	prev := 0;
-	for y := 1 to GRID_HEIGHT-2 do begin
-  	for x := 1 to GRID_WIDTH-2 do begin
-    	this := impact[y,x];
+  prev := 0;
+  for y := 1 to GRID_HEIGHT-2 do begin
+    for x := 1 to GRID_WIDTH-2 do begin
+      this := impact[y,x];
       next := impact[y,x+1];
       impact[y,x] := (prev / 2) + (this / 4) + (next / 2);
       prev := this;
     end;
   end;
-	prev := 0;
+  prev := 0;
   for x := 1 to GRID_WIDTH-2 do begin
-  	for y := 1 to GRID_HEIGHT-2 do begin
-    	this := impact[y,x];
+    for y := 1 to GRID_HEIGHT-2 do begin
+      this := impact[y,x];
       next := impact[y+1,x];
       impact[y,x] := (prev / 2) + (this / 4) + (next / 2);
       prev := this;
@@ -89,26 +89,26 @@ ASM Integer version
 Not tested!
 }
 var
-	x,y: integer;
+  x,y: integer;
 begin
 
-	for y := 1 to GRID_HEIGHT-2 do begin
-  	asm
+  for y := 1 to GRID_HEIGHT-2 do begin
+    asm
 
-    	xor eax, eax
-  		mov ah, y
+      xor eax, eax
+      mov ah, y
       mov al, 1
       shl eax, 1
       mov edi, eax
 
-    	mov cx, GRID_WIDTH-2
-    	mov ax, iImpact[edi-2]    {prev}
+      mov cx, GRID_WIDTH-2
+      mov ax, iImpact[edi-2]    {prev}
       mov bx, iImpact[edi]      {this}
       mov dx, iImpact[edi+2]    {next}
 
     @LOOP:
 
-    	shl bx, 1
+      shl bx, 1
       add ax, bx
       add ax, dx
       shr ax, 2
@@ -119,29 +119,29 @@ begin
       add edi, 2
       mov dx, iImpact[edi]
 
-    	dec cx
+      dec cx
       jnz @LOOP
     end;
 
   end;
 
-	for x := 1 to GRID_WIDTH-2 do begin
-  	asm
+  for x := 1 to GRID_WIDTH-2 do begin
+    asm
 
-    	xor eax, eax
-  		mov ah, 1
+      xor eax, eax
+      mov ah, 1
       mov al, x
       shl eax, 1
       mov edi, eax
 
-    	mov cx, GRID_HEIGHT-2
-    	mov ax, iImpact[edi-(256*2)]    {prev}
+      mov cx, GRID_HEIGHT-2
+      mov ax, iImpact[edi-(256*2)]    {prev}
       mov bx, iImpact[edi]        {this}
       mov dx, iImpact[edi+(256*2)]    {next}
 
     @LOOP:
 
-    	shl bx, 1
+      shl bx, 1
       add ax, bx
       add ax, dx
       shr ax, 2
@@ -152,7 +152,7 @@ begin
       add edi, 2*256
       mov dx, iImpact[edi]
 
-    	dec cx
+      dec cx
       jnz @LOOP
     end;
 
@@ -168,21 +168,21 @@ MMX Integer version
 3.6 ms (but some bugs...)
 }
 var
-	x,y: integer;
+  x,y: integer;
 begin
 
-	for y := 1 to GRID_HEIGHT-2 do begin
-  	asm
+  for y := 1 to GRID_HEIGHT-2 do begin
+    asm
 
-    	xor eax, eax
-  		mov ah, y
+      xor eax, eax
+      mov ah, y
       mov al, 1
       shl eax, 1
       mov edi, eax
 
       {we process 4 pixels at a time using MMX.
        note: we ignore 2 pixels, which isn't great...}
-    	mov cx, GRID_WIDTH-2
+      mov cx, GRID_WIDTH-2
       shr cx, 2
 
     @LOOP:
@@ -191,7 +191,7 @@ begin
       movq mm1, iImpact[edi]      {this}
       movq mm2, iImpact[edi+2]    {next}
 
-    	psllw mm1, 0   {this *= 2}
+      psllw mm1, 0   {this *= 2}
       paddw mm0, mm1
       paddw mm0, mm2
       psrlw mm0, 2
@@ -203,24 +203,24 @@ begin
 
       add edi, 2*4
 
-    	dec cx
+      dec cx
       jnz @LOOP
     end;
 
   end;
 
-	for x := 1 to GRID_WIDTH-2 do begin
-  	asm
+  for x := 1 to GRID_WIDTH-2 do begin
+    asm
 
-    	xor eax, eax
-  		mov ah, 1
+      xor eax, eax
+      mov ah, 1
       mov al, x
       shl eax, 1
       mov edi, eax
 
       {we process 4 pixels at a time using MMX.
        note: we ignore 2 pixels, which isn't great...}
-    	mov cx, GRID_HEIGHT-2
+      mov cx, GRID_HEIGHT-2
       shr cx, 2
 
     @LOOP:
@@ -229,7 +229,7 @@ begin
       movq mm1, iImpact[edi]      {this}
       movq mm2, iImpact[edi+(2*256)]    {next}
 
-    	psllw mm1, 0   {this *= 2}
+      psllw mm1, 0   {this *= 2}
       paddw mm0, mm1
       paddw mm0, mm2
       psrlw mm0, 2
@@ -238,7 +238,7 @@ begin
 
       add edi, (2*256)*4
 
-    	dec cx
+      dec cx
       jnz @LOOP
     end;
 
@@ -255,21 +255,21 @@ Reference implementation...
 Not fast....
 }
 var
-	x,y: integer;
-	prev,this,next: single;
+  x,y: integer;
+  prev,this,next: single;
   w1,w2,w3,w4,w0,wt: single;
   value: single;
   give: single;
   total: single;
 begin
-	total := 0;
+  total := 0;
   impactTMP := impact;
   for y := 1 to GRID_HEIGHT-1 do begin
-  	for x := 1 to GRID_WIDTH-1 do begin
+    for x := 1 to GRID_WIDTH-1 do begin
 
-    	if grid[y,x].typeid = 1 then continue;
+      if grid[y,x].typeid = 1 then continue;
 
-  		value := impactTMP[y,x];
+      value := impactTMP[y,x];
       total += value;
 
       w1 := 0;

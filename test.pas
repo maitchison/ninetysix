@@ -5,7 +5,7 @@ interface
 
 
 type
-	tBytes = array of byte;
+  tBytes = array of byte;
 
 procedure assertError(msg: string); overload;
 
@@ -18,54 +18,54 @@ procedure assertEqualLarge(a, b: tBytes); overload;
 implementation
 
 uses
-	utils,
-	debug;
+  utils,
+  debug;
 
 procedure assertError(msg: string); overload;
 begin
-	error('Test case failed: '+msg);
+  error('Test case failed: '+msg);
 end;
 
 procedure assert(condition: boolean;msg: string); overload;
 begin
-	if not condition then assertError(msg);
+  if not condition then assertError(msg);
 end;
 
 procedure assertEqual(value, expected: string); overload;
 begin
-	if value <> expected then
-  	assertError('Expecting "'+expected+'" but found "'+value+'".');
+  if value <> expected then
+    assertError('Expecting "'+expected+'" but found "'+value+'".');
 end;
 
 procedure assertEqual(a, b: tBytes); overload;
 var
-	i: integer;
+  i: integer;
   strA, strB: string;
 begin
-	strA := bytesToSanStr(a);
+  strA := bytesToSanStr(a);
   strB := bytesToSanStr(b);
-	if length(a) <> length(b) then
-		assertError('Expecting "'+strb+'" but found "'+stra+'".');
+  if length(a) <> length(b) then
+    assertError('Expecting "'+strb+'" but found "'+stra+'".');
   for i := 0 to length(a)-1 do
-  	if a[i] <> b[i] then
-    	assertError('Expecting "'+#13#10+strb+'" but found "'+#13#10+stra+'".');
+    if a[i] <> b[i] then
+      assertError('Expecting "'+#13#10+strb+'" but found "'+#13#10+stra+'".');
 end;
 
 procedure assertEqualLarge(a, b: tBytes); overload;
 var
-	i: int32;
+  i: int32;
 begin
-	if length(a) <> length(b) then
-		assertError('Expecting "'+intToStr(length(b))+'" but found "'+intToStr(length(a))+'".');
+  if length(a) <> length(b) then
+    assertError('Expecting "'+intToStr(length(b))+'" but found "'+intToStr(length(a))+'".');
   for i := 0 to length(a)-1 do
-  	if a[i] <> b[i] then
-    	assertError('Expecting "'+intToStr(b[i])+'" but found "'+intToStr(a[i])+' at pos '+intToStr(i)+'".');
+    if a[i] <> b[i] then
+      assertError('Expecting "'+intToStr(b[i])+'" but found "'+intToStr(a[i])+' at pos '+intToStr(i)+'".');
 end;
 
 procedure assertEqual(value, expected: int64); overload;
 begin
-	if value <> expected then
-  	assertError('Expecting '+IntToStr(expected)+' but found '+intToStr(value)+'.');
+  if value <> expected then
+    assertError('Expecting '+IntToStr(expected)+' but found '+intToStr(value)+'.');
 end;
 
 begin
