@@ -13,21 +13,41 @@ uses
   go32,
   vga;
 
+type tVesaInfo = packed record
+  {----------- VBE 1.0 -----------------}
+  Signature: array[1..4] of char;
+  Version: word;
+  OemStringPtr: dWord;
+  Capabilities: dWord;
+  VideoModePtr: dWord;
+  TotalMemory: word; {in 64k blocks}
+  {----------- VBE 2.0 -----------------}
+  OemSoftwareRev: word;
+  OemVendorNamePtr: dWord;
+  OemProducNamePtr: dWord;
+  OemProductRevPtr: dWord;
+end;
+
 type tVesaDriver = class(tVGADriver)
-    fMappedPhysicalAddress: dword;
-  protected
+  private
+    vesaInfo: tVesaInfo;
+    mappedPhysicalAddress: dword;
     procedure allocateLFB(physicalAddress:dWord);
+    function getVesaInfo(): tVesaInfo;
   public
+    constructor create();
+    procedure logInfo();
+    procedure logModes();
     procedure setMode(width, height, BPP: word); override;
     procedure setLogicalSize(width, height: word); override;
     procedure setDisplayStart(x, y: word); override;
+
   end;
 
 implementation
 
-{----------------------------------------------------------------}
 
-type TVesaModeInfo = packed record
+type tVesaModeInfo = packed record
   {Vesa 1.0}
   ModeAttributes: word;
   WinAAttributes: byte;
@@ -59,27 +79,9 @@ type TVesaModeInfo = packed record
   not_used: array[1..205] of byte;
 end;
 
-type tVesaInfo = packed record
-  {----------- VBE 1.0 -----------------}
-  Signature: array[1..4] of Char;
-  Version: Word;
-  OemStringPtr: dWord;
-  Capabilities: dWord;
-  VideoModePtr: dWord;
-  TotalMemory: Word;
-  {----------- VBE 2.0 -----------------}
-  OemSoftwareRev: word;
-  OemVendorNamePtr: dWord;
-  OemProducNamePtr: dWord;
-  OemProductRevPtr: dWord;
-end;
+{----------------------------------------------------------------}
 
-var
-  vesaInfo: tVesaInfo;
-  Regs: tRealRegs;
-  dosSel, dosSeg: word;
-
-{Alllocates dos memory
+{Allocates dos memory
 seg:ofs, where ofs is always 0.
 selector can be used to free the memory.
 }
@@ -97,15 +99,12 @@ begin
   global_dos_free(selector);
 end;
 
-
 function getModeInfo(mode: word): TVesaModeInfo;
 var
   regs: tRealRegs;
   sel, seg: word;
 begin
-
   dosAlloc(sel, seg, sizeof(TVesaModeInfo));
-
   with regs do begin
     ax := $4f01;
     cx := mode;
@@ -113,22 +112,47 @@ begin
     di := 0;
     realintr($10, regs);
   end;
-
   dosmemget(seg, 0, result, sizeof(TVesaModeInfo));
-
   dosFree(sel);
-
 end;
-
-
-{Set the display page (zero indexed)}
-procedure SetDisplayPage(page: integer);
-begin
-{  SetDisplayStart(0, SCREEN_HEIGHT*page);}
-end;
-
 
 {----------------------------------------------------------------}
+
+constructor tVesaDriver.create();
+begin
+  vesaInfo := getVesaInfo();
+end;
+
+procedure tVesaDriver.logInfo();
+begin
+  note(format(
+    'VESA v%d.%d (%f MB)',
+    [
+      vesaInfo.version shr 8,
+      vesaInfo.version and $ff,
+      vesaInfo.totalMemory * 64 / 1024
+    ]));
+end;
+
+procedure tVesaDriver.logModes();
+var
+  i: integer;
+begin
+    DosMemGet(
+    word(VesaInfo.VideoModePtr shr 16),
+    word(VesaInfo.VideoModePtr),
+    vesaModes, sizeof(vesaModes));
+
+  for i := 0 to length(VesaModes)-1 do begin
+    if VesaModes[i] = $FFFF then break;
+    with getModeInfo(VesaModes[i]) do begin
+      if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
+        mode := VesaModes[i];
+        break
+      end;
+    end;
+  end;
+end;
 
 procedure tVesaDriver.allocateLFB(physicalAddress: dword);
 const
@@ -149,8 +173,26 @@ begin
     error('Error setting LFB segment limit.');
 
   info('Mapped LFB to segment $' + HexStr(fLFB_SEG, 4));
-  fMappedPhysicalAddress := physicalAddress;
+  mappedPhysicalAddress := physicalAddress;
+end;
 
+function tVesaDriver.getVesaInfo(): tVesaInfo;
+var
+  sel,seg: word;
+  regs: tRealRegs;
+begin
+  fillchar(result, sizeof(result), 0);
+  dosAlloc(sel, seg, 512);
+  result.Signature := 'VBE2';
+  dosmemput(seg, 0, result, sizeof(vesaInfo));
+  with regs do begin
+    ax := $4F00;
+    es := seg;
+    di := 0;
+    realintr($10, regs);
+  end;
+  dosMemGet(seg, 0, result, sizeof(tVesaInfo));
+  dosFree(sel);
 end;
 
 {Set graphics mode. Once complete the framebuffer can be accessed via
@@ -162,23 +204,11 @@ var
   mode: word;
   rights: dword;
   physicalAddress: dWord;
+  regs: tRealRegs;
+  dosSeg, dosSel: word;
 begin
 
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
-
-  {vesa stuff}
-  dosAlloc(dosSel, dosSeg, 512);
-  VesaInfo.Signature := 'VBE2';
-  dosmemput(dosSeg, 0, vesaInfo, sizeof(vesaInfo));
-
-  with regs do begin
-    ax := $4F00;
-    es := dosSeg;
-    di := 0;
-    realintr($10, regs);
-  end;
-
-  DosMemGet(dosSeg, 0, vesaInfo, sizeof(tVesaInfo));
 
   { get list of video modes }
   {todo: this looks wrong}
@@ -208,21 +238,19 @@ begin
     realintr($10, regs);
   end;
 
-  dosFree(dosSel);
-
   {Find our physical address}
   physicalAddress := dword(getModeInfo(mode).PhysBasePtr);
   if physicalAddress <> $E0000000 then
     Warn('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
 
-  if fMappedPhysicalAddress = 0 then begin
+  if mappedPhysicalAddress = 0 then begin
     {allocate for the first time}
     allocateLFB(physicalAddress);
-  end else if fMappedPhysicalAddress <> physicalAddress then begin
+  end else if mappedPhysicalAddress <> physicalAddress then begin
     {address moved, this is a bit weird}
     Warn(format(
       'Physical address moved, was at $%s and is now at $%s $',
-      [hexStr(fMappedPhysicalAddress, 8), hexStr(physicalAddress, 8)]
+      [hexStr(mappedPhysicalAddress, 8), hexStr(physicalAddress, 8)]
     ));
     allocateLFB(physicalAddress);
   end;
@@ -276,4 +304,12 @@ end;
 {----------------------------------------------------------------}
 
 begin
+
+{
+var
+  vesaInfo: tVesaInfo;
+  Regs: tRealRegs;
+  dosSel, dosSeg: word;
+
+}
 end.

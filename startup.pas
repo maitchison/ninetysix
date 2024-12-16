@@ -12,5 +12,4 @@ begin
   textAttr := $1f;
   clrscr();
   writeln('Airtime is starting up.');
-  writeln();
 end.
