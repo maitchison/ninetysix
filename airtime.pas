@@ -283,7 +283,9 @@ var
   xAngle, zAngle: single; {in degrees}
   xTheta, zTheta: single; {in radians}
   k: single;
+  b: byte;
 begin
+  b := 0;
   note('Title screen started');
 
   titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
@@ -352,6 +354,15 @@ begin
 
     mixer.mute := keyDown(key_m);
     mixer.noise := keyDown(key_n);
+
+    if keyDown(key_e) then begin
+      {force an error}
+      asm
+        mov edi, 0
+        mov ecx, 4
+        stosd
+      end;
+    end;
 
     if keyDown(key_p) and keyDown(key_l) and keyDown(key_y) then mainLoop();
 

@@ -169,8 +169,40 @@ begin
   end;
 end;
 
+{my version of dump stack from system}
+procedure dumpStack(fp: pointer);
+var
+  i : longint;
+  addr: codePointer;
+  prevfp : pointer;
+begin
+  addr := nil;
+  prevfp := get_frame;
+  i := 0;
+  while true do begin
+    if (fp < prevfp) then begin
+      warn('Stack frame corrupted');
+      exit;
+    end;
+    if (fp = prevfp) then begin
+      warn('Stack frame has loop');
+      exit;
+    end;
+    if (fp >= StackTop) then begin
+      warn('Stack frame out of bounds');
+      exit;
+    end;
+    prevfp:=fp;
+    get_caller_stackinfo(fp, addr);
+    if (addr=nil) then break;
+    note(backTraceStrFunc(addr));
+    if (fp=nil) then break;
+    inc(i);
+    if (i > 256) then break;
+  end;
+end;
 
-procedure CustomErrorProc(ErrNo: longint; Address:CodePointer; Frame: Pointer);
+procedure CustomErrorProc(ErrNo: longint; address:CodePointer; frame: Pointer);
 var
   CallerAddr: Pointer;
   FramePtr: Pointer;
@@ -182,16 +214,14 @@ const
   MAX_FRAMES = 16;
 begin
 
-  if assigned(videoDriver) then videoDriver.setText();
+  if assigned(videoDriver) then begin
+    if not videoDriver.isText then begin
+      videoDriver.setText();
+      clrscr;
+    end;
+  end;
 
-  Writeln('An error has occured!');
-
-  {todo: maybe write this to the log (if it's still open)}
-
-  WriteLn(LineEnding, 'Log:');
-  PrintLog();
-  WriteLn('');
-
+  warn('An error has occured!');
 
   case ErrNo of
     100: RunError := 'General Error (100)';
@@ -199,22 +229,14 @@ begin
     else RunError := 'Runtime error '+IntToStr(ErrNo);
   end;
 
+  warn(RunError);
+  note(backTraceStrFunc(address));
+  dumpStack(frame);
 
-  WriteLn(RunError);
-  WriteLn();
-
-
-  Writeln('Stack trace:');
-  InfoStr := BackTraceStrFunc(Address);
-  writeln(InfoStr);
-  dump_stack(STDOUT, Frame);
-
-
-  if Assigned(OldErrorProc) then
-    TErrorProc(OldErrorProc)(ErrNo, Address, Frame);
+  if assigned(OldErrorProc) then
+    tErrorProc(OldErrorProc)(ErrNo, Address, Frame);
 
   Halt(ErrorCode);
-
 end;
 
 {
