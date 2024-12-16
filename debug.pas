@@ -30,8 +30,8 @@ CONST
 type
 
   tLogEntry = record
-    Time: TMyDateTime;
-    Msg: string;
+    time: TMyDateTime;
+    msg: string;
     level: byte;
     function toString: String;
   end;
@@ -72,13 +72,9 @@ implementation
 uses
   vga;
 
-function TLogEntry.ToString(): String;
+function tLogEntry.toString(): String;
 begin
-  result :=
-    time.YYMMDD + ' '+
-{todo: add time}
-{    FormatDateTime('HH:NN', self.Time) + ' - '+}
-    self.Msg;
+  result := self.Msg;
 end;
 
 {write entry to log}
@@ -96,8 +92,8 @@ begin
   LogEntries[LogCount] := entry;
   {Write to disk}
   If WRITE_TO_LOG and LogFileOpen then begin
-    WriteLn(LogFile, entry.ToString);
-    Flush(LogFile);
+    writeln(logFile, entry.time.YYMMDD + ' ' +entry.time.HHMMSS + ' ' + entry.toString);
+    flush(logFile);
   end;
 
   if WRITE_TO_SCREEN then begin
