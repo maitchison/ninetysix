@@ -95,7 +95,7 @@ begin
   sample := nil;
   length := 0;
 
-  extension := getExtension(filename);
+  extension := toLowerCase(extractExtension(filename));
   if extension = 'wav' then
     loadFromWave(filename)
   else if extension = 'la9' then

@@ -305,6 +305,7 @@ end;
 
 var
   small: integer;
+  programFilename: string;
 
 begin
 
@@ -320,7 +321,8 @@ begin
   end;
 
   // Open Log File
-  Assign(LogFile, 'log.txt');
+  programFilename := toLowerCase(extractFilename(paramStr(0)));
+  Assign(LogFile, removeExtension(programFilename)+'.log');
   Rewrite(LogFile);
   LogFileOpen := True;
 

@@ -431,13 +431,12 @@ end;
 begin
 
   {setup heap logging before units start.}
-  {$IF DECLARED(heaptrc)}
-  info('Tracer size '+intToStr(heaptrc.tracesize));
+  {$if declared(Heaptrc)}
   heaptrc.setHeapTraceOutput('heaptrc.txt');
   heaptrc.printfaultyblock := true;
   heaptrc.printleakedblock := true;
   heaptrc.maxprintedblocklength := 64;
-  {$ENDIF}
+  {$endif}
 
   logHeapStatus('Program start');
 

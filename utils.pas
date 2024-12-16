@@ -78,7 +78,9 @@ procedure delay(ms: double);
 procedure logHeapStatus(msg: string='Heap status');
 function exists(filename: string): boolean;
 function toLowerCase(const s: string): string;
-function getExtension(const filename: string): string;
+function extractExtension(const path: string): string;
+function extractFilename(const path: string): string;
+function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
@@ -444,16 +446,37 @@ begin
 end;
 
 {return a filename extension}
-function getExtension(const filename: string): string;
+function extractExtension(const path: string): string;
 var
   dotPos: integer;
 begin
-  dotPos := pos('.', filename);
+  dotPos := pos('.', path);
   if dotPos >= 0 then
-    result := copy(filename, dotPos+1, length(filename) - dotPos)
+    result := copy(path, dotPos+1, length(path) - dotPos)
   else
     result := '';
-  result := toLowerCase(result);
+end;
+
+function removeExtension(const filename: string): string;
+var
+  dotPos: integer;
+  i: int32;
+begin
+  for i := length(filename) downto 1 do
+    if filename[i] = '.' then
+      exit(copy(filename, 1, i-1));
+  exit(filename);
+end;
+
+{return a filename from path}
+function extractFilename(const path: string): string;
+var
+  i: integer;
+begin
+  for i := length(path) downto 1 do
+    if path[i] in ['\', '/'] then
+      exit(copy(path, i+1, length(path)));
+  exit(path);
 end;
 
 function comma(value: int64; width: word; padding: char=' '): string;
@@ -586,9 +609,6 @@ begin
    time.}
   if ms > 60 then
     sleep(ms-55);
-
-  {stub:}
-  writeln(MSTarget-GetMsCount());
 
   while GetMsCount() < MSTarget do begin
     {pass}
@@ -881,14 +901,24 @@ begin
   for i := -256 to +256 do
     AssertEqual(negDecode(negEncode(i)), i);
 
+  assertEqual(extractExtension('fish.com'), 'com');
+  assertEqual(extractExtension('FISH.COM'), 'COM');
+
+  assertEqual(extractFilename('fish.com'), 'fish.com');
+  assertEqual(extractFilename('FISH.COM'), 'FISH.COM');
+  assertEqual(extractFilename('c:\FISH.COM'), 'FISH.COM');
+  assertEqual(extractFilename('c:\src\airtime.exe'), 'airtime.exe');
+
+  assertEqual(removeExtension('fish.com'), 'fish');
+  assertEqual(removeExtension('fish'), 'fish');
+  assertEqual(removeExtension('.'), '');
+  assertEqual(removeExtension('A.'), 'A');
+
   {test comma}
-  {stub}
-  {
   assertEqual(comma(5), '5');
   assertEqual(comma(100), '100');
   assertEqual(comma(1200), '1,200');
   assertEqual(comma(987654321), '987,654,321');
-  }
 end;
 
 procedure initUtils;
