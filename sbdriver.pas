@@ -59,7 +59,7 @@ const
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 2*1024;
+  BUFFER_SIZE = 4*1024;
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 
@@ -83,9 +83,9 @@ var
    reference a copy of it}
   backupDS: word = 0;
 
-const
-{72?}
-  SB_IRQ = $72; {INT10 in protected mode is $70+IRQ-8}
+var
+  SB_INT: byte = 0;
+  SB_IRQ: byte = 0;
 
 var
   sbGood: boolean = false;
@@ -347,7 +347,8 @@ begin
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
-  port[$A0] := $20;
+  if SB_INT >= $70 then
+    port[$A0] := $20;
   port[$20] := $20;
 
   asm
@@ -362,7 +363,6 @@ begin
 end;
 {$F-,S+,R+,Q+}
 
-
 var
   oldIntVec: tSegInfo;
   newIntVec: tSegInfo;
@@ -374,19 +374,30 @@ var
 var
   hasInstalledInt: boolean=False;
 
-procedure install_ISR();
+procedure install_ISR(irq: byte);
 begin
-  note('Installing music interupt');
+  note('Installing music interupt on IRQ'+intToStr(irq));
+
+  case irq of
+    0..7: SB_INT := $08+irq;
+    8..15: SB_INT := $70+irq-8;
+    else error('Invalid IRQ for SB');
+  end;
+  SB_IRQ := irq;
+
   newIntVec.offset := @soundBlaster_ISR;
   newIntVec.segment := get_cs;
 
-  irqStopMask := 1 shl (10 mod 8);
+  irqStopMask := 1 shl (SB_IRQ mod 8);
   irqStartMask := not IRQStopMask;
 
   get_pm_interrupt(SB_IRQ, oldIntVec);
   set_pm_interrupt(SB_IRQ, newIntVec);
 
-  port[$A1] := port[$A1] and IRQStartMask;
+  if SB_IRQ >= 8 then
+    port[$A1] := port[$A1] and IRQStartMask
+  else
+    port[$21] := port[$21] and IRQStartMask;
 
   hasInstalledInt := true;
 
@@ -396,7 +407,10 @@ procedure uninstall_ISR;
 begin
   if not hasInstalledInt then exit;
   note('Removing music interupt');
-  port[$A1] := port[$A1] or IRQStopMask;
+  if SB_IRQ >= 8 then
+    port[$A1] := port[$A1] or IRQStopMask
+  else
+    port[$21] := port[$21] or IRQStopMask;
   set_pm_interrupt(SB_IRQ, oldIntVec);
   hasInstalledInt := false;
 end;
@@ -598,9 +612,15 @@ end;
 
 {----------------------------------------------------------}
 
+function getPage(addr: dword): word;
+begin
+  result := (addr shr 16);
+end;
+
 procedure initSound();
 var
   res: longint;
+  addr: dword;
 begin
   note('[init] Sound');
   sbGood := DSPReset();
@@ -610,17 +630,28 @@ begin
   else
     warn('No SoundBlaster detected');
 
-  res := Global_Dos_Alloc(BUFFER_SIZE);
+  if BUFFER_SIZE > 32*1024 then
+    error('Invalid BUFFER_SIZE, must be <= 32k');
+  if (BUFFER_SIZE and $f) <> 0 then
+    error('Invalid BUFFER_SIZE, must be a multiple of 16');
+
+  {allocate twice the memory, this way atleast one half will not be split across segment boundaries}
+  res := Global_Dos_Alloc(BUFFER_SIZE*2);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
     error('Failed to allocate dos memory');
+
+  addr := (dosSegment shl 4);
+  if getPage(addr) <> getPage(addr + BUFFER_SIZE) then begin
+    warn('SB Buffer allocation spanned a page, so I moved it.');
+    dosSegment += (BUFFER_SIZE shr 4);
+  end;
+
   note(format('Sucessfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
-  install_ISR();
-  delay(1); {not sure if this is needed?}
+  install_ISR(DSPIrq);
   initiateDMAPlayback();
-
 end;
 
 procedure freeBuffer();
@@ -633,7 +664,6 @@ end;
 procedure closeSound();
 begin
   note('[done] sound');
-
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   if debug_dma_page_corrections > 0 then
     warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
@@ -651,13 +681,8 @@ end;
 {----------------------------------------------------------}
 
 begin
-
   backupDS := get_ds();
-
   runTests();
-
   initSound();
-
   addExitProc(closeSound);
-
 end.
