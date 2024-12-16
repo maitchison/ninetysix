@@ -29,11 +29,11 @@ CONST
 
 type
 
-  TLogEntry = record
+  tLogEntry = record
     Time: TMyDateTime;
     Msg: string;
     level: byte;
-    function ToString(): String;
+    function toString: String;
   end;
 
 var

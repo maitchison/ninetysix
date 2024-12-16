@@ -11,6 +11,6 @@ var
 begin
   clrscr;
   driver := tVesaDriver.create();
-  driver.logInfo();
   driver.logModes();
+  driver.logInfo();
 end.

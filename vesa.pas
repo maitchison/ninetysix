@@ -46,6 +46,12 @@ type tVesaDriver = class(tVGADriver)
 
 implementation
 
+const
+  VESA_MEMORYMODEL_TEXT=0;
+  VESA_MEMORYMODEL_PLANAR=3;
+  VESA_MEMORYMODEL_PACKED=4;
+  VESA_MEMORYMODEL_DIRECT=6;
+
 
 type tVesaModeInfo = packed record
   {Vesa 1.0}
@@ -137,19 +143,22 @@ end;
 procedure tVesaDriver.logModes();
 var
   i: integer;
+  vesaModes: array[0..63] of word;
+  postfix: string;
 begin
-    DosMemGet(
-    word(VesaInfo.VideoModePtr shr 16),
-    word(VesaInfo.VideoModePtr),
+  dosMemGet(
+    word(vesaInfo.VideoModePtr shr 16),
+    word(vesaInfo.VideoModePtr),
     vesaModes, sizeof(vesaModes));
+  for i := 0 to length(vesaModes)-1 do begin
+    if vesaModes[i] = $FFFF then break;
+    with getModeInfo(vesaModes[i]) do begin
+      if memoryModel = VESA_MEMORYMODEL_TEXT then
+        postfix := '(text)'
+      else
+        postfix := '';
 
-  for i := 0 to length(VesaModes)-1 do begin
-    if VesaModes[i] = $FFFF then break;
-    with getModeInfo(VesaModes[i]) do begin
-      if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
-        mode := VesaModes[i];
-        break
-      end;
+      note(format('[%d] %dx%dx%d %s', [i, xResolution, yResolution, bitsPerPixel, postfix]));
     end;
   end;
 end;
