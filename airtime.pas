@@ -5,13 +5,13 @@ program airtime;
 
 uses
   startup,
+  debug,
+  utils,
   vga,
   vesa,
   graph32,
   graph2d,
-  debug,
   test,
-  utils,
   sbDriver,
   mouse,
   keyboard,
@@ -23,7 +23,8 @@ uses
   screen,
   mix,
   font,
-  sound;
+  sound,
+  go32;
 
 var
 
@@ -282,8 +283,10 @@ var
   k: single;
   b: byte;
 begin
+
+  logHeapStatus('Title screen started');
+
   b := 0;
-  note('Title screen started');
 
   titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
   titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
@@ -427,9 +430,20 @@ end;
 
 begin
 
-  note('Units have loaded');
+  {setup heap logging before units start.}
+  {$IF DECLARED(heaptrc)}
+  info('Tracer size '+intToStr(heaptrc.tracesize));
+  heaptrc.setHeapTraceOutput('heaptrc.txt');
+  heaptrc.printfaultyblock := true;
+  heaptrc.printleakedblock := true;
+  heaptrc.maxprintedblocklength := 64;
+  {$ENDIF}
+
+  logHeapStatus('Program start');
 
   loadResources();
+
+  logHeapStatus('Resources loaded');
 
   videoDriver := tVesaDriver.create();
   videoDriver.setMode(640,480,32);

@@ -6,13 +6,10 @@ unit Debug;
 interface
 
 uses
-  utils,
   crt;
 
 var
   oldErrorProc: Pointer;
-  i: integer;
-  x: byte;
 
 CONST
   HOOK_EXIT: boolean = True;
@@ -30,7 +27,7 @@ CONST
 type
 
   tLogEntry = record
-    time: TMyDateTime;
+    time: tDateTime;
     msg: string;
     level: byte;
     function toString: String;
@@ -70,6 +67,7 @@ var
 implementation
 
 uses
+  utils,
   vga;
 
 function tLogEntry.toString(): String;
@@ -93,7 +91,7 @@ begin
   LogEntries[LogCount] := entry;
   {Write to disk}
   If WRITE_TO_LOG and logFileOpen then begin
-    writeln(logFile, entry.time.YYMMDD + ' ' +entry.time.HHMMSS + ' ' + entry.toString);
+    writeln(logFile, tMyDateTime(entry.time).YYMMDD + ' ' +tMyDateTime(entry.time).HHMMSS + ' ' + entry.toString);
     flush(logFile);
   end;
 
@@ -154,6 +152,8 @@ var
 end;
 
 procedure BasicPrintLog();
+var
+  i: int32;
 begin
   for i := 0 to LogCount-1 do
     writeln(LogEntries[i].msg);
@@ -336,6 +336,8 @@ begin
     AddExitProc(@shutdownLog);
   end;
 
-  Info('[init] Logging');
+  info('[init] Logging');
+
+  showCPUInfo();
 
 end.

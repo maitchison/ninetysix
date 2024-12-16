@@ -26,7 +26,7 @@ type
   tWords = array of word;
   tDWords = array of dword;
 
-  TMyDateTime = record
+  tMyDateTime = record
 
     asDouble: double;
 
@@ -75,10 +75,12 @@ procedure delay(ms: double);
 {------------------------------------------------}
 { My custom routines }
 
+procedure logHeapStatus(msg: string='Heap status');
 function exists(filename: string): boolean;
 function toLowerCase(const s: string): string;
 function getExtension(const filename: string): string;
 
+function comma(value: int64; width: word=0; padding: char=' '): string;
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: tBytes): string;
@@ -107,13 +109,14 @@ function  fileModifiedTime(fileName: string): longint;
 
 function  getTickCount(): int64;
 function  getMSCount(): int64;
-function   getEstimatedMHZ: double;
+function  getEstimatedMHZ: double;
+procedure showCPUInfo();
 
 implementation
 
 uses
-  test,
-  debug;
+  debug,
+  test;
 
 var
   SEED: byte;
@@ -232,7 +235,6 @@ begin
             vtInteger: result += IntToStr(args[ArgIndex].VInteger);
             vtString: result += string(args[ArgIndex].VString^);
             vtAnsiString: result += AnsiString(args[ArgIndex].VAnsiString);
-
             else Error('Invalid type for %s:'+IntToStr(a.VType));
           end;
         end;
@@ -387,6 +389,35 @@ begin
   end;
 end;
 
+procedure logHeapStatus(msg: string='Heap status');
+var
+  hs: tFPCHeapStatus;
+  memInfo: tMemInfo;
+  usedMem, totalMem, freeMem: int32;
+begin
+  hs:= getFPCHeapStatus();
+  get_memInfo(memInfo);
+
+  {
+  Total memory is the amount of system memory on the machine.
+  Used memory is memory used by our heap.
+  Free memory is avalaible physical memory, which could be less than
+    total-used, if, for example, we run from an IDE which retains
+    it's allocations.
+  }
+  totalMem := memInfo.total_physical_pages * get_page_size;
+  usedMem := hs.currHeapSize;
+  freeMem := memInfo.available_physical_pages * get_page_size;
+  note(format(
+    '>> %s used:%skb free:%skb',
+    [
+      msg,
+      // total_physical_pages
+      comma(usedMem div 1024),
+      comma(freeMem div 1024)
+    ]));
+end;
+
 function exists(filename: string): boolean;
 var
   f: file;
@@ -423,6 +454,21 @@ begin
   else
     result := '';
   result := toLowerCase(result);
+end;
+
+function comma(value: int64; width: word; padding: char=' '): string;
+var
+  s: string;
+  i, j: int32;
+begin
+  s := intToStr(value, width, padding);
+  result := '';
+  for i := length(s) downto 1 do begin
+    j := length(s) - i;
+    result := s[i] + result;
+    if (j mod 3 = 2) and (i <> 1) then
+      result := ',' + result;
+  end;
 end;
 
 function intToStr(value: int64; width: word; padding: char='0'): string;
@@ -769,7 +815,7 @@ var
   y,m,d: word;
 begin
   DecodeDate(y,m,d);
-  result := IntToStr(y, 2) + sep + IntToStr(m, 2) + sep + IntToStr(d, 2);
+  result := IntToStr(y, 2, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(d, 2, '0');
 end;
 
 function TMyDateTime.HHMMSS(sep: string=':'): string;
@@ -777,7 +823,7 @@ var
   h,m,s,ss: word;
 begin
   DecodeTime(h,m,s,ss);
-  result := IntToStr(h, 2) + sep + IntToStr(m, 2) + sep + IntToStr(s, 2);
+  result := IntToStr(h, 2, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(s, 2, '0');
 end;
 
 {returns the estimated clock rate of the machine.}
@@ -808,6 +854,7 @@ end;
 procedure runTests();
 var
   a,b: string;
+  i: int32;
 begin
 
   note('[init] Utils');
@@ -834,6 +881,14 @@ begin
   for i := -256 to +256 do
     AssertEqual(negDecode(negEncode(i)), i);
 
+  {test comma}
+  {stub}
+  {
+  assertEqual(comma(5), '5');
+  assertEqual(comma(100), '100');
+  assertEqual(comma(1200), '1,200');
+  assertEqual(comma(987654321), '987,654,321');
+  }
 end;
 
 procedure initUtils;
@@ -841,7 +896,16 @@ begin
   updateRDTSCRate();
   programStartTSC := getTSC();
   SEED := 97;
-  info(format('Estimated clock rate %fMHZ',[getEstimatedMHZ]));
+end;
+
+procedure showCPUInfo();
+var
+  memInfo: tMemInfo;
+  totalMem: int64;
+begin
+  get_memInfo(memInfo);
+  totalMem := memInfo.total_physical_pages * get_page_size;
+  info(format('System estimated to be %fMHZ with %fMB ram',[getEstimatedMHZ, totalMem/1024/1024]));
 end;
 
 begin
