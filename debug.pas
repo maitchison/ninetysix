@@ -63,11 +63,14 @@ const
   IO_PATH_NOT_FOUND = 3;
   IO_ACCESS_DENIED = 5;
 
+var
+  WRITE_TO_LOG: boolean = true;
+  WRITE_TO_SCREEN: boolean = true;
+
 implementation
 
 uses
   vga;
-
 
 function TLogEntry.ToString(): String;
 begin
@@ -92,9 +95,13 @@ begin
   {Save to memory}
   LogEntries[LogCount] := entry;
   {Write to disk}
-  If LogFileOpen then begin
+  If WRITE_TO_LOG and LogFileOpen then begin
     WriteLn(LogFile, entry.ToString);
     Flush(LogFile);
+  end;
+
+  if WRITE_TO_SCREEN then begin
+    writeln(entry.toString);
   end;
 
   Inc(LogCount);

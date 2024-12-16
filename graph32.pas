@@ -831,7 +831,7 @@ begin
     punpcklbw mm1, mm0      // MM1 <-  0  0  0 Rd|  0 Gd  0 Bd
     pmullw    mm1, mm4      // MM1 <-  0  (255-A)*Rd (255-A)*Gd (255-A)*bd
     paddw     mm1, mm2      // MM1 <- A*Rs+(255-A)*Rd ...
-    psrlw      mm1, 8        // MM1 <- (A*Rs+(255-A)*Rd) / 256
+    psrlw     mm1, 8        // MM1 <- (A*Rs+(255-A)*Rd) / 256
 
     { note, we should have divided by 255 instead of 255 but I don't think
      anyone will notice. To reduce the error we could do a saturated subtract of 128

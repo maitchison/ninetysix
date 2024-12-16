@@ -181,5 +181,6 @@ end;
 {--------------------------------------------------------------}
 
 begin
-  videoDriver := tVGADriver.create();
+  if not assigned(videoDriver) then
+    videoDriver := tVGADriver.create();
 end.

@@ -4,6 +4,7 @@ program airtime;
 {$MODE delphi}
 
 uses
+  startup,
   vga,
   vesa,
   graph32,
@@ -417,11 +418,9 @@ end;
 
 begin
 
-  {use svga driver}
-  videoDriver := tVesaDriver.create();
-
   loadResources();
 
+  videoDriver := tVesaDriver.create();
   videoDriver.setMode(640,480,32);
 
   S3D := tS3Driver.create();
