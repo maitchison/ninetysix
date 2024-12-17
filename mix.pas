@@ -75,9 +75,7 @@ var
 procedure clipAndConvert_MMX(bufSamples:int32);
 var
   srcPtr, dstPtr, noisePtr: pointer;
-  x: byte;
   FPUState: array[0..108-1] of byte; {$ALIGN 16}
-  y: byte;
 begin
 
   srcPtr := @scratchBufferI32[0];
@@ -124,6 +122,48 @@ begin
     frstor FPUState
 
     popad
+  end;
+
+end;
+
+procedure clipAndConvert_ASM(bufSamples:int32);
+var
+  srcPtr, dstPtr: pointer;
+begin
+
+  srcPtr := @scratchBufferI32[0];
+  dstPtr := @scratchBuffer[0];
+
+  asm
+
+    pushad
+
+    mov ecx, bufSamples
+    shl ecx, 1
+    mov esi, srcPtr
+    mov edi, dstPtr
+
+  @LOOP:
+
+    mov eax, [esi]
+    sar eax, 8
+    cmp eax, 32767
+    jng @SkipOver
+    mov eax, 32767
+  @SkipOver:
+    cmp eax, -32768
+    jnl @SkipUnder
+    mov eax, -32768
+  @SkipUnder:
+    mov [edi], eax
+
+    add esi, 4
+    add edi, 2
+    dec ecx
+    jnz @LOOP
+
+    popad
+
   end;
 
 end;
@@ -260,7 +300,7 @@ begin
     if cpuInfo.hasMMX then
       clipAndConvert_MMX(bufSamples)
     else
-      clipAndConvert_REF(bufSamples);
+      clipAndConvert_ASM(bufSamples);
   end;
 
   result := @scratchBuffer[0];
