@@ -204,6 +204,56 @@ begin
   exit(value div 65536 * 65536);
 end;
 
+procedure process8S_REF(sample, firstSample, finalSample: pAudioSample8S;count: dword);
+var
+  i: int32;
+begin
+  for i := 0 to count-1 do begin
+    scratchBufferI32[i].left += (int32(sample^.left)-128) * 65536;
+    scratchBufferI32[i].right += (int32(sample^.right)-128) * 65536;
+    inc(sample);
+    if sample >= finalSample then
+      sample := pointer(firstSample);
+  end;
+end;
+
+procedure process8S_ASM(sample, firstSample, finalSample: pAudioSample8S;count: dword);
+var
+  dstPointer: pointer;
+begin
+  if (pointer(sample) + count*2) >= finalSample then begin
+    {we can't handle looping here, yet.}
+    process8S_ASM(sample, firstSample, finalSample, count);
+    exit;
+  end;
+
+  dstPointer := @scratchBufferI32[0];
+
+  asm
+    pushad
+    mov esi, sample
+    mov edi, dstPointer
+    mov ecx, count
+    shl ecx, 1
+
+  @LOOP:
+
+    xor eax, eax
+    mov al, [esi]
+    sub eax, 128
+    sal eax, 16
+    add [edi], eax
+
+    inc esi
+    add edi, 4
+
+    dec ecx
+    jnz @LOOP
+
+    popad
+  end;
+end;
+
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 var
   sfx: tSoundEffect;
@@ -257,16 +307,7 @@ begin
               sample16S := pointer(sfx.data)
           end;
         end;
-        AF_8_STEREO: begin
-          sample8S := sample;
-          for i := 0 to bufSamples-1 do begin
-            scratchBufferI32[i].left += (int32(sample8S^.left)-128) * 65536;
-            scratchBufferI32[i].right += (int32(sample8S^.right)-128) * 65536;
-            inc(sample8S);
-            if sample8S >= finalSample then
-              sample8S := pointer(sfx.data)
-          end;
-        end;
+        AF_8_STEREO: process8S_ASM(sample, sfx.data, finalSample, bufSamples);
         else begin
           // format not supported, but no error as we're in an interupt.
         end;
