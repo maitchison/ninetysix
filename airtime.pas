@@ -452,6 +452,8 @@ begin
   screen.create();
   mixer.play(music);
 
+  {put mouse just after our map, this will just fit into 2MB of VRAM}
+  overrideBaseAddress(1024*480*4 div 1024);
   initMouse();
   initKeyboard();
 

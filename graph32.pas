@@ -759,6 +759,7 @@ asm
 {Draw line from (x1,y) to (x2,y) inclusive at start and exclusive at end.}
 procedure TPage.HLine(x1,y,x2: int16; c: RGBA); pascal;
 var
+  x: int32;
   count: int32;
   ofs: dword;
 begin
@@ -780,7 +781,13 @@ begin
     exit;
   end;
 
-  {alpha blending path}
+  if not cpuInfo.hasMMX then begin
+    for x := x1 to x2 do
+      putPixel(x, y, c);
+    exit;
+  end;
+
+  {MMX blending path}
   asm
 
     pushad

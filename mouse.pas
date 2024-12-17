@@ -25,11 +25,11 @@ var
   { button state }
   mouse_b : Word;
 
-
-procedure InitMouse();
-procedure CloseMouse();
+procedure overrideBaseAddress(newAddress: word);
+procedure initMouse();
+procedure closeMouse();
 {this should not need to be called}
-procedure UpdateMouse;
+procedure xxUpdateMouse;
 
 implementation
 
@@ -47,7 +47,8 @@ var
 
 const
   {This is 3 MEGs into the video ram, which is safe for <= 1024x668}
-  BASE_ADDRESS = 3072;
+  DEFAULT_BASE_ADDRESS = 3072;
+  BASE_ADDRESS: word = DEFAULT_BASE_ADDRESS;
 
 
 function DetectMouse(): boolean; assembler;
@@ -99,7 +100,7 @@ begin
   end;
 end;
 
-procedure EnableHardwareCursor();
+procedure enableHardwareCursor();
 var
   startAddress: word;
 const
@@ -118,14 +119,14 @@ begin
 
 end;
 
-procedure UpdateHardwareCursor(mouse_x, mouse_y: word);
+procedure updateHardwareCursor(mouse_x, mouse_y: word);
 var
   counter: dword;
 begin
   s3.S3SetHardwareCursorLocation(mouse_x, mouse_y);
 end;
 
-procedure WriteBit(x,y: integer; value: boolean; plane: byte);
+procedure writeBit(x,y: integer; value: boolean; plane: byte);
 var
   Address: dword;
   WordAddress: dword;
@@ -236,6 +237,12 @@ begin
     end;
 end;
 
+{set start address for mouse cursor (real address is newAddress*1024)}
+procedure overrideBaseAddress(newAddress: word);
+begin
+  BASE_ADDRESS := newAddress;
+end;
+
 {Call after mode set}
 procedure InitMouse();
 begin
@@ -246,7 +253,7 @@ begin
   installMouseProc(@userproc, userProcLength);
   SetBoundary(0, 0, videoDriver.physicalWidth-1, videoDriver.physicalHeight-1);
   SetPosition(videoDriver.physicalWidth div 2, videoDriver.physicalHeight div 2);
-  UpdateMouse();
+  xxUpdateMouse();
 end;
 
 procedure CloseMouse();
@@ -255,7 +262,7 @@ begin
   removeMouseProc();
 end;
 
-procedure UpdateMouse();
+procedure xxUpdateMouse();
 begin
   UpdateMousePosition();
   UpdateHardwareCursor(MouseX, MouseY);
@@ -427,13 +434,10 @@ begin
 
 end;
 
-
-begin
+initialization
 
   userProc_Installed := False;
   userProcLength := dword(@mouse_dummy2)-dword(@userProc);
-
-  addExitProc(@CloseMouse);
 
   Mouse_X := 0;
   Mouse_Y := 0;
@@ -443,4 +447,8 @@ begin
   MouseX := 0;
   MouseY := 0;
   MouseButtons := 0;
+
+finalization
+  closeMouse();
+
 end.
