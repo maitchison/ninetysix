@@ -78,8 +78,9 @@ end;
 {write entry to log}
 procedure Log(s: string; level: byte=LOG_NOTE);
 var
-  Entry: TLogEntry;
+  entry: TLogEntry;
   isText: boolean;
+  oldTextAttr: byte;
 begin
   SetLength(LogEntries, LogCount+1);
 
@@ -96,7 +97,10 @@ begin
   end;
 
   if WRITE_TO_SCREEN and assigned(videoDriver) and videoDriver.isText then begin
+    oldTextAttr := textAttr;
+    textAttr := (textAttr and $f0) + LOG_COLOR[entry.level];
     writeln(entry.toString);
+    textAttr := oldTextAttr;
   end;
 
   Inc(LogCount);
