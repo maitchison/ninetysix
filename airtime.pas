@@ -39,6 +39,7 @@ var
 
   {global time keeper}
   elapsed: double = 0;
+  smoothElapsed: double = 0;
   gameTime: double = 0;
   frameCount: dword = 0;
 
@@ -313,6 +314,7 @@ begin
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
+    smoothElapsed := smoothElapsed * 0.95 + elapsed * 0.05;
     if keyDown(key_space) then
       elapsed /= 100;
     gameTime += elapsed;
@@ -346,7 +348,7 @@ begin
 
     startTime := getSec;
     carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
-    carDrawTime := getSec - startTime;
+    carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
     drawGUI();
 
     screen.copyRegion(tRect.create(10, 10, 300, 25));
