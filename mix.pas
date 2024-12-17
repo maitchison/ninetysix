@@ -173,7 +173,9 @@ var
   i,j: int32;
   noise: int32;
   pos,len: int32;
-  sample,lastSample: pAudioSample;
+  sample16S: pAudioSample16S;
+  sample8S: pAudioSample8S;
+  sample, finalSample: pointer;
   bufSamples: int32;
 
 begin
@@ -204,14 +206,33 @@ begin
       if (startTC - mixer.channel[j].offset < 0) then continue;
 
       pos := (startTC - mixer.channel[j].offset) mod len;
-      sample := pointer(sfx.sample) + (pos * 4);
-      lastSample := pointer(sfx.sample) + (len * 4);
-      for i := 0 to bufSamples-1 do begin
-        scratchBufferI32[i].left += sample^.left*256;
-        scratchBufferI32[i].right += sample^.right*256;
-        inc(sample);
-        if sample >= lastSample then
-          sample := pointer(sfx.sample)
+      sample := pointer(sfx.data) + (pos * sfx.bytesPersample);
+      finalSample := pointer(sfx.data) + (len * sfx.bytesPersample);
+
+      case sfx.format of
+        AF_16_STEREO: begin
+          sample16S := sample;
+          for i := 0 to bufSamples-1 do begin
+            scratchBufferI32[i].left += sample16S^.left*256;
+            scratchBufferI32[i].right += sample16S^.right*256;
+            inc(sample16S);
+            if sample16S >= finalSample then
+              sample16S := pointer(sfx.data)
+          end;
+        end;
+        AF_8_STEREO: begin
+          sample8S := sample;
+          for i := 0 to bufSamples-1 do begin
+            scratchBufferI32[i].left += (int32(sample8S^.left)-128) * 65536;
+            scratchBufferI32[i].right += (int32(sample8S^.right)-128) * 65536;
+            inc(sample8S);
+            if sample8S >= finalSample then
+              sample8S := pointer(sfx.data)
+          end;
+        end;
+        else begin
+          // format not supported, but no error as we're in an interupt.
+        end;
       end;
     end;
   end;
@@ -300,7 +321,6 @@ begin
   {for the moment lock onto the first channel}
   if not assigned(soundEffect) then
     error('Tried to play invalid sound file');
-  note('playing sound!  <<--------- self='+hexStr(@self));
   channelNum := 1;
   ticksOffset := round(timeOffset*44100);
   channel[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);

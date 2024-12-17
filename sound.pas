@@ -25,14 +25,28 @@ type
   {time in samples from start of application.}
   tTimeCode = int64;
 
-  tAudioSample = packed record
-  {16 bit stereo sample}
-  case byte of
-    0: (left,right: int16);
-    1: (value: dword);
+  tAudioFormat = (
+    AF_16_STEREO,
+    AF_8_STEREO
+  );
+
+const
+  AF_SIZE: array[tAudioFormat] of integer = (
+    4,
+    2
+  );
+
+type
+  tAudioSample16S = packed record
+    left, right: int16;
   end;
 
-  pAudioSample = ^tAudioSample;
+  tAudioSample8S = packed record
+    left, right: uint8;
+  end;
+
+  pAudioSample16S = ^tAudioSample16S;
+  pAudioSample8S = ^tAudioSample8S;
 
   tAudioSampleF32 = packed record
   {32 bit stereo sample, used for mixing}
@@ -43,19 +57,31 @@ type
     left,right: int32;
   end;
 
+  tAudioSample = tAudioSample16S;
+  pAudioSample = ^tAudioSample;
+
   tSoundEffect = class
 
-    {todo: switch back to dynamic array}
-
-    sample: pAudioSample;
+    data: pointer;
     length: int32;
+    format: tAudioFormat;
 
-    constructor create(filename: string='');
+    constructor create(aFormat: tAudioFormat; aLength: int32);
+    destructor destroy();
 
-    procedure loadFromWave(filename: string);
-    procedure loadFromLA96(filename: string);
+    function bytesPerSample: int32; inline;
+
+    function getSample(pos: int32): tAudioSample;
+    procedure setSample(pos: int32;sample: tAudioSample);
+
+    class function loadFromWave(filename: string): tSoundEffect;
+
+    (*
+    class function loadFromFile(filename: string): tSoundEffect;
+    class function loadFromLA96(filename: string): tSoundEffect;
     procedure saveToLA96(filename: string);
     procedure saveToWave(filename: string);
+    *)
 
   end;
 
@@ -86,34 +112,74 @@ type
 
 {--------------------------------------------------------}
 
-{create soundfile, optionally loading it from disk.}
-constructor tSoundEffect.create(filename: string='');
-var
-  extension: string;
+constructor tSoundEffect.create(aFormat: tAudioFormat; aLength: int32);
 begin
-
-  sample := nil;
-  length := 0;
-
-  extension := toLowerCase(extractExtension(filename));
-  if extension = 'wav' then
-    loadFromWave(filename)
-  else if extension = 'la9' then
-    loadFromLA96(filename);
+  inherited create();
+  length := aLength;
+  format := aFormat;
+  getMem(data, length * AF_SIZE[format]);
 end;
 
+destructor tSoundEffect.destroy();
+begin
+  if assigned(data) then
+    freeMem(data);
+  length := 0;
+  data := nil;
+  inherited destroy();
+end;
 
-{-----------------------------------------------------}
+function tSoundEffect.getSample(pos: int32): tAudioSample;
+begin
+  if (pos < 0) or (pos >= length) then begin
+    fillchar(result, sizeof(result), 0);
+    exit;
+  end;
+  case format of
+    AF_16_STEREO: result := pAudioSample16S(data + (pos * 4))^;
+    AF_8_STEREO: begin
+      result.left := int32(pAudioSample8S(data + (pos * 2))^.left) * 256 - 32768;
+      result.right := int32(pAudioSample8S(data + (pos * 2))^.right) * 256 - 32768;
+    end;
+    else error('Invalid format');
+  end;
+end;
 
-procedure tSoundEffect.loadFromWave(filename: string);
+{bytes per sample}
+function tSoundEffect.bytesPerSample: int32; inline;
+begin
+  result := AF_SIZE[format];
+end;
+
+procedure tSoundEffect.setSample(pos: int32; sample: tAudioSample);
+begin
+  if (pos < 0) or (pos >= length) then begin
+    exit;
+  end;
+  case format of
+    AF_16_STEREO: pAudioSample16S(data + (pos * bytesPerSample))^ := sample;
+    AF_8_STEREO: begin
+      pAudioSample8S(data + (pos * bytesPerSample))^.left := (sample.left div 256) + 128;
+      pAudioSample8S(data + (pos * bytesPerSample))^.right := (sample.right div 256) + 128;
+    end;
+    else error('Invalid format');
+  end;
+end;
+
+class function tSoundEffect.loadFromWave(filename: string): tSoundEffect;
+const
+  BLOCK_SIZE = 16*1024;
 var
   f: file;
   fileHeader: tWaveFileHeader;
   chunkHeader: tChunkHeader;
   samples: int32;
   i,j: integer;
-  chunkWords: dword;
   ioError: word;
+  bytesRemaining: dWord;
+  blockSize: int32;
+  buffer: array of byte;
+  dataPtr: pointer;
 
 function wordAlign(x: int32): int32;
   begin
@@ -131,8 +197,7 @@ begin
 
     IOError := IOResult;
     if IOError <> 0 then
-      Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
-
+      error('Could not open file "'+FileName+'" '+GetIOError(IOError));
 
     blockread(f, fileHeader, sizeof(fileHeader));
 
@@ -162,12 +227,25 @@ begin
           seek(f, wordAlign(filePos(f) + chunkSize));
           continue;
         end;
-        chunkWords := chunkSize div 2;
-        length := min(chunkWords div 2, 16*1024*1024);
-        if (length < chunkWords div 2) then
-          warn(format('Wave file too large to read (%f MB), reading partial file.', [chunkSize/1024/1024]));
-        sample := getMem(length*4);
-        blockRead(f, sample^, length*4);
+
+        case fileHeader.bitsPerSample of
+          16: result := tSoundEffect.create(AF_16_STEREO, chunkSize div 4);
+          8: result := tSoundEffect.create(AF_8_STEREO, chunkSize div 2);
+          else error('bitsPerSample must be either 8 or 16');
+        end;
+
+        bytesRemaining := chunkSize;
+        dataPtr := result.data;
+
+        {reading in blocks stop interrupts from being blocked for too
+         long on larger files}
+        while bytesRemaining > 0 do begin
+          blockSize := min(BLOCK_SIZE, bytesRemaining);
+          setLength(buffer, blockSize);
+          blockRead(f, dataPtr^, blockSize);
+          dataPtr += blockSize;
+          bytesRemaining -= blocksize;
+        end;
 
         break;
       end;
@@ -178,6 +256,24 @@ begin
   end;
 
 end;
+
+(*
+{create soundfile, optionally loading it from disk.}
+function tSoundEffect.loadFromFile(filename: string=''): t;
+var
+  extension: string;
+begin
+
+  sample := nil;
+  length := 0;
+
+  extension := toLowerCase(extractExtension(filename));
+  if extension = 'wav' then
+    loadFromWave(filename)
+  else if extension = 'la9' then
+    loadFromLA96(filename);
+end;
+
 
 procedure tSoundEffect.loadFromLA96(filename: string);
 begin
@@ -190,7 +286,7 @@ end;
 procedure tSoundEffect.saveToWave(filename: string);
 begin
 end;
-
+  *)
 
 {----------------------------------------------------------}
 

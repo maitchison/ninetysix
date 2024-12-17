@@ -253,7 +253,7 @@ begin
   trackSprite := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('res\car1', 32);
-  music := tSoundEffect.create('res\music1.wav');
+  music := tSoundEffect.loadFromWave('res\music8.wav');
 end;
 
 procedure drawGUI();

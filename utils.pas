@@ -411,7 +411,7 @@ begin
   usedMem := hs.currHeapSize;
   freeMem := memInfo.available_physical_pages * get_page_size;
   note(format(
-    '>> %s used:%skb free:%skb',
+    '--- %s used:%skb free:%skb ---',
     [
       msg,
       // total_physical_pages
