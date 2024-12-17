@@ -24,7 +24,6 @@ procedure assertEqual(a, b: tBytes); overload;
 procedure assertEqualLarge(a, b: tBytes); overload;
 
 procedure runTestSuites();
-procedure addTestSuite(suite: tTestSuite);
 
 implementation
 
@@ -84,17 +83,6 @@ end;
 
 {--------------------------------------------------------}
 
-constructor tTestSuite.create(aTag: string='');
-begin
-  inherited create();
-  tag := aTag;
-end;
-
-procedure tTestSuite.run();
-begin
-  error('Empty test suite!');
-end;
-
 procedure addTestSuite(suite: tTestSuite);
 begin
   setLength(testSuites, length(testSuites) + 1);
@@ -111,6 +99,21 @@ begin
     testSuites[i].run();
   end;
   note('Finished running test cases.');
+end;
+
+
+{--------------------------------------------------------}
+
+constructor tTestSuite.create(aTag: string='');
+begin
+  inherited create();
+  tag := aTag;
+  addTestSuite(self);
+end;
+
+procedure tTestSuite.run();
+begin
+  error('Empty test suite!');
 end;
 
 begin

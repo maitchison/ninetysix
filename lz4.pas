@@ -1135,7 +1135,15 @@ end;
 
 {------------------------------------------------}
 
-procedure runTests_BPE();
+type
+  tBPETest = class(tTestSuite)
+    procedure run; override;
+  end;
+  tLZ4Test = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tBPETest.run();
 var
   i: integer;
   a,b: int32;
@@ -1175,7 +1183,7 @@ begin
 
 end;
 
-procedure runTests_LZ4();
+procedure tLZ4Test.run();
 var
   inBytes: tStream;
   compressedData: tBytes;
@@ -1264,15 +1272,9 @@ begin
 
 end;
 
+initialization
+  tLZ4Test.create('LZ4');
+  tBPETest.create('LZ4_BPE');
+finalization
 
-procedure runTests();
-begin
-  note('[test] LZ4');
-  runTests_BPE();
-  runTests_LZ4();
-end;
-
-
-begin
-  runTests();
 end.

@@ -252,12 +252,15 @@ end;
 
 {-------------------------------------------------}
 
-procedure runTests();
+type
+  tHashMapTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tHashMapTest.run();
 var
   map: tSparseMap;
 begin
-
-  note('[test] Hashmap');
 
   map := tSparseMap.create();
   assertEqual(map.getValue(97), 0);
@@ -275,6 +278,6 @@ begin
 end;
 
 
-begin
-  runTests();
+initialization
+  tHashMapTest.create('HashMap');
 end.

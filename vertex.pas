@@ -6,6 +6,7 @@ unit Vertex;
 interface
 
 uses
+  test,
   debug,
   utils;
 
@@ -344,7 +345,13 @@ begin
 end;
 
 {-----------------------------------------------------}
-procedure runTests();
+
+type
+  tVertexTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tVertexTest.run();
 var
   p, pInitial: V3D;
   target: single;
@@ -354,9 +361,6 @@ const
   degrees45 = 0.785398; {45 degrees in radians}
 
 begin
-
-  note('[test] Vertex');
-
   p := V3D.create(rnd,rnd,rnd);
   p := p.normed();
   pInitial := p;
@@ -382,7 +386,7 @@ begin
   p := A.transposed().apply(pInitial);
   assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
 
-  {make sure inverses kind of work}
+  {make sure inverse kind of works}
   A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
   p := A.apply(pInitial);
   B := A.transposed();
@@ -392,10 +396,8 @@ begin
       if i=j then target := 1 else target := 0;
       assert(abs(C.M(i,j)-target) < 0.01, 'Inversion did not work: '+#10#13+C.toString);
     end;
-
-
 end;
 
 begin
-  runTests();
+  tVertexTest.create('Vertex');
 end.

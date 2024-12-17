@@ -490,7 +490,12 @@ end;
 
 {-------------------------------------------------------}
 
-procedure runTests();
+type
+  tLC96Test = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tLC96Test.run();
 var
   img1,img2: tPage;
   s: tStream;
@@ -498,9 +503,6 @@ var
   x,y: int32;
   i,j,k: integer;
 begin
-
-  note('[test] LC96');
-
   {byte deltas}
   delta := encodeByteDelta(5,3);
   assertEqual(applyByteDelta(5, delta), 3);
@@ -557,11 +559,15 @@ begin
 
 end;
 
-begin
+initialization
+
   {todo: move this out of global}
   global_deltas := nil;
   setLength(global_deltas, 16*4);
   filldword(global_deltas[0], length(global_deltas), 0);
 
-  runTests();
+  tLC96Test.create('LC96');
+
+finalization
+
 end.

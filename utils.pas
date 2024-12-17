@@ -938,7 +938,7 @@ initialization
   updateRDTSCRate();
   programStartTSC := getTSC();
   SEED := 97;
-  addTestSuite(tUtilsTest.create('Utils'));
+  tUtilsTest.create('Utils');
 finalization
 
 end.

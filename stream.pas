@@ -865,7 +865,37 @@ begin
 
 end;
 
-procedure runTests();
+procedure runBenchmark();
+var
+  s: tStream;
+  i: int32;
+  startTime, endTime: double;
+begin
+  startTime := getSec;
+  s := tStream.Create();
+  for i := 1 to 1024 do
+    s.writeByte(255);
+  endTime := getSec;
+  writeln('Wrote 1kb at ',1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
+  s.free;
+
+  startTime := getSec;
+  s := tStream.Create();
+  for i := 1 to 64*1024 do
+    s.writeByte(255);
+  endTime := getSec;
+  writeln('Wrote 64kb at ',64*1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
+  s.free;
+end;
+
+{-------------------------------------------}
+
+type
+  tStreamTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tStreamTest.run();
 var
   s: tStream;
   i: integer;
@@ -879,9 +909,6 @@ const
   {this will get packed}
   testData3: array of dword = [15, 14, 0, 15, 15, 12, 11];
 begin
-
-  note('[test] Stream');
-
   {check pack and unpack}
   for bits := 7 to 15 do begin
     bitsStream := packBits(testData2, bits);
@@ -982,33 +1009,13 @@ begin
   for i := 0 to length(testData1)-1 do
     assertEqual(s.readVLC, testData1[i]);
   s.free;
-
 end;
 
-procedure runBenchmark();
-var
-  s: tStream;
-  i: int32;
-  startTime, endTime: double;
-begin
-  startTime := getSec;
-  s := tStream.Create();
-  for i := 1 to 1024 do
-    s.writeByte(255);
-  endTime := getSec;
-  writeln('Wrote 1kb at ',1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
-  s.free;
+{--------------------------------------------------}
 
-  startTime := getSec;
-  s := tStream.Create();
-  for i := 1 to 64*1024 do
-    s.writeByte(255);
-  endTime := getSec;
-  writeln('Wrote 64kb at ',64*1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
-  s.free;
-end;
-
-begin
+initialization
   buildUnpackingTables();
-  runTests();
+  tStreamTest.create('Stream');
+finalization
+
 end.
