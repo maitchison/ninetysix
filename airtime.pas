@@ -83,7 +83,11 @@ begin
 
   startTime := getSec;
   carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.5);
-  carDrawTime := getSec - startTime;
+  if carDrawTime = 0 then
+    carDrawTime := (getSec - startTime)
+  else
+    carDrawTime := (carDrawTime * 0.99) + 0.01*(getSec - startTime);
+
   screen.markRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
 end;
 
@@ -314,7 +318,7 @@ begin
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
-    smoothElapsed := smoothElapsed * 0.95 + elapsed * 0.05;
+    smoothElapsed := smoothElapsed * 0.99 + elapsed * 0.01;
     if keyDown(key_space) then
       elapsed /= 100;
     gameTime += elapsed;
@@ -348,7 +352,11 @@ begin
 
     startTime := getSec;
     carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
-    carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
+    if carDrawTime = 0 then
+      carDrawTime := (getSec - startTime)
+    else
+      carDrawTime := (carDrawTime * 0.99) + 0.01*(getSec - startTime);
+
     drawGUI();
 
     screen.copyRegion(tRect.create(10, 10, 300, 25));

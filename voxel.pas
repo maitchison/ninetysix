@@ -426,6 +426,7 @@ begin
     cmp eax, 255 shl 24
     jae @HIT
 
+
     // ------------------------------
     // mul step
     // todo: implement shift step, mul will be slow on p166
@@ -452,6 +453,7 @@ begin
     (*
     // ------------------------------
     // looped step
+    // faster on P166 MMX, slower under emulation.
     shr eax, 24     // get alpha
     not al          // d = 255-c.a
     shr al, 2       // value is d*4
@@ -463,9 +465,9 @@ begin
     add depth, 4
     dec al
     jnz @STEPLOOP
-
     // ------------------------------
     *)
+
 
     dec counter
     jnz @LOOP
@@ -516,6 +518,7 @@ begin
   result := col;
 
 end;
+
 
 {traces all pixels within the given polygon.
 points are in world space
