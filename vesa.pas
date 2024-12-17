@@ -41,7 +41,8 @@ type tVesaDriver = class(tVGADriver)
     procedure setMode(width, height, BPP: word); override;
     procedure setLogicalSize(width, height: word); override;
     procedure setDisplayStart(x, y: word); override;
-
+    function  vesaVersion: single;
+    function  videoMemory: dword;
   end;
 
 implementation
@@ -133,13 +134,7 @@ end;
 
 procedure tVesaDriver.logInfo();
 begin
-  note(format(
-    'VESA v%d.%d (%f MB)',
-    [
-      vesaInfo.version shr 8,
-      vesaInfo.version and $ff,
-      vesaInfo.totalMemory * 64 / 1024
-    ]));
+  note(format('VESA v%f (%f MB)', [vesaVersion, videoMemory / 1024 / 1024]));
 end;
 
 procedure tVesaDriver.logModes();
@@ -314,6 +309,21 @@ begin
   end;
 end;
 
+function tVesaDriver.vesaVersion: single;
+var
+  majVer, minVer: single;
+begin
+  majVer := vesaInfo.version shr 8;
+  minVer := (vesaInfo.version and $ff);
+  while minVer >= 1 do minVer /= 10;
+  result := majVer + minVer;
+end;
+
+{video memory in bytes}
+function tVesaDriver.videoMemory: dword;
+begin
+  result := vesaInfo.totalMemory * 64 * 1024;
+end;
 
 {----------------------------------------------------------------}
 

@@ -447,13 +447,17 @@ begin
   logHeapStatus('Resources loaded');
 
   videoDriver := tVesaDriver.create();
+
+  if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
+    error('Requires VESA 2.0 or greater.');
+  if (tVesaDriver(videoDriver).videoMemory) < 2*1024*1024 then
+    error('Requires 2MB video card.');
+
   videoDriver.setMode(640,480,32);
 
   screen.create();
   mixer.play(music);
 
-  {put mouse just after our map, this will just fit into 2MB of VRAM}
-  overrideBaseAddress(1024*480*4 div 1024);
   initMouse();
   initKeyboard();
 

@@ -28,8 +28,6 @@ var
 procedure overrideBaseAddress(newAddress: word);
 procedure initMouse();
 procedure closeMouse();
-{this should not need to be called}
-procedure xxUpdateMouse;
 
 implementation
 
@@ -46,10 +44,9 @@ var
 
 
 const
-  {This is 3 MEGs into the video ram, which is safe for <= 1024x668}
-  DEFAULT_BASE_ADDRESS = 3072;
+  {This is around 2 MEGs into the video ram, which is safe for <= 800x600x32}
+  DEFAULT_BASE_ADDRESS = 1920;
   BASE_ADDRESS: word = DEFAULT_BASE_ADDRESS;
-
 
 function DetectMouse(): boolean; assembler;
 asm
@@ -253,7 +250,6 @@ begin
   installMouseProc(@userproc, userProcLength);
   SetBoundary(0, 0, videoDriver.physicalWidth-1, videoDriver.physicalHeight-1);
   SetPosition(videoDriver.physicalWidth div 2, videoDriver.physicalHeight div 2);
-  xxUpdateMouse();
 end;
 
 procedure CloseMouse();
@@ -261,13 +257,6 @@ begin
   Info('[close] Mouse');
   removeMouseProc();
 end;
-
-procedure xxUpdateMouse();
-begin
-  UpdateMousePosition();
-  UpdateHardwareCursor(MouseX, MouseY);
-end;
-
 
 {--------------------------------------------------}
 

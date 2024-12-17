@@ -420,14 +420,13 @@ begin
   totalMem := memInfo.total_physical_pages * get_page_size;
   usedMem := hs.currHeapSize;
   freeMem := memInfo.available_physical_pages * get_page_size;
-  note(format(
-    '--- %s used:%skb free:%skb ---',
+  note(pad(format('--- %s used:%skb free:%skb ',
     [
       msg,
       // total_physical_pages
       comma(usedMem div 1024),
       comma(freeMem div 1024)
-    ]));
+    ]), 60, '-'));
 end;
 
 function exists(filename: string): boolean;
