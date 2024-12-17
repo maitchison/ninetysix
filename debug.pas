@@ -344,6 +344,6 @@ begin
 
   info('[init] Logging');
 
-  showCPUInfo();
+  cpuInfo.printToLog();
 
 end.

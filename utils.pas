@@ -45,6 +45,16 @@ type
     function HHMMSS(sep: string=':'): string;
   end;
 
+  tCPUInfo = record
+    mhz: single;
+    ram: dword;
+    hasMMX: boolean;
+    procedure printToLog();
+  end;
+
+var
+  CPUInfo: tCPUInfo;
+
 {------------------------------------------------}
 { Math replacements}
 
@@ -111,14 +121,13 @@ function  fileModifiedTime(fileName: string): longint;
 
 function  getTickCount(): int64;
 function  getMSCount(): int64;
-function  getEstimatedMHZ: double;
-procedure showCPUInfo();
 
 implementation
 
 uses
   debug,
-  test;
+  test,
+  mmx;
 
 var
   SEED: byte;
@@ -127,6 +136,7 @@ var
 var
   {updated on initialization, but fall back to 166MHZ on error}
   INV_CLOCK_FREQ: double = 1.0/(166*1000*1000);
+
 
 {----------------------------------------------------------}
 
@@ -795,9 +805,7 @@ begin
   day := ld;
   month := lm;
   year := ly;
-
 end;
-
 
 class function TMyDateTime.EncodeTime(hour, minute, second, ms: word): TMyDateTime; static;
 var
@@ -846,21 +854,28 @@ begin
   result := IntToStr(h, 2, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(s, 2, '0');
 end;
 
-{returns the estimated clock rate of the machine.}
-function getEstimatedMHZ: double;
-begin
-  result := (1.0 / INV_CLOCK_FREQ) / 1000 / 1000;
-end;
+{-------------------------------------------------------------}
 
-procedure showCPUInfo();
+procedure updateCPUInfo();
 var
   memInfo: tMemInfo;
   totalMem: int64;
 begin
+  cpuInfo.mhz := (1.0 / INV_CLOCK_FREQ) / 1000 / 1000;
+  cpuInfo.hasMMX := mmx.is_mmx_cpu;
   get_memInfo(memInfo);
-  totalMem := memInfo.total_physical_pages * get_page_size;
-  info(format('System estimated to be %fMHZ with %fMB ram',[getEstimatedMHZ, totalMem/1024/1024]));
+  cpuInfo.ram := memInfo.total_physical_pages * get_page_size;
 end;
+
+procedure tCPUInfo.printToLog();
+var
+  mmxString: string;
+begin
+  if hasMMX then mmxString := '(MMX)' else mmxString := '';
+  info(format('System is %fMHZ with %fMB ram %s',[mhz, ram/1024/1024, mmxString]));
+end;
+
+{-------------------------------------------------------------}
 
 procedure updateRDTSCRate();
 var
@@ -938,6 +953,7 @@ initialization
   updateRDTSCRate();
   programStartTSC := getTSC();
   SEED := 97;
+  updateCPUInfo();
   tUtilsTest.create('Utils');
 finalization
 
