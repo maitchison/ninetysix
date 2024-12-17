@@ -438,6 +438,8 @@ begin
   heaptrc.maxprintedblocklength := 64;
   {$endif}
 
+  runTestSuites();
+
   logHeapStatus('Program start');
 
   loadResources();

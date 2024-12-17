@@ -7,6 +7,14 @@ interface
 type
   tBytes = array of byte;
 
+  tTestSuite = class
+  private
+    tag: string;
+  public
+    constructor create(aTag: string='');
+    procedure run(); virtual;
+  end;
+
 procedure assertError(msg: string); overload;
 
 procedure assert(condition: boolean;msg: string); overload;
@@ -15,11 +23,17 @@ procedure assertEqual(value, expected: int64); overload;
 procedure assertEqual(a, b: tBytes); overload;
 procedure assertEqualLarge(a, b: tBytes); overload;
 
+procedure runTestSuites();
+procedure addTestSuite(suite: tTestSuite);
+
 implementation
 
 uses
   utils,
   debug;
+
+var
+  testSuites: array of tTestSuite = nil;
 
 procedure assertError(msg: string); overload;
 begin
@@ -66,6 +80,37 @@ procedure assertEqual(value, expected: int64); overload;
 begin
   if value <> expected then
     assertError('Expecting '+IntToStr(expected)+' but found '+intToStr(value)+'.');
+end;
+
+{--------------------------------------------------------}
+
+constructor tTestSuite.create(aTag: string='');
+begin
+  inherited create();
+  tag := aTag;
+end;
+
+procedure tTestSuite.run();
+begin
+  error('Empty test suite!');
+end;
+
+procedure addTestSuite(suite: tTestSuite);
+begin
+  setLength(testSuites, length(testSuites) + 1);
+  testSuites[length(testSuites)-1] := suite;
+end;
+
+procedure runTestSuites();
+var
+  i: int32;
+begin
+  note('Running test cases...');
+  for i := 0 to length(testSuites)-1 do begin
+    note('  [test] '+testSuites[i].tag);
+    testSuites[i].run();
+  end;
+  note('Finished running test cases.');
 end;
 
 begin

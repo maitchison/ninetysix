@@ -852,7 +852,15 @@ begin
   result := (1.0 / INV_CLOCK_FREQ) / 1000 / 1000;
 end;
 
-{-------------------------------------------------------------------}
+procedure showCPUInfo();
+var
+  memInfo: tMemInfo;
+  totalMem: int64;
+begin
+  get_memInfo(memInfo);
+  totalMem := memInfo.total_physical_pages * get_page_size;
+  info(format('System estimated to be %fMHZ with %fMB ram',[getEstimatedMHZ, totalMem/1024/1024]));
+end;
 
 procedure updateRDTSCRate();
 var
@@ -870,28 +878,31 @@ begin
     INV_CLOCK_FREQ := (1/18.2065) / (endTSC - startTSC);
 end;
 
+{--------------------------------------------------------}
 
-procedure runTests();
+type
+  tUtilsTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tUtilsTest.run();
 var
   a,b: string;
   i: int32;
 begin
+  assertEqual(StrToInt('123'), 123);
+  assertEqual(StrToInt('7'), 7);
+  assertEqual(Trim(' Fish'), 'Fish');
+  assertEqual(Trim(' Fish    '), 'Fish');
+  assertEqual(Trim('Fish'), 'Fish');
+  assertEqual(Trim('    '), '');
+  assertEqual(Trim(''), '');
 
-  note('[init] Utils');
+  assertEqual(Format('%s', [5]), '5');
 
-  AssertEqual(StrToInt('123'), 123);
-  AssertEqual(StrToInt('7'), 7);
-  AssertEqual(Trim(' Fish'), 'Fish');
-  AssertEqual(Trim(' Fish    '), 'Fish');
-  AssertEqual(Trim('Fish'), 'Fish');
-  AssertEqual(Trim('    '), '');
-  AssertEqual(Trim(''), '');
-
-  AssertEqual(Format('%s', [5]), '5');
-
-  AssertEqual(binToStr(5, 8), '00000101');
-  AssertEqual(binToStr(0), '0');
-  AssertEqual(binToStr(1), '1');
+  assertEqual(binToStr(5, 8), '00000101');
+  assertEqual(binToStr(0), '0');
+  assertEqual(binToStr(1), '1');
 
   split('fish=good', '=', a, b);
   assertEqual(a,'fish');
@@ -899,7 +910,7 @@ begin
 
   {test negEncode neg}
   for i := -256 to +256 do
-    AssertEqual(negDecode(negEncode(i)), i);
+    assertEqual(negDecode(negEncode(i)), i);
 
   assertEqual(extractExtension('fish.com'), 'com');
   assertEqual(extractExtension('FISH.COM'), 'COM');
@@ -914,31 +925,20 @@ begin
   assertEqual(removeExtension('.'), '');
   assertEqual(removeExtension('A.'), 'A');
 
-  {test comma}
   assertEqual(comma(5), '5');
   assertEqual(comma(100), '100');
   assertEqual(comma(1200), '1,200');
   assertEqual(comma(987654321), '987,654,321');
+
 end;
 
-procedure initUtils;
-begin
+{--------------------------------------------------------}
+
+initialization
   updateRDTSCRate();
   programStartTSC := getTSC();
   SEED := 97;
-end;
+  addTestSuite(tUtilsTest.create('Utils'));
+finalization
 
-procedure showCPUInfo();
-var
-  memInfo: tMemInfo;
-  totalMem: int64;
-begin
-  get_memInfo(memInfo);
-  totalMem := memInfo.total_physical_pages * get_page_size;
-  info(format('System estimated to be %fMHZ with %fMB ram',[getEstimatedMHZ, totalMem/1024/1024]));
-end;
-
-begin
-  initUtils();
-  runTests();
 end.
