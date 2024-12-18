@@ -487,7 +487,6 @@ begin
     jmp @FINISH
 
   @OUTOFBOUNDS:
-    //mov eax, $FF0000FF
     xor eax, eax
     mov col, eax
     jmp @FINISH
@@ -501,13 +500,18 @@ begin
 
 end;
 
+type
+  MMX16 = packed record
+    case integer of
+      0: (x,y,z,w: int16);
+      1: (value: qword);
+    end;
+
 {trace ray at location and direction (in object space)}
 function trace_MMX(pos: V3D;dir: V3D): RGBA;
 var
   col: RGBA;
-  vx,vy,vz,vw: int16; {velocity}
-  px,py,pz,pw: int16; {pos}
-  sx,sy,sz,sw: int16; {size }
+  p,v,s: MMX16;
 
   depth: byte;
   counter: int32;
@@ -521,18 +525,18 @@ begin
   // sometimes we get out of bounds input
   {$R-,Q-}
   {todo: trunc->round}
-  px := trunc(256*pos.x);
-  py := trunc(256*pos.y);
-  pz := trunc(256*pos.z);
-  pw := 0;
-  vx := round(256*dir.x);
-  vy := round(256*dir.y);
-  vz := round(256*dir.z);
-  vw := 0;
-  sx := 64*256-1;
-  sy := 32*256-1;
-  sz := 18*256-1;
-  sw := 0;
+  p.x := trunc(256*pos.x);
+  p.y := trunc(256*pos.y);
+  p.z := trunc(256*pos.z);
+  p.w := 0;
+  v.x := round(256*dir.x);
+  v.y := round(256*dir.y);
+  v.z := round(256*dir.z);
+  v.w := 0;
+  s.x := 64-1;
+  s.y := 32-1;
+  s.z := 18-1;
+  s.w := 0;
   {$R+,Q+}
 
   voxPtr := vox.pixels;
@@ -543,7 +547,7 @@ begin
 
     pushad
 
-    //mov edi, voxPtr
+    mov edi, voxPtr
 
     {
       MM1    px|py|pz|00
@@ -551,51 +555,56 @@ begin
       MM3    sx|sy|sz|00
       MM4    00|00|00|00
     }
-    (*
-    movq      mm1, qword ptr [px]
-    movq      mm2, qword ptr [vx]
-    movq      mm3, qword ptr [sx]
+
+    movq      mm1, qword ptr [p]
+    movq      mm2, qword ptr [v]
+    movq      mm3, qword ptr [s]
     pxor      mm4, mm4
-    *)
 
   @LOOP:
 
     {house keeping}
     inc VX_TRACE_COUNT
 
-    (*
-
     {convert scaled, and check bounds}
-    {todo: see if old method works ok here}
+
     movq      mm0, mm1
+    psraw     mm0, 8
     pcmpgtw   mm0, mm3    // pos > sx?
-    pmovmskb  eax, mm0
-    test      eax, eax
-    jnz @OUTOFBOUNDS
-    movq      mm0, mm4
+    movq      mm5, mm0
+    pxor      mm0, mm0
     pcmpgtw   mm0, mm1    // 0 > pos?
-    pmovmskb  eax, mm0
+    por       mm0, mm5    // (pos > sx) or (pos < 0)
+
+    xor       eax, eax
+    movd      ebx, mm0
+    or        eax, ebx
+    psrlq     mm0, 32
+    movd      ebx, mm0
+    or        eax, ebx
+
     test      eax, eax
-    jnz @OUTOFBOUNDS
+    jnz @OUTOFBOUNDS      // todo: could be much faster
+
 
     // lookup our value
-    packuswb  mm0, mm1
-    movd      ebx, mm0    // ebx = 0xyz (unscaled)
+    movq      mm0, mm1
+    psraw     mm0, 8
+    packuswb  mm0, mm0
+    movd      col, mm0    // ebx = 0xyz (unscaled)
 
     xor eax, eax
-    mov al, bl
+    mov al, col.r
     shl eax, 5
-    or al, bh
+    or al, col.g
     shl eax, 6
     shr ebx, 8
-    or al, bh             // might be around the wrong way?
-
-    // stub
-    mov eax,0
+    or al, col.b
 
     mov eax, [edi + eax*4]
 
     // check if we hit something
+
     cmp eax, 255 shl 24
     jae @HIT
 
@@ -603,20 +612,26 @@ begin
     // mul step
     shr eax, 24     // get alpha
     not al          // d = 255-c.a
-    mov d, eax
     add depth, al
+
+    mov bx, ax
+    shl eax, 16
+    mov ax, bx            // eax = 0d|0d
+
+
+    movd      mm5, eax    // 00|00|0d|0d
+    punpckldq mm5, mm5    // 0d|0d|0d|0d
 
     movq      mm0, mm2
     pmullw    mm0, mm5    // v *= d
-    paddw     mm1, mm0    // p += v * d
-
-    *)
+    psraw     mm0, 2
+    paddw     mm1, mm0    // p += v * (d/4)
 
     dec counter
     jnz @LOOP
 
   @OUTOFSAMPLES:
-    mov eax, $FFFF00FF
+    mov eax, $FFFF00FF    // purple
     mov col, eax
     jmp @FINISH
 
@@ -649,7 +664,6 @@ begin
     jmp @FINISH
 
   @OUTOFBOUNDS:
-    //mov eax, $FF0000FF
     xor eax, eax
     mov col, eax
     jmp @FINISH
