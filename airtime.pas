@@ -258,7 +258,12 @@ begin
   trackSprite := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('res\car1', 32);
-  music := tSoundEffect.loadFromWave('res\music8.wav');
+
+  if cpuInfo.ram > 40*1024*1024 then
+    {16bit music if we have the ram for it}
+    music := tSoundEffect.loadFromWave('res\music16.wav')
+  else
+    music := tSoundEffect.loadFromWave('res\music8.wav');
 end;
 
 procedure drawGUI();
@@ -439,6 +444,9 @@ begin
 end;
 
 begin
+
+  if cpuInfo.ram < 30*1024*1024 then
+    error('Application required 30MB of ram.');
 
   {setup heap logging before units start.}
   {$if declared(Heaptrc)}
