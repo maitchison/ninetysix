@@ -46,6 +46,7 @@ begin
   dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
   dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+destinationPath+'_tmp');
   mkDIR(destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
@@ -68,6 +69,7 @@ begin
   {$I-}
   mkDIR(destinationPath);
   {$I+}
+  dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath);
 
@@ -513,6 +515,7 @@ var
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
+  i: integer;
 begin
   {
     sln seems to be +140 / -13 = total of 153 lines
@@ -553,6 +556,7 @@ var
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
+  i: integer;
 begin
   {for the moment just show diff on go.pas}
   new := readFile(filename);
@@ -639,7 +643,10 @@ begin
   {todo: proper .gitignore style decision on what to include}
   if (length(path) > 0) and (path[length(path)] <> '\') then
     path += '\';
-  result := listFiles(path+'*.pas') + listFiles(path+'*.bat');
+  {note, a+b+c concatination procues invalid results}
+  result := listFiles(path+'*.pas');
+  result += listFiles(path+'*.bat');
+  result += listFiles(path+'*.inc');
 end;
 
 {show all changed / added / deleted files}
