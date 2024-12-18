@@ -500,6 +500,7 @@ begin
 
 end;
 
+
 type
   MMX16 = packed record
     case integer of
@@ -507,12 +508,38 @@ type
       1: (value: qword);
     end;
 
+function toMMX(v: V3D): MMX16;
+const
+  c256: single = 256.0;
+var
+  o: MMX16;
+begin
+(*
+{$R-,Q-}
+  result.x := round(256*v.x);
+  result.y := round(256*v.y);
+  result.z := round(256*v.z);
+  result.w := 0;
+{$R+,Q+}*)
+  asm
+    fld dword ptr [v.x]
+    fmul dword ptr [c256]
+    fistp word ptr [o.x]
+    fld dword ptr [v.y]
+    fmul dword ptr [c256]
+    fistp word ptr [o.y]
+    fld dword ptr [v.z]
+    fmul dword ptr [c256]
+    fistp word ptr [o.z]
+    mov [o.w], 0
+  end;
+  result := o;
+end;
+
 {trace ray at location and direction (in object space)}
-function trace_MMX(pos: V3D;dir: V3D): RGBA;
+function trace_MMX(p,v,s: MMX16): RGBA;
 var
   col: RGBA;
-  p,v,s: MMX16;
-
   depth: byte;
   counter: int32;
   voxPtr: pointer;
@@ -520,24 +547,6 @@ var
 const
   MAX_SAMPLES = 64;
 begin
-
-  pos += V3D.create(32,16,9);
-  // sometimes we get out of bounds input
-  {$R-,Q-}
-  {todo: trunc->round}
-  p.x := trunc(256*pos.x);
-  p.y := trunc(256*pos.y);
-  p.z := trunc(256*pos.z);
-  p.w := 0;
-  v.x := round(256*dir.x);
-  v.y := round(256*dir.y);
-  v.z := round(256*dir.z);
-  v.w := 0;
-  s.x := 64-1;
-  s.y := 32-1;
-  s.z := 18-1;
-  s.w := 0;
-  {$R+,Q+}
 
   voxPtr := vox.pixels;
   counter := MAX_SAMPLES;
@@ -639,6 +648,7 @@ begin
     mov col, eax
 
     // shading
+    // only 2ms on benchmark
     // todo: make this MMX
     mov cl, depth
     shl cl, 1
@@ -670,7 +680,8 @@ begin
 
   @FINISH:
     popad
-    emms
+    // no emms, main loop must handle this
+    //emms
   end;
 
   lastTraceCount := depth;
@@ -688,6 +699,7 @@ var
   cross: single;
   y, yMin, yMax: int32;
   s1,s2,s3,s4: tScreenPoint;
+  p,v,s,dltX: MMX16;
 
 function toScreen(p: V3D): tScreenPoint;
 begin
@@ -800,6 +812,11 @@ begin
   end;
   deltaX := cameraX + cameraZ*tDelta;
 
+  {setup vars}
+  v := toMMX(cameraZ);
+  s.x := 64-1; s.y := 32-1; s.z := 18-1; s.w := 0;
+  dltX := toMMX(deltaX);
+
   for y := yMin to yMax do begin
 
     pos := (cameraX*(screenLines[y].xMin-atX))+(cameraY*(y-atY));
@@ -815,10 +832,12 @@ begin
     end;
 
     pos += cameraZ * (t+0.5); {start half way in a voxel}
+    pos += V3D.create(32,16,9); {center object}
+    p := toMMX(pos);
 
     for x := screenLines[y].xMin to screenLines[y].xMax do begin
 
-      c := trace_MMX(pos, cameraZ);
+      c := trace_MMX(p, v, s);
       {show trace count}
       if VX_GHOST_MODE then
          c.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);
@@ -832,9 +851,19 @@ begin
       c := c*0.2+c1*0.2+c2*0.2+c3*0.2+c4*0.2;
       }
 
-      pos += deltaX;
+      asm
+        movq mm0, p
+        movq mm1, dltX
+        paddsw mm0, mm1
+        movq p, mm0
+      end;
+
       if c.a > 0 then
-        canvas.putPixel(x, y, c);
+        canvas.setPixel(x, y, c);
+    end;
+
+    asm
+      emms
     end;
   end;
 

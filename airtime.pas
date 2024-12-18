@@ -86,7 +86,7 @@ begin
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
   else
-    carDrawTime := (carDrawTime * 0.99) + 0.01*(getSec - startTime);
+    carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
 
   screen.markRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
 end;
@@ -292,11 +292,17 @@ var
   xTheta, zTheta: single; {in radians}
   k: single;
   b: byte;
+  benchmarkMode: boolean;
+  padding: integer;
+  carScale: single;
+
 begin
 
   logHeapStatus('Title screen started');
 
   b := 0;
+  benchmarkMode := false;
+  carScale := 0.75;
 
   titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
   titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
@@ -323,7 +329,7 @@ begin
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
-    smoothElapsed := smoothElapsed * 0.99 + elapsed * 0.01;
+    smoothElapsed := smoothElapsed * 0.95 + elapsed * 0.05;
     if keyDown(key_space) then
       elapsed /= 100;
     gameTime += elapsed;
@@ -353,22 +359,32 @@ begin
       zTheta := zAngle / 180 * 3.1415;
     end;
 
-    screen.clearRegion(tRect.create(320-30, 360-30, 60, 60));
+    padding := round(60 * carScale/0.75);
+
+    screen.clearRegion(tRect.create(320-(padding div 2), 360-(padding div 2), padding, padding));
 
     startTime := getSec;
-    carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, 0.75);
+    if benchmarkMode then begin
+      carVox.draw(screen.canvas, 320, 360, 0.3, 0, 0.2, carScale);
+    end else
+      carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, carScale);
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)
     else
-      carDrawTime := (carDrawTime * 0.99) + 0.01*(getSec - startTime);
+      carDrawTime := (carDrawTime * 0.90) + 0.10*(getSec - startTime);
 
     drawGUI();
 
     screen.copyRegion(tRect.create(10, 10, 300, 25));
-    screen.copyRegion(tRect.create(320-30, 360-30, 60, 60));
+    screen.copyRegion(tRect.create(320-(padding div 2), 360-(padding div 2), padding, padding));
 
     mixer.mute := keyDown(key_m);
     mixer.noise := keyDown(key_n);
+
+    if keyDown(key_b) then begin
+      benchmarkMode := true;
+      carScale := 2.0;
+    end;
 
     if keyDown(key_e) then begin
       {force an error}
