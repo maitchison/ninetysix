@@ -1,8 +1,6 @@
 {Airtime game}
 program airtime;
 
-{$MODE delphi}
-
 uses
   startup,
   debug,
@@ -25,6 +23,7 @@ uses
   font,
   sound,
   go32;
+
 
 var
 

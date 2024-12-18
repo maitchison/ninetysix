@@ -4,7 +4,7 @@ unit startup;
 interface
 
 uses
-  crt;
+  crt, debug;
 
 implementation
 
@@ -12,4 +12,5 @@ begin
   textAttr := $1f;
   clrscr();
   writeln('Airtime is starting up.');
+  WRITE_TO_SCREEN := true;
 end.

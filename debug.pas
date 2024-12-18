@@ -61,8 +61,8 @@ const
   IO_ACCESS_DENIED = 5;
 
 var
+  WRITE_TO_SCREEN: boolean = false;
   WRITE_TO_LOG: boolean = true;
-  WRITE_TO_SCREEN: boolean = true;
 
 implementation
 
