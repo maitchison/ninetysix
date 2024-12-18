@@ -508,20 +508,15 @@ type
       1: (value: qword);
     end;
 
-function toMMX(v: V3D): MMX16;
+function toMMX(v: V3D): MMX16; inline;
 const
   c256: single = 256.0;
 var
   o: MMX16;
 begin
-(*
-{$R-,Q-}
-  result.x := round(256*v.x);
-  result.y := round(256*v.y);
-  result.z := round(256*v.z);
-  result.w := 0;
-{$R+,Q+}*)
   asm
+    // note: could be done with adding to the expontent,
+    // but fmul is fast enough.
     fld dword ptr [v.x]
     fmul dword ptr [c256]
     fistp word ptr [o.x]
@@ -576,7 +571,7 @@ begin
     inc VX_TRACE_COUNT
 
     {convert scaled, and check bounds}
-
+    {this could be much faster I think}
     movq      mm0, mm1
     psraw     mm0, 8
     pcmpgtw   mm0, mm3    // pos > sx?
@@ -613,12 +608,11 @@ begin
     mov eax, [edi + eax*4]
 
     // check if we hit something
-
     cmp eax, 255 shl 24
     jae @HIT
 
     // ------------------------------
-    // mul step
+    // perform out step
     shr eax, 24     // get alpha
     not al          // d = 255-c.a
     add depth, al
@@ -626,7 +620,6 @@ begin
     mov bx, ax
     shl eax, 16
     mov ax, bx            // eax = 0d|0d
-
 
     movd      mm5, eax    // 00|00|0d|0d
     punpckldq mm5, mm5    // 0d|0d|0d|0d
