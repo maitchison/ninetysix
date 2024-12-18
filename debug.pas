@@ -258,9 +258,14 @@ procedure runError(code: word);
 var
   address: codePointer;
   frame: pointer;
+  basePointer: pointer;
 begin
-  frame := get_frame;
-  frame := get_caller_frame(frame);
+  {todo: check this is right}
+  asm
+    mov eax, ebp
+    mov basePointer, eax
+  end;
+  frame := get_caller_frame(basePointer);
   address := get_caller_addr(frame);
   CustomErrorProc(code, Address, Frame);
 end;
@@ -275,10 +280,12 @@ var
   address: CodePointer;
   frame: Pointer;
 begin
+  {todo: check this is right}
+  {todo: one runError procedure maybe? with a default skip=0}
   frame := get_frame;
   frame := get_caller_frame(frame);
   frame := get_caller_frame(frame);
-  address := get_caller_addr(frame);
+  address := get_caller_addr(get_frame);
   CustomErrorProc(code, Address, Frame);
 end;
 
