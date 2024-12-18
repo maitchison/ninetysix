@@ -1,0 +1,4 @@
+program testdebug;
+
+begin
+end.

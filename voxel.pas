@@ -405,7 +405,6 @@ begin
     inc VX_TRACE_COUNT
 
     {convert scaled, and check bounds}
-    {todo: see if old method works ok here}
     cmp bh,  64
     jae @OUTOFBOUNDS
     cmp ch,  32
@@ -420,6 +419,7 @@ begin
     or al, ch
     shl eax, 6
     or al, bh
+
     mov eax, [edi + eax*4]
 
     // check if we hit something
@@ -449,24 +449,6 @@ begin
     imul eax, d
     shr eax, 2
     add edx, eax
-
-    (*
-    // ------------------------------
-    // looped step
-    // faster on P166 MMX, slower under emulation.
-    shr eax, 24     // get alpha
-    not al          // d = 255-c.a
-    shr al, 2       // value is d*4
-
-  @STEPLOOP:
-    add ebx, vx
-    add ecx, vy
-    add edx, vz
-    add depth, 4
-    dec al
-    jnz @STEPLOOP
-    // ------------------------------
-    *)
 
 
     dec counter
@@ -512,6 +494,169 @@ begin
 
   @FINISH:
     popad
+  end;
+
+  lastTraceCount := depth;
+  result := col;
+
+end;
+
+{trace ray at location and direction (in object space)}
+function trace_MMX(pos: V3D;dir: V3D): RGBA;
+var
+  col: RGBA;
+  vx,vy,vz,vw: int16; {velocity}
+  px,py,pz,pw: int16; {pos}
+  sx,sy,sz,sw: int16; {size }
+
+  depth: byte;
+  counter: int32;
+  voxPtr: pointer;
+  d: int32;
+const
+  MAX_SAMPLES = 64;
+begin
+
+  pos += V3D.create(32,16,9);
+  // sometimes we get out of bounds input
+  {$R-,Q-}
+  {todo: trunc->round}
+  px := trunc(256*pos.x);
+  py := trunc(256*pos.y);
+  pz := trunc(256*pos.z);
+  pw := 0;
+  vx := round(256*dir.x);
+  vy := round(256*dir.y);
+  vz := round(256*dir.z);
+  vw := 0;
+  sx := 64*256-1;
+  sy := 32*256-1;
+  sz := 18*256-1;
+  sw := 0;
+  {$R+,Q+}
+
+  voxPtr := vox.pixels;
+  counter := MAX_SAMPLES;
+  depth := 0;
+
+  asm
+
+    pushad
+
+    //mov edi, voxPtr
+
+    {
+      MM1    px|py|pz|00
+      MM2    vx|vy|vz|00
+      MM3    sx|sy|sz|00
+      MM4    00|00|00|00
+    }
+    (*
+    movq      mm1, qword ptr [px]
+    movq      mm2, qword ptr [vx]
+    movq      mm3, qword ptr [sx]
+    pxor      mm4, mm4
+    *)
+
+  @LOOP:
+
+    {house keeping}
+    inc VX_TRACE_COUNT
+
+    (*
+
+    {convert scaled, and check bounds}
+    {todo: see if old method works ok here}
+    movq      mm0, mm1
+    pcmpgtw   mm0, mm3    // pos > sx?
+    pmovmskb  eax, mm0
+    test      eax, eax
+    jnz @OUTOFBOUNDS
+    movq      mm0, mm4
+    pcmpgtw   mm0, mm1    // 0 > pos?
+    pmovmskb  eax, mm0
+    test      eax, eax
+    jnz @OUTOFBOUNDS
+
+    // lookup our value
+    packuswb  mm0, mm1
+    movd      ebx, mm0    // ebx = 0xyz (unscaled)
+
+    xor eax, eax
+    mov al, bl
+    shl eax, 5
+    or al, bh
+    shl eax, 6
+    shr ebx, 8
+    or al, bh             // might be around the wrong way?
+
+    // stub
+    mov eax,0
+
+    mov eax, [edi + eax*4]
+
+    // check if we hit something
+    cmp eax, 255 shl 24
+    jae @HIT
+
+    // ------------------------------
+    // mul step
+    shr eax, 24     // get alpha
+    not al          // d = 255-c.a
+    mov d, eax
+    add depth, al
+
+    movq      mm0, mm2
+    pmullw    mm0, mm5    // v *= d
+    paddw     mm1, mm0    // p += v * d
+
+    *)
+
+    dec counter
+    jnz @LOOP
+
+  @OUTOFSAMPLES:
+    mov eax, $FFFF00FF
+    mov col, eax
+    jmp @FINISH
+
+  @HIT:
+    mov col, eax
+
+    // shading
+    // todo: make this MMX
+    mov cl, depth
+    shl cl, 1
+    not cl            // cl = (255-(depth*2))
+
+    mov dl, $ff
+
+
+    mov al, col.r
+    mul cl
+    shl edx, 8
+    mov dl, ah
+    mov al, col.g
+    mul cl
+    shl edx, 8
+    mov dl, ah
+    mov al, col.b
+    mul cl
+    shl edx, 8
+    mov dl, ah      // r,g,b *= bl/256
+
+    mov col, edx
+    jmp @FINISH
+
+  @OUTOFBOUNDS:
+    //mov eax, $FF0000FF
+    xor eax, eax
+    mov col, eax
+    jmp @FINISH
+
+  @FINISH:
+    popad
+    emms
   end;
 
   lastTraceCount := depth;
@@ -659,7 +804,7 @@ begin
 
     for x := screenLines[y].xMin to screenLines[y].xMax do begin
 
-       c := trace_ASM(pos, cameraZ);
+      c := trace_MMX(pos, cameraZ);
       {show trace count}
       if VX_GHOST_MODE then
          c.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);

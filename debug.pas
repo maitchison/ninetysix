@@ -215,6 +215,9 @@ var
   FrameCount: integer;
   RunError: string;
 
+  func, source: shortstring;
+  line: longint;
+
 const
   MAX_FRAMES = 16;
 begin

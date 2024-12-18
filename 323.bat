@@ -1,0 +1,1 @@
+path=c:\bin;c:\dos;c:\fpc\323fix\bin\go32v2
