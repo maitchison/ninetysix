@@ -254,23 +254,14 @@ Calls CustomErrorProc for a common exit point, and so that logs are shown.
 This is needed, as the built in RunError does not call ErrorProc
 (for some reason).
 }
-procedure RunError(code: word);
+procedure runError(code: word);
 var
-  Address: CodePointer;
-  Frame: Pointer;
+  address: codePointer;
+  frame: pointer;
 begin
-  asm
-  // FPC will complain that this is not a valid way to access parameters,
-  // but I'm instead looking at the stack frame.
-
-  // [MA] Actually this might be wrong.. need to check this out.
-  mov  eax, [ebp+4]    // get current frame pointer
-  mov  [Address], eax
-
-  // get callers return address
-  mov  eax, ebp
-  mov  [frame], eax
-  end;
+  frame := get_frame;
+  frame := get_caller_frame(frame);
+  address := get_caller_addr(frame);
   CustomErrorProc(code, Address, Frame);
 end;
 
@@ -281,18 +272,13 @@ Removes one entry of the stack frame.
 }
 procedure RunErrorSkipFrame(code: word);
 var
-  Address: CodePointer;
-  Frame: Pointer;
+  address: CodePointer;
+  frame: Pointer;
 begin
-  asm
-  mov  eax, [ebp]    // get current frame pointer
-  mov  ebx, [eax]    // get caller's pointer
-  mov  [Frame], ebx
-
-  // get callers return address
-  mov  eax, [eax+4]
-  mov  [Address], eax
-  end;
+  frame := get_frame;
+  frame := get_caller_frame(frame);
+  frame := get_caller_frame(frame);
+  address := get_caller_addr(frame);
   CustomErrorProc(code, Address, Frame);
 end;
 
