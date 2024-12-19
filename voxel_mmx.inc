@@ -8,12 +8,11 @@ var
 }
 procedure traceScanline_MMX(canvas: tPage; voxPtr: pointer; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
 var
-  col: RGBA;
-  counter: int32;
-  x: int16;
-  depth: byte;
+  col: RGBA; {todo: remove}
   pagePtr: pointer;
-
+  xCounter: int32;
+  zCounter: int32;
+  depth: byte;
 begin
 
   {todo: remove these checks, I just want to see what causes the issue}
@@ -29,50 +28,52 @@ begin
 
   pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
 
-  for x := xMin to xMax do begin
+  xCounter := (xMax-xMin)+1; // inclusive
+  if xCounter <= 0 then exit;
 
-    counter := MAX_SAMPLES;
-    depth := 0;
+  asm
+    pushad
 
-    asm
+    {x-loop setup}
+    mov esi, voxPtr
+    mov edi, pagePtr
 
-      pushad
+    {
+    MM0    temp
 
-      mov esi, voxPtr
-      mov edi, pagePtr
+    MM1    px|py|pz|00 (current position in trace)
+    MM2    vx|vy|vz|00
+    MM3    sx|sy|sz|00 (with bias)
+    MM4    qx|qy|qz|00 (position at start of trace)
+    MM5    80|80|80|80 (bias - $8000)
 
-      {
-        MM0    temp
+    MM6    temp
+    MM7    temp
+    }
 
-        MM1    px|py|pz|00
-        MM2    vx|vy|vz|00
-        MM3    sx|sy|sz|00 (with bias)
-        MM4    00|00|00|00
-        MM5    80|80|80|80 (bias - $8000)
+    movq      mm2, qword ptr [v16]
+    movq      mm3, qword ptr [s16]
+    movq      mm4, qword ptr [p16]
 
-        MM6    used for shading
-        MM7    used for shading
-      }
+    // bias for unsigned comparision
+    mov       eax, $80008000
+    movd      mm5, eax
+    psllq     mm5, 32
+    movd      mm5, eax
+    paddw     mm3, mm5 // bias our sizes
 
-      movq      mm1, qword ptr [p16]
-      movq      mm2, qword ptr [v16]
-      movq      mm3, qword ptr [s16]
-      pxor      mm4, mm4
+    @XLOOP:
 
-      // bias for unsigned comparision
-      mov       eax, $80008000
-      movd      mm5, eax
-      psllq     mm5, 32
-      movd      mm5, eax
-      paddw     mm3, mm5 // bias our sizes
+      mov       zCounter, MAX_SAMPLES
+      mov       depth, 0
+      movq      mm1, mm4    // restore pos
 
-    @LOOP:
+    @ZLOOP:
 
       {house keeping}
       inc VX_TRACE_COUNT
 
       {convert scaled, and check bounds}
-      {this could be much faster I think}
       movq      mm0, mm1
       paddw     mm0, mm5    // add bias for signed comparision
       pcmpgtw   mm0, mm3    // pos > sx or pos < 0?
@@ -102,7 +103,6 @@ begin
       cmp eax, 255 shl 24
       jae @HIT
 
-      // ------------------------------
       // perform our step
       shr eax, 24     // get alpha
       not al          // d = 255-c.a
@@ -120,8 +120,8 @@ begin
       psraw     mm0, 2
       paddw     mm1, mm0    // p += v * (d/4)
 
-      dec counter
-      jnz @LOOP
+      dec zCounter
+      jnz @ZLOOP
 
     @OUTOFSAMPLES:
       mov eax, $FFFF00FF    // purple
@@ -129,9 +129,7 @@ begin
       jmp @FINISH
 
     @HIT:
-
       // shading
-      // assume MM4 = 0
       mov cl, depth
       shl cl, 1
       not cl                // cl = v = (255-(depth*2))
@@ -141,10 +139,12 @@ begin
       shl ecx, 16
       mov cx, bx            // ecx = vv|vv
 
+      pxor      mm0, mm0    // 00|00|00|00
+
       movd      mm6, ecx    // 00|00|vv|vv
-      punpcklbw mm6, mm4    // 0v|0v|0v|0v
+      punpcklbw mm6, mm0    // 0v|0v|0v|0v
       movd      mm7, eax    // 00|00|ar|gb
-      punpcklbw mm7, mm4    // 0a|0r|0g|0b
+      punpcklbw mm7, mm0    // 0a|0r|0g|0b
 
       pmullw    mm6, mm7    // aa|rr|gg|bb
       psrlw     mm6, 8      // 0a|0r|0g|0b
@@ -161,22 +161,19 @@ begin
       jmp @FINISH
 
     @FINISH:
+      // update pos position
+      paddw mm4, qword ptr [d16]
+      add edi, 4
 
-      // update position
-      movq mm0, p16
-      movq mm1, d16
-      paddsw mm0, mm1
-      movq p16, mm0
+      dec xCounter
+      jnz @XLOOP
 
-      add pagePtr, 4
+  @XLOOPEND:
 
-      popad
-
-    end;
-
-  end;
-
-  asm
+    popad
     emms
+
   end;
+
+
 end;
