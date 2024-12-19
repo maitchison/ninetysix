@@ -842,7 +842,7 @@ begin
      anyone will notice. To reduce the error we could do a saturated subtract of 128
      which makes the expected error 0 over uniform input}
     packuswb  mm1, mm1      // MM1 = 0 0 0 0 | 0 R G B
-    movd       eax, mm1
+    movd      eax, mm1
 
     mov dword ptr [edi], eax
 

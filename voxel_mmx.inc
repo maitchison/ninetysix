@@ -17,6 +17,7 @@ var
 begin
 
   {todo: remove these checks, I just want to see what causes the issue}
+  {~0.1ms}
   if dword(@(p16)) and $7 <> 0 then error('Alignment issue');
   if dword(@(v16)) and $7 <> 0 then error('Alignment issue');
 
@@ -41,10 +42,15 @@ begin
       mov edi, pagePtr
 
       {
+        MM0    temp
+
         MM1    px|py|pz|00
         MM2    vx|vy|vz|00
         MM3    sx|sy|sz|00
         MM4    00|00|00|00
+
+        MM6    used for shading
+        MM7    used for shading
       }
 
       movq      mm1, qword ptr [p16]
@@ -77,7 +83,6 @@ begin
       test      eax, eax
       jnz @OUTOFBOUNDS      // todo: could be much faster
 
-
       // lookup our value
       movq      mm0, mm1
       psraw     mm0, 8
@@ -99,7 +104,7 @@ begin
       jae @HIT
 
       // ------------------------------
-      // perform out step
+      // perform our step
       shr eax, 24     // get alpha
       not al          // d = 255-c.a
       add depth, al
@@ -125,35 +130,30 @@ begin
       jmp @FINISH
 
     @HIT:
-      mov col, eax
 
       // shading
-      // only 2ms on benchmark
-      // todo: make this MMX
       mov cl, depth
       shl cl, 1
-      not cl            // cl = (255-(depth*2))
+      not cl                // cl = v = (255-(depth*2))
 
-      mov dl, $ff
+      mov ch, cl
+      mov bx, cx
+      shl ecx, 16
+      mov cx, bx            // ecx = vv|vv
 
+      pxor      mm0, mm0
 
-      mov al, col.r
-      mul cl
-      shl edx, 8
-      mov dl, ah
-      mov al, col.g
-      mul cl
-      shl edx, 8
-      mov dl, ah
-      mov al, col.b
-      mul cl
-      shl edx, 8
-      mov dl, ah      // r,g,b *= bl/256
+      movd      mm6, ecx    // 00|00|vv|vv
+      punpcklbw mm6, mm0    // 0v|0v|0v|0v
+      movd      mm7, eax    // 00|00|ar|gb
+      punpcklbw mm7, mm0    // 0a|0r|0g|0b
 
-      // set pixel(x,y,col)
-      // col is in edx
-      mov [edi], edx
+      pmullw    mm6, mm7    // aa|rr|gg|bb
+      psrlw     mm6, 8      // 0a|0r|0g|0b
 
+      packuswb  mm6, mm6    // 00|00|ar|gb
+      movd      eax, mm6
+      mov [edi], eax
 
       jmp @FINISH
 
