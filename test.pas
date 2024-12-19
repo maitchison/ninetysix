@@ -3,7 +3,6 @@ unit Test;
 
 interface
 
-
 type
   tBytes = array of byte;
 

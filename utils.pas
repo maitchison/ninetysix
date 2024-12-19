@@ -127,7 +127,7 @@ implementation
 uses
   debug,
   test,
-  mmx;
+  cpu;
 
 var
   SEED: byte;
@@ -861,7 +861,7 @@ var
   totalMem: int64;
 begin
   cpuInfo.mhz := (1.0 / INV_CLOCK_FREQ) / 1000 / 1000;
-  cpuInfo.hasMMX := mmx.is_mmx_cpu;
+  cpuInfo.hasMMX := cpu.getMMXSupport();
   get_memInfo(memInfo);
   cpuInfo.ram := memInfo.total_physical_pages * get_page_size;
 end;

@@ -4,12 +4,9 @@ program info;
 {$MODE delphi}
 
 uses
+  crt,
   cpu,
-  {$IFDEF VER3_2_2}
-  mmx,
-  {$ENDIF}
-  utils,
-  crt;
+  utils;
 
 var
   infoStr: string;
@@ -22,10 +19,6 @@ begin
   writeln(s);
   halt;
 end;
-
-{will be set later}
-var
-  HAS_MMX: boolean = false;
 
 {------------------------------------------------------------}
 
@@ -91,7 +84,7 @@ begin
 
   write(pad(tag, 40));
 
-  cycles := lpad(format('~%f', [elapsed/value*(getEstimatedMHZ*1000*1000)]), 6)+' cycles';
+  cycles := lpad(format('~%f', [elapsed/value*(cpuInfo.mhz*1000*1000)]), 6)+' cycles';
   mips := lpad(format('%f', [(value / elapsed) / 1000 / 1000]), 6)+' M';
 
   case mode of
@@ -468,7 +461,7 @@ begin
   timer.stop(); timer.print();
 
   {this should be just a few cycles}
-  if HAS_MMX then begin
+  if cpu.getMMXSupport then begin
     timer.mode := TM_CYCLES;
     timer.start('EMMS');
     asm
@@ -497,69 +490,15 @@ begin
   textAttr := $07;
 end;
 
-function getCPUName(): string;
-var
-  reax: dword;
-  cpuName: string;
-  family, model, stepping: word;
-begin
-  if not cpu.cpuid_support then exit('');
-
-  asm
-    pushad
-    mov eax, 1
-    cpuid
-    mov [reax], eax
-    popad
-    end;
-
-  family := (reax shr 8) and $f;
-  model := (reax shr 4) and $f;
-  stepping :=(reax shr 0) and $f;
-
-  case family of
-    3: cpuName := '386';
-    4: case model of
-      0,1,4: cpuName := '486DX';
-      2: cpuName := '486SX';
-      3: cpuName := '486DX2';
-      5: cpuName := '486SX2';
-      7: cpuName := '486DX4';
-      else cpuName := '486';
-    end;
-    5: case model of
-      3: cpuName := 'Pentium Overdrive';
-      4: cpuName := 'Pentium MMX';
-      else cpuName := 'Pentium';
-    end;
-    6: case model of
-      1: cpuName := 'Pentium Pro';
-      3: cpuName := 'Pentium II';
-      6: cpuName := 'Pentium III';
-      else cpuName := 'Pentium Pro/II/III';
-    end;
-    else cpuName := 'Unknown ('+intToStr(family)+')';
-  end;
-  result := cpuName;
-end;
 
 procedure printCpuInfo();
 var
   cpuBrand: string;
 begin
   testInfo('CPUINFO','');
-  showFlag('CPUID' ,cpu.cpuid_support);
+  showFlag('CPUID' ,cpu.getCPUIDSupport);
   showFlag('CPU Name' ,getCPUName());
-  {$IFDEF VER3_2_2}
-  HAS_MMX := mmx.is_mmx_cpu;
-  showFlag('MMX', mmx.is_mmx_cpu);
-  showFlag('SSE', mmx.is_sse_cpu);
-  {$ELSE}
-  HAS_MMX := cpu.MMXSupport;
-  showFlag('MMX', cpu.MMXSupport);
-  showFlag('SSE3', cpu.SSE3SUpport);
-  {$ENDIF}
-  showFlag('AVX', cpu.AVXSupport);
+  showFlag('MMX', cpu.getMMXSupport);
 end;
 
 begin
