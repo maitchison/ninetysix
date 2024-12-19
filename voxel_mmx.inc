@@ -1,60 +1,30 @@
 
-type
-  MMX16 = packed record
-    case integer of
-      0: (x,y,z,w: int16);
-      1: (value: qword);
-    end;
-
-const
-  c256: single = 256.0;
-
-function toMMX(v: V3D): MMX16; inline;
+{globals for 8-byte alignment}
 var
-  o: MMX16;
-begin
-(*
-  // not sure why this doesn't work right now
-  asm
-    // note: could be done with adding to the expontent,
-    // but fmul is fast enough.
-    fld dword ptr [v.x]
-    fmul dword ptr [c256]
-    fistp word ptr [o.x]
-    fld dword ptr [v.y]
-    fmul dword ptr [c256]
-    fistp word ptr [o.y]
-    fld dword ptr [v.z]
-    fmul dword ptr [c256]
-    fistp word ptr [o.z]
-    mov [o.w], 0
-  end;
-  result := o;*)
-  {$R-,Q-}
-  result.x := round(v.x * 256);
-  result.y := round(v.y * 256);
-  result.z := round(v.z * 256);
-  result.w := 0;
-  {$R+,Q+}
-end;
+  p16, v16, s16, d16: V3D16;
 
 {
   pos: position in voxelspace at xMin
 }
 procedure traceScanline_MMX(canvas: tPage; voxPtr: pointer; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
 var
-  x: int16;
-  p, v, s, d: MMX16;
   col: RGBA;
-  depth: byte;
   counter: int32;
+  x: int16;
+  depth: byte;
   pagePtr: pointer;
+
 begin
 
-  p := toMMX(pos);
-  v := toMMX(dir);
-  s.x := 64-1; s.y := 32-1; s.z := 18-1; s.w := 0;
-  d := toMMX(delta);
+  {todo: remove these checks, I just want to see what causes the issue}
+  if dword(@(p16)) and $7 <> 0 then error('Alignment issue');
+  if dword(@(v16)) and $7 <> 0 then error('Alignment issue');
+
+  {0.3ms for these conversions}
+  p16 := V3D16.make256(pos);
+  v16 := V3D16.make256(dir);
+  s16 := V3D16.make(64-1, 32-1, 18-1);
+  d16 := V3D16.make256(delta);
 
   pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
 
@@ -77,9 +47,9 @@ begin
         MM4    00|00|00|00
       }
 
-      movq      mm1, qword ptr [p]
-      movq      mm2, qword ptr [v]
-      movq      mm3, qword ptr [s]
+      movq      mm1, qword ptr [p16]
+      movq      mm2, qword ptr [v16]
+      movq      mm3, qword ptr [s16]
       pxor      mm4, mm4
 
     @LOOP:
@@ -195,22 +165,17 @@ begin
     @FINISH:
 
       // update position
-      movq mm0, p
-      movq mm1, d
+      movq mm0, p16
+      movq mm1, d16
       paddsw mm0, mm1
-      movq p, mm0
+      movq p16, mm0
 
       add pagePtr, 4
 
       popad
 
-      // todo: inline the setPixel and retain the MMX registers
-
     end;
 
-
-    //if col.a > 0 then
-    //  canvas.setPixel(x, y, col);
   end;
 
   asm

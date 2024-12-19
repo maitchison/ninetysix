@@ -10,7 +10,7 @@ uses
   debug,
   utils;
 
-type V2D = record
+type V2D = packed record
     x, y: single;
     //u: single absolute x;
     //v: single absolute y;
@@ -28,7 +28,8 @@ type V2D = record
     end;
 
 
-type V3D = record
+type
+  V3D = packed record
     x, y, z, w: single;
 
     function abs2: single;
@@ -46,6 +47,15 @@ type V3D = record
     class operator Subtract(a, b: V3D): V3D;
     class operator Multiply(a: V3D; b:single): V3D;
     class operator Multiply(a: V3D; b:V3D): V3D;
+    end;
+
+  {Int16 vector, useful for MMX}
+  V3D16 = packed record
+    x, y, z, w: int16;
+
+    class function make(x, y, z: int16): V3D16; static; inline; overload;
+    class function make(a: V3D): V3D16; static; inline; overload;
+    class function make256(a: V3D): V3D16; static; inline;
     end;
 
 type
@@ -342,6 +352,52 @@ begin
   result := '';
   for i := 0 to 2 do
     result += format('%f %f %f', [data[i*3+1],data[i*3+2],data[i*3+3]]) + #13#10;
+end;
+
+{-----------------------------------------------------}
+
+class function V3D16.make(x, y, z: int16): V3D16; static; inline; overload;
+begin
+  result.x := x;
+  result.y := y;
+  result.z := z;
+  result.w := 0;
+end;
+
+class function V3D16.make(a: V3D): V3D16; static; inline; overload;
+begin
+  {$R-,Q-}
+  result.x := round(a.x);
+  result.y := round(a.y);
+  result.z := round(a.z);
+  result.w := 0;
+  {$R+,Q+}
+end;
+
+class function V3D16.make256(a: V3D): V3D16;
+begin
+  (*
+    // below does not work
+    // note: could be done with adding to the expontent,
+    // but fmul is fast enough.
+    fld dword ptr [v.x]
+    fmul dword ptr [c256]
+    fistp word ptr [o.x]
+    fld dword ptr [v.y]
+    fmul dword ptr [c256]
+    fistp word ptr [o.y]
+    fld dword ptr [v.z]
+    fmul dword ptr [c256]
+    fistp word ptr [o.z]
+    mov [o.w], 0
+  *)
+
+  {$R-,Q-}
+  result.x := round(a.x * 256.0);
+  result.y := round(a.y * 256.0);
+  result.z := round(a.z * 256.0);
+  result.w := 0;
+  {$R+,Q+}
 end;
 
 {-----------------------------------------------------}

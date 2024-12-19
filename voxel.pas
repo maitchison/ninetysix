@@ -514,7 +514,6 @@ var
   cross: single;
   y, yMin, yMax: int32;
   s1,s2,s3,s4: tScreenPoint;
-  p,v,s,dltX: MMX16;
 
 function toScreen(p: V3D): tScreenPoint;
 begin
