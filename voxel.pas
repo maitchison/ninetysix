@@ -1,6 +1,9 @@
 {unit for handling voxel drawing}
 unit voxel;
 
+{stub}
+
+
 {$MODE delphi}
 
 interface

@@ -1,7 +1,5 @@
-
 {globals for 8-byte alignment}
 var
-  {$ALIGN 8}
   p16, v16, s16, d16: V3D16;
 
 {
@@ -18,8 +16,10 @@ begin
 
   {todo: remove these checks, I just want to see what causes the issue}
   {~0.1ms}
+  (*
   if dword(@(p16)) and $7 <> 0 then error('Alignment issue');
   if dword(@(v16)) and $7 <> 0 then error('Alignment issue');
+  *)
 
   bias := V3D.create(0.499/256, 0.499/256, 0.499/256);
 
