@@ -24,7 +24,7 @@ begin
   {0.3ms for these conversions}
   p16 := V3D16.make256(pos);
   v16 := V3D16.make256(dir);
-  s16 := V3D16.make(64-1, 32-1, 18-1);
+  s16 := V3D16.make(256*64-1, 256*32-1, 256*18-1);
   d16 := V3D16.make256(delta);
 
   pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
@@ -46,8 +46,9 @@ begin
 
         MM1    px|py|pz|00
         MM2    vx|vy|vz|00
-        MM3    sx|sy|sz|00
+        MM3    sx|sy|sz|00 (with bias)
         MM4    00|00|00|00
+        MM5    80|80|80|80 (bias - $8000)
 
         MM6    used for shading
         MM7    used for shading
@@ -58,6 +59,13 @@ begin
       movq      mm3, qword ptr [s16]
       pxor      mm4, mm4
 
+      // bias for unsigned comparision
+      mov       eax, $80008000
+      movd      mm5, eax
+      psllq     mm5, 32
+      movd      mm5, eax
+      paddw     mm3, mm5 // bias our sizes
+
     @LOOP:
 
       {house keeping}
@@ -66,20 +74,11 @@ begin
       {convert scaled, and check bounds}
       {this could be much faster I think}
       movq      mm0, mm1
-      psraw     mm0, 8
-      pcmpgtw   mm0, mm3    // pos > sx?
-      movq      mm5, mm0
-      pxor      mm0, mm0
-      pcmpgtw   mm0, mm1    // 0 > pos?
-      por       mm0, mm5    // (pos > sx) or (pos < 0)
-
-      xor       eax, eax
-      movd      ebx, mm0
-      or        eax, ebx
-      psrlq     mm0, 32
-      movd      ebx, mm0
-      or        eax, ebx
-
+      paddw     mm0, mm5    // add bias for signed comparision
+      pcmpgtw   mm0, mm3    // pos > sx or pos < 0?
+      psrlq     mm0, 1      // shift right by 1 bit so that lower 32 bits
+                            // contains a little of each of RGB masks.
+      movd      eax, mm0
       test      eax, eax
       jnz @OUTOFBOUNDS      // todo: could be much faster
 
@@ -113,11 +112,11 @@ begin
       shl eax, 16
       mov ax, bx            // eax = 0d|0d
 
-      movd      mm5, eax    // 00|00|0d|0d
-      punpckldq mm5, mm5    // 0d|0d|0d|0d
+      movd      mm6, eax    // 00|00|0d|0d
+      punpckldq mm6, mm6    // 0d|0d|0d|0d
 
       movq      mm0, mm2
-      pmullw    mm0, mm5    // v *= d
+      pmullw    mm0, mm6    // v *= d
       psraw     mm0, 2
       paddw     mm1, mm0    // p += v * (d/4)
 
@@ -132,6 +131,7 @@ begin
     @HIT:
 
       // shading
+      // assume MM4 = 0
       mov cl, depth
       shl cl, 1
       not cl                // cl = v = (255-(depth*2))
@@ -141,12 +141,10 @@ begin
       shl ecx, 16
       mov cx, bx            // ecx = vv|vv
 
-      pxor      mm0, mm0
-
       movd      mm6, ecx    // 00|00|vv|vv
-      punpcklbw mm6, mm0    // 0v|0v|0v|0v
+      punpcklbw mm6, mm4    // 0v|0v|0v|0v
       movd      mm7, eax    // 00|00|ar|gb
-      punpcklbw mm7, mm0    // 0a|0r|0g|0b
+      punpcklbw mm7, mm4    // 0a|0r|0g|0b
 
       pmullw    mm6, mm7    // aa|rr|gg|bb
       psrlw     mm6, 8      // 0a|0r|0g|0b
