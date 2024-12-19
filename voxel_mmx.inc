@@ -8,7 +8,6 @@ var
 }
 procedure traceScanline_MMX(canvas: tPage; voxPtr: pointer; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
 var
-  col: RGBA; {todo: remove}
   pagePtr: pointer;
   xCounter: int32;
   zCounter: int32;
@@ -73,7 +72,7 @@ begin
       {house keeping}
       inc VX_TRACE_COUNT
 
-      {convert scaled, and check bounds}
+      {check bounds}
       movq      mm0, mm1
       paddw     mm0, mm5    // add bias for signed comparision
       pcmpgtw   mm0, mm3    // pos > sx or pos < 0?
@@ -81,23 +80,25 @@ begin
                             // contains a little of each of RGB masks.
       movd      eax, mm0
       test      eax, eax
-      jnz @OUTOFBOUNDS      // todo: could be much faster
+      jnz @FINISH
 
       // lookup our value
       movq      mm0, mm1
       psraw     mm0, 8
       packuswb  mm0, mm0
-      movd      col, mm0    // ebx = 0xyz (unscaled)
+      movd      eax, mm0    // eax = 0xyz (unscaled)
 
-      xor eax, eax
-      mov al, col.r
-      shl eax, 5
-      or al, col.g
-      shl eax, 6
-      shr ebx, 8
-      or al, col.b
+      mov ebx, eax          // ax = yz
+      shr ebx, 16           // bx = 0x
 
-      mov eax, [esi + eax*4]
+      xor edx, edx
+      or dl, bl
+      shl edx, 5
+      or dl, ah
+      shl edx, 6
+      or dl, al
+
+      mov eax, [esi + edx*4]
 
       // check if we hit something
       cmp eax, 255 shl 24
@@ -124,8 +125,8 @@ begin
       jnz @ZLOOP
 
     @OUTOFSAMPLES:
-      mov eax, $FFFF00FF    // purple
-      mov col, eax
+      mov eax, $FFFF00FF    // write purple to indicate an issue
+      mov [edi], eax
       jmp @FINISH
 
     @HIT:
@@ -151,14 +152,7 @@ begin
 
       packuswb  mm6, mm6    // 00|00|ar|gb
       movd      eax, mm6
-      mov [edi], eax
-
-      jmp @FINISH
-
-    @OUTOFBOUNDS:
-      xor eax, eax
-      mov col, eax
-      jmp @FINISH
+      mov       [edi], eax
 
     @FINISH:
       // update pos position
