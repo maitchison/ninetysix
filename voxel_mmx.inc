@@ -1,6 +1,7 @@
 
 {globals for 8-byte alignment}
 var
+  {$ALIGN 8}
   p16, v16, s16, d16: V3D16;
 
 {

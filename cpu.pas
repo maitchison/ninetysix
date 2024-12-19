@@ -34,6 +34,10 @@ function getCPUIDSupport: boolean; assembler;
 
 function getMMXSupport: boolean; assembler;
   asm
+    push  ebx
+    push  ecx
+    push  edx
+
     call  getCPUIDSupport
     jz    @NoCPUID
 
@@ -43,14 +47,17 @@ function getMMXSupport: boolean; assembler;
     jz    @NoMMX
 
   @HasMMX:
-    mov al, 1
+    mov   al, 1
     jmp   @Done
 
   @NoMMX:
   @NoCPUID:
-    mov al, 0
+    mov   al, 0
 
   @Done:
+    pop   edx
+    pop   ecx
+    pop   ebx
   end;
 
 function getCPUName(): string;

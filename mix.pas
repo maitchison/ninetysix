@@ -10,7 +10,6 @@ uses
   debug,
   utils,
   sound,
-  mmx,
   go32;
 
 CONST
