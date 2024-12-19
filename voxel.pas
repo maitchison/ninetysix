@@ -506,7 +506,7 @@ begin
     pos += cameraZ * (t+0.5); {start half way in a voxel}
     pos += V3D.create(32,16,9); {center object}
 
-    traceScanline_ASM(
+    traceScanline_MMX(
       canvas,
       vox.pixels,
       screenLines[y].xMin,

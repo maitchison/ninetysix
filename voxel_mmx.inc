@@ -11,6 +11,7 @@ var
   pagePtr: pointer;
   xCounter: int32;
   zCounter: int32;
+  bias: V3D;
   depth: byte;
 begin
 
@@ -19,8 +20,10 @@ begin
   if dword(@(p16)) and $7 <> 0 then error('Alignment issue');
   if dword(@(v16)) and $7 <> 0 then error('Alignment issue');
 
+  bias := V3D.create(0.499/256, 0.499/256, 0.499/256);
+
   {0.3ms for these conversions}
-  p16 := V3D16.make256(pos);
+  p16 := V3D16.make256(pos-bias);
   v16 := V3D16.make256(dir);
   s16 := V3D16.make(256*64-1, 256*32-1, 256*18-1);
   d16 := V3D16.make256(delta);
@@ -44,7 +47,7 @@ begin
     MM2    vx|vy|vz|00
     MM3    sx|sy|sz|00 (with bias)
     MM4    qx|qy|qz|00 (position at start of trace)
-    MM5    80|80|80|80 (bias - $8000)
+    MM5    80|80|80|80 (bias for unsigned compare)
 
     MM6    temp
     MM7    temp
@@ -54,12 +57,11 @@ begin
     movq      mm3, qword ptr [s16]
     movq      mm4, qword ptr [p16]
 
-    // bias for unsigned comparision
     mov       eax, $80008000
     movd      mm5, eax
-    psllq     mm5, 32
-    movd      mm5, eax
-    paddw     mm3, mm5 // bias our sizes
+    punpckldq mm5, mm5
+
+    pxor      mm3, mm5
 
     @XLOOP:
 
@@ -74,17 +76,18 @@ begin
 
       {check bounds}
       movq      mm0, mm1
-      paddw     mm0, mm5    // add bias for signed comparision
-      pcmpgtw   mm0, mm3    // pos > sx or pos < 0?
+      pxor      mm0, mm5    // perform unsigned compare
+      pcmpgtw   mm0, mm3    // is pos > sx or pos < 0 ?
       psrlq     mm0, 1      // shift right by 1 bit so that lower 32 bits
                             // contains a little of each of RGB masks.
       movd      eax, mm0
       test      eax, eax
       jnz @FINISH
 
+
       // lookup our value
       movq      mm0, mm1
-      psraw     mm0, 8
+      psrlw     mm0, 8
       packuswb  mm0, mm0
       movd      eax, mm0    // eax = 0xyz (unscaled)
 
@@ -119,7 +122,7 @@ begin
       movq      mm0, mm2
       pmullw    mm0, mm6    // v *= d
       psraw     mm0, 2
-      paddw     mm1, mm0    // p += v * (d/4)
+      paddsw    mm1, mm0    // p += v * (d/4)
 
       dec zCounter
       jnz @ZLOOP
@@ -156,11 +159,11 @@ begin
 
     @FINISH:
       // update pos position
-      paddw mm4, qword ptr [d16]
-      add edi, 4
+      paddsw    mm4, qword ptr [d16]
+      add       edi, 4
 
-      dec xCounter
-      jnz @XLOOP
+      dec       xCounter
+      jnz       @XLOOP
 
   @XLOOPEND:
 

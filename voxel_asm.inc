@@ -2,25 +2,13 @@ var
   lastTraceCount: dword = 0;
 
 {trace ray at location and direction (in object space)}
-function trace_ASM(voxPtr: pointer; pos: V3D;dir: V3D): RGBA;
+function trace_ASM(voxPtr: pointer; pos: V3D16;dir: V3D16): RGBA;
 var
   col: RGBA;
-  vx,vy,vz: int32;
-  sx,sy,sz: int32;
   depth: byte;
   counter: int32;
   d: int32;
-const
-  MAX_SAMPLES = 64;
 begin
-
-  {todo: switch to V3D16 inputs}
-  sx := trunc(256*pos.x);
-  sy := trunc(256*pos.y);
-  sz := trunc(256*pos.z);
-  vx := round(256*dir.x);
-  vy := round(256*dir.y);
-  vz := round(256*dir.z);
 
   counter := MAX_SAMPLES;
   depth := 0;
@@ -30,9 +18,9 @@ begin
     pushad
 
     mov edi, voxPtr
-    mov ebx, sx
-    mov ecx, sy
-    mov edx, sz
+    movsx ebx, word ptr pos.x
+    movsx ecx, word ptr pos.y
+    movsx edx, word ptr pos.z
 
   @LOOP:
 
@@ -69,21 +57,20 @@ begin
     mov d, eax
     add depth, al
 
-    mov eax, vx
+    movsx eax, word ptr dir.x
     imul eax, d
     shr eax, 2
     add ebx, eax
 
-    mov eax, vy
+    movsx eax, word ptr dir.y
     imul eax, d
     shr eax, 2
     add ecx, eax
 
-    mov eax, vz
+    movsx eax, word ptr dir.z
     imul eax, d
     shr eax, 2
     add edx, eax
-
 
     dec counter
     jnz @LOOP
@@ -138,26 +125,30 @@ procedure traceScanline_ASM(canvas: tPage; voxPtr: pointer; xMin, xMax: int16; y
 var
   x: int16;
   col: RGBA;
-
+  p16, v16, d16: V3D16;
+  bias: V3D;
 begin
+
+  // make256 will use round, this converts it into a trunc}
+  bias := V3D.create(0.499/256, 0.499/256, 0.499/256);
+
+  p16 := V3D16.make256(pos-bias);
+  v16 := V3D16.make256(dir);
+  d16 := V3D16.make256(delta);
 
   for x := xMin to xMax do begin
 
-    col := trace_ASM(voxPtr, pos, dir);
+    col := trace_ASM(voxPtr, p16, v16);
     {show trace count}
     if VX_GHOST_MODE then
        col.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);
 
-    {AA}
-    {
-    c1 := trace(pos+cameraX*0.25+cameraY*0.25, cameraZ);
-    c2 := trace(pos-cameraX*0.25+cameraY*0.25, cameraZ);
-    c3 := trace(pos-cameraX*0.25-cameraY*0.25, cameraZ);
-    c4 := trace(pos+cameraX*0.25-cameraY*0.25, cameraZ);
-    c := c*0.2+c1*0.2+c2*0.2+c3*0.2+c4*0.2;
-    }
+    {$R-}
+    p16.x += d16.x;
+    p16.y += d16.y;
+    p16.z += d16.z;
+    {$R+}
 
-    pos += delta;
     if col.a > 0 then
       canvas.putPixel(x, y, col);
   end;
