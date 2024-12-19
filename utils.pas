@@ -95,7 +95,7 @@ function removeExtension(const filename: string): string;
 function comma(value: int64; width: word=0; padding: char=' '): string;
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
-function bytesToStr(bytes: tBytes): string;
+function bytesToStr(bytes: array of byte): string;
 function bytesToSanStr(bytes: tBytes): string;
 function strToInt(s: string): int64;
 function trim(s: string): string;
@@ -376,7 +376,7 @@ end;
 
 {-------------------------------------------------------}
 
-function bytesToStr(bytes: tBytes): string;
+function bytesToStr(bytes: array of byte): string;
 var
   i: int32;
 begin

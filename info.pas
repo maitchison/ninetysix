@@ -100,6 +100,12 @@ end;
 
 {------------------------------------------------------------}
 
+procedure showFlag(flag: string; value: string); overload;
+begin
+  textAttr := $07;
+  writeln(pad(flag,40), value);
+end;
+
 procedure testInfo(name: string; description: string);
 begin
   textAttr := $0F;
@@ -227,6 +233,9 @@ var
   d: double;
   x: extended;
   a,b: int64;
+  i: integer;
+  q1,q2: qword;
+  maxMantissa: integer;
 begin
   testInfo(
     'Limited Precision FPU',
@@ -240,16 +249,28 @@ begin
   end;
   assertEqual('FILD Move', a, b);
   asm
-    fld1
-    fld1
-    fadd
-    fsqrt
+    fldpi
     fst dword ptr [s]
     fst qword ptr [d]
     fstp tbyte ptr [x]
   end;
+
   assertNotEqual('80bit float is not reduced to 32bit', x-s, 0);
   assertNotEqual('80bit float is not reduced to 64bit', x-d, 0);
+
+  maxMantissa := 0;
+  for i := 1 to 64 do begin
+    q1 := (qword(1) shl i)-1;
+    x := q1;
+    q2 := round(x);
+    if q1 <> q2 then
+      break
+    else
+      maxMantissa := i;
+  end;
+
+  showFlag('Mantisaa' ,intToStr(maxMantissa)+'bits');
+
 end;
 
 {waits until the start of the next tick.}
@@ -297,12 +318,6 @@ begin
 
 end;
 
-procedure showFlag(flag: string; value: string); overload;
-begin
-  textAttr := $07;
-  writeln(pad(flag,40), value);
-end;
-
 procedure benchRAM();
 var
   timer: tTimer;
@@ -340,7 +355,7 @@ begin
    end;
   timer.stop(); timer.print();
 
-  timer.start('Move - REP STOSD');
+  timer.start('Move - REP MOVSD');
   asm
     pushad
     mov ecx, LEN
