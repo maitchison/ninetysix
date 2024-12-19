@@ -509,12 +509,6 @@ begin
     pos += cameraZ * (t+0.5); {start half way in a voxel}
     pos += V3D.create(32,16,9); {center object}
 
-    traceScanline_MMX(
-        canvas, vox.pixels,
-        screenLines[y].xMin, screenLines[y].xMax, y,
-        pos, cameraZ, deltaX
-      )
-    (*
     if cpuInfo.hasMMX then
       traceScanline_MMX(
         canvas, vox.pixels,
@@ -527,7 +521,6 @@ begin
         screenLines[y].xMin, screenLines[y].xMax, y,
         pos, cameraZ, deltaX
       );
-    *)
   end;
 
 end;

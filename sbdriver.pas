@@ -58,7 +58,7 @@ const
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 4*1024;
+  BUFFER_SIZE = 8*1024;
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 

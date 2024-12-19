@@ -35,6 +35,8 @@ begin
   if xCounter <= 0 then exit;
 
   asm
+    // if an interupt occurs the FPU will be in an invalid state.
+    cli
     pushad
 
     {x-loop setup}
@@ -170,6 +172,7 @@ begin
 
     popad
     emms
+    sti
 
   end;
 
