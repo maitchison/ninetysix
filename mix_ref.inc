@@ -26,19 +26,6 @@ var
   i: int32;
 begin
 
-  if samplePos < 0 then
-    // this just means sample starts partway in this chunk.
-    samplesToProcess += samplePos;
-
-  if samplesToProcess <= 0 then exit;
-
-  if samplePos >= sampleLength then begin
-    if looping then
-      samplePos := samplePos mod sampleLength
-    else
-      exit;
-  end;
-
   for i := 0 to samplesToProcess-1 do begin
     scratchBufferI32[i].left += int32(sample^[samplePos].left) * 256;
     scratchBufferI32[i].right += int32(sample^[samplePos].right) * 256;

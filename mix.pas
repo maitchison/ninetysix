@@ -109,7 +109,7 @@ var
   noise: int32;
   sample, finalSample: pointer;
   bufSamples: int32;
-  pos: int32;
+  samplePos, samplesToProcess: int32;
 
 begin
 
@@ -133,11 +133,24 @@ begin
     if mixer.channel[j].inUse then begin
       sfx := mixer.channel[j].soundEffect;
       if sfx.length = 0 then exit;
-      pos := (startTC - mixer.channel[j].startTC) mod sfx.length;
+      samplePos := (startTC - mixer.channel[j].startTC) mod sfx.length;
+      samplesToProcess := bufSamples;
+
+      if samplePos < 0 then
+        // this just means sample starts partway in this chunk.
+        samplesToProcess += samplePos;
+      if samplesToProcess <= 0 then continue;
+      if samplePos >= sfx.length then begin
+        if mixer.channel[j].looping then
+          samplePos := samplePos mod sfx.length
+        else
+          continue;
+      end;
+
       case sfx.format of
         // stub: support asm again
         AF_16_STEREO: process16S_REF(
-          pos, sfx.data, sfx.length, bufSamples,
+          samplePos, sfx.data, sfx.length, samplesToProcess,
           mixer.channel[j].looping
         );
         // stub: support 8bit again

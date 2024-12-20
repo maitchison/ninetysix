@@ -176,8 +176,8 @@ begin
   numSamples := trunc(44100 * duration);
   result := tSoundEffect.create(AF_16_STEREO, numSamples);
   for i := 0 to numSamples-1 do begin
-    sample.left := (rnd-128)*256;
-    sample.right := (rnd-128)*256;
+    sample.left := (rnd+rnd-256)*64;
+    sample.right := (rnd+rnd-256)*64;
     result.setSample(i, sample);
   end;
 end;
