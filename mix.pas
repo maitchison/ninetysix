@@ -38,9 +38,7 @@ type
 
     constructor create();
     procedure play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
-
   end;
-
 
 var
   {our global mixer}
@@ -61,121 +59,22 @@ uses
 var
   scratchBuffer: array[0..8*1024-1] of tAudioSample;
   scratchBufferF32: array[0..8*1024-1] of tAudioSampleF32;
-  scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32; {$ALIGN 8}
+  scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32; {$align 8}
 
-{-----------------------------------------------------}
-{our big mixdown function}
-{note: this can not be mixer.mixdown, as calls to
- class methods can cause crashes apparently (due to RTL being invalid)
-}
-
+{Mixer is called during interupt, so stack might be invalid,
+ also, make sure to not throw any errors. These will get turned
+ back on below}
 {$S-,R-,Q-}
 
-procedure clipAndConvert_MMX(bufSamples:int32);
-var
-  srcPtr, dstPtr, noisePtr: pointer;
-  FPUState: array[0..108-1] of byte; {$ALIGN 16}
+{$i mix_ref.inc}
+{$i mix_asm.inc}
+{$i mix_mmx.inc}
+
+{-----------------------------------------------------}
+
+function fake8Bit(value: int32): int32;
 begin
-
-  srcPtr := @scratchBufferI32[0];
-  dstPtr := @scratchBuffer[0];
-  noisePtr := @mixer.noiseBuffer[0];
-
-  asm
-
-    add noiseCounter, 1997
-
-    pushad
-
-    fsave FPUState
-    fwait
-
-    mov ecx, bufSamples
-    mov esi, srcPtr
-    mov edi, dstPtr
-
-  @LOOP:
-
-    {noise}
-    mov ebx, noiseCounter
-    and ebx, $FFFF
-    shl ebx, 2
-    add ebx, noisePtr
-    movq mm1, qword ptr [ebx]
-
-    add noiseCounter, 97
-
-    {convert and clip}
-    movq   mm0, [esi]            // mm0 = LEFT|RIGHT
-    paddd mm0, mm1              // mm0 = LEFT+noise|RIGHT+noise}
-    psrad  mm0, 8                // mm0 = (LEFT+noise)/256|(RIGHT+noise)/256
-    packssdw mm0, mm0            // mm0 = left|right|left|right (16bit)
-
-    movd [edi], mm0
-
-    add esi, 8
-    add edi, 4
-    dec ecx
-    jnz @LOOP
-
-    frstor FPUState
-    popad
-  end;
-end;
-
-procedure clipAndConvert_ASM(bufSamples:int32);
-var
-  srcPtr, dstPtr: pointer;
-begin
-
-  srcPtr := @scratchBufferI32[0];
-  dstPtr := @scratchBuffer[0];
-
-  asm
-
-    pushad
-
-    mov ecx, bufSamples
-    shl ecx, 1
-    mov esi, srcPtr
-    mov edi, dstPtr
-
-  @LOOP:
-
-    mov eax, [esi]
-    sar eax, 8
-    cmp eax, 32767
-    jng @SkipOver
-    mov eax, 32767
-  @SkipOver:
-    cmp eax, -32768
-    jnl @SkipUnder
-    mov eax, -32768
-  @SkipUnder:
-    mov [edi], eax
-
-    add esi, 4
-    add edi, 2
-    dec ecx
-    jnz @LOOP
-
-    popad
-  end;
-end;
-
-procedure clipAndConvert_REF(bufSamples:int32);
-var
-  i: int32;
-  left,right: int32;
-begin
-  for i := 0 to bufSamples-1 do begin
-    left := (scratchBufferI32[i].left) div 256;
-    right := (scratchBufferI32[i].right) div 256;
-    if left > 32767 then left := 32767 else if left < -32768 then left := -32768;
-    if right > 32767 then right := 32767 else if right < -32768 then right := -32768;
-    scratchBuffer[i].left := left;
-    scratchBuffer[i].right := right;
-  end;
+  exit(value div 65536 * 65536);
 end;
 
 function fakeULAW(value: int32): int32;
@@ -194,69 +93,18 @@ begin
   result := round(x*256*32*1024);          // we're mixing in 24.8
 end;
 
-function fake8Bit(value: int32): int32;
-begin
-  exit(value div 65536 * 65536);
-end;
+{-----------------------------------------------------}
 
-procedure process8S_REF(sample, firstSample, finalSample: pAudioSample8S;count: dword);
-var
-  i: int32;
-begin
-  for i := 0 to count-1 do begin
-    scratchBufferI32[i].left += (int32(sample^.left)-128) * 65536;
-    scratchBufferI32[i].right += (int32(sample^.right)-128) * 65536;
-    inc(sample);
-    if sample >= finalSample then
-      sample := pointer(firstSample);
-  end;
-end;
-
-procedure process8S_ASM(sample, firstSample, finalSample: pAudioSample8S;count: dword);
-var
-  dstPointer: pointer;
-begin
-  if (pointer(sample) + count*2) >= finalSample then begin
-    {we can't handle looping here, yet.}
-    process8S_ASM(sample, firstSample, finalSample, count);
-    exit;
-  end;
-
-  dstPointer := @scratchBufferI32[0];
-
-  asm
-    pushad
-    mov esi, sample
-    mov edi, dstPointer
-    mov ecx, count
-    shl ecx, 1
-
-  @LOOP:
-
-    xor eax, eax
-    mov al, [esi]
-    sub eax, 128
-    sal eax, 16
-    add [edi], eax
-
-    inc esi
-    add edi, 4
-
-    dec ecx
-    jnz @LOOP
-
-    popad
-  end;
-end;
-
+{our big mixdown function}
+{note: this can not be mixer.mixdown, as calls to
+ class methods can cause crashes apparently (due to RTL being invalid)
+}
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 var
   sfx: tSoundEffect;
   i,j: int32;
   noise: int32;
   pos,len: int32;
-  sample16S: pAudioSample16S;
-  sample8S: pAudioSample8S;
   sample, finalSample: pointer;
   bufSamples: int32;
 
@@ -292,20 +140,9 @@ begin
       finalSample := pointer(sfx.data) + (len * sfx.bytesPersample);
 
       case sfx.format of
-        AF_16_STEREO: begin
-          sample16S := sample;
-          for i := 0 to bufSamples-1 do begin
-            scratchBufferI32[i].left += sample16S^.left*256;
-            scratchBufferI32[i].right += sample16S^.right*256;
-            inc(sample16S);
-            if sample16S >= finalSample then
-              sample16S := pointer(sfx.data)
-          end;
-        end;
+        AF_16_STEREO: process16S_ASM(sample, sfx.data, finalSample, bufSamples);
         AF_8_STEREO: process8S_ASM(sample, sfx.data, finalSample, bufSamples);
-        else begin
-          // format not supported, but no error as we're in an interupt.
-        end;
+        else ; // ignore error as we're in an interupt.
       end;
     end;
   end;
@@ -341,6 +178,7 @@ begin
 
   result := @scratchBuffer[0];
 end;
+
 {$S+,R+,Q+}
 
 

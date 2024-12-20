@@ -105,7 +105,7 @@ var
 function tVoxelSprite.getDistance_L1(x,y,z: integer): integer;
 var
   dx,dy,dz: integer;
-  d, i: integer;
+  d: integer;
 const
   MAX_D=16;
 begin
@@ -122,10 +122,9 @@ end;
 function tVoxelSprite.getDistance_L2(x,y,z: integer): single;
 var
   dx,dy,dz: integer;
-  i,d: integer;
-   d2: single;
+  d: integer;
+  d2: single;
   bestD2: single;
-  max_d: integer;
 begin
 
   if getVoxel(x,y,z).a = 255 then exit(0);
@@ -147,7 +146,6 @@ end;
 function tVoxelSprite.generateSDF(): tPage;
 var
   i,j,k: int32;
-  minDst: integer;
   d: single;
   c: RGBA;
 begin
@@ -436,7 +434,6 @@ end;
 
 
 var
-  i,j: integer;
   c: RGBA;
   p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
   isometricTransform : tMatrix3x3;
@@ -459,8 +456,6 @@ begin
   objToWorld := objToWorld.MM(isometricTransform);
   {transpose is inverse (for unitary)}
   worldToObj := objToWorld.transposed();
-
-
 
   objToWorld.applyScale(scale);
   worldToObj.applyScale(1/scale);
