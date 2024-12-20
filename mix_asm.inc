@@ -83,7 +83,9 @@ procedure process16S_ASM(
   samplePos: int32; samplePtr: pointer; sampleLength: dword;
   bufferPos: int32; count: int32;
   startVolume: int32 = 256*256;
-  endVolume: int32 = 256*256
+  endVolume: int32 = 256*256;
+  pitch: int32 = 256
+
 );
 var
   srcPtr, dstPtr: pointer;
@@ -124,7 +126,7 @@ begin
   end; exit; end;
 
   {standard case (but no pitch ... yet)}
-  if true then begin
+  if (pitch = 256) then begin
   asm
     pushad
 
@@ -171,7 +173,8 @@ begin
   process16S_REF(
     samplePos, samplePtr, sampleLength,
     bufferPos, count,
-    startVolume, endVolume
+    startVolume, endVolume,
+    pitch
   );
 
 end;

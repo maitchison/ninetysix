@@ -21,18 +21,21 @@ type
     samplePos: int32; samplePtr: pointer; sampleLength: dword;
     bufferPos: int32; count: int32;
     startVolume: int32 = 256*256;
-    endVolume: int32 = 256*256
+    endVolume: int32 = 256*256;
+    pitch: int32 = 256
   );
 
 procedure process16S_REF(
   samplePos: int32; samplePtr: pointer; sampleLength: dword;
   bufferPos: int32; count: int32;
   startVolume: int32 = 256*256;
-  endVolume: int32 = 256*256
+  endVolume: int32 = 256*256;
+  pitch: int32 = 256
 );
 var
   i: int32;
   volume, volumeDelta: int32;
+  sPos,sVel: int32;
   sample: pSamples16S;
 begin
 
@@ -41,11 +44,12 @@ begin
 
   volume := startVolume;
   volumeDelta := int32(endVolume-startVolume) div count;
+  sPos := samplePos * 256;
 
   for i := 0 to count-1 do begin
-    scratchBufferI32[bufferPos+i].left += int32(sample^[samplePos].left) * (volume div 256);
-    scratchBufferI32[bufferPos+i].right += int32(sample^[samplePos].right) * (volume div 256);
-    inc(samplePos);
+    scratchBufferI32[bufferPos+i].left += int32(sample^[sPos shr 8].left) * (volume div 256);
+    scratchBufferI32[bufferPos+i].right += int32(sample^[sPos shr 8].right) * (volume div 256);
+    sPos += pitch;
     volume += volumeDelta;
   end;
 end;

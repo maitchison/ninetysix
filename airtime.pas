@@ -472,11 +472,11 @@ begin
     end;
 
     if keyDown(key_s) and (getSec > nextBellSound) then begin
-      mixer.play(slideSFX, rnd/256, 1.0);
-      if getSec > nextBellSound + (1/136) then
-        nextBellSound := getSec + (1/136)
+      mixer.play(slideSFX, (256+rnd)/512, (rnd+64)/256);
+      if getSec > nextBellSound + (30/136) then
+        nextBellSound := getSec + (30/136)
       else
-        nextBellSound += (1/136)
+        nextBellSound += (30/136)
     end;
 
     if keyDown(key_e) then begin
@@ -489,7 +489,6 @@ begin
     end;
 
     if keyDown(key_p) and keyDown(key_l) and keyDown(key_y) then mainLoop();
-
     if keyDown(key_q) or keyDown(key_esc) then break;
   end;
 end;

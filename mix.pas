@@ -119,8 +119,11 @@ var
   noise: int32;
   sample, finalSample: pointer;
   bufPos, bufSamples: int32;
-  samplePos, samplesToProcess, chunkSamples: int32;
+  samplePos, remainingBufferSamples, chunkBufferSamples: int32;
+  bufferSamplesRequiredToCatchUp,chunkSourceSamples: int32;
   channel: tSoundChannel;
+
+  pitchVel: int32; // (sfx samples per buffer sample) * 256
 
   processAudio: tProcessAudioProc;
 
@@ -147,21 +150,30 @@ begin
     channel := mixer.channels[j];
 
     if channel.inUse then begin
+
       sfx := channel.sfx;
       if sfx.length = 0 then exit;
-      samplePos := (startTC - channel.startTC);
+
+      pitchVel := trunc(256*channel.pitch);
+
+      {todo: have sub sample precision for samplePos
+       - this means all process functions bellow must support it}
+      samplePos := (startTC - channel.startTC) * pitchVel div 256;
       if samplePos > 0 then samplePos := samplePos mod sfx.length;
-      samplesToProcess := bufSamples;
+      remainingBufferSamples := bufSamples;
 
       bufPos := 0;
 
       if samplePos < 0 then begin
         // this means sample starts partway in this buffer.
-        bufPos := -samplePos;
+        bufferSamplesRequiredToCatchUp := -samplePos * 256 div pitchVel;
+        bufPos := bufferSamplesRequiredToCatchUp;
         samplePos := 0;
-        samplesToProcess += samplePos;
+        remainingBufferSamples -= bufferSamplesRequiredToCatchUp;
       end;
-      if samplesToProcess <= 0 then continue;
+
+      if remainingBufferSamples <= 0 then continue;
+
       if samplePos >= sfx.length then begin
         if channel.looping then
           samplePos := samplePos mod sfx.length
@@ -181,19 +193,21 @@ begin
       // - process need not handle looping
       // - volume is linear within chunk
 
-      while samplesToProcess > 0 do begin
-        chunkSamples := samplesToProcess;
-        if (samplePos + chunkSamples) >= sfx.length then
+      while remainingBufferSamples > 0 do begin
+        chunkBufferSamples := remainingBufferSamples;
+        if (samplePos + chunkBufferSamples) >= sfx.length then
           // this means audio ends early within the buffer
-          chunkSamples := sfx.length - samplePos;
+          chunkBufferSamples := sfx.length - samplePos;
         processAudio(
           samplePos, sfx.data, sfx.length,
-          bufPos, chunkSamples,
-          trunc(channel.volume*65536), trunc(channel.volume*65536)
+          bufPos, chunkBufferSamples,
+          trunc(channel.volume*65536), trunc(channel.volume*65536),
+          trunc(channel.pitch*256)
         );
-        samplePos := (samplePos + chunkSamples) mod sfx.length;
-        bufPos += chunkSamples;
-        samplesToProcess -= chunkSamples;
+        chunkSourceSamples := chunkBufferSamples * 256 div pitchVel;
+        samplePos := (samplePos + chunkSourceSamples) mod sfx.length;
+        bufPos += chunkBufferSamples;
+        remainingBufferSamples -= chunkBufferSamples;
       end;
     end;
 
