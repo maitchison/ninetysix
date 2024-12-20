@@ -654,9 +654,9 @@ asm
     mov esi, eax
 
     cmp dx,  [esi].Width                // unsigned cmp will catch negative values.
-    jge @Skip
+    jae @Skip
     cmp cx,  [esi].Height
-    jge @Skip
+    jae @Skip
 
     movzx edi, dx
 
@@ -729,9 +729,9 @@ asm
     mov esi, eax
 
     cmp dx,  [esi].Width                // unsigned cmp will catch negative values.
-    jge @SKIP
+    jae @SKIP
     cmp cx,  [esi].Height
-    jge @SKIP
+    jae @SKIP
 
     movzx edi, dx
 
