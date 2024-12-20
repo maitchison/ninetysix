@@ -117,7 +117,7 @@ function  Quantize(value, levels: byte): byte;
 function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
-function  GetSec(): double;
+function  GetSec(): double; inline;
 function  fileModifiedTime(fileName: string): longint;
 
 function  getTickCount(): int64;
@@ -707,7 +707,7 @@ end;
 Can be used for very accurate timing measurement}
 function GetSec(): double; inline;
 begin
-    result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
+  result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
 end;
 
 {returns timestamp for file modified time, or -1 if file not found.}

@@ -43,10 +43,10 @@ type
     function dot(other: V3D): single;
     procedure clip(maxLen: single);
 
-    class operator Add(a, b: V3D): V3D;
-    class operator Subtract(a, b: V3D): V3D;
-    class operator Multiply(a: V3D; b:single): V3D;
-    class operator Multiply(a: V3D; b:V3D): V3D;
+    class operator Add(a, b: V3D): V3D; inline;
+    class operator Subtract(a, b: V3D): V3D; inline;
+    class operator Multiply(a: V3D; b:single): V3D; inline;
+    class operator Multiply(a: V3D; b:V3D): V3D; inline;
     end;
 
   {Int16 vector, useful for MMX}

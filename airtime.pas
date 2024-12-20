@@ -109,21 +109,10 @@ end;
 
 procedure tCar.tractionSimple();
 var
-  drag, coefficent: single;
-  slipAngle: single;
-
-  dir: v3d;
-
-  engineForce: v3d;
-  lateralForce: v3d;
-  dragForce: v3d;
-
-  tractionForce: v3d;
   targetVelocity: v3d;
-  lateralForceCap: single;
-
-  x,y: single;
-
+  tractionForce: v3d;
+  drag, coefficent: single;
+  dragForce: v3d;
 begin
 
   {simplified traction model}
@@ -170,26 +159,19 @@ end;
 
 procedure tCar.tractionComplex();
 var
-  drag, coefficent: single;
   slipAngle: single;
-
   dir: v3d;
-
-  engineForce: v3d;
-  lateralForce: v3d;
-  dragForce: v3d;
-
   tractionForce: v3d;
   targetVelocity: v3d;
   lateralForceCap: single;
 
-  x,y: single;
-
 const
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
 
-
 begin
+
+  dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+
   {-----------------------------------}
   {tire traction}
 
@@ -223,21 +205,10 @@ end;
 
 procedure tCar.update();
 var
-  drag, coefficent: single;
-  slipAngle: single;
-
   dir: v3d;
-
-  engineForce: v3d;
-  lateralForce: v3d;
-  dragForce: v3d;
-
-  tractionForce: v3d;
+  engineForce, lateralForce, dragForce: v3d;
   targetVelocity: v3d;
-  lateralForceCap: single;
-
   x,y: single;
-
 const
   BOUNDARY = 50;
 
@@ -315,8 +286,7 @@ end;
 
 procedure drawGUI();
 var
-  fps: double;
-  tpf: double;
+  fps, tpf: double;
   mixerCpuUsage: double;
 begin
 
@@ -451,7 +421,6 @@ end;
 procedure mainLoop();
 var
   startClock,lastClock,thisClock: double;
-  startTime: double;
   car: tCar;
   camX, camY: single;
 
