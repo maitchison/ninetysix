@@ -199,7 +199,6 @@ begin
     format('vel:%.3f slip:%.1f',[vel.abs, slipAngle])
   )
 
-
   (*
 
   {linear until a point then constant, but really I want this to
@@ -461,7 +460,6 @@ begin
   videoDriver.setLogicalSize(1024,480);
 
   screen.reset();
-  screen.SHOW_DIRTY_RECTS := true;
   screen.background := trackSprite;
   screen.clear();
   screen.pageFlip();
@@ -494,6 +492,9 @@ begin
     camX += ((car.pos.x-CamX)*0.05);
     camY += ((car.pos.rotated(0.955, 0,0).y-CamY)*0.05);
     car.draw();
+
+    {debugging}
+    screen.SHOW_DIRTY_RECTS := keyDown(key_d);
 
     // not really needed
     //screen.waitVSync();

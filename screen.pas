@@ -59,13 +59,17 @@ type
 
   end;
 
-
 implementation
+
+uses
+  keyboard; {stub}
 
 var
   {todo: change to 8x8 grid}
+  previousDirtyRegions: array[0..63] of tRect;
   dirtyRegions: array[0..63] of tRect;
   drCounter: integer = 0;
+  prevDrCounter: integer = 0;
 
 {-------------------------------------------------}
 
@@ -247,6 +251,8 @@ var
 begin
   for i := 0 to drCounter-1 do
     clearRegion(dirtyRegions[i]);
+  move(dirtyRegions, previousDirtyRegions, sizeof(dirtyRegions));
+  prevDrCounter := drCounter;
   fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
   drCounter := 0;
 end;
@@ -258,6 +264,10 @@ var
 begin
   for i := 0 to drCounter-1 do
     self.copyRegion(dirtyRegions[i]);
+  {unfortunately we also have to flip any previous regions as these will have
+   been cleared. Switcing to a grid system will resolve the overlap with this.}
+  for i := 0 to prevDrCounter-1 do
+    self.copyRegion(previousDirtyRegions[i]);
 end;
 
 procedure tScreen.waitVSync();
@@ -273,10 +283,10 @@ begin
 
 end;
 
-
 {clears region on canvas with background color}
 procedure tScreen.clearRegion(rect: tRect);
 var
+  x: int32;
   y,yMin,yMax: int32;
   paddingX,paddingY: int32;
 begin
@@ -293,7 +303,6 @@ begin
   end;
 
   for y := rect.top to rect.bottom do begin
-
     {support for background}
     if assigned(background) then begin
       {top alignment for the moment}
@@ -334,4 +343,5 @@ end;
 
 begin
   fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
+  fillchar(previousDirtyRegions, sizeof(previousDirtyRegions), 0);
 end.
