@@ -213,27 +213,27 @@ begin
 
   for i := 1 to length(fmt) do begin
     if fmt[i] = '%' then begin
-      if InPlaceholder then begin
+      if inPlaceholder then begin
+        inPlaceholder := False;
         result += '%';
-        InPlaceholder := False;
-      end else begin
-        InPlaceholder := True;
-      end;
+      end else
+        inPlaceholder := True;
       continue;
     end;
-    if InPlaceholder then begin
-      InPlaceholder := False;
+    if inPlaceholder then begin
+      inPlaceholder := False;
       a := args[ArgIndex];
       case fmt[i] of
-        '%': begin
-            result += '%'
-          end;
         '.': begin
             // very basic for the moment
             if (i = length(fmt)) or (not (fmt[i+1] in ['0'..'9']))  then
               error('invalid formatting, decimal expected after "."');
-            places := strToInt(fmt[i+1]);
+            inPlaceholder := true;
           end;
+        '0'..'9': begin
+          places := strToInt(fmt[i]);
+          inPlaceholder := true;
+        end;
         'd': begin
           // integer
           case a.VType of
@@ -268,7 +268,8 @@ begin
         else
           // ignore invalid
       end;
-      inc(ArgIndex);
+      if not inPlaceholder then
+        inc(ArgIndex);
     end else
       result += fmt[i];
   end;

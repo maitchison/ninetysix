@@ -78,7 +78,7 @@ var
   startTime: double;
   dx, dy: int32;
 const
-  PADDING = 25;
+  PADDING = 35;
 begin
 
   {correct for isometric}
@@ -147,14 +147,23 @@ begin
   end;
   *)
 
-  {again a simpler model}
-  drag := 3.0 + 1.5 * vel.abs;
-  dragForce := vel.normed() * drag;
-  dragForce *= (elapsed/mass);
-  dragForce.clip(vel.abs);
+end;
 
-  vel -= dragForce;
-
+procedure debugTextOut(dx,dy: integer; s: string);
+var
+  r: tRect;
+begin
+  r := textExtents(s);
+  r.x := dx-1;
+  r.y := dy-1;
+  r.width += 2;
+  r.height += 2;
+  screen.markRegion(r);
+  textOut(
+    screen.canvas,
+    dx, dy, s,
+    RGBA.create(255,255,255)
+  )
 end;
 
 procedure tCar.tractionComplex();
@@ -164,6 +173,7 @@ var
   tractionForce: v3d;
   targetVelocity: v3d;
   lateralForceCap: single;
+  dx,dy: integer;
 
 const
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
@@ -171,12 +181,28 @@ const
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+  dx := round(pos.x);
+  dy := round(pos.rotated(0.955, 0,0).y);
 
   {-----------------------------------}
   {tire traction}
 
-  {calculate the slip angle}
-  slipAngle := arcCos(vel.dot(dir) / vel.abs);
+  if vel.abs < 0.1 then begin
+    {perfect traction for small speeds}
+    slipAngle := 0;
+    //...
+  end else begin
+    {calculate the slip angle}
+    slipAngle := radToDeg(arcCos(vel.dot(dir) / vel.abs));
+  end;
+
+  debugTextOut(
+    dx, dy,
+    format('vel:%.3f slip:%.1f',[vel.abs, slipAngle])
+  )
+
+
+  (*
 
   {linear until a point then constant, but really I want this to
    decrease after a point}
@@ -195,16 +221,18 @@ begin
   tractionForce.z := 0;
 
   screen.clearRegion(tRect.create(300, 300, 200, 20));
-  textOut(screen.canvas, 300, 300, format('%f %f %f',[log2(1+abs(tractionForce.x)), log2(1+abs(tractionForce.y)), log2(1+tractionForce.z)]), RGBA.create(255,255,255));
+
   screen.copyRegion(tRect.create(300, 300, 200, 20));
 
    tractionForce := tractionForce.rotated(0,0,+zAngle);
 
   vel += tractionForce * (1/mass);
+  *)
 end;
 
 procedure tCar.update();
 var
+  drag: single;
   dir: v3d;
   engineForce, lateralForce, dragForce: v3d;
   targetVelocity: v3d;
@@ -235,14 +263,18 @@ begin
   {note: we correct for isometric projection here}
   pos += vel * elapsed; {stub on the *100}
 
-  {-----------------------------------}
   {engine in 'spaceship' mode}
-
   vel += engineForce * (1/mass) * elapsed;
 
-  self.tractionSimple();
+  {handle traction}
+  self.tractionComplex();
 
-  {-----------------------------------}
+  {handle drag}
+  drag := 1.0 + 1.5 * vel.abs;
+  dragForce := vel.normed() * drag;
+  dragForce *= (elapsed/mass);
+  dragForce.clip(vel.abs);
+  vel -= dragForce;
 
   {boundaries}
   x := pos.x;

@@ -63,7 +63,8 @@ implementation
 
 var
   {todo: change to 8x8 grid}
-  dirtyRegion: tRect;
+  dirtyRegions: array[0..63] of tRect;
+  drCounter: integer = 0;
 
 {-------------------------------------------------}
 
@@ -228,20 +229,30 @@ end;
 {indicates that region should fliped this frame, and cleared next frame}
 procedure tScreen.markRegion(rect: tRect);
 begin
-  dirtyRegion := rect;
+  if drCounter >= high(dirtyRegions) then
+    error('Sorry, too many dirty regions');
+  dirtyRegions[drCounter] := rect;
+  inc(drCounter);
 end;
 
 {clears all parts of the screen marked previously and removes dirty}
 procedure tScreen.clearAll();
+var
+  i: integer;
 begin
-  clearRegion(dirtyRegion);
-  dirtyRegion := tRect.create(0,0);
+  for i := 0 to drCounter-1 do
+    clearRegion(dirtyRegions[i]);
+  fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
+  drCounter := 0;
 end;
 
 
 procedure tScreen.flipAll();
+var
+  i: integer;
 begin
-  self.copyRegion(dirtyRegion);
+  for i := 0 to drCounter-1 do
+    self.copyRegion(dirtyRegions[i]);
 end;
 
 procedure tScreen.waitVSync();
@@ -317,5 +328,5 @@ end;
 {-------------------------------------------------}
 
 begin
-  dirtyRegion := tRect.create(0,0);
+  fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
 end.

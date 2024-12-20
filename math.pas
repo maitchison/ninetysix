@@ -14,10 +14,22 @@ uses
 type
   tFloat = extended;  // floating point type to use
 
+function degToRad(x: tFloat): tFloat;
+function radToDeg(x: tFloat): tFloat;
 function arccos(x: tFloat): tFloat;
 function arctan2(y,x: tFloat): tFloat;
 
 implementation
+
+function degToRad(x: tFloat): tFloat;
+begin
+  result := x / 180 * pi;
+end;
+
+function radToDeg(x: tFloat): tFloat;
+begin
+  result := x * 180 / pi;
+end;
 
 function arccos(x: tFloat): tFloat;
 begin
