@@ -21,12 +21,15 @@ type
     soundEffect: tSoundEffect;   {the currently playing sound effect}
     volume: single;
     pitch: single;
-    offset: tTimeCode;       {when the sound should start playing}
-    loop: boolean;
+    startTC: tTimeCode;       {when the sound starts playing}
+    looping: boolean;
     constructor create();
+    procedure reset();
+    function  endTC(): tTimeCode;         {when the sound stops playing (if no looping)}
+    function  inUse(): boolean;
+    procedure update(currentTC: tTimeCode);
     procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
   end;
-
 
   tSoundMixer = class
     {handles mixing of channels}
@@ -126,16 +129,17 @@ begin
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
     if mixer.mute or mixer.noise then continue;
-    if assigned(mixer.channel[j].soundEffect) then begin
+
+    if mixer.channel[j].inUse then begin
       sfx := mixer.channel[j].soundEffect;
       len := sfx.length;
       if len <= 0 then continue;
 
       {todo: support this case, this just means audio plays later, perhaps
        even within this chunk}
-      if (startTC - mixer.channel[j].offset < 0) then continue;
+      if ((startTC - mixer.channel[j].startTC) < 0) then continue;
 
-      pos := (startTC - mixer.channel[j].offset) mod len;
+      pos := (startTC - mixer.channel[j].startTC) mod len;
       sample := pointer(sfx.data) + (pos * sfx.bytesPersample);
       finalSample := pointer(sfx.data) + (len * sfx.bytesPersample);
 
@@ -145,6 +149,9 @@ begin
         else ; // ignore error as we're in an interupt.
       end;
     end;
+
+    mixer.channel[j].update(startTC);
+
   end;
 
   {stub: simulate 8 bit}
@@ -196,11 +203,38 @@ end;
 
 constructor tSoundChannel.create();
 begin
+  inherited create;
+  reset();
+end;
+
+procedure tSoundChannel.reset();
+begin
   soundEffect := nil;
   volume := 1.0;
   pitch := 1.0;
-  offset := 0;
-  loop := false;
+  startTC := 0;
+  looping := false;
+end;
+
+procedure tSoundChannel.update(currentTC: tTimeCode);
+begin
+  if inUse and (not looping) then begin
+    if currentTC >= endTC then
+      reset();
+  end;
+end;
+
+function tSoundChannel.endTC(): tTimeCode;         {when the sound stops playing (if no looping)}
+begin
+  if inUse then
+    result := startTC + soundEffect.length
+  else
+    result := startTC;
+end;
+
+function tSoundChannel.inUse(): boolean;
+begin
+  result := assigned(soundEffect);
 end;
 
 procedure tSoundChannel.play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
@@ -208,8 +242,8 @@ begin
   self.soundEffect := soundEffect;
   self.volume := volume;
   self.pitch := pitch;
-  self.offset := startTime;
-  self.loop := loop;
+  self.startTC := startTime;
+  self.looping := loop;
 end;
 
 {-----------------------------------------------------}
@@ -231,11 +265,24 @@ procedure tSoundMixer.play(soundEffect: tSoundEffect; volume: single=1.0; pitch:
 var
   channelNum: integer;
   ticksOffset: int32;
+  i: integer;
 begin
   {for the moment lock onto the first channel}
   if not assigned(soundEffect) then
     error('Tried to play invalid sound file');
-  channelNum := 1;
+
+  {find a slot to use}
+  channelNum := -1;
+  for i := 1 to NUM_CHANNELS do begin
+    if not channel[i].inUse then begin
+      channelNum := i;
+      break;
+    end;
+  end;
+
+  // no free channels
+  if channelNum < 0 then exit;
+
   ticksOffset := round(timeOffset*44100);
   channel[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
 end;

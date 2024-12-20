@@ -63,7 +63,7 @@ type
   tSoundEffect = class
 
     data: pointer;
-    length: int32;
+    length: int32;        // number of samples
     format: tAudioFormat;
 
     constructor create(aFormat: tAudioFormat; aLength: int32);
@@ -75,6 +75,7 @@ type
     procedure setSample(pos: int32;sample: tAudioSample);
 
     class function loadFromWave(filename: string): tSoundEffect;
+    class function createNoise(duration: single): tSoundEffect;
 
     (*
     class function loadFromFile(filename: string): tSoundEffect;
@@ -163,6 +164,21 @@ begin
       pAudioSample8S(data + (pos * bytesPerSample))^.right := (sample.right div 256) + 128;
     end;
     else error('Invalid format');
+  end;
+end;
+
+class function tSoundEffect.createNoise(duration: single): tSoundEffect;
+var
+  i: int32;
+  numSamples: dWord;
+  sample: tAudioSample;
+begin
+  numSamples := trunc(44100 * duration);
+  result := tSoundEffect.create(AF_16_STEREO, numSamples);
+  for i := 0 to numSamples-1 do begin
+    sample.left := (rnd-128)*256;
+    sample.right := (rnd-128)*256;
+    result.setSample(i, sample);
   end;
 end;
 

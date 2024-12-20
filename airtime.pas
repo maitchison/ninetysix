@@ -34,6 +34,7 @@ var
   {resources}
   titleBackground: tSprite;
   music: tSoundEffect;
+  slideSFX: tSoundEffect;
   trackSprite: tSprite;
   carVox: tVoxelSprite;
 
@@ -220,7 +221,7 @@ begin
     end;
 
     if (requiredTractionForce.abs - tractionForce.abs) > 10 then begin
-      sbDriver.directNoise(0.01);
+      mixer.play(slideSFX);
     end;
 
     vel += tractionForce * (elapsed / mass);
@@ -343,6 +344,9 @@ begin
     music := tSoundEffect.loadFromWave('res\music16.wav')
   else
     music := tSoundEffect.loadFromWave('res\music8.wav');
+
+  {todo: load a proper sound effect}
+  slideSFX := tSoundEffect.createNoise(0.1);
 end;
 
 procedure drawGUI();
