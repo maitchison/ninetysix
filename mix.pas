@@ -119,10 +119,8 @@ begin
     jnz @LOOP
 
     frstor FPUState
-
     popad
   end;
-
 end;
 
 procedure clipAndConvert_ASM(bufSamples:int32);
@@ -162,9 +160,7 @@ begin
     jnz @LOOP
 
     popad
-
   end;
-
 end;
 
 procedure clipAndConvert_REF(bufSamples:int32);

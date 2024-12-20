@@ -1,6 +1,3 @@
-var
-  lastTraceCount: dword = 0;
-
 {trace ray at location and direction (in object space)}
 function trace_ASM(voxPtr: pointer; pos: V3D16;dir: V3D16): RGBA;
 var
@@ -116,12 +113,12 @@ begin
     popad
   end;
 
-  lastTraceCount := depth;
+  LAST_TRACE_COUNT := depth;
   result := col;
 
 end;
 
-procedure traceScanline_ASM(canvas: tPage; voxPtr: pointer; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
+procedure traceScanline_ASM(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
 var
   x: int16;
   col: RGBA;
@@ -138,10 +135,10 @@ begin
 
   for x := xMin to xMax do begin
 
-    col := trace_ASM(voxPtr, p16, v16);
+    col := trace_ASM(voxSprite.vox.pixels, p16, v16);
     {show trace count}
     if VX_GHOST_MODE then
-       col.init(lastTraceCount,lastTraceCount*4, lastTraceCount*16);
+       col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);
 
     {$R-}
     p16.x += d16.x;

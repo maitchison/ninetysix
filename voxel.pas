@@ -50,6 +50,7 @@ type
     procedure setPage(page: tPage; height: integer);
     class function loadFromFile(filename: string; height: integer): tVoxelSprite; static;
     function getVoxel(x,y,z:int32): RGBA;
+    procedure setVoxel(x,y,z:int32;c: RGBA);
     procedure draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
   end;
 
@@ -58,6 +59,11 @@ implementation
 const
   MAX_SAMPLES = 64;
 
+var
+  LAST_TRACE_COUNT: dword = 0;
+
+
+{$I voxel_ref.inc}
 {$I voxel_asm.inc}
 {$I voxel_mmx.inc}
 
@@ -249,6 +255,15 @@ begin
   result := vox.getPixel(x,y+z*fHeight);
 end;
 
+procedure tVoxelSprite.setVoxel(x,y,z:int32;c: RGBA);
+begin
+  {todo: fast asm}
+  if (x < 0) or (x >= fWidth) then exit;
+  if (y < 0) or (y >= fHeight) then exit;
+  if (z < 0) or (z >= fDepth) then exit;
+  vox.setPixel(x,y+z*fHeight, c);
+end;
+
 {draw voxel sprite.}
 procedure tVoxelSprite.draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
 var
@@ -264,112 +279,6 @@ var
 
 var
   faceColor: array[1..6] of RGBA;
-
-{trace ray at location and direction (in object space)}
-function trace_REF(pos: V3D;dir: V3D): RGBA;
-var
-  k: integer;
-  c: RGBA;
-  d: int32;
-  x,y,z: int32;
-  dx,dy,dz: int32;
-  sx,sy,sz: int32;
-  depth: int32;
-  voxPtr: pointer;
-const
-  MAX_SAMPLES = 64;
-begin
-
-  lastTraceCount := 0;
-
-  {color used when initial sample is out of of bounds}
-  {this shouldn't happen, but might due to rounding error or bug}
-  result.init(255,0,0,255);
-
-  {center}
-  {todo: make sender do this for us}
-  pos += V3D.create(32,16,9);
-
-  {sometimes initial point is slightly outside. this is due to a bug
-   where we trace edges with the suboptimal face projection.
-   For the moment I'll just step ahead when this happens}
-
-  sx := trunc(256*pos.x);
-  sy := trunc(256*pos.y);
-  sz := trunc(256*pos.z);
-
-  result.init(255,0,255,0); {color used when out of bounds}
-
-  depth := 0;
-  dx := round(256*dir.x);
-  dy := round(256*dir.y);
-  dz := round(256*dir.z);
-
-  voxPtr := vox.pixels;
-
-  for k := 0 to MAX_SAMPLES-1 do begin
-
-    inc(VX_TRACE_COUNT);
-    inc(lastTraceCount);
-
-    x := sx div 256;
-    y := sy div 256;
-    z := sz div 256;
-
-    if (x < 0) or (x >= 64) then begin
-      if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGBA.create(255,0,0));
-    end;
-    if (y < 0) or (y >= 32) then begin
-      if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGBA.create(0,255,0));
-    end;
-    if (z < 0) or (z >= 18) then begin
-      if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGBA.create(0,0,255));
-    end;
-
-    asm
-      push edi
-      push edx
-      push eax
-
-      mov edi, voxPtr
-      xor edx, edx
-      or dl, byte ptr [z]
-      shl edx, 5
-      or dl, byte ptr [y]
-      shl edx, 6
-      or dl, byte ptr [x]
-      mov eax, [edi+edx*4]
-      mov [c],eax
-
-      pop eax
-      pop edx
-      pop edi
-
-    end;
-
-    if c.a = 255 then begin
-      {shade by distance from bounding box}
-      c *= (255-(depth*2))/255;
-      exit(c)
-    end else begin
-      {move to next voxel}
-      d := (255-c.a);
-      {d is distance * 4}
-      sx := sx + ((dx * d) div 4);
-      sy := sy + ((dy * d) div 4);
-      sz := sz + ((dz * d) div 4);
-
-      depth += d;
-    end;
-  end;
-
-  {color used when we ran out of samples}
-  result.init(255,0,255,255); {purple}
-
-end;
 
 {traces all pixels within the given polygon.
 points are in world space
@@ -511,13 +420,13 @@ begin
 
     if cpuInfo.hasMMX then
       traceScanline_MMX(
-        canvas, vox.pixels,
+        canvas, self,
         screenLines[y].xMin, screenLines[y].xMax, y,
         pos, cameraZ, deltaX
       )
     else
       traceScanline_ASM(
-        canvas, vox.pixels,
+        canvas, self,
         screenLines[y].xMin, screenLines[y].xMax, y,
         pos, cameraZ, deltaX
       );
@@ -529,11 +438,8 @@ end;
 var
   i,j: integer;
   c: RGBA;
-
   p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
-
   isometricTransform : tMatrix3x3;
-
 
 begin
 
@@ -583,16 +489,10 @@ begin
   traceFace(4, p2, p6, p7, p3);
   traceFace(5, p5, p6, p2, p1);
   traceFace(6, p4, p3, p7, p8);
-
 end;
 
 
 {-----------------------------------------------------}
 
-procedure runTests();
 begin
-end;
-
-begin
-  runTests();
 end.

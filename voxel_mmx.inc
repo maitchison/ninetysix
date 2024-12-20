@@ -5,9 +5,9 @@ var
 {
   pos: position in voxelspace at xMin
 }
-procedure traceScanline_MMX(canvas: tPage; voxPtr: pointer; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
+procedure traceScanline_MMX(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
 var
-  pagePtr: pointer;
+  pagePtr, voxPtr: pointer;
   xCounter: int32;
   zCounter: int32;
   bias: V3D;
@@ -30,6 +30,7 @@ begin
   d16 := V3D16.make256(delta);
 
   pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
+  voxPtr := voxSprite.vox.pixels;
 
   xCounter := (xMax-xMin)+1; // inclusive
   if xCounter <= 0 then exit;
