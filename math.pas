@@ -33,7 +33,7 @@ end;
 
 function arccos(x: tFloat): tFloat;
 begin
-  result := arctan2(sqrt((1.0-x)*1.0+x), x);
+  result := arctan2(sqrt((1.0-x)*(1.0+x)), x);
 end;
 
 function arctan2(y,x: tFloat): tFloat;
@@ -65,6 +65,9 @@ type
 
 procedure tMathTest.run();
 begin
+
+  assertClose(arccos(cos(0.7)), 0.7);
+
   assertEqual(arctan2(0,1), 0.0);
   assertClose(arctan2(1,0), pi/2);
   assertClose(arctan2(0,-1), pi);

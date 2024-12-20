@@ -79,7 +79,7 @@ var
   dx, dy: int32;
   bounds: tRect;
 const
-  PADDING = 25;
+  PADDING = 15;
 begin
 
   {correct for isometric}
@@ -89,7 +89,7 @@ begin
   if not screen.rect.isInside(dx, dy) then exit;
 
   startTime := getSec;
-  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.35);
+  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.42);
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
   else
@@ -154,8 +154,9 @@ procedure debugTextOut(dx,dy: integer; s: string);
 var
   r: tRect;
 begin
-  {not sure why we need to pad?}
-  r := textExtents(s).padded(8);
+  r := textExtents(s).padded(2);
+  r.x += dx;
+  r.y += dy;
   screen.markRegion(r);
   textOut(
     screen.canvas,
@@ -166,7 +167,7 @@ end;
 
 procedure tCar.tractionComplex();
 var
-  slipAngle: single;
+  slipAngle, dirAngle, velAngle: single;
   dir: v3d;
   tractionForce: v3d;
   targetVelocity: v3d;
@@ -192,12 +193,15 @@ begin
   end else begin
     {calculate the slip angle}
     slipAngle := radToDeg(arcCos(vel.dot(dir) / vel.abs));
+    dirAngle := radToDeg(arctan2(-dir.y, -dir.x));
+    velAngle := radToDeg(arctan2(-vel.y, -vel.x));
   end;
 
   debugTextOut(
-    dx-20, dy+100,
-    format('vel:%.3f slip:%.1f',[vel.abs, slipAngle])
-  )
+    dx-120, dy+50,
+    format('vel:%.1f slipa:%.1f dira:%.1f vela:%.1f za:%.1f',
+    [vel.abs, slipAngle, dirAngle, velAngle, radToDeg(zAngle)]
+  ));
 
   (*
 
@@ -456,7 +460,7 @@ var
 begin
   note('Main loop started');
 
-  videoDriver.setMode(320,240,32);
+  videoDriver.setMode(640,480,32);
   videoDriver.setLogicalSize(1024,480);
 
   screen.reset();
