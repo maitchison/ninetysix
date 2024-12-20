@@ -93,6 +93,7 @@ function extractFilename(const path: string): string;
 function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
+function fltToStr(value: extended): string;
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: array of byte): string;
@@ -200,12 +201,14 @@ function Format(fmt: string; args: array of Const): string;
 var
   i, ArgIndex: Integer;
   InPlaceholder: Boolean;
+  places: word;
   s: string;
   a: TVarRec;
 begin
   result := '';
   s := '';
   ArgIndex := 0;
+  places := 1;
   InPlaceholder := False;
 
   for i := 1 to length(fmt) do begin
@@ -225,6 +228,12 @@ begin
         '%': begin
             result += '%'
           end;
+        '.': begin
+            // very basic for the moment
+            if (i = length(fmt)) or (not (fmt[i+1] in ['0'..'9']))  then
+              error('invalid formatting, decimal expected after "."');
+            places := strToInt(fmt[i+1]);
+          end;
         'd': begin
           // integer
           case a.VType of
@@ -237,7 +246,7 @@ begin
         'f': begin
           // float
           case a.VType of
-            vtExtended: Str(args[ArgIndex].VExtended^:0:1, s);
+            vtExtended: Str(args[ArgIndex].VExtended^:0:places, s);
             else Error('Invalid type for %f:'+IntToStr(a.VType));
           end;
           result += s;
@@ -501,6 +510,11 @@ begin
     if (j mod 3 = 2) and (i <> 1) then
       result := ',' + result;
   end;
+end;
+
+function fltToStr(value: extended): string;
+begin
+  str(value, result);
 end;
 
 function intToStr(value: int64; width: word; padding: char='0'): string;

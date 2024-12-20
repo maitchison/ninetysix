@@ -5,6 +5,7 @@ uses
   startup,
   debug,
   utils,
+  math,
   vga,
   vesa,
   graph32,
@@ -48,10 +49,15 @@ procedure mainLoop(); forward;
 
 type
   tCar = class
+  protected
+    procedure tractionSimple();
+    procedure tractionComplex();
+  public
     pos: V3D;
     vel: V3D;
     zAngle: single;
     tilt: single;
+      mass: single;
     constructor create();
     procedure draw();
     procedure update();
@@ -64,6 +70,7 @@ begin
   vel := V3D.create(0,0,0);
   zAngle := 0;
   tilt := 0;
+  mass := 1;
 end;
 
 procedure tCar.draw();
@@ -100,7 +107,7 @@ begin
   result := exp(-rate*elapsed);
 end;
 
-procedure tCar.update();
+procedure tCar.tractionSimple();
 var
   drag, coefficent: single;
   slipAngle: single;
@@ -117,73 +124,9 @@ var
 
   x,y: single;
 
-const
-  mass: single = 1;
-  slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
-  BOUNDARY = 50;
-
 begin
 
-  dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
-  dragForce := v3d.create(0,0,0);
-  engineForce := v3d.create(0,0,0);
-  lateralForce := v3d.create(0,0,0);
-
-  {process input}
-  if keyDown(key_left) then begin
-    zAngle -= elapsed*2.5;
-    tilt += elapsed*1.0;
-  end;
-  if keyDown(key_right) then begin
-    zAngle += elapsed*2.5;
-    tilt -= elapsed*1.0;
-  end;
-  if keyDown(key_up) then
-    engineForce := dir * 500;
-
-  {movement from last rame}
-  {note: we correct for isometric projection here}
-  pos += vel * elapsed; {stub on the *100}
-
-
-  {-----------------------------------}
-  {engine in 'spaceship' mode}
-
-  vel += engineForce * (1/mass) * elapsed;
-
-  {-----------------------------------}
-  {tire traction}
-
-  (*
-  {calculate the slip angle}
-  slipAngle := arcCos(vel.dot(dir) / vel.abs);
-
-  {linear until a point then constant, but really I want this to
-   decrease after a point}
-  lateralForceCap := min(slipAngle, slipThreshold) * 40000;
-  if keyDown(key_x) then
-    lateralForceCap := 0;
-  if keyDown(key_z) then
-    lateralForceCap := 99999999999;
-
-  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
-
-  tractionForce := ((targetVelocity-vel)*mass).rotated(0,0,-zAngle);
-
-  tractionForce.x := 0;  {logatudinal, could be used for breaking.}
-  tractionForce.y := clamp(tractionForce.y, -lateralForceCap, +lateralForceCap);
-  tractionForce.z := 0;
-
-  screen.clearRegion(tRect.create(300, 300, 200, 20));
-  textOut(screen.canvas, 300, 300, format('%f %f %f',[log2(1+abs(tractionForce.x)), log2(1+abs(tractionForce.y)), log2(1+tractionForce.z)]), RGBA.create(255,255,255));
-  screen.copyRegion(tRect.create(300, 300, 200, 20));
-
-   tractionForce := tractionForce.rotated(0,0,+zAngle);
-
-  vel += tractionForce * (1/mass);
-  *)
-
-  {simplified model}
+  {simplified traction model}
   targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
   tractionForce := ((targetVelocity-vel)*mass);
   if keyDown(key_x) then begin
@@ -222,6 +165,111 @@ begin
   dragForce.clip(vel.abs);
 
   vel -= dragForce;
+
+end;
+
+procedure tCar.tractionComplex();
+var
+  drag, coefficent: single;
+  slipAngle: single;
+
+  dir: v3d;
+
+  engineForce: v3d;
+  lateralForce: v3d;
+  dragForce: v3d;
+
+  tractionForce: v3d;
+  targetVelocity: v3d;
+  lateralForceCap: single;
+
+  x,y: single;
+
+const
+  slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
+
+
+begin
+  {-----------------------------------}
+  {tire traction}
+
+  {calculate the slip angle}
+  slipAngle := arcCos(vel.dot(dir) / vel.abs);
+
+  {linear until a point then constant, but really I want this to
+   decrease after a point}
+  lateralForceCap := min(slipAngle, slipThreshold) * 40000;
+  if keyDown(key_x) then
+    lateralForceCap := 0;
+  if keyDown(key_z) then
+    lateralForceCap := 99999999999;
+
+  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
+
+  tractionForce := ((targetVelocity-vel)*mass).rotated(0,0,-zAngle);
+
+  tractionForce.x := 0;  {logatudinal, could be used for breaking.}
+  tractionForce.y := clamp(tractionForce.y, -lateralForceCap, +lateralForceCap);
+  tractionForce.z := 0;
+
+  screen.clearRegion(tRect.create(300, 300, 200, 20));
+  textOut(screen.canvas, 300, 300, format('%f %f %f',[log2(1+abs(tractionForce.x)), log2(1+abs(tractionForce.y)), log2(1+tractionForce.z)]), RGBA.create(255,255,255));
+  screen.copyRegion(tRect.create(300, 300, 200, 20));
+
+   tractionForce := tractionForce.rotated(0,0,+zAngle);
+
+  vel += tractionForce * (1/mass);
+end;
+
+procedure tCar.update();
+var
+  drag, coefficent: single;
+  slipAngle: single;
+
+  dir: v3d;
+
+  engineForce: v3d;
+  lateralForce: v3d;
+  dragForce: v3d;
+
+  tractionForce: v3d;
+  targetVelocity: v3d;
+  lateralForceCap: single;
+
+  x,y: single;
+
+const
+  BOUNDARY = 50;
+
+begin
+
+  dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+  dragForce := v3d.create(0,0,0);
+  engineForce := v3d.create(0,0,0);
+  lateralForce := v3d.create(0,0,0);
+
+  {process input}
+  if keyDown(key_left) then begin
+    zAngle -= elapsed*2.5;
+    tilt += elapsed*1.0;
+  end;
+  if keyDown(key_right) then begin
+    zAngle += elapsed*2.5;
+    tilt -= elapsed*1.0;
+  end;
+  if keyDown(key_up) then
+    engineForce := dir * 500;
+
+  {movement from last rame}
+  {note: we correct for isometric projection here}
+  pos += vel * elapsed; {stub on the *100}
+
+  {-----------------------------------}
+  {engine in 'spaceship' mode}
+
+  vel += engineForce * (1/mass) * elapsed;
+
+  self.tractionSimple();
 
   {-----------------------------------}
 

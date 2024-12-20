@@ -17,8 +17,10 @@ type
 procedure assertError(msg: string); overload;
 
 procedure assert(condition: boolean;msg: string); overload;
+procedure assertClose(value, expected: extended;epsilon: extended=1e-6);
 procedure assertEqual(value, expected: string); overload;
 procedure assertEqual(value, expected: int64); overload;
+procedure assertEqual(value, expected: extended); overload;
 procedure assertEqual(a, b: tBytes); overload;
 procedure assertEqualLarge(a, b: tBytes); overload;
 
@@ -41,6 +43,15 @@ end;
 procedure assert(condition: boolean;msg: string); overload;
 begin
   if not condition then assertError(msg);
+end;
+
+procedure assertClose(value, expected: extended;epsilon: extended=1e-6);
+begin
+  if abs(value-expected) > epsilon then
+    assertError(format(
+      'Expecting %.7f to be close to %.7f but differed by %.7f which is more than %.7f.',
+      [value, expected, abs(value-expected), epsilon]
+    ));
 end;
 
 procedure assertEqual(value, expected: string); overload;
@@ -78,6 +89,12 @@ procedure assertEqual(value, expected: int64); overload;
 begin
   if value <> expected then
     assertError('Expecting '+IntToStr(expected)+' but found '+intToStr(value)+'.');
+end;
+
+procedure assertEqual(value, expected: extended); overload;
+begin
+  if value <> expected then
+    assertError('Expecting '+fltToStr(expected)+' but found '+fltToStr(value)+'.');
 end;
 
 {--------------------------------------------------------}
