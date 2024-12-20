@@ -77,8 +77,9 @@ procedure tCar.draw();
 var
   startTime: double;
   dx, dy: int32;
+  bounds: tRect;
 const
-  PADDING = 35;
+  PADDING = 25;
 begin
 
   {correct for isometric}
@@ -88,13 +89,13 @@ begin
   if not screen.rect.isInside(dx, dy) then exit;
 
   startTime := getSec;
-  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.5);
+  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.35);
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
   else
     carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
 
-  screen.markRegion(tRect.create(dx-PADDING, dy-PADDING, PADDING*2, PADDING*2));
+  screen.markRegion(tRect.create(dx, dy, 0, 0).padded(PADDING));
 end;
 
 {returns decay factor for with given halflife (in seconds) over current
@@ -153,11 +154,8 @@ procedure debugTextOut(dx,dy: integer; s: string);
 var
   r: tRect;
 begin
-  r := textExtents(s);
-  r.x := dx-1;
-  r.y := dy-1;
-  r.width += 2;
-  r.height += 2;
+  {not sure why we need to pad?}
+  r := textExtents(s).padded(8);
   screen.markRegion(r);
   textOut(
     screen.canvas,
@@ -197,7 +195,7 @@ begin
   end;
 
   debugTextOut(
-    dx, dy,
+    dx-20, dy+100,
     format('vel:%.3f slip:%.1f',[vel.abs, slipAngle])
   )
 
@@ -463,6 +461,7 @@ begin
   videoDriver.setLogicalSize(1024,480);
 
   screen.reset();
+  screen.SHOW_DIRTY_RECTS := true;
   screen.background := trackSprite;
   screen.clear();
   screen.pageFlip();

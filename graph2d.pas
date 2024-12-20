@@ -23,6 +23,8 @@ type
 
     constructor create(width, height: int32); overload;
     constructor create(left, top, width, height: int32); overload;
+    procedure pad(padding: int32);
+    function padded(padding: int32): tRect;
 
     function isInside(x,y: int32): boolean;
     class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
@@ -83,6 +85,22 @@ begin
   self.y := top;
   self.width := width;
   self.height := height;
+end;
+
+{adds padding units to each side}
+procedure tRect.pad(padding: int32);
+begin
+  x -= padding;
+  y -= padding;
+  width += padding * 2;
+  height += padding * 2;
+end;
+
+{adds padding units to each side}
+function tRect.padded(padding: int32): tRect;
+begin
+  result := self;
+  result.pad(padding);
 end;
 
 class operator tRect.Explicit(a: TRect): ShortString;

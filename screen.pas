@@ -24,12 +24,13 @@ type
     canvas: tPage;
     background: tSprite;
     backgroundColor: RGBA;
+    SHOW_DIRTY_RECTS: boolean;
 
   private
     procedure copyLine(x1, x2, y: int32);
   public
 
-    constructor create();
+    constructor create(); // todo: change to init
 
     function width: word;
     function height: word;
@@ -73,6 +74,7 @@ begin
   backgroundColor.init(0,0,0,255);
   background := nil;
   canvas := nil;
+  SHOW_DIRTY_RECTS := false;
   reset();
 end;
 
@@ -232,7 +234,10 @@ begin
   if drCounter >= high(dirtyRegions) then
     error('Sorry, too many dirty regions');
   dirtyRegions[drCounter] := rect;
+  if SHOW_DIRTY_RECTS then
+    canvas.drawRect(rect, RGBA.create(255,0,255));
   inc(drCounter);
+
 end;
 
 {clears all parts of the screen marked previously and removes dirty}
