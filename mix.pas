@@ -33,7 +33,7 @@ type
 
   tSoundMixer = class
     {handles mixing of channels}
-    channel: array[1..NUM_CHANNELS] of tSoundChannel;
+    channels: array[1..NUM_CHANNELS] of tSoundChannel;
     noiseBuffer: array[0..64*1024] of int32; {+1 so that we can read 64bytes at a time}
 
     mute: boolean;
@@ -110,6 +110,7 @@ var
   sample, finalSample: pointer;
   bufSamples: int32;
   samplePos, samplesToProcess: int32;
+  channel: tSoundChannel;
 
 begin
 
@@ -128,12 +129,15 @@ begin
 
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
+
     if mixer.mute or mixer.noise then continue;
 
-    if mixer.channel[j].inUse then begin
-      sfx := mixer.channel[j].soundEffect;
+    channel := mixer.channels[j];
+
+    if channel.inUse then begin
+      sfx := channel.soundEffect;
       if sfx.length = 0 then exit;
-      samplePos := (startTC - mixer.channel[j].startTC) mod sfx.length;
+      samplePos := (startTC - channel.startTC) mod sfx.length;
       samplesToProcess := bufSamples;
 
       if samplePos < 0 then
@@ -141,7 +145,7 @@ begin
         samplesToProcess += samplePos;
       if samplesToProcess <= 0 then continue;
       if samplePos >= sfx.length then begin
-        if mixer.channel[j].looping then
+        if channel.looping then
           samplePos := samplePos mod sfx.length
         else
           continue;
@@ -151,7 +155,8 @@ begin
         // stub: support asm again
         AF_16_STEREO: process16S_REF(
           samplePos, sfx.data, sfx.length, samplesToProcess,
-          mixer.channel[j].looping
+          channel.looping,
+          trunc(channel.volume*65536), trunc(channel.volume*65536)
         );
         // stub: support 8bit again
         //AF_8_STEREO: process8S_REF(sample, sfx.data, finalSample, bufSamples);
@@ -159,7 +164,7 @@ begin
       end;
     end;
 
-    mixer.channel[j].update(startTC);
+    channel.update(startTC);
 
   end;
 
@@ -264,7 +269,7 @@ begin
   mute := false;
   noise := false;
   for i := 1 to NUM_CHANNELS do
-    channel[i] := tSoundChannel.create();
+    channels[i] := tSoundChannel.create();
   for i := 0 to length(noiseBuffer)-1 do begin
     noiseBuffer[i] := ((random(256) + random(256)) div 2) - 128;
   end;
@@ -283,7 +288,7 @@ begin
   {find a slot to use}
   channelNum := -1;
   for i := 1 to NUM_CHANNELS do begin
-    if not channel[i].inUse then begin
+    if not channels[i].inUse then begin
       channelNum := i;
       break;
     end;
@@ -293,7 +298,7 @@ begin
   if channelNum < 0 then exit;
 
   ticksOffset := round(timeOffset*44100);
-  channel[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
+  channels[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
 end;
 
 procedure initMixer();

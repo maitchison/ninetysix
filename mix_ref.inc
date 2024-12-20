@@ -20,16 +20,25 @@ type
 procedure process16S_REF(
   samplePos: int32; sample: pSamples16S; sampleLength: dword;
   samplesToProcess: dword;
-  looping: boolean=false
+  looping: boolean=false;
+  startVolume: int32 = 256*256;
+  endVolume: int32 = 256*256
 );
 var
   i: int32;
+  volume, volumeDelta: int32;
 begin
 
+  if samplesToProcess = 0 then exit;
+
+  volume := startVolume;
+  volumeDelta := int32(endVolume-startVolume) div samplesToProcess;
+
   for i := 0 to samplesToProcess-1 do begin
-    scratchBufferI32[i].left += int32(sample^[samplePos].left) * 256;
-    scratchBufferI32[i].right += int32(sample^[samplePos].right) * 256;
+    scratchBufferI32[i].left += int32(sample^[samplePos].left) * (volume div 256);
+    scratchBufferI32[i].right += int32(sample^[samplePos].right) * (volume div 256);
     inc(samplePos);
+    volume += volumeDelta;
     if samplePos >= sampleLength then begin
       if looping then
         samplePos := 0
