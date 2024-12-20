@@ -62,12 +62,15 @@ type
 
   tSoundEffect = class
 
+    tag: string;
     data: pointer;
     length: int32;        // number of samples
     format: tAudioFormat;
 
-    constructor create(aFormat: tAudioFormat; aLength: int32);
+    constructor create(aFormat: tAudioFormat; aLength: int32; aTag: string='');
     destructor destroy();
+
+    function toString(): string;
 
     function bytesPerSample: int32; inline;
 
@@ -113,11 +116,12 @@ type
 
 {--------------------------------------------------------}
 
-constructor tSoundEffect.create(aFormat: tAudioFormat; aLength: int32);
+constructor tSoundEffect.create(aFormat: tAudioFormat; aLength: int32; aTag: string='');
 begin
   inherited create();
   length := aLength;
   format := aFormat;
+  tag := aTag;
   getMem(data, length * AF_SIZE[format]);
 end;
 
@@ -127,7 +131,13 @@ begin
     freeMem(data);
   length := 0;
   data := nil;
+  tag := '';
   inherited destroy();
+end;
+
+function tSoundEffect.toString(): string;
+begin
+  exit(tag);
 end;
 
 function tSoundEffect.getSample(pos: int32): tAudioSample;
@@ -180,6 +190,7 @@ begin
     sample.right := (rnd+rnd-256)*64;
     result.setSample(i, sample);
   end;
+  result.tag := 'noise';
 end;
 
 class function tSoundEffect.loadFromWave(filename: string): tSoundEffect;
@@ -245,8 +256,8 @@ begin
         end;
 
         case fileHeader.bitsPerSample of
-          16: result := tSoundEffect.create(AF_16_STEREO, chunkSize div 4);
-          8: result := tSoundEffect.create(AF_8_STEREO, chunkSize div 2);
+          16: result := tSoundEffect.create(AF_16_STEREO, chunkSize div 4, filename);
+          8: result := tSoundEffect.create(AF_8_STEREO, chunkSize div 2, filename);
           else error('bitsPerSample must be either 8 or 16');
         end;
 

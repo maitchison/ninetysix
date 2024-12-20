@@ -17,8 +17,16 @@ type
   tSamples16S = array[0..65536-1] of tAudioSample16S;
   pSamples16S = ^tSamples16S;
 
+  tProcessAudioProc = procedure(
+    samplePos: int32; samplePtr: pointer; sampleLength: dword;
+    samplesToProcess: dword;
+    looping: boolean=false;
+    startVolume: int32 = 256*256;
+    endVolume: int32 = 256*256
+  );
+
 procedure process16S_REF(
-  samplePos: int32; sample: pSamples16S; sampleLength: dword;
+  samplePos: int32; samplePtr: pointer; sampleLength: dword;
   samplesToProcess: dword;
   looping: boolean=false;
   startVolume: int32 = 256*256;
@@ -27,9 +35,11 @@ procedure process16S_REF(
 var
   i: int32;
   volume, volumeDelta: int32;
+  sample: pSamples16S;
 begin
 
   if samplesToProcess = 0 then exit;
+  sample := samplePtr;
 
   volume := startVolume;
   volumeDelta := int32(endVolume-startVolume) div samplesToProcess;
@@ -39,12 +49,6 @@ begin
     scratchBufferI32[i].right += int32(sample^[samplePos].right) * (volume div 256);
     inc(samplePos);
     volume += volumeDelta;
-    if samplePos >= sampleLength then begin
-      if looping then
-        samplePos := 0
-      else
-        exit;
-    end;
   end;
 end;
 

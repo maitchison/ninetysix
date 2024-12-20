@@ -17,18 +17,29 @@ CONST
 
 type
 
+  tSoundChannelSelection = (
+    SCS_SELFOVERWRITE,    // overwrite is sound is already playing,
+                          // otherwise next free
+    SCS_NEXTFREE,         // find the next free channel
+    SCS_FIXED1,           // use a fixed channel
+    SCS_FIXED2,
+    SCS_FIXED3,
+    SCS_FIXED4
+  );
+
   tSoundChannel = class
-    soundEffect: tSoundEffect;   {the currently playing sound effect}
+    id: word;
+    sfx: tSoundEffect;   {the currently playing sound effect}
     volume: single;
     pitch: single;
     startTC: tTimeCode;       {when the sound starts playing}
     looping: boolean;
-    constructor create();
+    constructor create(id: word);
     procedure reset();
     function  endTC(): tTimeCode;         {when the sound stops playing (if no looping)}
     function  inUse(): boolean;
     procedure update(currentTC: tTimeCode);
-    procedure play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
+    procedure play(sfx: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode);
   end;
 
   tSoundMixer = class
@@ -40,16 +51,14 @@ type
     noise: boolean;
 
     constructor create();
-    procedure play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
+    function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
+    function playRepeat(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+    function play(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
   end;
 
 var
   {our global mixer}
   mixer: tSoundMixer = nil;
-
-  inIRQ: boolean = false;
-
-  noiseCounter: dword;
 
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 
@@ -63,6 +72,7 @@ var
   scratchBuffer: array[0..8*1024-1] of tAudioSample;
   scratchBufferF32: array[0..8*1024-1] of tAudioSampleF32;
   scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32; {$align 8}
+  noiseCounter: dword;
 
 {Mixer is called during interupt, so stack might be invalid,
  also, make sure to not throw any errors. These will get turned
@@ -109,8 +119,10 @@ var
   noise: int32;
   sample, finalSample: pointer;
   bufSamples: int32;
-  samplePos, samplesToProcess: int32;
+  samplePos, samplesToProcess, chunkSamples: int32;
   channel: tSoundChannel;
+
+  processAudio: tProcessAudioProc;
 
 begin
 
@@ -135,7 +147,7 @@ begin
     channel := mixer.channels[j];
 
     if channel.inUse then begin
-      sfx := channel.soundEffect;
+      sfx := channel.sfx;
       if sfx.length = 0 then exit;
       samplePos := (startTC - channel.startTC) mod sfx.length;
       samplesToProcess := bufSamples;
@@ -153,14 +165,27 @@ begin
 
       case sfx.format of
         // stub: support asm again
-        AF_16_STEREO: process16S_REF(
-          samplePos, sfx.data, sfx.length, samplesToProcess,
+        AF_16_STEREO: processAudio:= process16S_REF;
+        // stub: support 8bit again
+        //AF_8_STEREO: process8S_REF(sample, sfx.data, finalSample, bufSamples);
+        else continue; // ignore error as we're in an interupt.
+      end;
+
+      // break audio into chunks such that...
+      // - process need not handle looping
+      // - volume is linear within chunk
+
+      while samplesToProcess > 0 do begin
+        chunkSamples := samplesToProcess;
+        if (samplePos + chunkSamples) >= sfx.length then
+          chunkSamples := sfx.length - samplePos;
+        processAudio(
+          samplePos, sfx.data, sfx.length, chunkSamples,
           channel.looping,
           trunc(channel.volume*65536), trunc(channel.volume*65536)
         );
-        // stub: support 8bit again
-        //AF_8_STEREO: process8S_REF(sample, sfx.data, finalSample, bufSamples);
-        else ; // ignore error as we're in an interupt.
+        samplePos := (samplePos + chunkSamples) mod sfx.length;
+        samplesToProcess -= chunkSamples;
       end;
     end;
 
@@ -215,15 +240,16 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tSoundChannel.create();
+constructor tSoundChannel.create(id: word);
 begin
-  inherited create;
+  inherited create();
+  self.id := id;
   reset();
 end;
 
 procedure tSoundChannel.reset();
 begin
-  soundEffect := nil;
+  sfx := nil;
   volume := 1.0;
   pitch := 1.0;
   startTC := 0;
@@ -241,23 +267,22 @@ end;
 function tSoundChannel.endTC(): tTimeCode;         {when the sound stops playing (if no looping)}
 begin
   if inUse then
-    result := startTC + soundEffect.length
+    result := startTC + sfx.length
   else
     result := startTC;
 end;
 
 function tSoundChannel.inUse(): boolean;
 begin
-  result := assigned(soundEffect);
+  result := assigned(sfx);
 end;
 
-procedure tSoundChannel.play(soundEffect: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode; loop: boolean=false);
+procedure tSoundChannel.play(sfx: tSoundEffect; volume:single; pitch: single;startTime:tTimeCode);
 begin
-  self.soundEffect := soundEffect;
+  self.sfx := sfx;
   self.volume := volume;
   self.pitch := pitch;
   self.startTC := startTime;
-  self.looping := loop;
 end;
 
 {-----------------------------------------------------}
@@ -269,36 +294,66 @@ begin
   mute := false;
   noise := false;
   for i := 1 to NUM_CHANNELS do
-    channels[i] := tSoundChannel.create();
+    channels[i] := tSoundChannel.create(i);
   for i := 0 to length(noiseBuffer)-1 do begin
     noiseBuffer[i] := ((random(256) + random(256)) div 2) - 128;
   end;
 end;
 
-procedure tSoundMixer.play(soundEffect: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0);
+{returns a channel to use for given sound}
+function tSoundMixer.getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
 var
-  channelNum: integer;
-  ticksOffset: int32;
   i: integer;
 begin
+  case strategy of
+    SCS_SELFOVERWRITE:
+      //NIY
+      exit(nil);
+    SCS_NEXTFREE: begin
+      for i := 1 to NUM_CHANNELS do
+        if not channels[i].inUse then
+          exit(channels[i]);
+      exit(nil);
+      end;
+    SCS_FIXED1: exit(channels[1]);
+    SCS_FIXED2: exit(channels[2]);
+    SCS_FIXED3: exit(channels[3]);
+    SCS_FIXED4: exit(channels[4]);
+    else error('Invalid sound channel selection strategoy');
+  end;
+end;
+
+function tSoundMixer.playRepeat(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+var
+  channel: tSoundChannel;
+begin
+  channel := play(sfx, volume, pitch, timeOffset);
+  if assigned(channel) then
+    channel.looping := true;
+  result := channel;
+end;
+
+function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+var
+  ticksOffset: int32;
+begin
+
   {for the moment lock onto the first channel}
-  if not assigned(soundEffect) then
+  if not assigned(sfx) then
     error('Tried to play invalid sound file');
 
   {find a slot to use}
-  channelNum := -1;
-  for i := 1 to NUM_CHANNELS do begin
-    if not channels[i].inUse then begin
-      channelNum := i;
-      break;
-    end;
+  result := getFreeChannel(sfx, SCS_NEXTFREE);
+  if not assigned(result) then begin
+    note(format('playing %s but no free channels', [sfx.toString] ));
+    exit;
   end;
 
-  // no free channels
-  if channelNum < 0 then exit;
+  note(format('playing %s but on channel %d', [sfx.toString, result.id]));
 
   ticksOffset := round(timeOffset*44100);
-  channels[channelNum].play(soundEffect, volume, pitch, sbDriver.currentTC+ticksOffset);
+  result.play(sfx, volume, pitch, sbDriver.currentTC+ticksOffset);
+  result.looping := false;
 end;
 
 procedure initMixer();

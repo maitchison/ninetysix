@@ -346,7 +346,7 @@ begin
     music := tSoundEffect.loadFromWave('res\music8.wav');
 
   {todo: load a proper sound effect}
-  slideSFX := tSoundEffect.createNoise(0.1);
+  slideSFX := tSoundEffect.loadFromWave('res\bell.wav');
 end;
 
 procedure drawGUI();
@@ -466,6 +466,10 @@ begin
     if keyDown(key_b) then begin
       benchmarkMode := true;
       carScale := 2.0;
+    end;
+
+    if keyDown(key_s) then begin
+      mixer.play(slideSFX);
     end;
 
     if keyDown(key_e) then begin
