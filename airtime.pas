@@ -78,7 +78,7 @@ begin
   tilt := 0;
   mass := 1;
   enginePower := 300;
-  tireTraction := 600;
+  tireTraction := 410;
   dragCoefficent := 0.0025;
   constantDrag := 50;
 end;
