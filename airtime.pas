@@ -472,11 +472,11 @@ begin
     end;
 
     if keyDown(key_s) and (getSec > nextBellSound) then begin
-      mixer.play(slideSFX, 1.0, 1.0, 0.1*(rnd/256));
-      if getSec > nextBellSound + (120/136) then
-        nextBellSound := getSec + (120/136)
+      mixer.play(slideSFX, rnd/256, 1.0);
+      if getSec > nextBellSound + (1/136) then
+        nextBellSound := getSec + (1/136)
       else
-        nextBellSound += (120/136)
+        nextBellSound += (1/136)
     end;
 
     if keyDown(key_e) then begin
