@@ -336,6 +336,7 @@ end;
 function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   ticksOffset: int32;
+  offsetString: string;
 begin
 
   {for the moment lock onto the first channel}
@@ -349,7 +350,11 @@ begin
     exit;
   end;
 
-  note(format('playing %s but on channel %d', [sfx.toString, result.id]));
+  if timeOffset <> 0 then
+    offsetString := format(' (%.2fs)', [timeOffset])
+  else
+    offsetString := '';
+  note(format('playing %s channel %d%s', [sfx.toString, result.id, offsetString]));
 
   ticksOffset := round(timeOffset*44100);
   result.play(sfx, volume, pitch, sbDriver.currentTC+ticksOffset);
