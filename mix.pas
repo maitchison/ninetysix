@@ -118,7 +118,7 @@ var
   i,j: int32;
   noise: int32;
   sample, finalSample: pointer;
-  bufSamples: int32;
+  bufPos, bufSamples: int32;
   samplePos, samplesToProcess, chunkSamples: int32;
   channel: tSoundChannel;
 
@@ -149,12 +149,18 @@ begin
     if channel.inUse then begin
       sfx := channel.sfx;
       if sfx.length = 0 then exit;
-      samplePos := (startTC - channel.startTC) mod sfx.length;
+      samplePos := (startTC - channel.startTC);
+      if samplePos > 0 then samplePos := samplePos mod sfx.length;
       samplesToProcess := bufSamples;
 
-      if samplePos < 0 then
-        // this just means sample starts partway in this chunk.
+      bufPos := 0;
+
+      if samplePos < 0 then begin
+        // this means sample starts partway in this buffer.
+        bufPos := -samplePos;
+        samplePos := 0;
         samplesToProcess += samplePos;
+      end;
       if samplesToProcess <= 0 then continue;
       if samplePos >= sfx.length then begin
         if channel.looping then
@@ -178,13 +184,16 @@ begin
       while samplesToProcess > 0 do begin
         chunkSamples := samplesToProcess;
         if (samplePos + chunkSamples) >= sfx.length then
+          // this means audio ends early within the buffer
           chunkSamples := sfx.length - samplePos;
         processAudio(
-          samplePos, sfx.data, sfx.length, chunkSamples,
+          samplePos, sfx.data, sfx.length,
+          bufPos, chunkSamples,
           channel.looping,
           trunc(channel.volume*65536), trunc(channel.volume*65536)
         );
         samplePos := (samplePos + chunkSamples) mod sfx.length;
+        bufPos += chunkSamples;
         samplesToProcess -= chunkSamples;
       end;
     end;

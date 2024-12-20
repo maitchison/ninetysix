@@ -47,7 +47,7 @@ var
   carDrawTime: double = 0;
 
 var
-  lastBellSound: double = 0;
+  nextBellSound: double = 0;
 
 procedure mainLoop(); forward;
 
@@ -471,9 +471,12 @@ begin
       carScale := 2.0;
     end;
 
-    if keyDown(key_s) and (getSec > lastBellSound + (60/136)) then begin
-      mixer.play(slideSFX, 1.0, 1.0, 0.02*(rnd/256));
-      lastBellSound := getSec
+    if keyDown(key_s) and (getSec > nextBellSound) then begin
+      mixer.play(slideSFX, 1.0, 1.0, 0.1*(rnd/256));
+      if getSec > nextBellSound + (120/136) then
+        nextBellSound := getSec + (120/136)
+      else
+        nextBellSound += (120/136)
     end;
 
     if keyDown(key_e) then begin
