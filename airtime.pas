@@ -185,6 +185,9 @@ var
   dir: v3d;
   requiredTractionForce, tractionForce: v3d;
   targetVelocity: v3d;
+  slidingPower: int32;
+  skidVolume: single;
+  alpha: single;
 
   dx,dy: integer;
 const
@@ -223,11 +226,18 @@ begin
       tractionForce.clip(tireTraction)
     end;
 
-    if (requiredTractionForce.abs - tractionForce.abs) > 10 then begin
-      mixer.play(slideSFX);
-    end;
+    slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
+
+    {sound is always playing, we only adjust the volume}
+    skidVolume := clamp(slidingPower/5000, 0, 1.0);
+    if skidVolume = 0 then alpha := 0.5 else alpha := 0.9;
+    mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
+
+    debugTextOut(dx, dy-50, format('%.2f %.2f', [slidingPower/5000, mixer.channels[2].volume]));
+
 
     vel += tractionForce * (elapsed / mass);
+
   end;
 
   debugTextOut(
@@ -349,7 +359,7 @@ begin
     music := tSoundEffect.loadFromWave('res\music8.wav');
 
   {todo: load a proper sound effect}
-  slideSFX := tSoundEffect.loadFromWave('res\bell.wav');
+  slideSFX := tSoundEffect.loadFromWave('res\skid.wav');
 end;
 
 procedure drawGUI();
@@ -472,7 +482,7 @@ begin
     end;
 
     if keyDown(key_s) and (getSec > nextBellSound) then begin
-      mixer.play(slideSFX, (256+rnd)/512, (rnd+64)/256);
+      mixer.play(slideSFX, SCS_NEXTFREE, (256+rnd)/512, (rnd+64)/256);
       if getSec > nextBellSound + (30/136) then
         nextBellSound := getSec + (30/136)
       else
@@ -509,6 +519,14 @@ begin
   screen.background := trackSprite;
   screen.clear();
   screen.pageFlip();
+
+  // turn off music
+  // todo: find a better way of doing this
+  mixer.channels[1].reset();
+
+  // start our sliding sound
+  mixer.playRepeat(slideSFX, SCS_FIXED2);
+  mixer.channels[2].volume := 0.0;
 
   car := tCar.create();
   car.pos := V3D.create(300,300,0);
@@ -590,7 +608,7 @@ begin
   videoDriver.setMode(640,480,32);
 
   screen.create();
-  mixer.play(music);
+  mixer.play(music, SCS_FIXED1);
 
   initMouse();
   initKeyboard();

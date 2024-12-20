@@ -52,8 +52,8 @@ type
 
     constructor create();
     function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
-    function playRepeat(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
-    function play(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+    function playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+    function play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
   end;
 
 var
@@ -152,7 +152,8 @@ begin
     if channel.inUse then begin
 
       sfx := channel.sfx;
-      if sfx.length = 0 then exit;
+      if sfx.length = 0 then continue; // should not happen
+      if channel.volume = 0 then continue;
 
       pitchVel := trunc(256*channel.pitch);
 
@@ -345,17 +346,17 @@ begin
   end;
 end;
 
-function tSoundMixer.playRepeat(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+function tSoundMixer.playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   channel: tSoundChannel;
 begin
-  channel := play(sfx, volume, pitch, timeOffset);
+  channel := play(sfx, channelSelection, volume, pitch, timeOffset);
   if assigned(channel) then
     channel.looping := true;
   result := channel;
 end;
 
-function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+function tSoundMixer.play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   ticksOffset: int32;
   offsetString: string;
@@ -366,7 +367,7 @@ begin
     error('Tried to play invalid sound file');
 
   {find a slot to use}
-  result := getFreeChannel(sfx, SCS_NEXTFREE);
+  result := getFreeChannel(sfx, channelSelection);
   if not assigned(result) then begin
     note(format('playing %s but no free channels', [sfx.toString] ));
     exit;
