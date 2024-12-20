@@ -107,9 +107,9 @@ var
   sfx: tSoundEffect;
   i,j: int32;
   noise: int32;
-  pos,len: int32;
   sample, finalSample: pointer;
   bufSamples: int32;
+  pos: int32;
 
 begin
 
@@ -132,20 +132,16 @@ begin
 
     if mixer.channel[j].inUse then begin
       sfx := mixer.channel[j].soundEffect;
-      len := sfx.length;
-      if len <= 0 then continue;
-
-      {todo: support this case, this just means audio plays later, perhaps
-       even within this chunk}
-      if ((startTC - mixer.channel[j].startTC) < 0) then continue;
-
-      pos := (startTC - mixer.channel[j].startTC) mod len;
-      sample := pointer(sfx.data) + (pos * sfx.bytesPersample);
-      finalSample := pointer(sfx.data) + (len * sfx.bytesPersample);
-
+      if sfx.length = 0 then exit;
+      pos := (startTC - mixer.channel[j].startTC) mod sfx.length;
       case sfx.format of
-        AF_16_STEREO: process16S_ASM(sample, sfx.data, finalSample, bufSamples);
-        AF_8_STEREO: process8S_ASM(sample, sfx.data, finalSample, bufSamples);
+        // stub: support asm again
+        AF_16_STEREO: process16S_REF(
+          pos, sfx.data, sfx.length, bufSamples,
+          mixer.channel[j].looping
+        );
+        // stub: support 8bit again
+        //AF_8_STEREO: process8S_REF(sample, sfx.data, finalSample, bufSamples);
         else ; // ignore error as we're in an interupt.
       end;
     end;
