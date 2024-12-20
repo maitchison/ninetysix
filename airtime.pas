@@ -57,7 +57,13 @@ type
     vel: V3D;
     zAngle: single;
     tilt: single;
-      mass: single;
+
+    mass: single;
+    tireTraction: single;
+    enginePower: single;
+    dragCoefficent: single;
+    constantDrag: single;
+
     constructor create();
     procedure draw();
     procedure update();
@@ -71,6 +77,10 @@ begin
   zAngle := 0;
   tilt := 0;
   mass := 1;
+  enginePower := 300;
+  tireTraction := 600;
+  dragCoefficent := 0.0025;
+  constantDrag := 50;
 end;
 
 procedure tCar.draw();
@@ -169,11 +179,10 @@ procedure tCar.tractionComplex();
 var
   slipAngle, dirAngle, velAngle: single;
   dir: v3d;
-  tractionForce: v3d;
+  requiredTractionForce, tractionForce: v3d;
   targetVelocity: v3d;
-  lateralForceCap: single;
-  dx,dy: integer;
 
+  dx,dy: integer;
 const
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
 
@@ -182,6 +191,8 @@ begin
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
   dx := round(pos.x);
   dy := round(pos.rotated(0.955, 0,0).y);
+
+  if elapsed <= 0 then exit;
 
   {-----------------------------------}
   {tire traction}
@@ -193,14 +204,32 @@ begin
   end else begin
     {calculate the slip angle}
     slipAngle := radToDeg(arcCos(vel.dot(dir) / vel.abs));
-    dirAngle := radToDeg(arctan2(-dir.y, -dir.x));
-    velAngle := radToDeg(arctan2(-vel.y, -vel.x));
+
+    targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
+    {force required to correct velocity *this* frame}
+    requiredTractionForce := (targetVelocity-vel)*(mass/elapsed);
+    tractionForce := requiredTractionForce;
+
+    if keyDown(key_z) then
+      tractionForce.clip(0) {no traction}
+    else if keyDown(key_x) then
+      tractionForce.clip(9999999) {perfect traction}
+    else begin
+      {model how well our tires work}
+      tractionForce.clip(tireTraction)
+    end;
+
+    if (requiredTractionForce.abs - tractionForce.abs) > 10 then begin
+      sbDriver.directNoise(0.01);
+    end;
+
+    vel += tractionForce * (elapsed / mass);
   end;
 
   debugTextOut(
     dx-120, dy+50,
-    format('vel:%.1f slipa:%.1f dira:%.1f vela:%.1f za:%.1f',
-    [vel.abs, slipAngle, dirAngle, velAngle, radToDeg(zAngle)]
+    format('vel:%.1f slipa:%.1f tf:%.1f/%.1f fps:%.2f',
+    [vel.abs, slipAngle, tractionForce.abs, requiredTractionForce.abs, 1/elapsed]
   ));
 
   (*
@@ -240,7 +269,6 @@ var
   x,y: single;
 const
   BOUNDARY = 50;
-
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
@@ -258,7 +286,7 @@ begin
     tilt -= elapsed*1.0;
   end;
   if keyDown(key_up) then
-    engineForce := dir * 500;
+    engineForce := dir * enginePower;
 
   {movement from last rame}
   {note: we correct for isometric projection here}
@@ -271,7 +299,7 @@ begin
   self.tractionComplex();
 
   {handle drag}
-  drag := 1.0 + 1.5 * vel.abs;
+  drag := constantDrag + dragCoefficent * vel.abs2;
   dragForce := vel.normed() * drag;
   dragForce *= (elapsed/mass);
   dragForce.clip(vel.abs);
@@ -499,6 +527,12 @@ begin
 
     {debugging}
     screen.SHOW_DIRTY_RECTS := keyDown(key_d);
+
+    {more debuggug}
+    if keyDown(key_1) then
+      car.tireTraction -= 10;
+    if keyDown(key_2) then
+      car.tireTraction += 10;
 
     // not really needed
     //screen.waitVSync();
