@@ -64,6 +64,8 @@ type
 
   pAudioSample16S = ^tAudioSample16S;
   pAudioSample8S = ^tAudioSample8S;
+  pAudioSample16M = ^tAudioSample16M;
+  pAudioSample8M = ^tAudioSample8M;
 
   tAudioSampleF32 = packed record
   {32 bit stereo sample, used for mixing}
@@ -180,9 +182,17 @@ begin
   end;
   case format of
     AF_16_STEREO: result := pAudioSample16S(data + (pos * 4))^;
+    AF_16_MONO: begin
+      result.left := pAudioSample16M(data + (pos * 2))^.value;
+      result.right := pAudioSample16M(data + (pos * 2))^.value;
+    end;
     AF_8_STEREO: begin
       result.left := int32(pAudioSample8S(data + (pos * 2))^.left) * 256 - 32768;
       result.right := int32(pAudioSample8S(data + (pos * 2))^.right) * 256 - 32768;
+    end;
+    AF_8_MONO: begin
+      result.left := int32(pAudioSample8M(data + (pos * 1))^.value) * 256 - 32768;
+      result.right := int32(pAudioSample8M(data + (pos * 1))^.value) * 256 - 32768;
     end;
     else error('Invalid format');
   end;

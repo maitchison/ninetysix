@@ -193,6 +193,9 @@ var
 const
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
 
+  EASE_IN = 0.5;
+  EASE_OUT = 0.9;
+
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
@@ -230,8 +233,9 @@ begin
 
     {sound is always playing, we only adjust the volume}
     skidVolume := clamp(slidingPower/5000, 0, 1.0);
-    if skidVolume = 0 then alpha := 0.5 else alpha := 0.9;
-    mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
+    //if skidVolume < mixer.channels[2].volume then alpha := EASE_OUT else alpha := EASE_IN;
+    //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
+    mixer.channels[2].volume := skidVolume;
 
     debugTextOut(dx, dy-50, format('%.2f %.2f', [slidingPower/5000, mixer.channels[2].volume]));
 
