@@ -240,7 +240,7 @@ begin
     skidVolume := clamp(slidingPower/5000, 0, 1.0);
     //if skidVolume < mixer.channels[2].volume then alpha := EASE_OUT else alpha := EASE_IN;
     //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
-    mixer.channels[2].volume := skidVolume;
+    mixer.channels[2].volume := skidVolume * 0.65;
     //mixer.channels[2].pitch := clamp(0.85+tireHeat/400, 0.85, 2.0);
 
     // write skidmarks to map

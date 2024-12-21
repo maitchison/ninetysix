@@ -176,9 +176,10 @@ var
   noise: int32;
   sample, finalSample: pointer;
   bufPos, bufSamples: int32;
-  samplePos, sampleTick, ticksPerSample: int32;
+  sampleTick, ticksPerSample: int32;
   remainingBufferSamples, chunkBufferSamples: int32;
-  chunkSourceTicks: int32;
+  chunkSourceTicks, sampleTicksRemaining: int32;
+  volumeChunkStart, volumeChunkEnd: single;
   channel: tSoundChannel;
 
   processAudio: tProcessAudioProc;
@@ -255,20 +256,24 @@ begin
       // break audio into chunks so that process need not handle looping
       while remainingBufferSamples > 0 do begin
 
-        samplePos := sampleTick div 256;
-
         chunkBufferSamples := remainingBufferSamples;
         chunkSourceTicks := remainingBufferSamples * ticksPerSample;
 
-        if (sampleTick + chunkSourceTicks) >= (sfx.length*256) then
+        if (sampleTick + chunkSourceTicks) >= (sfx.length*256) then begin
           // this means audio ends early within the buffer
-          // so we need to either loop and stop.
-          chunkBufferSamples := sfx.length - (sampleTick div 256);
+          // so make sure this chunk ends at the boundary,
+          // then we handle loop or stop later on.
+          sampleTicksRemaining := (sfx.length*256) - sampleTick;
+          // round up
+          chunkBufferSamples := (sampleTicksRemaining+(ticksPerSample-1)) div ticksPerSample;
+        end;
 
         // this should never happen!
-        if chunkBufferSamples = 0 then begin
-          mixWarn('chunkBufferSamples was 0');
+        if chunkBufferSamples <= 0 then begin
+          mixWarn('chunkBufferSamples was <= 0');
           channel.sampleTick := sampleTick;
+          DR3 := remainingBufferSamples;
+          DR4 := chunkBufferSamples;
           break;
         end;
 
@@ -288,10 +293,13 @@ begin
           break;
         *)
 
+        volumeChunkStart := channel.lastUpdateVolume + (bufPos / bufSamples) * (channel.volume - channel.lastUpdateVolume);
+        volumeChunkEnd := channel.lastUpdateVolume + ((bufPos + chunkBufferSamples) / bufSamples) * (channel.volume - channel.lastUpdateVolume);
+
         processAudio(
           sampleTick, sfx.data, sfx.length,
           bufPos, chunkBufferSamples,
-          trunc(channel.lastUpdateVolume*65536), trunc(channel.volume*65536),
+          trunc(volumeChunkStart*65536), trunc(volumeChunkEnd*65536),
           ticksPerSample
         );
         sampleTick += (chunkBufferSamples * ticksPerSample);
