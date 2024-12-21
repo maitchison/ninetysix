@@ -30,6 +30,7 @@ type
   tSoundChannel = class
     id: word;
     sfx: tSoundEffect;   {the currently playing sound effect}
+    volumeLastUpdate: single;
     volume: single;
     pitch: single;
     startTC: tTimeCode;       {when the sound starts playing}
@@ -203,7 +204,7 @@ begin
         processAudio(
           samplePos, sfx.data, sfx.length,
           bufPos, chunkBufferSamples,
-          trunc(channel.volume*65536), trunc(channel.volume*65536),
+          trunc(channel.volumeLastUpdate*65536), trunc(channel.volume*65536),
           trunc(channel.pitch*256)
         );
         chunkSourceSamples := chunkBufferSamples * 256 div pitchVel;
@@ -212,10 +213,10 @@ begin
         remainingBufferSamples -= chunkBufferSamples;
       end;
     end;
-
-    channel.update(startTC);
-
   end;
+
+  for j := 1 to NUM_CHANNELS do
+    mixer.channels[j].update(startTC);
 
   {stub: simulate 8 bit}
   if keyDownNoCheck(key_8) then
@@ -274,6 +275,7 @@ end;
 procedure tSoundChannel.reset();
 begin
   sfx := nil;
+  volumeLastUpdate := 0;
   volume := 1.0;
   pitch := 1.0;
   startTC := 0;
@@ -282,6 +284,9 @@ end;
 
 procedure tSoundChannel.update(currentTC: tTimeCode);
 begin
+  // we can't really process a volume this quite, so just mute.
+  if volume < (1/256) then volume := 0;
+  volumeLastUpdate := volume;
   if inUse and (not looping) then begin
     if currentTC >= endTC then
       reset();

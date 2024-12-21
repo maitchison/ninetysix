@@ -35,6 +35,7 @@ var
   titleBackground: tSprite;
   music: tSoundEffect;
   slideSFX: tSoundEffect;
+  startSFX: tSoundEffect;
   trackSprite: tSprite;
   carVox: tVoxelSprite;
 
@@ -375,7 +376,6 @@ begin
   else
     music := tSoundEffect.loadFromWave('res\music8.wav');
 
-  {todo: load a proper sound effect}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav');
 end;
 
