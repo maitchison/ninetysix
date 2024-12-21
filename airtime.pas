@@ -64,6 +64,7 @@ type
 
     mass: single;
     tireTraction: single;
+    tireHeat: single;       //reduces traction
     enginePower: single;
     dragCoefficent: single;
     constantDrag: single;
@@ -83,6 +84,7 @@ begin
   mass := 1;
   enginePower := 300;
   tireTraction := 410;
+  tireHeat := 0;
   dragCoefficent := 0.0025;
   constantDrag := 50;
 end;
@@ -193,9 +195,6 @@ var
 const
   slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
 
-  EASE_IN = 0.5;
-  EASE_OUT = 0.9;
-
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
@@ -226,10 +225,13 @@ begin
       tractionForce.clip(9999999) {perfect traction}
     else begin
       {model how well our tires work}
-      tractionForce.clip(tireTraction)
+      tractionForce.clip(clamp(tireTraction-(tireHeat*2), 0, tireTraction));
     end;
 
     slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
+
+    tireHeat += slidingPower / 1000;
+    tireHeat := 0.93 * tireHeat;
 
     {sound is always playing, we only adjust the volume}
     skidVolume := clamp(slidingPower/5000, 0, 1.0);
@@ -237,7 +239,7 @@ begin
     //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
     mixer.channels[2].volume := skidVolume;
 
-    debugTextOut(dx, dy-50, format('%.2f %.2f', [slidingPower/5000, mixer.channels[2].volume]));
+    debugTextOut(dx, dy-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
 
     vel += tractionForce * (elapsed / mass);
