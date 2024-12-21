@@ -22,8 +22,6 @@ uses
   sbDriver;
 
 type
-  {time in samples from start of application.}
-  tTimeCode = int64;
 
   tAudioFormat = (
     AF_INVALID,

@@ -183,6 +183,9 @@ begin
   )
 end;
 
+const
+  slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
+
 procedure tCar.tractionComplex();
 var
   slipAngle, dirAngle, velAngle: single;
@@ -194,8 +197,6 @@ var
   alpha: single;
 
   dx,dy: integer;
-const
-  slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
 
 begin
 
@@ -256,7 +257,7 @@ begin
     // for the moment engine sound is speed, which is not quiet right
     // should be 'revs'
     mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
-    mixer.channels[3].pitch := 0.5 + clamp(vel.abs/300, 0, 2.0);
+    mixer.channels[3].pitch := 0.5 + clamp(vel.abs/250, 0, 4.0);
 
     debugTextOut(dx, dy-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
