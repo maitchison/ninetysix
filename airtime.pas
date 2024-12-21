@@ -377,6 +377,7 @@ begin
     music := tSoundEffect.loadFromWave('res\music8.wav');
 
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav');
+  startSFX := tSoundEffect.loadFromWave('res\start.wav');
 end;
 
 procedure drawGUI();
@@ -544,6 +545,8 @@ begin
   // start our sliding sound
   mixer.playRepeat(slideSFX, SCS_FIXED2);
   mixer.channels[2].volume := 0.0;
+
+  mixer.play(startSFX);
 
   car := tCar.create();
   car.pos := V3D.create(300,300,0);
