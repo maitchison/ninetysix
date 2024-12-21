@@ -38,96 +38,61 @@ begin
   end;
 end;
 
-procedure process8S_ASM(sample, firstSample, finalSample: pAudioSample8S;count: dword);
-var
-  dstPointer: pointer;
+procedure direct16S(count: int32; srcPtr, dstPtr: pointer);
 begin
-  if (pointer(sample) + count*2) >= finalSample then begin
-    {we can't handle looping here, yet.}
-    process8S_ASM(sample, firstSample, finalSample, count);
-    exit;
-  end;
-
-  dstPointer := @scratchBufferI32[0];
-
-  asm
-    pushad
-    mov esi, sample
-    mov edi, dstPointer
-    mov ecx, count
-
-  @LOOP:
-
-    {left}
-    movzx eax, byte ptr [esi]
-    sub eax, 128
-    shl eax, 16
-    add [edi], eax
-    {right}
-    movzx eax, byte ptr [esi+1]
-    sub eax, 128
-    shl eax, 16
-    add [edi+4], eax
-
-    add esi, 2
-    add edi, 8
-
-    dec ecx
-    jnz @LOOP
-
-    popad
-  end;
-end;
-
-(*
-procedure process16S_ASM(
-  samplePos: int32; samplePtr: pointer; sampleLength: dword;
-  bufferPos: int32; count: int32;
-  startVolume: int32 = 256*256;
-  endVolume: int32 = 256*256;
-  pitch: int32 = 256
-
-);
-var
-  srcPtr, dstPtr: pointer;
-begin
-
-  if count <= 0 then exit;
-
-  srcPtr := @pSamples16S(samplePtr)^[samplePos];
-  dstPtr := @scratchBufferI32[bufferPos];
-
-  if (startVolume = 65536) and (endVolume = 65536) then begin
   {direct copy case}
   asm
     pushad
     mov   esi, srcPtr
     mov   edi, dstPtr
     mov   ecx, count
-
   @LOOP:
-
     {left}
     movsx eax, word ptr [esi]
     shl   eax, 8
     add   [edi], eax
-
     {right}
     movsx eax, word ptr [esi+2]
     shl   eax, 8
     add   [edi+4], eax
-
     add   esi, 4
     add   edi, 8
-
     dec   ecx
     jnz   @LOOP
-
     popad
-  end; exit; end;
+  end;
+end;
 
+procedure direct8S(count: int32; srcPtr, dstPtr: pointer);
+begin
+  {direct copy case}
+  asm
+    pushad
+    mov   esi, srcPtr
+    mov   edi, dstPtr
+    mov   ecx, count
+  @LOOP:
+    {left}
+    movzx eax, byte ptr [esi]
+    sub   eax, 128
+    shl   eax, 16
+    add   [edi], eax
+    {right}
+    movzx eax, byte ptr [esi+1]
+    sub   eax, 128
+    shl   eax, 16
+    add   [edi+4], eax
+    add   esi, 2
+    add   edi, 8
+    dec   ecx
+    jnz   @LOOP
+    popad
+  end;
+end;
+
+procedure standard16S(count: int32; srcPtr, dstPtr: pointer;startVolume, endVolume: int32);
+begin
   {standard case (but no pitch ... yet)}
-  if (pitch = 256) then begin
   asm
     pushad
 
@@ -168,15 +133,47 @@ begin
     jnz   @LOOP
 
     popad
-  end; exit; end;
+  end;
+end;
+
+function processAudio_ASM(
+  af: tAudioFormat;
+  sampleTick: int32; samplePtr: pointer; sampleLength: dword;
+  bufferPos: int32; count: int32;
+  startVolume: int32 = 256*256;
+  endVolume: int32 = 256*256;
+  pitch: int32 = 256
+): boolean;
+var
+  srcPtr, dstPtr: pointer;
+begin
+
+  if count <= 0 then exit(true);
+  if AF_SIZE[af] = 0 then exit(false);
+
+  srcPtr := samplePtr + (sampleTick div 256) * AF_SIZE[af];
+  dstPtr := @scratchBufferI32[bufferPos];
+
+  if (startVolume = 65536) and (endVolume = 65536) and (pitch = 256) then begin
+    case af of
+      AF_16_STEREO: begin direct16S(count, srcPtr, dstPtr); exit(true); end;
+      AF_8_STEREO: begin direct8S(count, srcPtr, dstPtr); exit(true); end;
+    end;
+  end;
+
+  if (pitch = 256) then begin
+    case af of
+      AF_16_STEREO: begin standard16S(count, srcPtr, dstPtr, startVolume, endVolume); exit(true); end;
+    end;
+  end;
 
   {fall back to reference in cases we don't handle}
-  process16S_REF(
-    samplePos, samplePtr, sampleLength,
+  result := processAudio_REF(
+    af,
+    sampleTick, samplePtr, sampleLength,
     bufferPos, count,
     startVolume, endVolume,
     pitch
   );
-
 end;
-  *)
+

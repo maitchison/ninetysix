@@ -245,7 +245,7 @@ begin
 
       if remainingBufferSamples <= 0 then continue;
 
-      processAudio:= processAudio_REF;
+      processAudio:= processAudio_ASM;
 
       // break audio into chunks so that process need not handle looping
       DEBUG_CHUNK_COUNTER := 0;
