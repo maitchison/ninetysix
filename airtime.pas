@@ -239,6 +239,17 @@ begin
     //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
     mixer.channels[2].volume := skidVolume;
 
+    // write skidmarks to map
+    if (skidVolume > 0.1) and assigned(screen.background) then begin
+      // todo: find wheel locations
+      screen.background.page.putPixel(
+        dx+(rnd-rnd) div 64, dy+(rnd-rnd) div 64,
+      RGBA.create(0,0,0,32));
+      screen.background.page.putPixel(
+        dx+(rnd-rnd) div 64, dy+(rnd-rnd) div 64,
+      RGBA.create(0,0,0,32));
+    end;
+
     debugTextOut(dx, dy-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
 
