@@ -79,6 +79,7 @@ begin
   end;
 end;
 
+(*
 procedure process16S_ASM(
   samplePos: int32; samplePtr: pointer; sampleLength: dword;
   bufferPos: int32; count: int32;
@@ -178,3 +179,4 @@ begin
   );
 
 end;
+  *)

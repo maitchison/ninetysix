@@ -245,15 +245,7 @@ begin
 
       if remainingBufferSamples <= 0 then continue;
 
-      // todo: processAudio handles formats
-      case sfx.format of
-        // stub: support asm again
-        AF_16_STEREO: processAudio:= process16S_REF;
-        AF_16_MONO: processAudio:= process16M_REF;
-        // stub: support 8bit again
-        //AF_8_STEREO: process8S_REF(sample, sfx.data, finalSample, bufSamples);
-        else continue; // ignore error as we're in an interupt.
-      end;
+      processAudio:= processAudio_REF;
 
       // break audio into chunks so that process need not handle looping
       DEBUG_CHUNK_COUNTER := 0;
@@ -310,6 +302,7 @@ begin
         volumeChunkEnd := channel.lastUpdateVolume + ((bufPos + chunkBufferSamples) / bufSamples) * (channel.volume - channel.lastUpdateVolume);
 
         processAudio(
+          sfx.format,
           sampleTick, sfx.data, sfx.length,
           bufPos, chunkBufferSamples,
           trunc(volumeChunkStart*65536), trunc(volumeChunkEnd*65536),
