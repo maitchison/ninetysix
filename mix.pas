@@ -30,7 +30,7 @@ type
   tSoundChannel = class
     id: word;
     sfx: tSoundEffect;   {the currently playing sound effect}
-    volumeLastUpdate: single;
+    lastUpdateVolume, lastUpdatePitch: single;
     volume: single;
     pitch: single;
     startTC: tTimeCode;       {when the sound starts playing}
@@ -204,7 +204,7 @@ begin
         processAudio(
           samplePos, sfx.data, sfx.length,
           bufPos, chunkBufferSamples,
-          trunc(channel.volumeLastUpdate*65536), trunc(channel.volume*65536),
+          trunc(channel.lastUpdateVolume*65536), trunc(channel.volume*65536),
           trunc(channel.pitch*256)
         );
         chunkSourceSamples := chunkBufferSamples * 256 div pitchVel;
@@ -275,7 +275,8 @@ end;
 procedure tSoundChannel.reset();
 begin
   sfx := nil;
-  volumeLastUpdate := 0;
+  lastUpdateVolume := 0;
+  lastUpdatePitch := 1.0;
   volume := 1.0;
   pitch := 1.0;
   startTC := 0;
@@ -286,7 +287,8 @@ procedure tSoundChannel.update(currentTC: tTimeCode);
 begin
   // we can't really process a volume this quite, so just mute.
   if volume < (1/256) then volume := 0;
-  volumeLastUpdate := volume;
+  lastUpdateVolume := volume;
+  lastUpdatePitch := pitch;
   if inUse and (not looping) then begin
     if currentTC >= endTC then
       reset();

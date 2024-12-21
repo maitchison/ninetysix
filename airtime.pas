@@ -35,6 +35,7 @@ var
   titleBackground: tSprite;
   music: tSoundEffect;
   slideSFX: tSoundEffect;
+  engineSFX: tSoundEffect;
   startSFX: tSoundEffect;
   trackSprite: tSprite;
   carVox: tVoxelSprite;
@@ -239,6 +240,7 @@ begin
     //if skidVolume < mixer.channels[2].volume then alpha := EASE_OUT else alpha := EASE_IN;
     //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
     mixer.channels[2].volume := skidVolume;
+    //mixer.channels[2].pitch := clamp(0.85+tireHeat/400, 0.85, 2.0);
 
     // write skidmarks to map
     if (skidVolume > 0.1) and assigned(screen.background) then begin
@@ -250,6 +252,11 @@ begin
         dx+(rnd-rnd) div 64, dy+(rnd-rnd) div 64,
       RGBA.create(0,0,0,32));
     end;
+
+    // for the moment engine sound is speed, which is not quiet right
+    // should be 'revs'
+    mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
+    mixer.channels[3].pitch := 0.5 + clamp(vel.abs/300, 0, 2.0);
 
     debugTextOut(dx, dy-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
@@ -377,6 +384,7 @@ begin
     music := tSoundEffect.loadFromWave('res\music8.wav');
 
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav');
+  engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav');
   startSFX := tSoundEffect.loadFromWave('res\start.wav');
 end;
 
@@ -545,6 +553,9 @@ begin
   // start our sliding sound
   mixer.playRepeat(slideSFX, SCS_FIXED2);
   mixer.channels[2].volume := 0.0;
+
+  mixer.playRepeat(engineSFX, SCS_FIXED3);
+  mixer.channels[3].volume := 0.0;
 
   mixer.play(startSFX);
 
