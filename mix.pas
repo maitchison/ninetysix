@@ -184,6 +184,8 @@ var
 
   processAudio: tProcessAudioProc;
 
+  DEBUG_CHUNK_COUNTER: int32;
+
 begin
 
   result := nil;
@@ -254,7 +256,18 @@ begin
       end;
 
       // break audio into chunks so that process need not handle looping
+      DEBUG_CHUNK_COUNTER := 0;
       while remainingBufferSamples > 0 do begin
+
+        inc(DEBUG_CHUNK_COUNTER);
+
+        if DEBUG_CHUNK_COUNTER > 16 then begin
+          // this can happen if we, for some reason, start splitting
+          // audio into very small (e.g. 1 sample) chunks.
+          // but it also happens if audio is very short.
+          mixWarn('Too many chunks, short audio?');
+          break;
+        end;
 
         chunkBufferSamples := remainingBufferSamples;
         chunkSourceTicks := remainingBufferSamples * ticksPerSample;
