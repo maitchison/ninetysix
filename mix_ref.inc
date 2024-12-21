@@ -16,6 +16,8 @@ end;
 type
   tSamples16S = array[0..65536-1] of tAudioSample16S;
   pSamples16S = ^tSamples16S;
+  tSamples16M = array[0..65536-1] of tAudioSample16M;
+  pSamples16M = ^tSamples16M;
 
   tProcessAudioProc = procedure(
     samplePos: int32; samplePtr: pointer; sampleLength: dword;
@@ -49,6 +51,37 @@ begin
   for i := 0 to count-1 do begin
     scratchBufferI32[bufferPos+i].left += int32(sample^[sPos shr 8].left) * (volume div 256);
     scratchBufferI32[bufferPos+i].right += int32(sample^[sPos shr 8].right) * (volume div 256);
+    sPos += pitch;
+    volume += volumeDelta;
+  end;
+end;
+
+procedure process16M_REF(
+  samplePos: int32; samplePtr: pointer; sampleLength: dword;
+  bufferPos: int32; count: int32;
+  startVolume: int32 = 256*256;
+  endVolume: int32 = 256*256;
+  pitch: int32 = 256
+);
+var
+  i: int32;
+  volume, volumeDelta: int32;
+  sPos,sVel: int32;
+  sample: pSamples16M;
+  value: int32;
+begin
+
+  if count <= 0 then exit;
+  sample := samplePtr;
+
+  volume := startVolume;
+  volumeDelta := int32(endVolume-startVolume) div count;
+  sPos := samplePos * 256;
+
+  for i := 0 to count-1 do begin
+    value := int32(sample^[sPos shr 8].value) * (volume div 256);
+    scratchBufferI32[bufferPos+i].left += value;
+    scratchBufferI32[bufferPos+i].right += value;
     sPos += pitch;
     volume += volumeDelta;
   end;

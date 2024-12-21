@@ -185,6 +185,7 @@ begin
       case sfx.format of
         // stub: support asm again
         AF_16_STEREO: processAudio:= process16S_ASM;
+        AF_16_MONO: processAudio:= process16M_REF;
         // stub: support 8bit again
         //AF_8_STEREO: process8S_REF(sample, sfx.data, finalSample, bufSamples);
         else continue; // ignore error as we're in an interupt.

@@ -512,7 +512,7 @@ var
 begin
   note('Main loop started');
 
-  videoDriver.setMode(640,480,32);
+  videoDriver.setMode(320,240,32);
   videoDriver.setLogicalSize(1024,480);
 
   screen.reset();

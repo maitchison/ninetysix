@@ -26,23 +26,40 @@ type
   tTimeCode = int64;
 
   tAudioFormat = (
+    AF_INVALID,
     AF_16_STEREO,
-    AF_8_STEREO
+    AF_8_STEREO,
+    AF_16_MONO,
+    AF_8_MONO
   );
 
 const
   AF_SIZE: array[tAudioFormat] of integer = (
+    0,
     4,
-    2
+    2,
+    2,
+    1
   );
 
 type
   tAudioSample16S = packed record
     left, right: int16;
   end;
-
   tAudioSample8S = packed record
     left, right: uint8;
+  end;
+  tAudioSample16M = packed record
+  case byte of
+    0: (value: int16);
+    1: (left: int16);
+    2: (right: int16);
+  end;
+  tAudioSample8M = packed record
+  case byte of
+    0: (value: byte);
+    1: (left: byte);
+    2: (right: byte);
   end;
 
   pAudioSample16S = ^tAudioSample16S;
@@ -113,6 +130,21 @@ type
     chunkBlockID: array[0..3] of char;
     chunkSize: dword;
   end;
+
+function getAudioFormat(bitsPerChannel: integer; numChannels: integer): tAudioFormat;
+begin
+  case numChannels of
+    1: case bitsPerChannel of
+      8: exit(AF_8_MONO);
+      16: exit(AF_16_MONO);
+    end;
+    2: case bitsPerChannel of
+      8: exit(AF_8_STEREO);
+      16: exit(AF_16_STEREO);
+    end;
+  end;
+  exit(AF_INVALID);
+end;
 
 {--------------------------------------------------------}
 
@@ -205,8 +237,8 @@ var
   ioError: word;
   bytesRemaining: dWord;
   blockSize: int32;
-  buffer: array of byte;
   dataPtr: pointer;
+  af: tAudioFormat;
 
 function wordAlign(x: int32): int32;
   begin
@@ -238,12 +270,13 @@ begin
       if formatBlockID <> 'fmt ' then
         Error('Invalid formatBlockID '+formatBlockID);
 
-      if numChannels <> 2 then
-        Error('numChannels must be 2');
-
       if frequency <> 44100 then
-        Error('frequency must be 44100');
+        error(utils.format('frequency must be 44100 but was %d', [frequency]));
 
+      // will error if not valid
+      af := getAudioFormat(bitsPerSample, numChannels);
+      if af = AF_INVALID then
+        error(utils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));
     end;
 
     {process the chunks}
@@ -255,11 +288,7 @@ begin
           continue;
         end;
 
-        case fileHeader.bitsPerSample of
-          16: result := tSoundEffect.create(AF_16_STEREO, chunkSize div 4, filename);
-          8: result := tSoundEffect.create(AF_8_STEREO, chunkSize div 2, filename);
-          else error('bitsPerSample must be either 8 or 16');
-        end;
+        result := tSoundEffect.create(af, chunkSize div AF_SIZE[af], filename);
 
         bytesRemaining := chunkSize;
         dataPtr := result.data;
@@ -268,7 +297,6 @@ begin
          long on larger files}
         while bytesRemaining > 0 do begin
           blockSize := min(BLOCK_SIZE, bytesRemaining);
-          setLength(buffer, blockSize);
           blockRead(f, dataPtr^, blockSize);
           dataPtr += blockSize;
           bytesRemaining -= blocksize;
