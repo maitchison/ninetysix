@@ -72,13 +72,6 @@ implementation
 uses
   keyboard; {stub}
 
-var
-  {todo: change to 8x8 grid}
-  previousDirtyRegions: array[0..63] of tRect;
-  dirtyRegions: array[0..63] of tRect;
-  drCounter: integer = 0;
-  prevDrCounter: integer = 0;
-
 {-------------------------------------------------}
 
 constructor tScreen.Create();
@@ -255,14 +248,6 @@ begin
   for y := sy to ey do
     for x := sx to ex do
       flagGrid[x,y] := FG_FLIP + FG_CLEAR;
-      (*
-  if drCounter >= high(dirtyRegions) then
-    error('Sorry, too many dirty regions');
-  dirtyRegions[drCounter] := rect;
-  if SHOW_DIRTY_RECTS then
-    canvas.drawRect(rect, RGBA.create(255,0,255));
-  inc(drCounter);
-  *)
 end;
 
 {clears all parts of the screen marked for clearing
@@ -277,14 +262,6 @@ begin
         clearRegion(tRect.create(x*8, y*8, 8, 8));
         flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
       end;
-(*
-  for i := 0 to drCounter-1 do
-    clearRegion(dirtyRegions[i]);
-  move(dirtyRegions, previousDirtyRegions, sizeof(dirtyRegions));
-  prevDrCounter := drCounter;
-  fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
-  drCounter := 0;
-  *)
 end;
 
 
@@ -302,14 +279,6 @@ begin
         copyRegion(tRect.create(x*8, y*8, 8, 8));
         flagGrid[x,y] := flagGrid[x,y] xor FG_FLIP;
       end;
-(*
-  for i := 0 to drCounter-1 do
-    self.copyRegion(dirtyRegions[i]);
-  {unfortunately we also have to flip any previous regions as these will have
-   been cleared. Switcing to a grid system will resolve the overlap with this.}
-  for i := 0 to prevDrCounter-1 do
-    self.copyRegion(previousDirtyRegions[i]);
-    *)
 end;
 
 procedure tScreen.waitVSync();
@@ -381,6 +350,4 @@ end;
 {-------------------------------------------------}
 
 begin
-  fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
-  fillchar(previousDirtyRegions, sizeof(previousDirtyRegions), 0);
 end.
