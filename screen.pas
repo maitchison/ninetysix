@@ -30,7 +30,7 @@ type
     procedure reset();
   end;
 
-  tScreen = object    //stub: make class
+  tScreen = class
 
   private
     fViewPort: tRect;
@@ -97,7 +97,7 @@ end;
 
 constructor tScreen.Create();
 begin
-  //inherited create(); //stub: add back in
+  inherited create();
   backgroundColor.init(0,0,0,255);
   background := nil;
   canvas := nil;
@@ -138,20 +138,19 @@ end;
 procedure tScreen.copyRegion(rect: tRect);
 var
   y,yMin,yMax: int32;
-  pixels: pointer;
+  pixelsPtr: pointer;
   ofs,len: dword;
   lfb_seg: word;
 begin
   {todo: support S3 upload (but maybe make sure regions are small enough
    to not cause stutter - S3 is about twice as fast.}
-
   rect.clipTo(bounds);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   lfb_seg := videoDriver.LFB_SEG;
   if lfb_seg = 0 then exit;
 
-  pixels := canvas.pixels;
+  pixelsPtr := canvas.pixels;
 
   // show debug regions
   if keyDown(key_f2) then begin
@@ -172,7 +171,7 @@ begin
       mov es,  lfb_seg
       mov edi, ofs
 
-      mov esi, pixels
+      mov esi, pixelsPtr
       add esi, ofs
 
       mov ecx, len
@@ -189,7 +188,7 @@ end;
 {draw line from x1,y -> x2,y, including final point}
 procedure tScreen.hLine(x1, x2, y: int32;col: RGBA);
 var
-  pixels: pointer;
+  pixelsPtr: pointer;
   ofs,len: int32;
 begin
 
@@ -198,7 +197,7 @@ begin
   x1 := max(0, x1);
   x2 := min(canvas.width-1, x2);
 
-  pixels := canvas.pixels;
+  pixelsPtr := canvas.pixels;
   ofs := (x1 + (y * canvas.width))*4;
   len := x2-x1; {todo: check this is right}
   if len <= 0 then exit;
@@ -208,7 +207,7 @@ begin
     push eax
     push ecx
 
-    mov edi, pixels
+    mov edi, pixelsPtr
     add edi, ofs
 
     mov eax, col
@@ -276,7 +275,7 @@ var
   x,y, x1,x2,y1,y2: integer;
 begin
   rect.clipTo(bounds);
-  {new method}
+
   x1 := rect.x div 8;
   y1 := rect.y div 8;
   x2 := (rect.right-1) div 8;

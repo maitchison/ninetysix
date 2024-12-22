@@ -435,8 +435,8 @@ begin
   textOut(titleBackground.page, 640-140, 480-25, 'v0.1a (09/12/2024)', RGBA.create(250,250,250,240));
 
   screen.background := titleBackground;
-  screen.clear();
 
+  screen.clear();
   screen.pageFlip();
 
   startClock := getSec;
@@ -641,7 +641,7 @@ begin
 
   videoDriver.setMode(640,480,32);
 
-  screen.create(); // stub: x := x.create();
+  screen := tScreen.create();
   mixer.play(music, SCS_FIXED1);
 
   initMouse();
