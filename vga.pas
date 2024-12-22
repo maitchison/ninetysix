@@ -44,6 +44,7 @@ type
     property BPP:word read getBPP;
     property LFB_SEG:word read getLFB_SEG;
 
+    procedure waitVSYNC(); virtual; abstract;
     procedure setMode(width, height, BPP: word); virtual; abstract;
     procedure setLogicalSize(width, height: word); virtual; abstract;
     procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); virtual; abstract;
@@ -53,6 +54,7 @@ type
 
   tVGADriver = class(tVideoDriver)
     {basic VGA driver}
+    procedure waitVSYNC(); override;
     procedure setMode(width, height, BPP: word); override;
     procedure setText(); override;
   end;
@@ -146,6 +148,14 @@ begin
   end else begin
     error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
   end;
+end;
+
+procedure tVGADriver.waitVSYNC();
+begin
+  {wait until out (previous partial) vsync pulse}
+  repeat until (portb[$03DA] and $8) = 0;
+  {wait until start of new vsync pulse}
+  repeat until (portb[$03DA] and $8) = 8;
 end;
 
 procedure tVGADriver.setText();

@@ -72,8 +72,6 @@ type
     procedure pageFlip();
     procedure clear();
 
-    procedure waitVSync();
-
     {dirty handling}
     procedure flipAll();
     procedure clearAll();
@@ -357,14 +355,6 @@ begin
     end;
   end;
   stats.copyTime := getSec - startTime;
-end;
-
-procedure tScreen.waitVSync();
-begin
-  {wait until out (previous partial) vsync pulse}
-  repeat until (portb[$03DA] and $8) = 0;
-  {wait until start of new vsync pulse}
-  repeat until (portb[$03DA] and $8) = 8;
 end;
 
 {clears region on canvas with background color}

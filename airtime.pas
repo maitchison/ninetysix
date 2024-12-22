@@ -611,7 +611,7 @@ begin
       round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2),
       false
     );
-    screen.waitVSync();
+    videoDriver.waitVSync();
     screen.flipAll();
 
     if keyDown(key_q) or keyDown(key_esc) then break;
