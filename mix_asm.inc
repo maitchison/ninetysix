@@ -99,11 +99,11 @@ begin
     mov   esi, srcPtr
     mov   edi, dstPtr
 
-    // ebx = volume, ecx = volumeDelta
-    mov   eax, startVolume
+    // ebx = startVolume
+    // ecx = volumeDelta
     mov   eax, endVolume
     sub   eax, startVolume
-    xor   edx, edx
+    cdq
     mov   ecx, count
     idiv  ecx
     mov   ebx, startVolume

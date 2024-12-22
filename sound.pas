@@ -91,6 +91,7 @@ type
 
     function bytesPerSample: int32; inline;
 
+    function asFormat(af: tAudioFormat): tSoundEffect;
     function getSample(pos: int32): tAudioSample;
     procedure setSample(pos: int32;sample: tAudioSample);
 
@@ -171,6 +172,17 @@ function tSoundEffect.toString(): string;
 begin
   exit(tag);
 end;
+
+{returns copy of sound in 16bit-stereo format.}
+function tSoundEffect.asFormat(af: tAudioFormat): tSoundEffect;
+var
+  i: int32;
+begin
+  result := tSoundEffect.create(af, self.length, self.tag);
+  for i := 0 to self.length-1 do
+    result.setSample(i, self.getSample(i));
+end;
+
 
 function tSoundEffect.getSample(pos: int32): tAudioSample;
 begin

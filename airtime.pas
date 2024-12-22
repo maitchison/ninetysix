@@ -261,7 +261,6 @@ begin
 
     debugTextOut(dx, dy-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
-
     vel += tractionForce * (elapsed / mass);
 
   end;
@@ -384,9 +383,11 @@ begin
   else
     music := tSoundEffect.loadFromWave('res\music8.wav');
 
-  slideSFX := tSoundEffect.loadFromWave('res\skid.wav');
-  engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav');
-  startSFX := tSoundEffect.loadFromWave('res\start.wav');
+  {the sound engine is currently optimized for 16bit stereo sound}
+  slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
+  engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
+  startSFX := tSoundEffect.loadFromWave('res\start.wav').asFormat(AF_16_STEREO);
+
 end;
 
 procedure drawGUI();
