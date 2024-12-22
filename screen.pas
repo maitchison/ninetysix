@@ -257,13 +257,24 @@ Also removes clear flag, and sets flip flag}
 procedure tScreen.clearAll();
 var
   x, y: integer;
+  xStart, rle: integer;
 begin
-  for y := 0 to (canvas.height div 8)-1 do
-    for x := 0 to (canvas.width div 8)-1 do
+  for y := 0 to (canvas.height div 8)-1 do begin
+    rle := 0;
+    for x := 0 to (canvas.width div 8)-1 do begin
       if (flagGrid[x,y] and FG_CLEAR) = FG_CLEAR then begin
-        clearRegion(tRect.create(x*8, y*8, 8, 8));
+        if rle = 0 then xStart := x;
+        inc(rle);
         flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
+      end else begin
+        if rle > 0 then
+          clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+        rle := 0;
       end;
+    end;
+    if rle > 0 then
+      clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+  end;
 end;
 
 
@@ -272,13 +283,24 @@ end;
 procedure tScreen.flipAll();
 var
   x,y: integer;
+  xStart, rle: integer;
 begin
-  for y := 0 to (canvas.height div 8)-1 do
-    for x := 0 to (canvas.width div 8)-1 do
+  for y := 0 to (canvas.height div 8)-1 do begin
+    rle := 0;
+    for x := 0 to (canvas.width div 8)-1 do begin
       if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
-        copyRegion(tRect.create(x*8, y*8, 8, 8));
-        flagGrid[x,y] := flagGrid[x,y] xor FG_FLIP;
+        if rle = 0 then xStart := x;
+        inc(rle);
+        flagGrid[x,y] := (flagGrid[x,y] xor FG_FLIP)
+      end else begin
+        if rle > 0 then
+          copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+        rle := 0;
       end;
+    end;
+    if rle > 0 then
+      copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+  end;
 end;
 
 procedure tScreen.waitVSync();
