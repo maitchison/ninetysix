@@ -28,10 +28,10 @@ procedure directPCMData(buffer: tWords);
 
 var
   INTERRUPT_COUNTER: int32 = 0;
-  LOOP_MUSIC: boolean = True;
 
   {number of seconds it took to process the last audio chunk}
   lastChunkTime: double = -1;
+  maxChunkTime: double = -1;
   currentTC: uint64 = 0;
 
   backgroundMusicBuffer: pointer = nil;
@@ -344,6 +344,8 @@ begin
   currentTC += HALF_BUFFER_SIZE div 4;
 
   lastChunkTime := getSec-startTime;
+  if lastChunkTime > maxChunkTime then
+    maxChunkTime := lastChunkTime;
 
   // end of interupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
@@ -357,6 +359,8 @@ begin
     pop fs
     pop ds
     pop es
+    // no sti?
+    // no push and pop float registers?
   end;
 
 end;

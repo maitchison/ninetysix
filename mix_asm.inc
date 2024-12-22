@@ -90,44 +90,58 @@ begin
   end;
 end;
 
-procedure standard16S(count: int32; srcPtr, dstPtr: pointer;startVolume, endVolume: int32);
+procedure standard16S(count: int32; samplePtr: pointer; sampleTick: int32; dstPtr: pointer;startVolume, endVolume: int32;pitch:int32);
+var
+  volumeDelta: int32;
 begin
-  {standard case (but no pitch ... yet)}
   asm
     pushad
 
-    mov   esi, srcPtr
-    mov   edi, dstPtr
+    // eax = tmp
+    // ebx = volume
+    // ecx = sampleTick
+    // edx = tmp
 
-    // ebx = startVolume
-    // ecx = volumeDelta
+
+    // edi = destBuffer
+    // esi = samplePtr
+
+    mov   edi, dstPtr
     mov   eax, endVolume
     sub   eax, startVolume
     cdq
     mov   ecx, count
     idiv  ecx
     mov   ebx, startVolume
-    mov   ecx, eax
+    mov   volumeDelta, eax
+    mov   ecx, sampleTick
 
   @LOOP:
 
-    {left}
-    movsx eax, word ptr [esi]
+    {sample pos}
+    mov   esi, ecx
+    shr   esi, 8
+    shl   esi, 2
+    add   esi, samplePtr
+
+    {volume}
     mov   edx, ebx
     shr   edx, 8
+
+    {left}
+    movsx eax, word ptr [esi]
     imul  eax, edx
     add   [edi], eax
 
     {right}
-    movsx eax, word ptr [esi+2]
-    mov   edx, ebx
-    shr   edx, 8
+    movsx eax, word ptr [esi + 2]
     imul  eax, edx
     add   [edi+4], eax
 
     add   esi, 4
     add   edi, 8
-    add   ebx, ecx
+    add   ebx, volumeDelta
+    add   ecx, pitch
 
     dec   count
     jnz   @LOOP
@@ -161,10 +175,8 @@ begin
     end;
   end;
 
-  if (pitch = 256) then begin
-    case af of
-      AF_16_STEREO: begin standard16S(count, srcPtr, dstPtr, startVolume, endVolume); exit(true); end;
-    end;
+  case af of
+    AF_16_STEREO: begin standard16S(count, samplePtr, sampleTick, dstPtr, startVolume, endVolume, pitch); exit(true); end;
   end;
 
   {fall back to reference in cases we don't handle}

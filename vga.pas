@@ -152,10 +152,11 @@ end;
 
 procedure tVGADriver.waitVSYNC();
 begin
-  {wait until out (previous partial) vsync pulse}
+  {wait until out (previous partial) vsync pulse, this will be a short wait}
   repeat until (portb[$03DA] and $8) = 0;
-  {wait until start of new vsync pulse}
+  {wait until start of new vsync pulse, this is a long wait}
   repeat until (portb[$03DA] and $8) = 8;
+
 end;
 
 procedure tVGADriver.setText();

@@ -406,6 +406,7 @@ begin
 
 
   GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
+
   screen.markRegion(tRect.create(10, 10, 300, 22), FG_FLIP);
 end;
 
