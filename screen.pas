@@ -187,7 +187,9 @@ begin
     end;
 end;
 
-{copy line background to canvas}
+{copy line background to canvas
+Copy from x1, to x2 inclusive
+}
 procedure tScreen.copyLine(x1, x2, y: int32);
 var
   canvasPixels,backgroundPixels: pointer;
@@ -274,8 +276,6 @@ begin
   for y := 0 to (canvas.height div 8)-1 do
     for x := 0 to (canvas.width div 8)-1 do
       if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
-        //stub:
-        canvas.setPixel(x*8+4, y*8+4, rgba.create(0, rnd, 0));
         copyRegion(tRect.create(x*8, y*8, 8, 8));
         flagGrid[x,y] := flagGrid[x,y] xor FG_FLIP;
       end;
@@ -310,17 +310,17 @@ begin
     paddingY := (canvas.height - background.height) div 2;
   end;
 
-  for y := rect.top to rect.bottom do begin
+  for y := rect.top to rect.bottom-1 do begin
     {support for background}
     if assigned(background) then begin
       {top alignment for the moment}
       if (y > canvas.height - (paddingY*2)) then
-        hline(rect.left, rect.right, y, backgroundColor)
+        hline(rect.left, rect.right-1, y, backgroundColor)
       else
-        copyLine(rect.left, rect.right, y);
+        copyLine(rect.left, rect.right-1, y);
 
     end else
-      hline(rect.left, rect.right, y, backgroundColor);
+      hline(rect.left, rect.right-1, y, backgroundColor);
   end;
 
 end;
