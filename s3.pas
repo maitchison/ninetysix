@@ -756,6 +756,8 @@ end;
 procedure tS3Driver.fillRect(x1,y1,width,height:int16);
 begin
 
+  if (width <= 0) or (height <= 0) then exit;
+
   S3UnlockRegs();
   S3Wait;
   writew(FRGD_MIX, MIX_NEW + MIX_FG);
@@ -763,8 +765,8 @@ begin
   writew($BEE8, $A000); {PIXEL_CNTL}
   writew(CUR_X, x1);
   writew(CUR_Y, y1);
-  writew(MAJ_AXIS_PCNT, width);
-  writew($BEE8, height + (MIN_AXIS_PCNT shl 12));
+  writew(MAJ_AXIS_PCNT, width-1);
+  writew($BEE8, height - 1 + (MIN_AXIS_PCNT shl 12));
   S3Wait;
   (*
   writew(CMD,

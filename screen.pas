@@ -11,7 +11,8 @@ uses
   graph2d,
   graph32,
   sprite,
-  vga;
+  vga,
+  s3;
 
 const
   FG_FLIP  = 1;
@@ -28,6 +29,7 @@ type
     // pixel -> grid is divide by 8
     flagGrid: array[0..127, 0..127] of byte;
     fgxMin,fgyMin,fgxMax,fgyMax: integer;
+    s3Driver: tS3Driver;
 
   public
     canvas: tPage;
@@ -81,6 +83,7 @@ begin
   background := nil;
   canvas := nil;
   SHOW_DIRTY_RECTS := false;
+  s3Driver := tS3Driver.create();
   reset();
 end;
 
@@ -125,14 +128,24 @@ begin
    to not cause stutter - S3 is about twice as fast.}
 
   rect.clip(tRect.create(canvas.width, canvas.height));
-  if rect.area = 0 then exit;
+  if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   lfb_seg := videoDriver.LFB_SEG;
   if lfb_seg = 0 then exit;
 
   pixels := canvas.pixels;
 
+  //stub:
+  if keyDown(key_f2) then begin
+    s3Driver.fgColor := rgba.create(rnd,rnd,0);
+    s3Driver.fillRect(rect.x, rect.y, rect.width, rect.height);
+    exit;
+  end;
+
   for y := rect.top to rect.bottom-1 do begin
+
+
+
     ofs := (rect.left + (y * canvas.width))*4;
     len := rect.width;
     asm
@@ -245,22 +258,23 @@ end;
 {indicates that region should fliped this frame, and cleared next frame}
 procedure tScreen.markAndClearRegion(rect: tRect);
 var
-  x,y, sx,sy,ex,ey: integer;
+  x,y, x1,x2,y1,y2: integer;
 begin
+  rect.clip(tRect.create(canvas.width, canvas.height));
   {new method}
-  sx := rect.x div 8;
-  sy := rect.y div 8;
-  ex := rect.right div 8;
-  ey := rect.bottom div 8;
+  x1 := rect.x div 8;
+  y1 := rect.y div 8;
+  x2 := (rect.right-1) div 8;
+  y2 := (rect.bottom -1) div 8;
 
-  for y := sy to ey do
-    for x := sx to ex do
+  for y := y1 to y2 do
+    for x := x1 to x2 do
       flagGrid[x,y] := FG_FLIP + FG_CLEAR;
 
-  fgxMin := min(sx, fgxMin);
-  fgyMin := min(sy, fgyMin);
-  fgxMax := max(ex, fgxMax);
-  fgyMax := max(ey, fgyMax);
+  fgxMin := min(x1, fgxMin);
+  fgyMin := min(y1, fgyMin);
+  fgxMax := max(x2, fgxMax);
+  fgyMax := max(y2, fgyMax);
 end;
 
 {clears all parts of the screen marked for clearing
@@ -336,7 +350,7 @@ var
   paddingX,paddingY: int32;
 begin
   rect.clip(tRect.create(canvas.width, canvas.height));
-  if rect.area = 0 then exit;
+  if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   if assigned(background) then begin
     {calculate padding}
