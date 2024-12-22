@@ -13,12 +13,20 @@ uses
   sprite,
   vga;
 
+const
+  FG_FLIP  = 1;
+  FG_CLEAR = 2;
+
 type
 
   tScreen = object
 
   private
     fViewPort: tRect;
+    // dirty grid
+    // support for up to 1024x128
+    // pixel -> grid is divide by 8
+    flagGrid: array[0..127, 0..127] of byte;
 
   public
     canvas: tPage;
@@ -55,7 +63,7 @@ type
     {dirty handling}
     procedure flipAll();
     procedure clearAll();
-    procedure markRegion(rect: tRect);
+    procedure markAndClearRegion(rect: tRect);
 
   end;
 
@@ -88,6 +96,7 @@ begin
   {todo: if assigned(canvas) then canvas.done;}
   if assigned(canvas) then canvas.Destroy;
   canvas := tPage.Create(videoDriver.width, videoDriver.height);
+  fillchar(flagGrid, sizeof(flagGrid), 0);
 end;
 
 function tScreen.width: word;
@@ -233,41 +242,74 @@ begin
 end;
 
 {indicates that region should fliped this frame, and cleared next frame}
-procedure tScreen.markRegion(rect: tRect);
+procedure tScreen.markAndClearRegion(rect: tRect);
+var
+  x,y, sx,sy,ex,ey: integer;
 begin
+  {new method}
+  sx := rect.x div 8;
+  sy := rect.y div 8;
+  ex := rect.right div 8;
+  ey := rect.bottom div 8;
+
+  for y := sy to ey do
+    for x := sx to ex do
+      flagGrid[x,y] := FG_FLIP + FG_CLEAR;
+      (*
   if drCounter >= high(dirtyRegions) then
     error('Sorry, too many dirty regions');
   dirtyRegions[drCounter] := rect;
   if SHOW_DIRTY_RECTS then
     canvas.drawRect(rect, RGBA.create(255,0,255));
   inc(drCounter);
-
+  *)
 end;
 
-{clears all parts of the screen marked previously and removes dirty}
+{clears all parts of the screen marked for clearing
+Also removes clear flag, and sets flip flag}
 procedure tScreen.clearAll();
 var
-  i: integer;
+  x, y: integer;
 begin
+  for y := 0 to (canvas.height div 8)-1 do
+    for x := 0 to (canvas.width div 8)-1 do
+      if (flagGrid[x,y] and FG_CLEAR) = FG_CLEAR then begin
+        clearRegion(tRect.create(x*8, y*8, 8, 8));
+        flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
+      end;
+(*
   for i := 0 to drCounter-1 do
     clearRegion(dirtyRegions[i]);
   move(dirtyRegions, previousDirtyRegions, sizeof(dirtyRegions));
   prevDrCounter := drCounter;
   fillchar(dirtyRegions, sizeof(dirtyRegions), 0);
   drCounter := 0;
+  *)
 end;
 
 
+{flips all valid regions}
+{clears flip flag}
 procedure tScreen.flipAll();
 var
-  i: integer;
+  x,y: integer;
 begin
+  for y := 0 to (canvas.height div 8)-1 do
+    for x := 0 to (canvas.width div 8)-1 do
+      if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
+        //stub:
+        canvas.setPixel(x*8+4, y*8+4, rgba.create(0, rnd, 0));
+        copyRegion(tRect.create(x*8, y*8, 8, 8));
+        flagGrid[x,y] := flagGrid[x,y] xor FG_FLIP;
+      end;
+(*
   for i := 0 to drCounter-1 do
     self.copyRegion(dirtyRegions[i]);
   {unfortunately we also have to flip any previous regions as these will have
    been cleared. Switcing to a grid system will resolve the overlap with this.}
   for i := 0 to prevDrCounter-1 do
     self.copyRegion(previousDirtyRegions[i]);
+    *)
 end;
 
 procedure tScreen.waitVSync();
@@ -290,9 +332,6 @@ var
   y,yMin,yMax: int32;
   paddingX,paddingY: int32;
 begin
-  {todo: support S3 upload (but maybe make sure regions are small enough
-   to not cause stutter - S3 is about twice as fast.}
-
   rect.clip(tRect.create(canvas.width, canvas.height));
   if rect.area = 0 then exit;
 

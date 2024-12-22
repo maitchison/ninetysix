@@ -113,7 +113,7 @@ begin
   else
     carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
 
-  screen.markRegion(tRect.create(dx, dy, 0, 0).padded(PADDING));
+  screen.markAndClearRegion(tRect.create(dx, dy, 0, 0).padded(PADDING));
 end;
 
 {returns decay factor for with given halflife (in seconds) over current
@@ -175,7 +175,7 @@ begin
   r := textExtents(s).padded(2);
   r.x += dx;
   r.y += dy;
-  screen.markRegion(r);
+  screen.markAndClearRegion(r);
   textOut(
     screen.canvas,
     dx, dy, s,
