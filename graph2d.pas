@@ -43,7 +43,7 @@ type
     function right: int32; inline;
 
     procedure clear();
-    procedure clip(const other: tRect);
+    procedure clipTo(const other: tRect);
 
     function toString: string;
 
@@ -174,7 +174,7 @@ end;
 
 {clips this rect to another, i.e. returns their intersection.
 if two rectangles do not intersect sets rect to (0,0,0,0)}
-procedure tRect.clip(const other: tRect);
+procedure tRect.clipTo(const other: tRect);
 var
   ox, oy: int32;
 begin
@@ -211,7 +211,7 @@ begin
 
   a := tRect.create(0,0,50,50);
   b := tRect.create(10,25,10,50);
-  a.clip(b);
+  a.clipTo(b);
   assertEqual(a.toString, '(10,25 10x25)');
 
 

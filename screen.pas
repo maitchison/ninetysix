@@ -20,7 +20,17 @@ const
 
 type
 
-  tScreen = object
+  tScreenStats = record
+    copyRegions: int32;
+    copyCells: int32;
+    clearRegions: int32;
+    clearCells: int32;
+    copyTime: single;
+    clearTime: single;
+    procedure reset();
+  end;
+
+  tScreen = object    //stub: make class
 
   private
     fViewPort: tRect;
@@ -36,16 +46,17 @@ type
     background: tSprite;
     backgroundColor: RGBA;
     SHOW_DIRTY_RECTS: boolean;
+    stats: tScreenStats;
+    bounds: tRect;    // logical bounds of canvas
 
   private
     procedure copyLine(x1, x2, y: int32);
   public
 
-    constructor create(); // todo: change to init
+    constructor create();
 
     function width: word;
     function height: word;
-    function rect: tRect;
 
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
@@ -77,8 +88,16 @@ uses
 
 {-------------------------------------------------}
 
+procedure tScreenStats.reset();
+begin
+  fillchar(self, sizeof(self), 0);
+end;
+
+{-------------------------------------------------}
+
 constructor tScreen.Create();
 begin
+  //inherited create(); //stub: add back in
   backgroundColor.init(0,0,0,255);
   background := nil;
   canvas := nil;
@@ -99,6 +118,10 @@ begin
   fgyMin := (canvas.height div 8)-1;
   fgxMax := 0;
   fgyMax := 0;
+
+  bounds := tRect.create(width, height);
+
+  stats.reset();
 end;
 
 function tScreen.width: word;
@@ -109,11 +132,6 @@ end;
 function tScreen.height: word;
 begin
   result := canvas.height;
-end;
-
-function tScreen.rect(): tRect;
-begin
-  result := tRect.create(width, height);
 end;
 
 {copies region from canvas to screen.}
@@ -127,7 +145,7 @@ begin
   {todo: support S3 upload (but maybe make sure regions are small enough
    to not cause stutter - S3 is about twice as fast.}
 
-  rect.clip(tRect.create(canvas.width, canvas.height));
+  rect.clipTo(bounds);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   lfb_seg := videoDriver.LFB_SEG;
@@ -135,7 +153,7 @@ begin
 
   pixels := canvas.pixels;
 
-  //stub:
+  // show debug regions
   if keyDown(key_f2) then begin
     s3Driver.fgColor := rgba.create(rnd,rnd,0);
     s3Driver.fillRect(rect.x, rect.y, rect.width, rect.height);
@@ -143,9 +161,6 @@ begin
   end;
 
   for y := rect.top to rect.bottom-1 do begin
-
-
-
     ofs := (rect.left + (y * canvas.width))*4;
     len := rect.width;
     asm
@@ -260,7 +275,7 @@ procedure tScreen.markAndClearRegion(rect: tRect);
 var
   x,y, x1,x2,y1,y2: integer;
 begin
-  rect.clip(tRect.create(canvas.width, canvas.height));
+  rect.clipTo(bounds);
   {new method}
   x1 := rect.x div 8;
   y1 := rect.y div 8;
@@ -283,26 +298,33 @@ procedure tScreen.clearAll();
 var
   x, y: integer;
   xStart, rle: integer;
+  startTime: double;
 begin
+  stats.clearCells := 0; stats.clearRegions := 0;
+  startTime := getSec;
   for y := fgyMin to fgyMax do begin
     rle := 0;
-    for x :=
-    fgxMin to fgxMax do begin
+    for x := fgxMin to fgxMax do begin
       if (flagGrid[x,y] and FG_CLEAR) = FG_CLEAR then begin
         if rle = 0 then xStart := x;
+        inc(stats.clearCells);
         inc(rle);
         flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
       end else begin
-        if rle > 0 then
+        if rle > 0 then begin
           clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
-        rle := 0;
+          stats.clearRegions += 1;
+          rle := 0;
+        end;
       end;
     end;
-    if rle > 0 then
+    if rle > 0 then begin
       clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+      stats.clearRegions += 1;
+    end;
   end;
+  stats.clearTime := getSec - startTime;
 end;
-
 
 {flips all valid regions}
 {clears flip flag}
@@ -310,23 +332,32 @@ procedure tScreen.flipAll();
 var
   x,y: integer;
   xStart, rle: integer;
+  startTime: double;
 begin
+  stats.copyCells := 0; stats.copyRegions := 0;
+  startTime := getSec;
   for y := fgyMin to fgYMax do begin
     rle := 0;
     for x := fgXMin to fgXMax do begin
       if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
         if rle = 0 then xStart := x;
+        inc(stats.copyCells);
         inc(rle);
         flagGrid[x,y] := (flagGrid[x,y] xor FG_FLIP)
       end else begin
-        if rle > 0 then
+        if rle > 0 then begin
           copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
-        rle := 0;
+          stats.copyRegions += 1;
+          rle := 0;
+        end;
       end;
     end;
-    if rle > 0 then
+    if rle > 0 then begin
       copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+      stats.copyRegions += 1;
+    end;
   end;
+  stats.copyTime := getSec - startTime;
 end;
 
 procedure tScreen.waitVSync();
@@ -349,7 +380,8 @@ var
   y,yMin,yMax: int32;
   paddingX,paddingY: int32;
 begin
-  rect.clip(tRect.create(canvas.width, canvas.height));
+
+  rect.clipTo(bounds);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   if assigned(background) then begin

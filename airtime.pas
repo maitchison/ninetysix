@@ -104,7 +104,7 @@ begin
   dx := round(pos.x);
   dy := round(pos.rotated(0.955, 0,0).y);
 
-  if not screen.rect.isInside(dx, dy) then exit;
+  if not screen.bounds.isInside(dx, dy) then exit;
 
   startTime := getSec;
   carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.42);
@@ -537,6 +537,7 @@ var
   car: tCar;
   camX, camY: single;
 
+
 begin
   note('Main loop started');
 
@@ -640,7 +641,7 @@ begin
 
   videoDriver.setMode(640,480,32);
 
-  screen.create();
+  screen.create(); // stub: x := x.create();
   mixer.play(music, SCS_FIXED1);
 
   initMouse();
