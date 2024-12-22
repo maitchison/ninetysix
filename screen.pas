@@ -27,6 +27,7 @@ type
     // support for up to 1024x128
     // pixel -> grid is divide by 8
     flagGrid: array[0..127, 0..127] of byte;
+    fgxMin,fgyMin,fgxMax,fgyMax: integer;
 
   public
     canvas: tPage;
@@ -89,7 +90,12 @@ begin
   {todo: if assigned(canvas) then canvas.done;}
   if assigned(canvas) then canvas.Destroy;
   canvas := tPage.Create(videoDriver.width, videoDriver.height);
+
   fillchar(flagGrid, sizeof(flagGrid), 0);
+  fgxMin := (canvas.width div 8)-1;
+  fgyMin := (canvas.height div 8)-1;
+  fgxMax := 0;
+  fgyMax := 0;
 end;
 
 function tScreen.width: word;
@@ -250,6 +256,11 @@ begin
   for y := sy to ey do
     for x := sx to ex do
       flagGrid[x,y] := FG_FLIP + FG_CLEAR;
+
+  fgxMin := min(sx, fgxMin);
+  fgyMin := min(sy, fgyMin);
+  fgxMax := max(ex, fgxMax);
+  fgyMax := max(ey, fgyMax);
 end;
 
 {clears all parts of the screen marked for clearing
@@ -259,9 +270,10 @@ var
   x, y: integer;
   xStart, rle: integer;
 begin
-  for y := 0 to (canvas.height div 8)-1 do begin
+  for y := fgyMin to fgyMax do begin
     rle := 0;
-    for x := 0 to (canvas.width div 8)-1 do begin
+    for x :=
+    fgxMin to fgxMax do begin
       if (flagGrid[x,y] and FG_CLEAR) = FG_CLEAR then begin
         if rle = 0 then xStart := x;
         inc(rle);
@@ -285,9 +297,9 @@ var
   x,y: integer;
   xStart, rle: integer;
 begin
-  for y := 0 to (canvas.height div 8)-1 do begin
+  for y := fgyMin to fgYMax do begin
     rle := 0;
-    for x := 0 to (canvas.width div 8)-1 do begin
+    for x := fgXMin to fgXMax do begin
       if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
         if rle = 0 then xStart := x;
         inc(rle);
