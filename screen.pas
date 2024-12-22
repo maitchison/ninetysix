@@ -61,7 +61,7 @@ type
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
 
-    procedure setViewPort(x,y: int32);
+    procedure setViewPort(x,y: int32;waitRetrace: boolean=false);
 
     procedure reset();
 
@@ -77,7 +77,7 @@ type
     {dirty handling}
     procedure flipAll();
     procedure clearAll();
-    procedure markAndClearRegion(rect: tRect);
+    procedure markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR);
 
   end;
 
@@ -270,7 +270,7 @@ begin
 end;
 
 {indicates that region should fliped this frame, and cleared next frame}
-procedure tScreen.markAndClearRegion(rect: tRect);
+procedure tScreen.markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR);
 var
   x,y, x1,x2,y1,y2: integer;
 begin
@@ -283,7 +283,7 @@ begin
 
   for y := y1 to y2 do
     for x := x1 to x2 do
-      flagGrid[x,y] := FG_FLIP + FG_CLEAR;
+      flagGrid[x,y] := flags;
 
   fgxMin := min(x1, fgxMin);
   fgyMin := min(y1, fgyMin);
@@ -360,16 +360,11 @@ begin
 end;
 
 procedure tScreen.waitVSync();
-var
-  counter: int32;
 begin
-  {will throw an overflow error if too slow}
-  counter := 0;
-  {wait until out of trace}
-  while (portb[$03DA] and $8) <> 0 do inc(counter);
-  {wait until start of retrace}
-  while (portb[$03DA] and $8) = 8 do inc(counter);
-
+  {wait until out (previous partial) vsync pulse}
+  repeat until (portb[$03DA] and $8) = 0;
+  {wait until start of new vsync pulse}
+  repeat until (portb[$03DA] and $8) = 8;
 end;
 
 {clears region on canvas with background color}
@@ -415,7 +410,7 @@ begin
   clearRegion(tRect.create(canvas.width, canvas.height));
 end;
 
-procedure tScreen.setViewPort(x,y: int32);
+procedure tScreen.setViewPort(x,y: int32;waitRetrace: boolean=false);
 begin
   if x < 0 then x := 0;
   if y < 0 then y := 0;
@@ -423,7 +418,7 @@ begin
     x := (canvas.width-videoDriver.physicalWidth);
   if y > (canvas.height-videoDriver.physicalHeight) then
     y := (canvas.height-videoDriver.physicalHeight);
-  videoDriver.setDisplayStart(x,y);
+  videoDriver.setDisplayStart(x,y,waitRetrace);
 end;
 
 {-------------------------------------------------}

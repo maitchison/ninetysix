@@ -46,7 +46,7 @@ type
 
     procedure setMode(width, height, BPP: word); virtual; abstract;
     procedure setLogicalSize(width, height: word); virtual; abstract;
-    procedure setDisplayStart(x, y: word); virtual; abstract;
+    procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); virtual; abstract;
     procedure setText(); virtual; abstract;
     function  isText(): boolean;
   end;

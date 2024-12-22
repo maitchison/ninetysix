@@ -40,7 +40,7 @@ type tVesaDriver = class(tVGADriver)
     procedure logModes();
     procedure setMode(width, height, BPP: word); override;
     procedure setLogicalSize(width, height: word); override;
-    procedure setDisplayStart(x, y: word); override;
+    procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); override;
     function  vesaVersion: single;
     function  videoMemory: dword;
   end;
@@ -292,14 +292,16 @@ begin
 end;
 
 {Set display start address (in pixels)}
-procedure tVesaDriver.setDisplayStart(x, y: word);
+procedure tVesaDriver.setDisplayStart(x, y: word;waitRetrace:boolean=false);
+var
+  code: word;
 begin
+  if waitRetrace then code := $0080 else code := $0000;
   asm
     pusha
 
     mov ax, $4F07
-    mov bh, $00
-    mov bl, $00 // not not wait for vsync
+    mov bx, [code]
 
     mov cx, [x]
     mov dx, [y]

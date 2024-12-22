@@ -97,7 +97,7 @@ var
   dx, dy: int32;
   bounds: tRect;
 const
-  PADDING = 15;
+  CAR_SCALE = 0.5;
 begin
 
   {correct for isometric}
@@ -107,13 +107,13 @@ begin
   if not screen.bounds.isInside(dx, dy) then exit;
 
   startTime := getSec;
-  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, 0.42);
+  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, CAR_SCALE);
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
   else
     carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
 
-  screen.markAndClearRegion(tRect.create(dx, dy, 0, 0).padded(PADDING));
+  screen.markRegion(tRect.create(dx, dy, 0, 0).padded(round(35*CAR_SCALE)));
 end;
 
 {returns decay factor for with given halflife (in seconds) over current
@@ -175,7 +175,7 @@ begin
   r := textExtents(s).padded(2);
   r.x += dx;
   r.y += dy;
-  screen.markAndClearRegion(r);
+  screen.markRegion(r);
   textOut(
     screen.canvas,
     dx, dy, s,
@@ -404,7 +404,9 @@ begin
   else
     mixerCpuUsage := -1;
 
+
   GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
+  screen.markRegion(tRect.create(10, 10, 300, 22), FG_FLIP);
 end;
 
 procedure titleScreen();
@@ -591,6 +593,8 @@ begin
     camY += ((car.pos.rotated(0.955, 0,0).y-CamY)*0.05);
     car.draw();
 
+    drawGUI();
+
     {debugging}
     screen.SHOW_DIRTY_RECTS := keyDown(key_d);
 
@@ -600,12 +604,15 @@ begin
     if keyDown(key_2) then
       car.tireTraction += 10;
 
-    // not really needed
-    //screen.waitVSync();
-    screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
-    screen.flipAll();
+    if keyDown(key_3) then
+      delay(100); // pretend to be slow
 
-    drawGUI();
+    screen.setViewPort(
+      round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2),
+      false
+    );
+    screen.waitVSync();
+    screen.flipAll();
 
     if keyDown(key_q) or keyDown(key_esc) then break;
   end;
