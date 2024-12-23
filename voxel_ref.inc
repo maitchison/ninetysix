@@ -17,10 +17,6 @@ begin
   {this shouldn't happen, but might due to rounding error or bug}
   result.init(255,0,0,255);
 
-  {sometimes initial point is slightly outside. this is due to a bug
-   where we trace edges with the suboptimal face projection.
-   For the moment I'll just step ahead when this happens}
-
   sx := trunc(256*pos.x);
   sy := trunc(256*pos.y);
   sz := trunc(256*pos.z);
@@ -31,6 +27,12 @@ begin
   dx := round(256*dir.x);
   dy := round(256*dir.y);
   dz := round(256*dir.z);
+
+  {clamping sucks, but lets do it}
+  {this is needed due either bugs in my tracer, or precision issues}
+  sx := clamp(sx, 0, size.x*256-1);
+  sy := clamp(sy, 0, size.y*256-1);
+  sz := clamp(sz, 0, size.z*256-1);
 
   voxPtr := voxSprite.vox.pixels;
 
@@ -88,12 +90,15 @@ begin
 
   size := voxSprite.getSize;
 
-  for x := xMin to xMax do begin
+  for x := xMin to xMax-1 do begin
 
     col := trace_REF(voxSprite, pos, dir, size);
 
     if VX_GHOST_MODE then
        col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);
+
+    if VX_UVW_MODE and (col.a = 0) then
+       col.init(trunc(pos.x*4), trunc(pos.y*8), trunc(pos.z*16));
 
     pos += delta;
 

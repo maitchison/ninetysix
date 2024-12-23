@@ -147,7 +147,7 @@ begin
   d16 := V3D16.make256(delta);
   s16 := voxSprite.getSize;
 
-  for x := xMin to xMax do begin
+  for x := xMin to xMax-1 do begin
 
     col := trace_ASM(voxSprite.vox.pixels, p16, v16, s16, voxSprite.fLog2Width, voxSprite.fLog2Height);
     {show trace count}

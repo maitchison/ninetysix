@@ -24,6 +24,7 @@ var
   VX_SHOW_TRACE_EXITS: boolean = false;
   VX_SHOW_CORNERS: boolean = false;
   VX_GHOST_MODE: boolean = false;
+  VX_UVW_MODE: boolean = false;
 
 
 {restrictions
@@ -303,11 +304,10 @@ var
       tmp := a; a := b; b := tmp;
     end;
 
-    {I think this is off by 1}
     x := a.x;
     deltaX := (b.x-a.x) / (b.y-a.y);
     for y := a.y to b.y do begin
-      screenLines[y].adjust(trunc(x));
+      screenLines[y].adjust(round(x));
       x += deltaX;
     end;
   end;
@@ -328,6 +328,7 @@ var
     value: integer;
     c1,c2,c3,c4: RGBA;
     s1,s2,s3,s4: tPoint;
+    adjustedAtPos: V3D;
 
   begin
     {do not render back face}
@@ -399,14 +400,18 @@ var
     end;
     deltaX := cameraX + cameraZ*tDelta;
 
-    for y := yMin to yMax do begin
+    {we adjust the position so that we trace through the center of the pixel.
+     tracing the topleft would give rounding problems}
+    adjustedAtPos := atPos - V3D.create(0.5, 0.5, 0);
+
+    for y := yMin to yMax-1 do begin
 
       if screenLines[y].xMax < screenLines[y].xMin then
         continue;
 
       {find the ray's origin given current screenspace coord}
       //todo: support pos.z
-      pos := (cameraX*(screenLines[y].xMin-atPos.x))+(cameraY*(y-atPos.y));
+      pos := (cameraX*(screenLines[y].xMin-adjustedAtPos.x))+(cameraY*(y-adjustedAtPos.y));
 
       case faceID of
         1: t := (-size.z-pos.z) * invZ;
@@ -418,7 +423,7 @@ var
         else t := 0;
       end;
 
-      pos += cameraZ * (t+0.5); {start half way in a voxel}
+      pos += cameraZ * (t+0.50); {start half way in a voxel}
       pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
 
       if cpuInfo.hasMMX then

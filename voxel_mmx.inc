@@ -22,20 +22,26 @@ begin
   if dword(@(v16)) and $7 <> 0 then error('Alignment issue');
   *)
 
-  bias := V3D.create(0.499/256, 0.499/256, 0.499/256);
+  // add this bias to cause make256 to truncate instead of round.
+  bias := V3D.create(-0.495/256, -0.495/256, -0.495/256);
 
   {0.3ms for these conversions}
-  p16 := V3D16.make256(pos-bias);
+  p16 := V3D16.make256(pos+bias);
   v16 := V3D16.make256(dir);
   s16 := V3D16.make(256*voxSprite.fWidth-1, 256*voxSprite.fHeight-1, 256*voxSprite.fDepth-1);
   d16 := V3D16.make256(delta);
+
+  {this is needed due either bugs in my tracer, or precision issues}
+  p16.x := clamp(p16.x, 0, s16.x);
+  p16.y := clamp(p16.y, 0, s16.y);
+  p16.z := clamp(p16.z, 0, s16.z);
 
   shiftCode := voxSprite.fLog2Height + voxSprite.fLog2Width * 256;
 
   pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
   voxPtr := voxSprite.vox.pixels;
 
-  xCounter := (xMax-xMin)+1; // inclusive
+  xCounter := (xMax-xMin); // exlusive of final pixel
   if xCounter <= 0 then exit;
 
   asm

@@ -503,8 +503,6 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 
-    {subRegion.blit(screen.canvas, 320-30, 360-30);}
-
     if mouse_b and $1 = $1 then begin
       xAngle := (mouse_x-320)/640*360;
       zAngle := (mouse_y-240)/480*360;
