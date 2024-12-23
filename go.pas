@@ -37,25 +37,29 @@ uses
   hashMap,
   dos;
 
+// not sure if needed, but wait for external filesystem to catch up.
+procedure fsWait();
+begin
+  delay(200);
+end;
+
 {copies all '.pas' files from current path to destination folder.
 if destination folder exists it is renamed, and then a new folder is
 created. If back exists, it is removed.}
-
 procedure safeCopy(destinationPath: string);
 begin
-
-  // not sure if needed, but wait for external filesystem to catch up.
-  delay(1000);
-
   //stub
   destinationPath := trim(destinationPath);
   dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+  fsWait;
   dos.exec(getEnv('COMSPEC'), '/C ren '+destinationPath+' '+destinationPath+'_tmp');
+  fsWait;
   try
     mkDIR(destinationPath);
   except
     // ignore
   end;
+  fsWait;
   dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
