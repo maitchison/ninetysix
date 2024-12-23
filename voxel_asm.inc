@@ -136,15 +136,11 @@ var
   x: int16;
   col: RGBA;
   p16, v16, d16, s16: V3D16;
-  bias: V3D;
 begin
 
-  // make256 will use round, this converts it into a trunc}
-  bias := V3D.create(0.499/256, 0.499/256, 0.499/256);
-
-  p16 := V3D16.make256(pos-bias);
-  v16 := V3D16.make256(dir);
-  d16 := V3D16.make256(deltaX);
+  p16 := V3D16.trunc(pos*256);
+  v16 := V3D16.round(dir*256);
+  d16 := V3D16.round(deltaX*256);
   s16 := voxSprite.getSize;
 
   for x := xMin to xMax-1 do begin

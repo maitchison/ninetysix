@@ -1,6 +1,7 @@
 {globals for 8-byte alignment}
 var
   p16, v16, s16, d16: V3D16;
+  p32, d32: V3D32;
 
 {
   pos: position in voxelspace at xMin
@@ -11,7 +12,6 @@ var
   xCounter: int32;
   zCounter: int32;
   shiftCode: word;
-  bias: V3D;
   depth: byte;
 begin
 
@@ -22,14 +22,15 @@ begin
   if dword(@(v16)) and $7 <> 0 then error('Alignment issue');
   *)
 
-  // add this bias to cause make256 to truncate instead of round.
-  bias := V3D.create(-0.495/256, -0.495/256, -0.495/256);
-
   {0.3ms for these conversions}
-  p16 := V3D16.make256(pos+bias);
-  v16 := V3D16.make256(dir);
+  p16 := V3D16.trunc(pos*256);
+  v16 := V3D16.round(dir*256);
   s16 := V3D16.make(256*voxSprite.fWidth-1, 256*voxSprite.fHeight-1, 256*voxSprite.fDepth-1);
-  d16 := V3D16.make256(deltaX);
+  d16 := V3D16.round(deltaX*256);
+
+  // higher precision
+  p32 := V3D32.trunc(pos*256*65536);
+  d32 := V3D32.round(deltaX*256*65536);
 
   {this is needed due either bugs in my tracer, or precision issues}
   p16.x := clamp(p16.x, 0, s16.x);

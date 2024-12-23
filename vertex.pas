@@ -55,10 +55,26 @@ type
   V3D16 = packed record
     x, y, z, w: int16;
 
-    function toV3D(): V3D; inline; overload;
+    function toV3D(): V3D; inline;
+    function toString(): shortstring;
+
     class function make(x, y, z: int16): V3D16; static; inline; overload;
-    class function make(a: V3D): V3D16; static; inline; overload;
-    class function make256(a: V3D): V3D16; static; inline;
+    class function round(a: V3D): V3D16; static; inline;
+    class function trunc(a: V3D): V3D16; static; inline;
+    end;
+
+  {Int32 vector}
+  V3D32 = packed record
+    x, y, z, w: int32;
+
+    function toString(): shortstring;
+    function toV3D(): V3D; inline;
+
+    function low(): V3D16; inline;
+    function high(): V3D16; inline;
+
+    class function round(a: V3D): V3D32; static; inline;
+    class function trunc(a: V3D): V3D32; static; inline;
     end;
 
 type
@@ -94,7 +110,7 @@ begin
     result := sqrt(abs2);
 end;
 
-function V2D.ToString(): shortstring;
+function V2D.toString(): shortstring;
 begin
     result := format('(%f, %f)', [x, y]);
 end;
@@ -138,7 +154,6 @@ begin
     result := sqrt(abs2);
 end;
 
-
 function V3D.toString(): shortstring;
 begin
     result := Format('(%f, %f, %f)', [x, y, z]);
@@ -149,7 +164,7 @@ var
   len: single;
 begin
   len := self.Abs();
-  if len = 0 then exit;
+  if len = 0 then exit(self);
   result.x := x / len;
   result.y := y / len;
   result.z := z / len;
@@ -355,6 +370,8 @@ var
   i,j,k: integer;
   value: single;
 begin
+  // not needed, but stop compiler complaining
+  fillchar(result, sizeof(result), 0);
   for i := 1 to 4 do
     for j := 1 to 4 do begin
       value := 0;
@@ -401,12 +418,17 @@ end;
 
 {-----------------------------------------------------}
 
-function V3D16.toV3D(): V3D; inline; overload;
+function V3D16.toV3D(): V3D; inline;
 begin
   result.x := x;
   result.y := y;
   result.z := z;
   result.w := w;
+end;
+
+function V3D16.toString(): shortstring;
+begin
+    result := Format('(%d, %d, %d)', [x, y, z]);
 end;
 
 class function V3D16.make(x, y, z: int16): V3D16; static; inline; overload;
@@ -417,38 +439,88 @@ begin
   result.w := 0;
 end;
 
-class function V3D16.make(a: V3D): V3D16; static; inline; overload;
+class function V3D16.round(a: V3D): V3D16; static; inline;
 begin
   {$R-,Q-}
-  result.x := round(a.x);
-  result.y := round(a.y);
-  result.z := round(a.z);
+  result.x := system.round(a.x);
+  result.y := system.round(a.y);
+  result.z := system.round(a.z);
   result.w := 0;
   {$R+,Q+}
 end;
 
-class function V3D16.make256(a: V3D): V3D16;
+class function V3D16.trunc(a: V3D): V3D16; static; inline;
 begin
-  (*
-    // below does not work
-    // note: could be done with adding to the expontent,
-    // but fmul is fast enough.
-    fld dword ptr [v.x]
-    fmul dword ptr [c256]
-    fistp word ptr [o.x]
-    fld dword ptr [v.y]
-    fmul dword ptr [c256]
-    fistp word ptr [o.y]
-    fld dword ptr [v.z]
-    fmul dword ptr [c256]
-    fistp word ptr [o.z]
-    mov [o.w], 0
-  *)
-
   {$R-,Q-}
-  result.x := round(a.x * 256.0);
-  result.y := round(a.y * 256.0);
-  result.z := round(a.z * 256.0);
+  result.x := system.trunc(a.x);
+  result.y := system.trunc(a.y);
+  result.z := system.trunc(a.z);
+  result.w := 0;
+  {$R+,Q+}
+end;
+
+{-----------------------------------------------------}
+
+function V3D32.toV3D(): V3D; inline;
+begin
+  result.x := x;
+  result.y := y;
+  result.z := z;
+  result.w := w;
+end;
+
+function V3D32.toString(): shortstring;
+begin
+    result := Format('(%d, %d, %d)', [x, y, z]);
+end;
+
+{returns low words as vector}
+function V3D32.low(): V3D16; assembler;
+  asm
+    push bx
+    mov bx, [eax+0]
+    mov word ptr [result+0], bx
+    mov bx, [eax+4]
+    mov word ptr [result+2], bx
+    mov bx, [eax+8]
+    mov word ptr [result+4], bx
+    mov bx, [eax+12]
+    mov word ptr [result+8], bx
+    pop bx
+  end;
+
+{returns high words as vector}
+function V3D32.high(): V3D16; assembler;
+  asm
+    push bx
+    mov bx, [eax+2]
+    mov word ptr [result+0], bx
+    mov bx, [eax+6]
+    mov word ptr [result+2], bx
+    mov bx, [eax+10]
+    mov word ptr [result+4], bx
+    mov bx, [eax+14]
+    mov word ptr [result+8], bx
+    pop bx
+  end;
+
+
+class function V3D32.round(a: V3D): V3D32; static; inline;
+begin
+  {$R-,Q-}
+  result.x := system.round(a.x);
+  result.y := system.round(a.y);
+  result.z := system.round(a.z);
+  result.w := 0;
+  {$R+,Q+}
+end;
+
+class function V3D32.trunc(a: V3D): V3D32; static; inline;
+begin
+  {$R-,Q-}
+  result.x := system.trunc(a.x);
+  result.y := system.trunc(a.y);
+  result.z := system.trunc(a.z);
   result.w := 0;
   {$R+,Q+}
 end;
@@ -457,8 +529,32 @@ end;
 
 type
   tVertexTest = class(tTestSuite)
+    procedure testV3D32();
     procedure run; override;
   end;
+
+procedure tVertexTest.testV3D32();
+var
+  p: V3D;
+  bias: V3D;
+  p32: V3D32;
+  p16: V3D16;
+begin
+  {make sure low and high look right}
+  p := V3D.create(-100.123, 102.9995, 53.2);
+
+  p16 := V3D16.round(p*256);
+  p32 := V3D32.round(p*256);
+  assertEqual(p32.low.toString, p16.toString);
+  // note we expect the sign to be extended to high words
+  assertEqual(p32.high.toString, V3D16.make(-1,0,0).toString);
+
+  p16 := V3D16.round(p*256);
+  p32 := V3D32.round(p*256*65536);
+  // this might be off by one due to rounding
+  assert((p32.high.toV3D - p16.toV3D).abs2 < 3);
+  assert(p32.low.toString <> V3D16.make(0,0,0).toString);
+end;
 
 procedure tVertexTest.run();
 var
@@ -470,6 +566,9 @@ const
   degrees45 = 0.785398; {45 degrees in radians}
 
 begin
+
+  testV3D32();
+
   p := V3D.create(rnd,rnd,rnd);
   p := p.normed();
   pInitial := p;
