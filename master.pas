@@ -69,7 +69,6 @@ begin
     Create();
 end;
 
-
 destructor tResourceLibrary.Destroy();
 begin
   inherited Destroy();
@@ -110,6 +109,7 @@ var
   t: text;
   ioError: word;
   res: tResource;
+  i: integer;
 begin
   assign(t, filename);
   {$I-}
@@ -189,7 +189,7 @@ var
   resourceLibrary: tResourceLibrary;
 
 const
-  DEFAULT_SRC_FOLDER = 'e:\airtime\';
+  DEFAULT_SRC_FOLDER = 'd:\masters\airtime\';
 
 procedure convertBMP(filename: string;srcPath:string='');
 var
@@ -205,6 +205,14 @@ begin
   textAttr := $07;
   write(pad(filename,14, ' '));
 
+  {make sure it exists}
+  if not exists(srcPath) then begin
+    textAttr := $0C;
+    writeln('[missing]');
+    textAttr := $07;
+    exit;
+  end;
+
   {check if this is already done}
   id := resourceLibrary.findResourceIndex(dstPath);
   if id >= 0 then begin
@@ -213,7 +221,7 @@ begin
       (res.srcFile = srcPath) and
       (res.modifiedTime = fileModifiedTime(res.srcFile)) and
       exists(dstPath)
-      then begin
+    then begin
       textAttr := $02;
       writeln('[skip]');
       textAttr := $07;
@@ -240,14 +248,15 @@ procedure processAll();
 begin
 
   {game stuff}
-  convertBMP('title', 'e:\airtime\title_640.bmp');
-  convertBMP('track1');
-  convertBMP('car1', 'd:\car1.bmp'); // todo: move this to e:\ somehow
+//  convertBMP('title', 'c:\masters\airtime\title_640.bmp');
+//  convertBMP('track1', 'c:\masters\airtime\track1.bmp');
+//  convertBMP('car1', 'c:\masters\airtime\car1.bmp');
+  convertBMP('wheel1', 'c:\masters\airtime\wheel.bmp');
 
   {gui stuff}
-  convertBMP('ec_frame', 'e:\gui\ec_frame.bmp');
-  convertBMP('panel', 'e:\gui\panel.bmp');
-  convertBMP('font', 'e:\font\font.bmp');
+//  convertBMP('ec_frame', 'c:\masters\gui\ec_frame.bmp');
+//  convertBMP('panel', 'c:\masters\gui\panel.bmp');
+//  convertBMP('font', 'c:\masters\font\font.bmp');
 end;
 
 {-------------------------------------------}

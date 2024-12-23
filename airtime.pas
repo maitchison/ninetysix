@@ -38,7 +38,7 @@ var
   engineSFX: tSoundEffect;
   startSFX: tSoundEffect;
   trackSprite: tSprite;
-  carVox: tVoxelSprite;
+  carVox, wheelVox: tVoxelSprite;
 
   {global time keeper}
   elapsed: double = 0;
@@ -376,6 +376,7 @@ begin
   trackSprite := loadSprite('track1');
 
   carVox := tVoxelSprite.loadFromFile('res\car1', 32);
+  wheelVox := tVoxelSprite.loadFromFile('res\wheel1', 8);
 
   if cpuInfo.ram > 40*1024*1024 then
     {16bit music if we have the ram for it}
@@ -490,10 +491,12 @@ begin
     screen.clearRegion(tRect.create(320-(padding div 2), 360-(padding div 2), padding, padding));
 
     startTime := getSec;
+
     if benchmarkMode then begin
       carVox.draw(screen.canvas, 320, 360, 0.3, 0, 0.2, carScale);
     end else
       carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, carScale);
+
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)
     else

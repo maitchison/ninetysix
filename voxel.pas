@@ -49,6 +49,7 @@ type
     constructor create();
     procedure setPage(page: tPage; height: integer);
     class function loadFromFile(filename: string; height: integer): tVoxelSprite; static;
+    function getSize(): V3D16;
     function getVoxel(x,y,z:int32): RGBA;
     procedure setVoxel(x,y,z:int32;c: RGBA);
     procedure draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
@@ -243,6 +244,15 @@ begin
 end;
 
 
+{get size as 16bit vector}
+function tVoxelSprite.getSize(): V3D16;
+begin
+  result.x := fWidth;
+  result.y := fHeight;
+  result.z := fDepth;
+  result.w := 0;
+end;
+
 function tVoxelSprite.getVoxel(x,y,z:int32): RGBA;
 begin
   {todo: fast asm}
@@ -414,7 +424,7 @@ begin
     end;
 
     pos += cameraZ * (t+0.5); {start half way in a voxel}
-    pos += V3D.create(32,16,9); {center object}
+    pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
 
     if cpuInfo.hasMMX then
       traceScanline_MMX(
@@ -465,8 +475,8 @@ begin
   cameraZ := worldToObj.apply(V3D.create(0,0,1)).normed();
 
   {get cube corners}
-  {note: we apply cropping here, actual half size is 32x16x9}
-  size := V3D.create(32,13,9);
+  {note: this would be great place to apply cropping}
+  size := V3D.create(fWidth/2,fHeight/2,fDepth/2);
   {object space -> world space}
   p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z));
   p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z));

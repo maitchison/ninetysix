@@ -1,5 +1,5 @@
 {trace ray at location and direction (in object space)}
-function trace_REF(voxSprite: tVoxelSprite; pos: V3D;dir: V3D): RGBA;
+function trace_REF(voxSprite: tVoxelSprite; pos: V3D;dir: V3D;size: V3D16): RGBA;
 var
   k: integer;
   c: RGBA;
@@ -43,15 +43,15 @@ begin
     y := sy div 256;
     z := sz div 256;
 
-    if (x < 0) or (x >= 64) then begin
+    if (x < 0) or (x >= size.x) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
       exit(RGBA.create(255,0,0));
     end;
-    if (y < 0) or (y >= 32) then begin
+    if (y < 0) or (y >= size.y) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
       exit(RGBA.create(0,255,0));
     end;
-    if (z < 0) or (z >= 18) then begin
+    if (z < 0) or (z >= size.z) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
       exit(RGBA.create(0,0,255));
     end;
@@ -82,12 +82,15 @@ end;
 procedure traceScanline_REF(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
 var
   x: int16;
+  size: V3D16;
   col: RGBA;
 begin
 
+  size := voxSprite.getSize;
+
   for x := xMin to xMax do begin
 
-    col := trace_REF(voxSprite, pos, dir);
+    col := trace_REF(voxSprite, pos, dir, size);
 
     if VX_GHOST_MODE then
        col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);

@@ -10,6 +10,7 @@ var
   pagePtr, voxPtr: pointer;
   xCounter: int32;
   zCounter: int32;
+  shiftCode: word;
   bias: V3D;
   depth: byte;
 begin
@@ -26,8 +27,10 @@ begin
   {0.3ms for these conversions}
   p16 := V3D16.make256(pos-bias);
   v16 := V3D16.make256(dir);
-  s16 := V3D16.make(256*64-1, 256*32-1, 256*18-1);
+  s16 := V3D16.make(256*voxSprite.fWidth-1, 256*voxSprite.fHeight-1, 256*voxSprite.fDepth-1);
   d16 := V3D16.make256(delta);
+
+  shiftCode := voxSprite.fLog2Height + voxSprite.fLog2Width * 256;
 
   pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
   voxPtr := voxSprite.vox.pixels;
@@ -43,6 +46,24 @@ begin
     {x-loop setup}
     mov esi, voxPtr
     mov edi, pagePtr
+
+    // todo: move all memory values into registers
+
+    {
+      EAX tmp
+      EBX tmp
+      ECX tmp
+      EDX tmp
+      ESI srcVoxels
+      EDI dstPixels
+
+      (not in registers)
+      shiftcode       - move to register and use xchg
+      depth           - move to register
+      zCounter        - move to register
+      VX_TRACE_COUNT  - can do this once at the end
+
+    }
 
     {
     MM0    temp
@@ -88,7 +109,6 @@ begin
       test      eax, eax
       jnz @FINISH
 
-
       // lookup our value
       movq      mm0, mm1
       psrlw     mm0, 8
@@ -98,11 +118,13 @@ begin
       mov ebx, eax          // ax = yz
       shr ebx, 16           // bx = 0x
 
+      mov cx, shiftCode
       xor edx, edx
       or dl, bl
-      shl edx, 5
+      shl edx, cl
+      shr cx, 8
       or dl, ah
-      shl edx, 6
+      shl edx, cl
       or dl, al
 
       mov eax, [esi + edx*4]

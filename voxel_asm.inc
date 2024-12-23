@@ -1,5 +1,5 @@
 {trace ray at location and direction (in object space)}
-function trace_ASM(voxPtr: pointer; pos: V3D16;dir: V3D16): RGBA;
+function trace_ASM(voxPtr: pointer; pos: V3D16;dir: V3D16;size: V3D16;logWidth,logHeight: byte): RGBA;
 var
   col: RGBA;
   depth: byte;
@@ -14,10 +14,19 @@ begin
 
     pushad
 
-    mov edi, voxPtr
+    mov esi, voxPtr
     movsx ebx, word ptr pos.x
     movsx ecx, word ptr pos.y
     movsx edx, word ptr pos.z
+
+    {
+      EAX - tmp
+      EBX - x * 256
+      ECX - y * 256
+      EDX - z * 256
+      ESI - voxPixels
+      EDI - tmp
+    }
 
   @LOOP:
 
@@ -25,22 +34,26 @@ begin
     inc VX_TRACE_COUNT
 
     {convert scaled, and check bounds}
-    cmp bh,  64
+    cmp bh,  byte ptr [size.x]
     jae @OUTOFBOUNDS
-    cmp ch,  32
+    cmp ch,  byte ptr [size.y]
     jae @OUTOFBOUNDS
-    cmp dh,  18
+    cmp dh,  byte ptr [size.z]
     jae @OUTOFBOUNDS
 
     // lookup our value
+    push cx         // shift needs cl so we borrow it
     xor eax, eax
     mov al, dh
-    shl eax, 5
+    mov cl, logHeight
+    shl eax, cl
     or al, ch
-    shl eax, 6
+    mov cl, logWidth
+    shl eax, cl
     or al, bh
+    pop cx
 
-    mov eax, [edi + eax*4]
+    mov eax, [esi + eax*4]
 
     // check if we hit something
     cmp eax, 255 shl 24
@@ -122,7 +135,7 @@ procedure traceScanline_ASM(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: 
 var
   x: int16;
   col: RGBA;
-  p16, v16, d16: V3D16;
+  p16, v16, d16, s16: V3D16;
   bias: V3D;
 begin
 
@@ -132,10 +145,11 @@ begin
   p16 := V3D16.make256(pos-bias);
   v16 := V3D16.make256(dir);
   d16 := V3D16.make256(delta);
+  s16 := voxSprite.getSize;
 
   for x := xMin to xMax do begin
 
-    col := trace_ASM(voxSprite.vox.pixels, p16, v16);
+    col := trace_ASM(voxSprite.vox.pixels, p16, v16, s16, voxSprite.fLog2Width, voxSprite.fLog2Height);
     {show trace count}
     if VX_GHOST_MODE then
        col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);
