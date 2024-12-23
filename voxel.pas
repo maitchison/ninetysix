@@ -52,7 +52,7 @@ type
     function getSize(): V3D16;
     function getVoxel(x,y,z:int32): RGBA;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    procedure draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
+    function draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1): tRect;
   end;
 
 implementation
@@ -73,10 +73,6 @@ var
 {----------------------------------------------------}
 
 type
-  tScreenPoint = record
-    x,y: int16;
-  end;
-
   tScreenLine = record
     xMin, xMax: int16;
     procedure reset();
@@ -97,7 +93,6 @@ end;
 
 var
   screenLines: array[0..1024-1] of tScreenLine;
-
 
 {-----------------------------------------------------}
 { Signed distance calculations }
@@ -272,184 +267,170 @@ begin
   vox.setPixel(x,y+z*fHeight, c);
 end;
 
-{draw voxel sprite.}
-procedure tVoxelSprite.draw(canvas: tPage;atX, atY: int16; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1);
+{draw voxel sprite, with position given in world space.
+
+returns the bounding rect of the drawn object.
+}
+function tVoxelSprite.draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1): tRect;
 var
+  c, debugCol: RGBA;
+  faceColor: array[1..6] of RGBA;
   size: V3D; {half size of cuboid}
-  debugCol: RGBA;
-var
-  cameraX: V3D;
-  cameraY: V3D;
-  cameraZ: V3D;
-  objToWorld: tMatrix3X3;
-  worldToObj: tMatrix3X3;
+  cameraX, cameraY, cameraZ: V3D;
+  p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
+  objToWorld: tMatrix4X4;
+  worldToObj: tMatrix4X4;
+  isometricTransform : tMatrix4x4;
   lastTraceCount: int32;
 
-var
-  faceColor: array[1..6] of RGBA;
-
-{traces all pixels within the given polygon.
-points are in world space
-}
-procedure traceFace(faceID: byte; p1,p2,p3,p4: V3D);
-var
-  c: RGBA;
-  cross: single;
-  y, yMin, yMax: int32;
-  s1,s2,s3,s4: tScreenPoint;
-
-function toScreen(p: V3D): tScreenPoint;
-begin
-  result.x := atX + trunc(p.x);
-  result.y := atY + trunc(p.y);
-end;
-
-procedure scanSide(a, b: tScreenPoint);
-var
-  tmp: tScreenPoint;
-  y: int32;
-  x: single;
-  deltaX: single;
-begin
-  if a.y = b.y then begin
-    {special case}
-    y := a.y;
-    screenLines[y].adjust(a.x);
-    screenLines[y].adjust(b.x);
-    exit;
-  end;
-
-  if a.y > b.y then begin
-    tmp := a; a := b; b := tmp;
-  end;
-
-  {I think this is off by 1}
-  x := a.x;
-  deltaX := (b.x-a.x) / (b.y-a.y);
-  for y := a.y to b.y do begin
-    screenLines[y].adjust(trunc(x));
-    x += deltaX;
-  end;
-end;
-
-var
-  x: int32;
-  worldPos: V3D;
-  t: single;
-  pos, basePos, deltaX, deltaY: V3D;
-  tDelta: single;
-  aZ, invZ: single;
-  value: integer;
-  c1,c2,c3,c4: RGBA;
-
-begin
-  {do not render back face}
-  cross := ((p2.x-p1.x) * (p3.y - p1.y)) - ((p2.y - p1.y) * (p3.x - p1.x));
-  if cross <= 0 then exit;
-
-  s1 := toScreen(p1);
-  s2 := toScreen(p2);
-  s3 := toScreen(p3);
-  s4 := toScreen(p4);
-
-  yMin := min(s1.y,s2.y);
-  yMin := min(yMin,s3.y);
-  yMin := min(yMin,s4.y);
-  yMin := max(0, yMin);
-
-  yMax := max(s1.y,s2.y);
-  yMax := max(yMax,s3.y);
-  yMax := max(yMax,s4.y);
-  yMax := min(videoDriver.logicalHeight-1, yMax);
-
-  {debuging, show corners}
-  {
-  c.init(255,0,255);
-  canvas.putPixel(s1.x, s1.y, c);
-  canvas.putPixel(s2.x, s2.y, c);
-  canvas.putPixel(s3.x, s3.y, c);
-  canvas.putPixel(s4.x, s4.y, c);
-  }
-
-  for y := yMin to yMax do
-    screenLines[y].reset();
-
-  {scan the sides of the polygon}
-  scanSide(s1, s2);
-  scanSide(s2, s3);
-  scanSide(s3, s4);
-  scanSide(s4, s1);
-
-  {alternative solid face render (for debugging)}
-  if (faceID in []) then begin
-    for y := yMin to yMax do
-      canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, faceColor[faceID]);
-    exit;
-  end;
-
-  case faceID of
-    1: aZ := cameraZ.z;
-    2: aZ := cameraZ.z;
-    3: aZ := cameraZ.x;
-    4: aZ := cameraZ.x;
-    5: aZ := cameraZ.y;
-    6: aZ := cameraZ.y;
-  end;
-  if aZ = 0 then exit; {should not happen?}
-  invZ := 1/aZ;
-
-  {calculate our deltas}
-  case faceID of
-    1: tDelta := -cameraX.z * invZ;
-    2: tDelta := -cameraX.z * invZ;
-    3: tDelta := -cameraX.x * invZ;
-    4: tDelta := -cameraX.x * invZ;
-    5: tDelta := -cameraX.y * invZ;
-    6: tDelta := -cameraX.y * invZ;
-  end;
-  deltaX := cameraX + cameraZ*tDelta;
-
-  for y := yMin to yMax do begin
-
-    pos := (cameraX*(screenLines[y].xMin-atX))+(cameraY*(y-atY));
-
-    case faceID of
-      1: t := (-size.z-pos.z) * invZ;
-      2: t := (+size.z-pos.z) * invZ;
-      3: t := (-size.x-pos.x) * invZ;
-      4: t := (+size.x-pos.x) * invZ;
-      5: t := (-size.y-pos.y) * invZ;
-      6: t := (+size.y-pos.y) * invZ;
-      else t := 0;
+  procedure scanSide(a, b: tPoint);
+  var
+    tmp: tPoint;
+    y: int32;
+    x: single;
+    deltaX: single;
+  begin
+    if a.y = b.y then begin
+      {special case}
+      y := a.y;
+      screenLines[y].adjust(a.x);
+      screenLines[y].adjust(b.x);
+      exit;
     end;
 
-    pos += cameraZ * (t+0.5); {start half way in a voxel}
-    pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
+    if a.y > b.y then begin
+      tmp := a; a := b; b := tmp;
+    end;
 
-    if cpuInfo.hasMMX then
-      traceScanline_MMX(
-        canvas, self,
-        screenLines[y].xMin, screenLines[y].xMax, y,
-        pos, cameraZ, deltaX
-      )
-    else
-      traceScanline_ASM(
-        canvas, self,
-        screenLines[y].xMin, screenLines[y].xMax, y,
-        pos, cameraZ, deltaX
-      );
+    {I think this is off by 1}
+    x := a.x;
+    deltaX := (b.x-a.x) / (b.y-a.y);
+    for y := a.y to b.y do begin
+      screenLines[y].adjust(trunc(x));
+      x += deltaX;
+    end;
   end;
 
-end;
+  {traces all pixels within the given polygon.
+  points are in world space}
+  procedure traceFace(faceID: byte; p1,p2,p3,p4: V3D);
+  var
+    c: RGBA;
+    cross: single;
+    y, yMin, yMax: int32;
+    x: int32;
+    worldPos: V3D;
+    t: single;
+    pos, basePos, deltaX, deltaY: V3D;
+    tDelta: single;
+    aZ, invZ: single;
+    value: integer;
+    c1,c2,c3,c4: RGBA;
+    s1,s2,s3,s4: tPoint;
 
+  begin
+    {do not render back face}
+    cross := ((p2.x-p1.x) * (p3.y - p1.y)) - ((p2.y - p1.y) * (p3.x - p1.x));
+    if cross <= 0 then exit;
 
-var
-  c: RGBA;
-  p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
-  isometricTransform : tMatrix3x3;
+    s1 := p1.toPoint;
+    s2 := p2.toPoint;
+    s3 := p3.toPoint;
+    s4 := p4.toPoint;
+
+    yMin := min(s1.y, s2.y);
+    yMin := min(yMin, s3.y);
+    yMin := min(yMin, s4.y);
+    yMin := max(0, yMin);
+
+    yMax := max(s1.y, s2.y);
+    yMax := max(yMax, s3.y);
+    yMax := max(yMax, s4.y);
+    yMax := min(videoDriver.logicalHeight-1, yMax);
+
+    //todo: do not render offscreen sides
+
+    {debuging, show corners}
+
+    c.init(255,0,255);
+    canvas.putPixel(s1.x, s1.y, c);
+    canvas.putPixel(s2.x, s2.y, c);
+    canvas.putPixel(s3.x, s3.y, c);
+    canvas.putPixel(s4.x, s4.y, c);
+
+    for y := yMin to yMax do
+      screenLines[y].reset();
+
+    {scan the sides of the polygon}
+    scanSide(s1, s2);
+    scanSide(s2, s3);
+    scanSide(s3, s4);
+    scanSide(s4, s1);
+
+    {alternative solid face render (for debugging)}
+    if (faceID in []) then begin
+      for y := yMin to yMax do
+        canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, faceColor[faceID]);
+      exit;
+    end;
+
+    case faceID of
+      1: aZ := cameraZ.z;
+      2: aZ := cameraZ.z;
+      3: aZ := cameraZ.x;
+      4: aZ := cameraZ.x;
+      5: aZ := cameraZ.y;
+      6: aZ := cameraZ.y;
+    end;
+    if aZ = 0 then exit; {should not happen?}
+    invZ := 1/aZ;
+
+    {calculate our deltas}
+    case faceID of
+      1: tDelta := -cameraX.z * invZ;
+      2: tDelta := -cameraX.z * invZ;
+      3: tDelta := -cameraX.x * invZ;
+      4: tDelta := -cameraX.x * invZ;
+      5: tDelta := -cameraX.y * invZ;
+      6: tDelta := -cameraX.y * invZ;
+    end;
+    deltaX := cameraX + cameraZ*tDelta;
+
+    for y := yMin to yMax do begin
+
+      {find the ray's origin given current screenspace coord}
+      //todo: support pos.z
+      pos := (cameraX*(screenLines[y].xMin-atPos.x))+(cameraY*(y-atPos.y));
+
+      case faceID of
+        1: t := (-size.z-pos.z) * invZ;
+        2: t := (+size.z-pos.z) * invZ;
+        3: t := (-size.x-pos.x) * invZ;
+        4: t := (+size.x-pos.x) * invZ;
+        5: t := (-size.y-pos.y) * invZ;
+        6: t := (+size.y-pos.y) * invZ;
+        else t := 0;
+      end;
+
+      pos += cameraZ * (t+0.5); {start half way in a voxel}
+      pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
+
+      if cpuInfo.hasMMX then
+        traceScanline_MMX(
+          canvas, self,
+          screenLines[y].xMin, screenLines[y].xMax, y,
+          pos, cameraZ, deltaX
+        )
+      else
+        traceScanline_ASM(
+          canvas, self,
+          screenLines[y].xMin, screenLines[y].xMax, y,
+          pos, cameraZ, deltaX
+        );
+    end;
+  end;
 
 begin
-
   VX_TRACE_COUNT := 0;
   if scale = 0 then exit;
 
@@ -460,7 +441,7 @@ begin
   faceColor[5].init(0,0,255);
   faceColor[6].init(0,0,128);
 
-  isometricTransform.rotationX(-0.955);
+  isometricTransform.rotationX(-0.615); //~35 degrees
   objToWorld.rotationXYZ(roll, 0, zAngle);
 
   objToWorld := objToWorld.MM(isometricTransform);
@@ -470,22 +451,30 @@ begin
   objToWorld.applyScale(scale);
   worldToObj.applyScale(1/scale);
 
-  cameraX := worldToObj.apply(V3D.create(1,0,0));
-  cameraY := worldToObj.apply(V3D.create(0,1,0));
-  cameraZ := worldToObj.apply(V3D.create(0,0,1)).normed();
+  {for the moment just hack the transform in here}
+  objToWorld.setM(4,1, atPos.x);
+  objToWorld.setM(4,2, atPos.y);
+  objToWorld.setM(4,3, atPos.z);
+  worldToObj.setM(4,1, -atPos.x);
+  worldToObj.setM(4,2, -atPos.y);
+  worldToObj.setM(4,3, -atPos.z);
+
+  cameraX := worldToObj.apply(V3D.create(1,0,0,0));
+  cameraY := worldToObj.apply(V3D.create(0,1,0,0));
+  cameraZ := worldToObj.apply(V3D.create(0,0,1,0)).normed();
 
   {get cube corners}
   {note: this would be great place to apply cropping}
   size := V3D.create(fWidth/2,fHeight/2,fDepth/2);
   {object space -> world space}
-  p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z));
-  p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z));
-  p3 := objToWorld.apply(V3D.create(+size.x, +size.y, -size.z));
-  p4 := objToWorld.apply(V3D.create(-size.x, +size.y, -size.z));
-  p5 := objToWorld.apply(V3D.create(-size.x, -size.y, +size.z));
-  p6 := objToWorld.apply(V3D.create(+size.x, -size.y, +size.z));
-  p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z));
-  p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z));
+  p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z, 1));
+  p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z, 1));
+  p3 := objToWorld.apply(V3D.create(+size.x, +size.y, -size.z, 1));
+  p4 := objToWorld.apply(V3D.create(-size.x, +size.y, -size.z, 1));
+  p5 := objToWorld.apply(V3D.create(-size.x, -size.y, +size.z, 1));
+  p6 := objToWorld.apply(V3D.create(+size.x, -size.y, +size.z, 1));
+  p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z, 1));
+  p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z, 1));
 
   {trace each side of the cubeoid}
   traceFace(1, p1, p2, p3, p4);
@@ -494,6 +483,17 @@ begin
   traceFace(4, p2, p6, p7, p3);
   traceFace(5, p5, p6, p2, p1);
   traceFace(6, p4, p3, p7, p8);
+
+  {return our bounds}
+  result := tRect.create(p1.toPoint.x,p1.toPoint.y,0,0);
+  result.expandToInclude(p2.toPoint);
+  result.expandToInclude(p3.toPoint);
+  result.expandToInclude(p4.toPoint);
+  result.expandToInclude(p5.toPoint);
+  result.expandToInclude(p6.toPoint);
+  result.expandToInclude(p7.toPoint);
+  result.expandToInclude(p8.toPoint);
+
 end;
 
 

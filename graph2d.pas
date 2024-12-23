@@ -24,9 +24,10 @@ type
     constructor create(width, height: int32); overload;
     constructor create(left, top, width, height: int32); overload;
     procedure pad(padding: int32);
-    function padded(padding: int32): tRect;
+    function  padded(padding: int32): tRect;
 
-    function isInside(x,y: int32): boolean;
+    procedure expandToInclude(p: tPoint);
+    function  isInside(x,y: int32): boolean;
     class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
     class operator Explicit(a: TRect): ShortString;
 
@@ -186,6 +187,15 @@ begin
   if (width <= 0) or (height <= 0) then clear();
 end;
 
+{expects rect to include new point (if needed)}
+procedure tRect.expandToInclude(p: tPoint);
+begin
+  x := min(x, p.x);
+  y := min(y, p.y);
+  width := max(width, p.x - x);
+  height := max(height, p.y - y);
+end;
+
 function tRect.isInside(x,y: int32): boolean;
 begin
   result := (x >= left) and (y >= top) and (x < right) and (y < bottom);
@@ -198,13 +208,16 @@ end;
 
 {--------------------------------------------------}
 
-procedure runTests();
+type
+  tGraph2DTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tGraph2DTest.run();
 var
   a,b: tRect;
   r: tRect;
 begin
-
-  note('[test] Graph2d');
 
   r := tRect.create(10,10,50,50);
   AssertEqual(r.toString, '(10,10 50x50)');
@@ -214,9 +227,24 @@ begin
   a.clipTo(b);
   assertEqual(a.toString, '(10,25 10x25)');
 
+  {make sure we have left/right top/bottom correct.}
+  r := tRect.create(2, 10, 16, 32);
+  assertEqual(r.left, 2);
+  assertEqual(r.top, 10);
+  assertEqual(r.right, 18);
+  assertEqual(r.bottom, 42);
+
+  {check expand to include}
+  r := tRect.create(12, 14, 0, 0);
+  r.expandToInclude(tPoint.create(15, 3));
+  r.expandToInclude(tPoint.create(22, 19));
+  assertEqual(r.left, 12);
+  assertEqual(r.top, 3);
+  assertEqual(r.right, 22);
+  assertEqual(r.bottom, 19);
 
 end;
 
-begin
-  runTests();
+initialization
+  tGraph2DTest.create('Graph2D');
 end.

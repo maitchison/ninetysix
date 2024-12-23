@@ -8,7 +8,8 @@ interface
 uses
   test,
   debug,
-  utils;
+  utils,
+  graph2d;
 
 type V2D = packed record
     x, y: single;
@@ -37,8 +38,9 @@ type
     function toString(): shortstring;
     function normed(): V3D;
 
-    constructor create(x, y, z: single);
+    constructor create(x, y, z: single; w:single=0);
 
+    function toPoint: tPoint; inline;
     function rotated(thetaX, thetaY, thetaZ: single): V3D;
     function dot(other: V3D): single;
     procedure clip(maxLen: single);
@@ -53,16 +55,18 @@ type
   V3D16 = packed record
     x, y, z, w: int16;
 
+    function toV3D(): V3D; inline; overload;
     class function make(x, y, z: int16): V3D16; static; inline; overload;
     class function make(a: V3D): V3D16; static; inline; overload;
     class function make256(a: V3D): V3D16; static; inline;
     end;
 
 type
-  tMatrix3x3 = record
-    data: array[1..9] of single;
+  tMatrix4x4 = record
+    data: array[1..16] of single;
 
-    function M(i,j: integer): single; inline;
+    function getM(i,j: integer): single; inline;
+    procedure setM(i,j: integer;value: single); inline;
 
     function apply(p: V3D): V3D;
     procedure applyScale(factor: single);
@@ -72,9 +76,9 @@ type
     procedure rotationZYX(thetaZ, thetaY, thetaX: single);
     procedure rotationXYZ(thetaX, thetaY, thetaZ: single);
 
-    function MM(other: tMatrix3x3): tMatrix3x3;
-    function transposed(): tMatrix3x3;
-    function cloned(): tMatrix3x3;
+    function MM(other: tMatrix4x4): tMatrix4x4;
+    function transposed(): tMatrix4x4;
+    function cloned(): tMatrix4x4;
     function toString(): string;
   end;
 
@@ -182,6 +186,12 @@ begin
     result.z := a.z * b.z;
 end;
 
+function V3D.toPoint: tPoint; inline;
+begin
+  result.x := trunc(self.x);
+  result.y := trunc(self.y);
+end;
+
 function V3D.rotated(thetaX, thetaY, thetaZ: single): V3D;
 var
   nX,nY,nZ: single;
@@ -216,11 +226,12 @@ begin
   result := x*other.x + y*other.y + z*other.z;
 end;
 
-constructor V3D.Create(x, y, z: single);
+constructor V3D.Create(x, y, z: single; w: single=0);
 begin
     self.x := x;
     self.y := y;
     self.z := z;
+    self.w := w;
 end;
 
 procedure V3D.clip(maxLen: single);
@@ -231,27 +242,33 @@ end;
 
 {---------------------------------------------------}
 
-function tMatrix3x3.M(i,j: integer): single; inline;
+function tMatrix4x4.getM(i,j: integer): single; inline;
 begin
-  result := data[i+(j-1)*3];
+  result := data[i+(j-1)*4];
 end;
 
-function tMatrix3x3.apply(p: V3D): V3D;
+procedure tMatrix4x4.setM(i,j: integer;value: single); inline;
 begin
-  result.x := data[1]*p.x + data[2]*p.y + data[3]*p.z;
-  result.y := data[4]*p.x + data[5]*p.y + data[6]*p.z;
-  result.z := data[7]*p.x + data[8]*p.y + data[9]*p.z;
+  data[i+(j-1)*4] := value;
 end;
 
-procedure tMatrix3X3.applyScale(factor: single);
+function tMatrix4x4.apply(p: V3D): V3D;
+begin
+  result.x := data[1]*p.x + data[2]*p.y + data[3]*p.z + data[4]*p.w;
+  result.y := data[5]*p.x + data[6]*p.y + data[7]*p.z + data[8]*p.w;
+  result.z := data[9]*p.x + data[10]*p.y + data[11]*p.z + data[12]*p.w;
+  result.w := p.w; // ignore these
+end;
+
+procedure tMatrix4X4.applyScale(factor: single);
 var
   i: integer;
 begin
-  for i := 1 to 9 do
+  for i := 1 to 16 do
     data[i] *= factor;
 end;
 
-procedure tMatrix3X3.rotationZYX(thetaZ, thetaY, thetaX: single);
+procedure tMatrix4X4.rotationZYX(thetaZ, thetaY, thetaX: single);
 var
   cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
@@ -265,15 +282,22 @@ begin
   data[1] := cosX*cosY;
   data[2] := cosX*sinY*sinZ-sinX*cosZ;
   data[3] := cosX*sinY*cosZ+sinX*sinZ;
-  data[4] := sinX*cosY;
-  data[5] := sinX*sinY*sinZ+cosX*cosZ;
-  data[6] := sinX*sinY*cosZ-cosX*sinZ;
-  data[7] := -sinY;
-  data[8] := cosY*sinZ;
-  data[9] := cosY*cosZ;
+  data[4] := 0;
+  data[5] := sinX*cosY;
+  data[6] := sinX*sinY*sinZ+cosX*cosZ;
+  data[7] := sinX*sinY*cosZ-cosX*sinZ;
+  data[8] := 0;
+  data[9] := -sinY;
+  data[10] := cosY*sinZ;
+  data[11] := cosY*cosZ;
+  data[12] := 0;
+  data[13] := 0;
+  data[14] := 0;
+  data[15] := 0;
+  data[16] := 1;
 end;
 
-procedure tMatrix3X3.rotationXYZ(thetaX, thetaY, thetaZ: single);
+procedure tMatrix4X4.rotationXYZ(thetaX, thetaY, thetaZ: single);
 var
   cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
@@ -286,15 +310,22 @@ begin
   data[1] := cosY*cosZ;
   data[2] := sinX*sinY*cosZ-cosX*sinZ;
   data[3] := cosX*sinY*cosZ+sinX*sinZ;
-  data[4] := cosY*sinZ;
-  data[5] := sinX*sinY*sinZ+cosX*cosZ;
-  data[6] := cosX*sinY*sinZ-sinX*cosZ;
-  data[7] := -sinY;
-  data[8] := sinX*cosY;
-  data[9] := cosX*cosY;
+  data[4] := 0;
+  data[5] := cosY*sinZ;
+  data[6] := sinX*sinY*sinZ+cosX*cosZ;
+  data[7] := cosX*sinY*sinZ-sinX*cosZ;
+  data[8] := 0;
+  data[9] := -sinY;
+  data[10] := sinX*cosY;
+  data[11] := cosX*cosY;
+  data[12] := 0;
+  data[13] := 0;
+  data[14] := 0;
+  data[15] := 0;
+  data[16] := 1;
 end;
 
-procedure tMatrix3X3.rotationX(theta: single);
+procedure tMatrix4X4.rotationX(theta: single);
 var
   cs,sn: single;
 begin
@@ -304,57 +335,79 @@ begin
   data[2] := 0;
   data[3] := 0;
   data[4] := 0;
-  data[5] := cs;
-  data[6] := -sn;
-  data[7] := 0;
-  data[8] := sn;
-  data[9] := cs;
+  data[5] := 0;
+  data[6] := cs;
+  data[7] := -sn;
+  data[8] := 0;
+  data[9] := 0;
+  data[10] := sn;
+  data[11] := cs;
+  data[12] := 0;
+  data[13] := 0;
+  data[14] := 0;
+  data[15] := 0;
+  data[16] := 1;
 end;
 
 {matrix multiplication}
-function tMatrix3X3.MM(other: tMatrix3x3): tMatrix3x3;
+function tMatrix4X4.MM(other: tMatrix4x4): tMatrix4x4;
 var
   i,j,k: integer;
   value: single;
 begin
-  for i := 1 to 3 do
-    for j := 1 to 3 do begin
+  for i := 1 to 4 do
+    for j := 1 to 4 do begin
       value := 0;
-      for k := 1 to 3 do
-        value += M(i,k) * other.M(k,j);
-      result.data[i+((j-1)*3)] := value;
+      for k := 1 to 4 do
+        value += getM(i,k) * other.getM(k,j);
+      result.setM(i, j, value);
     end;
 end;
 
 {returns the transpose}
-function tMatrix3X3.transposed(): tMatrix3x3;
+function tMatrix4X4.transposed(): tMatrix4x4;
 begin
-  result.data[1] := data[1];
-  result.data[2] := data[4];
-  result.data[3] := data[7];
-  result.data[4] := data[2];
-  result.data[5] := data[5];
-  result.data[6] := data[8];
-  result.data[7] := data[3];
-  result.data[8] := data[6];
-  result.data[9] := data[9];
+  result.data[1] := data[1+0];
+  result.data[2] := data[1+4];
+  result.data[3] := data[1+8];
+  result.data[4] := data[1+12];
+  result.data[5] := data[2+0];
+  result.data[6] := data[2+4];
+  result.data[7] := data[2+8];
+  result.data[8] := data[2+12];
+  result.data[9] := data[3+0];
+  result.data[10] := data[3+4];
+  result.data[11] := data[3+8];
+  result.data[12] := data[3+12];
+  result.data[13] := data[4+0];
+  result.data[14] := data[4+4];
+  result.data[15] := data[4+8];
+  result.data[16] := data[4+12];
 end;
 
-function tMatrix3X3.cloned(): tMatrix3x3;
+function tMatrix4X4.cloned(): tMatrix4x4;
 begin
   move(data, result.data, length(data)*sizeof(data[1]));
 end;
 
-function tMatrix3X3.toString(): string;
+function tMatrix4X4.toString(): string;
 var
   i: integer;
 begin
   result := '';
-  for i := 0 to 2 do
-    result += format('%f %f %f', [data[i*3+1],data[i*3+2],data[i*3+3]]) + #13#10;
+  for i := 0 to 3 do
+    result += format('%f %f %f', [data[i*4+1],data[i*4+2],data[i*4+3], data[i*4+4]]) + #13#10;
 end;
 
 {-----------------------------------------------------}
+
+function V3D16.toV3D(): V3D; inline; overload;
+begin
+  result.x := x;
+  result.y := y;
+  result.z := z;
+  result.w := w;
+end;
 
 class function V3D16.make(x, y, z: int16): V3D16; static; inline; overload;
 begin
@@ -411,7 +464,7 @@ procedure tVertexTest.run();
 var
   p, pInitial: V3D;
   target: single;
-  A,B,C: tMatrix3x3;
+  A,B,C: tMatrix4x4;
   i,j: integer;
 const
   degrees45 = 0.785398; {45 degrees in radians}
@@ -447,10 +500,10 @@ begin
   p := A.apply(pInitial);
   B := A.transposed();
   C := A.MM(B);
-  for i := 1 to 3 do
-    for j := 1 to 3 do begin
+  for i := 1 to 4 do
+    for j := 1 to 4 do begin
       if i=j then target := 1 else target := 0;
-      assert(abs(C.M(i,j)-target) < 0.01, 'Inversion did not work: '+#10#13+C.toString);
+      assert(abs(C.getM(i,j)-target) < 0.01, 'Inversion did not work: '+#10#13+C.toString);
     end;
 end;
 

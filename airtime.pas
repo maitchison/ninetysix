@@ -52,6 +52,11 @@ var
   nextBellSound: double = 0;
 
 procedure mainLoop(); forward;
+function decayFactor(const decayTime: single): single; forward;
+procedure debugTextOut(dx,dy: integer; s: string); forward;
+function worldToCanvas(p: V3D): tPoint; forward;
+
+{---------------------------------------------------------------------}
 
 type
   tCar = class
@@ -70,12 +75,15 @@ type
     enginePower: single;
     dragCoefficent: single;
     constantDrag: single;
+    vox: tVoxelSprite;
 
-    constructor create();
+    constructor create(aVox: tVoxelSprite);
+
+    function wheelPosition(dx,dy: integer): V3D;
+
     procedure draw();
     procedure update();
   end;
-
 
 constructor tCar.create();
 begin
@@ -100,30 +108,24 @@ const
   CAR_SCALE = 0.5;
 begin
 
-  {correct for isometric}
-  dx := round(pos.x);
-  dy := round(pos.rotated(0.955, 0,0).y);
-
-  if not screen.bounds.isInside(dx, dy) then exit;
-
   startTime := getSec;
-  carVox.draw(screen.canvas, dx, dy, zAngle, 0, 0, CAR_SCALE);
+  bounds := vox.draw(screen.canvas, pos, zAngle, 0, 0, CAR_SCALE);
+  screen.markRegion(bounds);
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
   else
     carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
-
-  screen.markRegion(tRect.create(dx, dy, 0, 0).padded(round(35*CAR_SCALE)));
 end;
 
-{returns decay factor for with given halflife (in seconds) over current
- elapsed time}
-function decayFactor(const decayTime: single): single;
+{returns wheel positon in world space, e.g. -1, -1 for front left tire}
+function tCar.wheelPosition(dx,dy: integer): V3D;
 var
-  rate: single;
+  p: V3D;
 begin
-  rate := ln(2.0) / decayTime;
-  result := exp(-rate*elapsed);
+  p := vox.getSize.toV3D * 0.5;
+  p := p * V3D.create(dx, dy, 0);
+  p.rotated(zAngle, 0, 0);
+  result := p;
 end;
 
 procedure tCar.tractionSimple();
@@ -168,24 +170,6 @@ begin
 
 end;
 
-procedure debugTextOut(dx,dy: integer; s: string);
-var
-  r: tRect;
-begin
-  r := textExtents(s).padded(2);
-  r.x += dx;
-  r.y += dy;
-  screen.markRegion(r);
-  textOut(
-    screen.canvas,
-    dx, dy, s,
-    RGBA.create(255,255,255)
-  )
-end;
-
-const
-  slipThreshold = 10/180*3.1415926;   {point at which tires start to slip}
-
 procedure tCar.tractionComplex();
 var
   slipAngle, dirAngle, velAngle: single;
@@ -201,8 +185,9 @@ var
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+  // todo: this should be toScreen
   dx := round(pos.x);
-  dy := round(pos.rotated(0.955, 0,0).y);
+  dy := round(pos.rotated(-0.615, 0,0).y);
 
   if elapsed <= 0 then exit;
 
@@ -345,8 +330,9 @@ begin
   vel -= dragForce;
 
   {boundaries}
+  //todo: this should be to screen?
   x := pos.x;
-  y := round(pos.rotated(0.955, 0,0).y);
+  y := round(pos.rotated(-0.615, 0,0).y);
 
   if x < BOUNDARY then vel.x += (BOUNDARY-x) * 1.0;
   if y < BOUNDARY then vel.y += (BOUNDARY-y) * 1.0;
@@ -354,6 +340,40 @@ begin
   if y > 480-BOUNDARY then vel.y -= (y-(480-BOUNDARY)) * 1.0;
 
   tilt *= decayFactor(0.5);
+end;
+
+{---------------------------------------------------------------------}
+
+{applies our isometric transformation}
+function worldToCanvas(p: V3D): tPoint;
+begin
+  result.x := round(p.x);
+  result.y := round(p.rotated(-0.615, 0,0).y);
+end;
+
+procedure debugTextOut(dx,dy: integer; s: string);
+var
+  r: tRect;
+begin
+  r := textExtents(s).padded(2);
+  r.x += dx;
+  r.y += dy;
+  screen.markRegion(r);
+  textOut(
+    screen.canvas,
+    dx, dy, s,
+    RGBA.create(255,255,255)
+  )
+end;
+
+{returns decay factor for with given halflife (in seconds) over current
+ elapsed time}
+function decayFactor(const decayTime: single): single;
+var
+  rate: single;
+begin
+  rate := ln(2.0) / decayTime;
+  result := exp(-rate*elapsed);
 end;
 
 {-------------------------------------------------}
@@ -493,9 +513,9 @@ begin
     startTime := getSec;
 
     if benchmarkMode then begin
-      carVox.draw(screen.canvas, 320, 360, 0.3, 0, 0.2, carScale);
+      carVox.draw(screen.canvas, V3D.create(320, 360, 0), 0.3, 0, 0.2, carScale);
     end else
-      carVox.draw(screen.canvas, 320, 360, xTheta, 0, zTheta, carScale);
+      carVox.draw(screen.canvas, V3D.create(320, 360, 0), xTheta, 0, zTheta, carScale);
 
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)
@@ -568,7 +588,7 @@ begin
 
   mixer.play(startSFX);
 
-  car := tCar.create();
+  car := tCar.create(carVox);
   car.pos := V3D.create(300,300,0);
 
   startClock := getSec;
@@ -593,8 +613,9 @@ begin
 
     car.update();
 
+    // todo: this should be toScreen
     camX += ((car.pos.x-CamX)*0.05);
-    camY += ((car.pos.rotated(0.955, 0,0).y-CamY)*0.05);
+    camY += ((car.pos.rotated(-0.615, 0,0).y-CamY)*0.05);
     car.draw();
 
     drawGUI();
