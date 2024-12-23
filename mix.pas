@@ -1,0 +1,534 @@
+{unit to handle sound mixing}
+unit mix;
+
+{$MODE delphi}
+
+interface
+
+uses
+  test,
+  debug,
+  utils,
+  sound,
+  go32;
+
+CONST
+  NUM_CHANNELS = 4;
+
+type
+
+  {measured in samples (usually from start of program)}
+  tTimeCode = int64;
+  {measure in samples * 256, usually an offset}
+  {limited to 190 seconds (~3 minutes)}
+  tTimeTick = int32;
+
+  tSoundChannelSelection = (
+    SCS_SELFOVERWRITE,    // overwrite is sound is already playing,
+                          // otherwise next free
+    SCS_NEXTFREE,         // find the next free channel
+    SCS_FIXED1,           // use a fixed channel
+    SCS_FIXED2,
+    SCS_FIXED3,
+    SCS_FIXED4
+  );
+
+  tSoundChannel = class
+    id: word;
+    sfx: tSoundEffect;   {the currently playing sound effect}
+    lastUpdateVolume, lastUpdatePitch: single;
+    volume: single;
+    pitch: single;
+    delay: tTimeCode;                     {ticks until sound starts playing}
+    sampleTick: tTimeTick;                {current sample position (in ticks)}
+    looping: boolean;
+    constructor create(id: word);
+    procedure reset();
+    function  inUse(): boolean;
+  end;
+
+  tSoundMixer = class
+    {handles mixing of channels}
+    channels: array[1..NUM_CHANNELS] of tSoundChannel;
+    noiseBuffer: array[0..64*1024] of int32; {+1 so that we can read 64bytes at a time}
+
+    mute: boolean;
+    noise: boolean;
+
+    constructor create();
+    function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
+    function playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+    function play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+  end;
+
+var
+  {our global mixer}
+  mixer: tSoundMixer = nil;
+
+function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
+
+implementation
+
+uses
+  keyboard, {stub}
+  sbdriver;
+
+var
+  scratchBuffer: array[0..8*1024-1] of tAudioSample;
+  scratchBufferF32: array[0..8*1024-1] of tAudioSampleF32;
+  scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32; {$align 8}
+  noiseCounter: dword;
+
+  // debug registers, used to indicate errors during interupt.
+  MIX_ERRORS: dword;
+  MIX_ERROR_STR: shortstring;
+  MIX_WARNINGS: dword;
+  MIX_WARNING_STR: shortstring;
+  MIX_NOTES: dword;
+  MIX_NOTE_STR: shortstring;
+  DR1: int64 = 0;
+  DR2: int64 = 0;
+  DR3: int64 = 0;
+  DR4: int64 = 0;
+
+{Mixer is called during interupt, so stack might be invalid,
+ also, make sure to not throw any errors. These will get turned
+ back on below}
+{$S-,R-,Q-}
+
+{$i mix_ref.inc}
+{$i mix_asm.inc}
+{$i mix_mmx.inc}
+
+{-----------------------------------------------------}
+
+function fake8Bit(value: int32): int32;
+begin
+  exit(value div 65536 * 65536);
+end;
+
+function fakeULAW(value: int32): int32;
+var
+  sign: int32;
+  x,y: single;
+const
+  MU = 256-1;
+  INV_LOG1P_MU = 0.18021017998;
+begin
+  if value < 0 then sign := -1 else sign := 1;
+  x := value / (256*32*1024);             // normalize to -1 to 1
+  y := sign * ln(1+MU*abs(x)) / ln(1+MU); // encode (output is also -1 to 1)}
+  y := trunc(y*128) / 128;                // encode as 8bit, including sign
+  x := sign * (power(1 + MU, abs(y)) - 1) / MU;  // decode
+  result := round(x*256*32*1024);          // we're mixing in 24.8
+end;
+
+procedure mixError(msg: shortstring); inline;
+begin
+  inc(MIX_ERRORS);
+  MIX_ERROR_STR := msg;
+end;
+
+procedure mixWarn(msg: shortstring); inline;
+begin
+  inc(MIX_WARNINGS);
+  MIX_WARNING_STR := msg;
+end;
+
+procedure mixNote(msg: shortstring); inline;
+begin
+  inc(MIX_NOTES);
+  MIX_NOTE_STR := msg;
+end;
+
+function mixAssertLess(value, limit: int64; msg: shortstring): boolean;
+begin
+  if not (value < limit) then begin
+    mixError(msg);
+    DR3 := value;
+    DR4 := limit;
+    exit(false)
+  end;
+  exit(true);
+end;
+
+function mixAssertGreaterOrEqual(value, limit: int64; msg: shortstring): boolean;
+begin
+  if not (value >= limit) then begin
+    mixError(msg);
+    DR3 := value;
+    DR4 := limit;
+    exit(false)
+  end;
+  exit(true);
+end;
+
+{-----------------------------------------------------}
+
+{our big mixdown function}
+{note: this can not be mixer.mixdown, as calls to
+ class methods can cause crashes apparently (due to RTL being invalid)
+}
+function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
+var
+  sfx: tSoundEffect;
+  i,j: int32;
+  noise: int32;
+  sample, finalSample: pointer;
+  bufPos, bufSamples: int32;
+  sampleTick, ticksPerSample: int32;
+  remainingBufferSamples, chunkBufferSamples: int32;
+  chunkSourceTicks, sampleTicksRemaining: int32;
+  volumeChunkStart, volumeChunkEnd: single;
+  channel: tSoundChannel;
+
+  processAudio: tProcessAudioProc;
+
+  DEBUG_CHUNK_COUNTER: int32;
+
+begin
+
+  result := nil;
+
+  {The budget here is about 10ms (for 8ksamples).
+    Even 20MS is sort of ok, as we'd just reduce halve the block size
+    and 10% CPU to audio is probably ok on a P166}
+
+  bufSamples := bufBytes div 4;
+  if bufSamples > (8*1024) then exit;
+  if bufSamples <= 0 then exit;
+  if (mixer = nil) then exit;
+
+  filldword(scratchBufferI32, bufSamples * 2, 0);
+
+  {process each active channel}
+  for j := 1 to NUM_CHANNELS do begin
+
+    if mixer.mute or mixer.noise then continue;
+    channel := mixer.channels[j];
+
+    if channel.inUse then begin
+
+      bufPos := 0;
+      remainingBufferSamples := bufSamples; // why is this needed?
+      sfx := channel.sfx;
+      ticksPerSample := trunc(channel.pitch*256);
+      sampleTick := channel.sampleTick;
+
+      if sfx.length = 0 then continue; // should not happen
+      if channel.volume = 0 then continue;
+
+      // handle delay
+      if channel.delay >= bufSamples then begin
+        channel.delay -= bufSamples;
+        continue;
+      end;
+
+      if channel.delay > 0 then begin
+        {we need only delay for a portion of the buffer}
+        bufPos := channel.delay;
+        remainingBufferSamples -= channel.delay;
+        channel.sampleTick := 256 * channel.delay;
+        channel.delay := 0;
+      end;
+
+      // should not be needed, but just in case.
+      if sampleTick >= (sfx.length * 256) then begin
+        mixWarn('Sample tick was out of bounds');
+        if channel.looping then
+          sampleTick := sampleTick mod (sfx.length * 256)
+        else begin
+          channel.reset();
+          continue;
+        end;
+      end;
+
+      if remainingBufferSamples <= 0 then continue;
+
+      processAudio:= processAudio_ASM;
+
+      // break audio into chunks so that process need not handle looping
+      DEBUG_CHUNK_COUNTER := 0;
+      while remainingBufferSamples > 0 do begin
+
+        inc(DEBUG_CHUNK_COUNTER);
+
+        if DEBUG_CHUNK_COUNTER > 16 then begin
+          // this can happen if we, for some reason, start splitting
+          // audio into very small (e.g. 1 sample) chunks.
+          // but it also happens if audio is very short.
+          mixWarn('Too many chunks, short audio?');
+          break;
+        end;
+
+        chunkBufferSamples := remainingBufferSamples;
+        chunkSourceTicks := remainingBufferSamples * ticksPerSample;
+
+        if (sampleTick + chunkSourceTicks) >= (sfx.length*256) then begin
+          // this means audio ends early within the buffer
+          // so make sure this chunk ends at the boundary,
+          // then we handle loop or stop later on.
+          sampleTicksRemaining := (sfx.length*256) - sampleTick;
+          // round up
+          chunkBufferSamples := (sampleTicksRemaining+(ticksPerSample-1)) div ticksPerSample;
+        end;
+
+        // this should never happen!
+        if chunkBufferSamples <= 0 then begin
+          mixWarn('chunkBufferSamples was <= 0');
+          channel.sampleTick := sampleTick;
+          DR3 := remainingBufferSamples;
+          DR4 := chunkBufferSamples;
+          break;
+        end;
+
+        DR1 := chunkBufferSamples;
+        DR2 := sampleTick;
+
+        // these assertion checks sometimes cause bugs, I think due
+        // to how strings are handled. I'd need to use codewords instead.
+        (*
+        if not mixAssertGreaterOrEqual(sampleTick, 0, 'invalid sample tick') then
+          break;
+        if not mixAssertLess(sampleTick + (chunkBufferSamples-1)*ticksPerSample, sfx.length*256, 'invalid sample tick') then
+          break;
+        if not mixAssertGreaterOrEqual(bufPos, 0, 'invalid bufPos') then
+          break;
+        if not mixAssertLess(bufPos + (chunkBufferSamples-1), bufSamples, 'invalid bufSamples') then
+          break;
+        *)
+
+        volumeChunkStart := channel.lastUpdateVolume + (bufPos / bufSamples) * (channel.volume - channel.lastUpdateVolume);
+        volumeChunkEnd := channel.lastUpdateVolume + ((bufPos + chunkBufferSamples) / bufSamples) * (channel.volume - channel.lastUpdateVolume);
+
+        processAudio(
+          sfx.format,
+          sampleTick, sfx.data, sfx.length,
+          bufPos, chunkBufferSamples,
+          trunc(volumeChunkStart*65536), trunc(volumeChunkEnd*65536),
+          ticksPerSample
+        );
+        sampleTick += (chunkBufferSamples * ticksPerSample);
+
+        // handle looping
+        if sampleTick >= (sfx.length * 256) then begin
+          if channel.looping then begin
+            sampleTick := sampleTick mod (sfx.length * 256);
+          end else begin
+            // reset channel
+            channel.sfx := nil;
+            channel.delay := 0;
+            channel.sampleTick := 0;
+            break;
+          end;
+        end;
+
+        bufPos += chunkBufferSamples;
+        remainingBufferSamples -= chunkBufferSamples;
+        channel.sampleTick := sampleTick;
+      end;
+    end;
+  end;
+
+  // update each channel
+  for j := 1 to NUM_CHANNELS do
+    with mixer.channels[j] do begin
+      if volume < (1/256) then volume := 0;
+      lastUpdateVolume := volume;
+      lastUpdatePitch := pitch;
+    end;
+
+  {stub: simulate 8 bit}
+  if keyDownNoCheck(key_8) then
+    for i := 0 to bufSamples-1 do begin
+      scratchBufferI32[i].left := fake8Bit(scratchBufferI32[i].left);
+      scratchBufferI32[i].right := fake8Bit(scratchBufferI32[i].right);
+    end;
+  {stub: simulate u-law}
+  if keyDownNoCheck(key_u) then
+    for i := 0 to bufSamples-1 do begin
+      scratchBufferI32[i].left := fakeULAW(scratchBufferI32[i].left);
+      scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
+    end;
+
+  {mix down}
+  if mixer.mute then begin
+    filldword(scratchBuffer, bufSamples, 0);
+  end else if mixer.noise then begin
+    for i := 0 to bufSamples-1 do begin
+      noise := ((rnd + rnd) div 2) - 128;
+      scratchBuffer[i].left := noise*128;
+      scratchBuffer[i].right := noise*128;
+    end;
+  end else begin
+    if cpuInfo.hasMMX then
+      clipAndConvert_MMX(bufSamples)
+    else
+      clipAndConvert_ASM(bufSamples);
+  end;
+
+  result := @scratchBuffer[0];
+end;
+
+{$S+,R+,Q+}
+
+{-----------------------------------------------------}
+
+{converts from seconds since app launch, to timestamp code}
+function secToTC(s: double): tTimeCode;
+begin
+  {note, we do not allow fractional samples when converting}
+  result := round(s * 44100);
+end;
+
+{-----------------------------------------------------}
+
+constructor tSoundChannel.create(id: word);
+begin
+  inherited create();
+  self.id := id;
+  reset();
+end;
+
+procedure tSoundChannel.reset();
+begin
+  sfx := nil;
+  lastUpdateVolume := 0;
+  lastUpdatePitch := 1.0;
+  volume := 1.0;
+  pitch := 1.0;
+  delay := 0;
+  sampleTick := 0;
+  looping := false;
+end;
+
+function tSoundChannel.inUse(): boolean;
+begin
+  result := assigned(sfx);
+end;
+
+{-----------------------------------------------------}
+
+constructor tSoundMixer.create();
+var
+  i: integer;
+begin
+  mute := false;
+  noise := false;
+  for i := 1 to NUM_CHANNELS do
+    channels[i] := tSoundChannel.create(i);
+  for i := 0 to length(noiseBuffer)-1 do begin
+    noiseBuffer[i] := ((random(256) + random(256)) div 2) - 128;
+  end;
+end;
+
+{returns a channel to use for given sound}
+function tSoundMixer.getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
+var
+  i: integer;
+begin
+  case strategy of
+    SCS_SELFOVERWRITE:
+      //NIY
+      exit(nil);
+    SCS_NEXTFREE: begin
+      for i := 1 to NUM_CHANNELS do
+        if not channels[i].inUse then
+          exit(channels[i]);
+      exit(nil);
+      end;
+    SCS_FIXED1: exit(channels[1]);
+    SCS_FIXED2: exit(channels[2]);
+    SCS_FIXED3: exit(channels[3]);
+    SCS_FIXED4: exit(channels[4]);
+    else error('Invalid sound channel selection strategoy');
+  end;
+end;
+
+function tSoundMixer.playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+var
+  channel: tSoundChannel;
+begin
+  channel := play(sfx, channelSelection, volume, pitch, timeOffset);
+  if assigned(channel) then
+    channel.looping := true;
+  result := channel;
+end;
+
+function tSoundMixer.play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+var
+  ticksOffset: int32;
+  offsetString: string;
+begin
+
+  {for the moment lock onto the first channel}
+  if not assigned(sfx) then
+    error('Tried to play invalid sound file');
+
+  {find a slot to use}
+  result := getFreeChannel(sfx, channelSelection);
+  if not assigned(result) then begin
+    note(format('playing %s but no free channels', [sfx.toString] ));
+    exit;
+  end;
+
+  if timeOffset <> 0 then
+    offsetString := format(' (%.2fs)', [timeOffset])
+  else
+    offsetString := '';
+  note(format('playing %s channel %d%s', [sfx.toString, result.id, offsetString]));
+
+  ticksOffset := round(timeOffset*44100);
+
+  // we don't want channel to be in an invalid state when interupt occurs.
+  asm
+    cli
+  end;
+
+  result.sfx := sfx;
+  result.volume := volume;
+  result.pitch := pitch;
+  result.delay := ticksOffset;
+  result.sampleTick := 0;
+  result.looping := false;
+
+  asm
+    sti
+  end;
+
+end;
+
+procedure initMixer();
+begin
+  note('[init] Mixer');
+  if not lock_data(scratchBuffer, sizeof(scratchBuffer)) then
+    warn('Could not lock mixer buffer. Audio might stutter.' );
+  if not lock_data(scratchBufferF32, sizeof(scratchBufferF32)) then
+    warn('Could not lock mixer buffer. Audio might stutter.' );
+  if not lock_data(scratchBufferI32, sizeof(scratchBufferI32)) then
+    warn('Could not lock mixer buffer. Audio might stutter.' );
+end;
+
+procedure closeMixer();
+begin
+  note('[close] Mixer');
+  if MIX_WARNINGS > 0 then
+    warn(format(' - %d warnings occured, the last of which was: %s', [MIX_WARNINGS, MIX_WARNING_STR]));
+  if MIX_ERRORS > 0 then
+    warn(format(' - %d errors occured, the last of which was: %s', [MIX_ERRORS, MIX_ERROR_STR]));
+  if MIX_NOTE_STR <> '' then
+    note(' - Last note:' + MIX_NOTE_STR);
+  note(' - DR1:' + intToStr(DR1));
+  note(' - DR2:' + intToStr(DR2));
+  note(' - DR3:' + intToStr(DR3));
+  note(' - DR4:' + intToStr(DR4));
+  unlock_data(scratchBuffer, sizeof(scratchBuffer));
+  unlock_data(scratchBufferF32, sizeof(scratchBufferF32));
+  unlock_data(scratchBufferI32, sizeof(scratchBufferI32));
+end;
+
+begin
+  mixer := tSoundMixer.create();
+  initMixer();
+  addExitProc(closeMixer);
+end.
