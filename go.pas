@@ -43,13 +43,27 @@ created. If back exists, it is removed.}
 
 procedure safeCopy(destinationPath: string);
 begin
-  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+
+  delay(1000);
+
+  //stub
+  writeln('dest >'+destinationPath+'<');
+  destinationPath := trim(destinationPath);
+  //dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+  writeln('move');
   dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+destinationPath+'_tmp');
-  mkDIR(destinationPath);
+  writeln('make');
+  try
+    mkDIR(destinationPath);
+  except
+    // ignore
+  end;
+  writeln('copy');
   dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy message.txt '+destinationPath+' > nul');
+  writeln('done');
   //dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
 end;
 
@@ -73,7 +87,7 @@ begin
 
   safeCopy('$rep\'+time.YYMMDD('')+'_'+time.HHMMSS(''));
   safeCopy('$rep\'+time.YYMMDD(''));
-  safeCopy('$rep\head');
+  safeCopy('$rep\HEAD');
 
 end;
 
