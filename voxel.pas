@@ -59,6 +59,8 @@ type
 
 implementation
 
+uses keyboard; {for debugging}
+
 const
   MAX_SAMPLES = 64;
 
@@ -313,7 +315,36 @@ var
   end;
 
   {traces all pixels within the given polygon.
-  points are in world space}
+  points are in world space
+
+  How this works:
+
+  We trace against a cuboid, in object space. That is, the object is
+  fixed and to render a rotation we rotate where the intersecting rays
+  are comming from.
+
+  We intersect a ray onto the face of a cube, then work out that point
+  changes as we scan the ray accross and down the screen.
+
+  We consider the initial position of the ray, as well as the intersection
+  point, aswell as how far the ray must travel from origin before it
+  intersects the face
+
+  We caculate
+
+    rayOrigin - location of ray origin in object space
+    pos     - location of intersection, in object space
+    t       - The distance from the ray's origin to the intersection point;
+
+    deltaX  - How much intersection point changes as we can accross screen
+    deltaY  - How much intersection point changes as we can accross down
+    txDelta - How much t changes as we scan accross
+    tyDelta - How much t changes as we scan down
+
+
+
+
+  }
   procedure traceFace(faceID: byte; p1,p2,p3,p4: V3D);
   var
     c: RGBA;
@@ -322,13 +353,13 @@ var
     x: int32;
     worldPos: V3D;
     t: single;
-    pos, basePos, deltaX, deltaY: V3D;
-    tDelta: single;
+    rayOrigin, pos, basePos, deltaX, deltaY: V3D;
+    txDelta, tyDelta: single;
     aZ, invZ: single;
     value: integer;
     c1,c2,c3,c4: RGBA;
     s1,s2,s3,s4: tPoint;
-    adjustedAtPos: V3D;
+    traceProc: tTraceScanlineProc;
 
   begin
     {do not render back face}
@@ -391,18 +422,22 @@ var
 
     {calculate our deltas}
     case faceID of
-      1: tDelta := -cameraX.z * invZ;
-      2: tDelta := -cameraX.z * invZ;
-      3: tDelta := -cameraX.x * invZ;
-      4: tDelta := -cameraX.x * invZ;
-      5: tDelta := -cameraX.y * invZ;
-      6: tDelta := -cameraX.y * invZ;
+      1: begin txDelta := -cameraX.z * invZ; tyDelta := -cameraY.z * invZ; end;
+      2: begin txDelta := -cameraX.z * invZ; tyDelta := -cameraY.z * invZ; end;
+      3: begin txDelta := -cameraX.x * invZ; tyDelta := -cameraY.x * invZ; end;
+      4: begin txDelta := -cameraX.x * invZ; tyDelta := -cameraY.x * invZ; end;
+      5: begin txDelta := -cameraX.y * invZ; tyDelta := -cameraY.y * invZ; end;
+      6: begin txDelta := -cameraX.y * invZ; tyDelta := -cameraY.y * invZ; end;
     end;
-    deltaX := cameraX + cameraZ*tDelta;
+    deltaX := cameraX + cameraZ*txDelta;
+    deltaY := cameraY + cameraZ*tyDelta;
 
-    {we adjust the position so that we trace through the center of the pixel.
-     tracing the topleft would give rounding problems}
-    adjustedAtPos := atPos - V3D.create(0.5, 0.5, 0);
+    if cpuInfo.hasMMX then
+      traceProc := traceScanline_MMX
+    else
+      traceProc := traceScanline_ASM;
+    if keyDown(key_f5) then
+      traceProc := traceScanline_REF;
 
     for y := yMin to yMax-1 do begin
 
@@ -410,34 +445,31 @@ var
         continue;
 
       {find the ray's origin given current screenspace coord}
-      //todo: support pos.z
-      pos := (cameraX*(screenLines[y].xMin-adjustedAtPos.x))+(cameraY*(y-adjustedAtPos.y));
+      {note: we trace from the middle of the pixel, not the top-left corner.
+       this resolves some precision errors}
+      rayOrigin :=
+        cameraX*((screenLines[y].xMin)-atPos.x+0.5) +
+        cameraY*(y-atPos.y+0.5) +
+        cameraZ*(0-atPos.z+0.5);
 
       case faceID of
-        1: t := (-size.z-pos.z) * invZ;
-        2: t := (+size.z-pos.z) * invZ;
-        3: t := (-size.x-pos.x) * invZ;
-        4: t := (+size.x-pos.x) * invZ;
-        5: t := (-size.y-pos.y) * invZ;
-        6: t := (+size.y-pos.y) * invZ;
+        1: t := (-size.z-rayOrigin.z) * invZ;
+        2: t := (+size.z-rayOrigin.z) * invZ;
+        3: t := (-size.x-rayOrigin.x) * invZ;
+        4: t := (+size.x-rayOrigin.x) * invZ;
+        5: t := (-size.y-rayOrigin.y) * invZ;
+        6: t := (+size.y-rayOrigin.y) * invZ;
         else t := 0;
       end;
 
-      pos += cameraZ * (t+0.50); {start half way in a voxel}
+      pos := rayOrigin + cameraZ * (t+0.50); {start half way in a voxel}
       pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
 
-      if cpuInfo.hasMMX then
-        traceScanline_MMX(
-          canvas, self,
-          screenLines[y].xMin, screenLines[y].xMax, y,
-          pos, cameraZ, deltaX
-        )
-      else
-        traceScanline_ASM(
-          canvas, self,
-          screenLines[y].xMin, screenLines[y].xMax, y,
-          pos, cameraZ, deltaX
-        );
+      traceProc(
+        canvas, self,
+        screenLines[y].xMin, screenLines[y].xMax, y,
+        pos, cameraZ, deltaX, deltaY
+      );
     end;
   end;
 

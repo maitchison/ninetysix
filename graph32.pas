@@ -90,8 +90,8 @@ type
   {16 bit signed integer}
   RGBA16 = packed record
     b,g,r,a: int16;
-  class operator explicit(this: RGBA16): RGBA;
-  class operator explicit(this: RGBA16): RGBA32;
+    class operator explicit(this: RGBA16): RGBA;
+    class operator explicit(this: RGBA16): RGBA32;
   end;
 
 const

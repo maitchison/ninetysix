@@ -5,7 +5,7 @@ var
 {
   pos: position in voxelspace at xMin
 }
-procedure traceScanline_MMX(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
+procedure traceScanline_MMX(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
 var
   pagePtr, voxPtr: pointer;
   xCounter: int32;
@@ -29,7 +29,7 @@ begin
   p16 := V3D16.make256(pos+bias);
   v16 := V3D16.make256(dir);
   s16 := V3D16.make(256*voxSprite.fWidth-1, 256*voxSprite.fHeight-1, 256*voxSprite.fDepth-1);
-  d16 := V3D16.make256(delta);
+  d16 := V3D16.make256(deltaX);
 
   {this is needed due either bugs in my tracer, or precision issues}
   p16.x := clamp(p16.x, 0, s16.x);

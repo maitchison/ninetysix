@@ -131,7 +131,7 @@ begin
 
 end;
 
-procedure traceScanline_ASM(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
+procedure traceScanline_ASM(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
 var
   x: int16;
   col: RGBA;
@@ -144,12 +144,13 @@ begin
 
   p16 := V3D16.make256(pos-bias);
   v16 := V3D16.make256(dir);
-  d16 := V3D16.make256(delta);
+  d16 := V3D16.make256(deltaX);
   s16 := voxSprite.getSize;
 
   for x := xMin to xMax-1 do begin
 
     col := trace_ASM(voxSprite.vox.pixels, p16, v16, s16, voxSprite.fLog2Width, voxSprite.fLog2Height);
+
     {show trace count}
     if VX_GHOST_MODE then
        col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);

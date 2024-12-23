@@ -1,3 +1,6 @@
+type
+  tTraceScanlineProc = procedure(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
+
 {trace ray at location and direction (in object space)}
 function trace_REF(voxSprite: tVoxelSprite; pos: V3D;dir: V3D;size: V3D16): RGBA;
 var
@@ -81,11 +84,14 @@ begin
 
 end;
 
-procedure traceScanline_REF(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, delta: V3D);
+procedure traceScanline_REF(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
 var
   x: int16;
   size: V3D16;
   col: RGBA;
+  col16: RGBA16;
+  i,j: integer;
+  dx,dy: single;
 begin
 
   size := voxSprite.getSize;
@@ -100,7 +106,40 @@ begin
     if VX_UVW_MODE and (col.a = 0) then
        col.init(trunc(pos.x*4), trunc(pos.y*8), trunc(pos.z*16));
 
-    pos += delta;
+    if keyDown(key_f6) then begin
+      {5 point AA}
+      if col.a > 0 then begin
+        col16.r := col.r;
+        col16.g := col.g;
+        col16.b := col.b;
+        col16.a := col.a;
+      end else
+        fillchar(col16, sizeof(col16), 0);
+      for i := 0 to 1 do
+        for j := 0 to 1 do begin
+          {the first sample is at pixel center (0.5,0.5)
+          each of these four samples is taken uniformally at random
+          from each of the pixels quadrants.
+          update: disabled random sampling
+          }
+
+          dx := ((i * 2) - 1) * 0.25;
+          dy := ((i * 2) - 1) * 0.25;
+          //dx += ((rnd/256) - 0.5) * 0.50;
+          //dy += ((rnd/256) - 0.5) * 0.50;
+          col := trace_REF(voxSprite, pos+(deltaX*dx)+(deltaY*dy), dir, size);
+          if col.a > 0 then begin
+            col16.r += col.r; col16.g += col.g; col16.b += col.b; col16.a += col.a;
+          end;
+        end;
+      col16.r := col16.r div 5;
+      col16.g := col16.g div 5;
+      col16.b := col16.b div 5;
+      col16.a := col16.a div 5;
+      col := RGBA(col16);
+    end;
+
+    pos += deltaX;
 
     if col.a > 0 then
       canvas.putPixel(x, y, col);
