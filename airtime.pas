@@ -181,15 +181,11 @@ var
   slidingPower: int32;
   skidVolume: single;
   alpha: single;
-
-  dx,dy: integer;
-
+  drawPos: tPoint;
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
-  // todo: this should be toScreen
-  dx := round(pos.x);
-  dy := round(pos.rotated(-0.615, 0,0).y);
+  drawPos := worldToCanvas(pos);
 
   if elapsed <= 0 then exit;
 
@@ -234,10 +230,10 @@ begin
     if (skidVolume > 0.1) and assigned(screen.background) then begin
       // todo: find wheel locations
       screen.background.page.putPixel(
-        dx+(rnd-rnd) div 64, dy+(rnd-rnd) div 64,
+        drawPos.x+(rnd-rnd) div 64, drawPos.y+(rnd-rnd) div 64,
       RGBA.create(0,0,0,32));
       screen.background.page.putPixel(
-        dx+(rnd-rnd) div 64, dy+(rnd-rnd) div 64,
+        drawPos.x+(rnd-rnd) div 64, drawPos.y+(rnd-rnd) div 64,
       RGBA.create(0,0,0,32));
     end;
 
@@ -246,14 +242,14 @@ begin
     mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
     mixer.channels[3].pitch := 0.5 + clamp(vel.abs/250, 0, 4.0);
 
-    debugTextOut(dx, dy-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
+    debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
     vel += tractionForce * (elapsed / mass);
 
   end;
 
   debugTextOut(
-    dx-120, dy+50,
+    drawPos.x-120, drawPos.y+50,
     format('vel:%.1f slipa:%.1f tf:%.1f/%.1f fps:%.2f',
     [vel.abs, slipAngle, tractionForce.abs, requiredTractionForce.abs, 1/elapsed]
   ));
@@ -293,6 +289,7 @@ var
   engineForce, lateralForce, dragForce: v3d;
   targetVelocity: v3d;
   x,y: single;
+  drawPos: tPoint;
 const
   BOUNDARY = 50;
 begin
@@ -332,14 +329,12 @@ begin
   vel -= dragForce;
 
   {boundaries}
-  //todo: this should be to screen?
-  x := pos.x;
-  y := round(pos.rotated(-0.615, 0,0).y);
+  drawPos := worldToCanvas(pos);
 
-  if x < BOUNDARY then vel.x += (BOUNDARY-x) * 1.0;
-  if y < BOUNDARY then vel.y += (BOUNDARY-y) * 1.0;
-  if x > 1024-BOUNDARY then vel.x -= (x-(1024-BOUNDARY)) * 1.0;
-  if y > 480-BOUNDARY then vel.y -= (y-(480-BOUNDARY)) * 1.0;
+  if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
+  if drawPos.y < BOUNDARY then vel.y += (BOUNDARY-drawPos.y) * 1.0;
+  if drawPos.x > 1024-BOUNDARY then vel.x -= (drawPos.x-(1024-BOUNDARY)) * 1.0;
+  if drawPos.y > 480-BOUNDARY then vel.y -= (drawPos.y-(480-BOUNDARY)) * 1.0;
 
   tilt *= decayFactor(0.5);
 end;
@@ -350,7 +345,7 @@ end;
 function worldToCanvas(p: V3D): tPoint;
 begin
   result.x := round(p.x);
-  result.y := round(p.rotated(-0.615, 0,0).y);
+  result.y := round(p.rotated(-0.615, 0, 0).y);
 end;
 
 procedure debugTextOut(dx,dy: integer; s: string);
@@ -564,7 +559,7 @@ var
   startClock,lastClock,thisClock: double;
   car: tCar;
   camX, camY: single;
-
+  drawPos: tPoint;
 
 begin
   note('Main loop started');
@@ -601,7 +596,6 @@ begin
 
   while True do begin
 
-
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
@@ -615,9 +609,9 @@ begin
 
     car.update();
 
-    // todo: this should be toScreen
-    camX += ((car.pos.x-CamX)*0.05);
-    camY += ((car.pos.rotated(-0.615, 0,0).y-CamY)*0.05);
+    drawPos := worldToCanvas(car.pos);
+    camX += ((drawPos.x-CamX)*0.10);
+    camY += ((drawPos.y+50-CamY)*0.10); // why +50?
     car.draw();
 
     drawGUI();

@@ -218,7 +218,7 @@ begin
   nZ := tz;
   tx := nX; ty := nY; tz := nZ;
 
-  result := V3D.create(tx, ty, tz);
+  result := V3D.create(tx, ty, tz, 0);
 end;
 
 function V3D.dot(other: V3D): single;
