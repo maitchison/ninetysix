@@ -136,7 +136,7 @@ begin
   startTime := getSec;
 
   drawTires(-1);
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, CAR_SCALE));
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, tilt/2, CAR_SCALE));
   drawTires(+1);
 
   if carDrawTime = 0 then
