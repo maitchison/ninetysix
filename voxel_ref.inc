@@ -149,6 +149,25 @@ begin
 
     pos += deltaX;
 
+    // simulate precision
+    if keyDown(key_o) then begin
+      pos := V3D16.round(pos*256).toV3D() * (1/256);
+      deltaX := V3D16.round(deltaX*256).toV3D() * (1/256);
+    end;
+    if keyDown(key_p) then begin
+      pos := V3D32.round(pos*256*65536).toV3D() * (1/(256*65536));
+      deltaX := V3D32.round(deltaX*256*65536).toV3D() * (1/(256*65536));
+    end;
+    if keyDown(key_k) then begin
+      pos := V3D16.trunc(pos*256).toV3D() * (1/256);
+      deltaX := V3D16.trunc(deltaX*256).toV3D() * (1/256);
+    end;
+    if keyDown(key_l) then begin
+      pos := V3D32.trunc(pos*256*65536).toV3D() * (1/(256*65536));
+      deltaX := V3D32.trunc(deltaX*256*65536).toV3D() * (1/(256*65536));
+    end;
+
+
     if col.a > 0 then
       canvas.putPixel(x, y, col);
   end;

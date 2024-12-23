@@ -1,7 +1,7 @@
 {globals for 8-byte alignment}
 var
-  p16, v16, s16, d16: V3D16;
-  p32, d32: V3D32;
+  v16, s16: V3D16;
+  p32, d32, s32: V3D32;
 
 {
   pos: position in voxelspace at xMin
@@ -23,19 +23,27 @@ begin
   *)
 
   {0.3ms for these conversions}
-  p16 := V3D16.trunc(pos*256);
   v16 := V3D16.round(dir*256);
   s16 := V3D16.make(256*voxSprite.fWidth-1, 256*voxSprite.fHeight-1, 256*voxSprite.fDepth-1);
-  d16 := V3D16.round(deltaX*256);
 
   // higher precision
-  p32 := V3D32.trunc(pos*256*65536);
-  d32 := V3D32.round(deltaX*256*65536);
+  p32 := V3D32.round(pos*65536);
+  d32 := V3D32.round(deltaX*65536);
 
   {this is needed due either bugs in my tracer, or precision issues}
-  p16.x := clamp(p16.x, 0, s16.x);
-  p16.y := clamp(p16.y, 0, s16.y);
-  p16.z := clamp(p16.z, 0, s16.z);
+  p32.x := clamp(p32.x, 0, 65536*256*voxSprite.fWidth-1);
+  p32.y := clamp(p32.y, 0, 65536*256*voxSprite.fHeight-1);
+  p32.z := clamp(p32.z, 0, 65536*256*voxSprite.fDepth-1);
+
+  //stub
+  if keyDown(key_i) then begin
+    p32.x := p32.x div 65536 * 65536;
+    p32.y := p32.y div 65536 * 65536;
+    p32.z := p32.z div 65536 * 65536;
+    d32.x := d32.x div 65536 * 65536;
+    d32.y := d32.y div 65536 * 65536;
+    d32.z := d32.z div 65536 * 65536;
+  end;
 
   shiftCode := voxSprite.fLog2Height + voxSprite.fLog2Width * 256;
 
@@ -73,21 +81,19 @@ begin
     }
 
     {
-    MM0    temp
-
+    //todo: move tmp to last 4 registers?
+    MM0    tmp
     MM1    px|py|pz|00 (current position in trace)
-    MM2    vx|vy|vz|00
+    MM2    vx|vy|vz|00 (veloictiy within trace)
     MM3    sx|sy|sz|00 (with bias)
-    MM4    qx|qy|qz|00 (position at start of trace)
+    MM4    tmp
     MM5    80|80|80|80 (bias for unsigned compare)
-
-    MM6    temp
-    MM7    temp
+    MM6    tmp
+    MM7    tmp
     }
 
     movq      mm2, qword ptr [v16]
     movq      mm3, qword ptr [s16]
-    movq      mm4, qword ptr [p16]
 
     mov       eax, $80008000
     movd      mm5, eax
@@ -99,7 +105,33 @@ begin
 
       mov       zCounter, MAX_SAMPLES
       mov       depth, 0
-      movq      mm1, mm4    // restore pos
+
+      // get the high words from our 32bit position
+      movq      mm1, qword ptr [p32]
+      movq      mm6, qword ptr [p32+8]
+      psrad     mm1, 8
+      psrad     mm6, 8
+      packssdw  mm1, mm6     // mm1 = pos
+
+      // clamping.. such a shame
+      pxor      mm0, mm0
+      pcmpgtw   mm0, mm1     // mm0 = (pos < 0)
+      pandn     mm0, mm1     // mm0 = (pos >= 0) * pos
+      movq      mm1, mm0     // mm1 = (pos >= 0) * pos
+
+      movq      mm0, mm1     // mm0 = pos
+      movq      mm6, qword ptr [s16] // mm6 = size
+      movq      mm7, mm6     // mm7 = size
+      pcmpgtw   mm6, mm0     // mm6 = (pos < size)
+      movq      mm4, mm6     // mm4 = (pos < size)
+
+      pand      mm0, mm6     // mm0 = (pos < size) * pos
+
+      pandn     mm4, mm7     // mm4 = (pos >= size) * size
+      paddw     mm0, mm4     // mm0 = (pos >= size) * size + (pos < size) * pos
+
+      movq      mm1, mm0     // mm1 = clamped position
+
 
     @ZLOOP:
 
@@ -191,8 +223,15 @@ begin
       mov       [edi], eax
 
     @FINISH:
-      // update pos position
-      paddsw    mm4, qword ptr [d16]
+
+      // update position
+      movq      mm6, qword ptr [p32]
+      paddd     mm6, qword ptr [d32]
+      movq      qword ptr [p32], mm6
+      movq      mm7, qword ptr [p32+8]
+      paddd     mm7, qword ptr [d32+8]
+      movq      qword ptr [p32+8], mm7
+
       add       edi, 4
 
       dec       xCounter

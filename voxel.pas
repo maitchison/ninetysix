@@ -356,8 +356,18 @@ var
     c1,c2,c3,c4: RGBA;
     s1,s2,s3,s4: tPoint;
     traceProc: tTraceScanlineProc;
-
   begin
+
+    {for debugging}
+    if true then begin
+      if keyDown(key_1) and (faceID = 1) then exit;
+      if keyDown(key_2) and (faceID = 2) then exit;
+      if keyDown(key_3) and (faceID = 3) then exit;
+      if keyDown(key_4) and (faceID = 4) then exit;
+      if keyDown(key_5) and (faceID = 5) then exit;
+      if keyDown(key_6) and (faceID = 6) then exit;
+    end;
+
     {do not render back face}
     cross := ((p2.x-p1.x) * (p3.y - p1.y)) - ((p2.y - p1.y) * (p3.x - p1.x));
     if cross <= 0 then exit;

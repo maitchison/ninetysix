@@ -61,7 +61,7 @@ function worldToCanvas(p: V3D): tPoint; forward;
 type
   tCar = class
   const
-    CAR_SCALE = 0.40; // 0.5
+    CAR_SCALE = 2.40; // 0.5
   protected
     procedure drawWheels(side: integer);
     procedure tractionSimple();
@@ -79,6 +79,7 @@ type
     dragCoefficent: single;
     constantDrag: single;
     vox: tVoxelSprite;
+    tireRotation: double;
 
     constructor create(aVox: tVoxelSprite);
 
@@ -102,6 +103,7 @@ begin
   tireHeat := 0;
   dragCoefficent := 0.0025;
   constantDrag := 50;
+  tireRotation := 0.0;
 end;
 
 {draws tires. If side < 0 then tires behind car are drawn,
@@ -127,7 +129,7 @@ begin
       screen.markRegion(wheelVox.draw(
         screen.canvas,
         getWheelPos(dx, dy),
-        tireAngle, getSec*dy*vel.abs/200, pi/2,
+        tireAngle, tireRotation * dy, pi/2,
         1.85*CAR_SCALE) //slightly oversized wheels
       );
     end;
@@ -362,6 +364,7 @@ begin
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
+  tireRotation += elapsed * vel.abs / 20;
 
   {handle traction}
   self.tractionComplex();
