@@ -50,7 +50,7 @@ begin
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy message.txt '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+  //dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
 end;
 
 
