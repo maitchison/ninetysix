@@ -82,7 +82,7 @@ type
 
     constructor create(aVox: tVoxelSprite);
 
-    function getWheelPosition(dx,dy: integer): V3D;
+    function getWheelPos(dx,dy: integer): V3D;
 
     procedure draw();
     procedure update();
@@ -121,7 +121,7 @@ begin
       if cos(tireAngle) * side >= 0 then
       screen.markRegion(wheelVox.draw(
         screen.canvas,
-        getWheelPosition(dx, dy),
+        getWheelPos(dx, dy),
         tireAngle, getSec*dy*vel.abs/200, pi/2,
         1.85*CAR_SCALE) //slightly oversized wheels
       );
@@ -136,7 +136,7 @@ begin
   startTime := getSec;
 
   drawTires(-1);
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, tilt/2, CAR_SCALE));
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, tilt/3, CAR_SCALE));
   drawTires(+1);
 
   if carDrawTime = 0 then
@@ -146,7 +146,7 @@ begin
 end;
 
 {returns wheel positon in world space, e.g. -1, -1 for front left tire}
-function tCar.getWheelPosition(dx,dy: integer): V3D;
+function tCar.getWheelPos(dx,dy: integer): V3D;
 var
   p: V3D;
   t1: single;
@@ -197,6 +197,19 @@ begin
 
 end;
 
+procedure addSkidMark(pos: V3D);
+var
+  drawPos: tPoint;
+begin
+  pos.x += ((rnd-rnd) / 256)*3;
+  pos.y += ((rnd-rnd) / 256)*3;
+  drawPos := worldToCanvas(pos);
+  screen.background.page.putPixel(
+    drawPos.x, drawPos.y,
+    RGBA.create(0,0,0,32)
+  );
+end;
+
 procedure tCar.tractionComplex();
 var
   slipAngle, dirAngle, velAngle: single;
@@ -207,6 +220,9 @@ var
   skidVolume: single;
   alpha: single;
   drawPos: tPoint;
+  i: integer;
+  t: single;
+  marks: integer;
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
@@ -252,14 +268,13 @@ begin
     //mixer.channels[2].pitch := clamp(0.85+tireHeat/400, 0.85, 2.0);
 
     // write skidmarks to map
-    if (skidVolume > 0.1) and assigned(screen.background) then begin
-      // todo: find wheel locations
-      screen.background.page.putPixel(
-        drawPos.x+(rnd-rnd) div 64, drawPos.y+(rnd-rnd) div 64,
-      RGBA.create(0,0,0,32));
-      screen.background.page.putPixel(
-        drawPos.x+(rnd-rnd) div 64, drawPos.y+(rnd-rnd) div 64,
-      RGBA.create(0,0,0,32));
+    if (skidVolume > 0.05) and assigned(screen.background) then begin
+      marks := trunc(skidVolume * 20);
+      for i := 1 to marks do begin
+        t := (rnd/256) * elapsed;
+        addSkidmark(getWheelPos(+1, -1)+vel*t);
+        addSkidmark(getWheelPos(+1, +1)+vel*t);
+      end;
     end;
 
     // for the moment engine sound is speed, which is not quiet right
