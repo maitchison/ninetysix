@@ -228,10 +228,10 @@ end;
 
 constructor V3D.Create(x, y, z: single; w: single=0);
 begin
-    self.x := x;
-    self.y := y;
-    self.z := z;
-    self.w := w;
+  self.x := x;
+  self.y := y;
+  self.z := z;
+  self.w := w;
 end;
 
 procedure V3D.clip(maxLen: single);

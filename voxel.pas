@@ -74,7 +74,7 @@ var
 
 type
   tScreenLine = record
-    xMin, xMax: int16;
+    xMin, xMax: int32;
     procedure reset();
     procedure adjust(x: int16);
   end;
@@ -348,7 +348,8 @@ var
     yMax := max(yMax, s4.y);
     yMax := min(videoDriver.logicalHeight-1, yMax);
 
-    //todo: do not render offscreen sides
+    //do not render offscreen sides
+    if yMax < yMin then exit;
 
     {debuging, show corners}
 
@@ -398,6 +399,9 @@ var
 
     for y := yMin to yMax do begin
 
+      if screenLines[y].xMax < screenLines[y].xMin then
+        continue;
+
       {find the ray's origin given current screenspace coord}
       //todo: support pos.z
       pos := (cameraX*(screenLines[y].xMin-atPos.x))+(cameraY*(y-atPos.y));
@@ -431,6 +435,9 @@ var
   end;
 
 begin
+
+  if not assigned(self) then error('Tried to call draw on an assigned vox.');
+
   VX_TRACE_COUNT := 0;
   if scale = 0 then exit;
 
@@ -475,6 +482,7 @@ begin
   p6 := objToWorld.apply(V3D.create(+size.x, -size.y, +size.z, 1));
   p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z, 1));
   p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z, 1));
+
 
   {trace each side of the cubeoid}
   traceFace(1, p1, p2, p3, p4);

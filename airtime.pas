@@ -85,10 +85,12 @@ type
     procedure update();
   end;
 
-constructor tCar.create();
+constructor tCar.create(aVox: tVoxelSprite);
 begin
+  inherited create();
   pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
   vel := V3D.create(0,0,0);
+  vox := aVox;
   zAngle := 0;
   tilt := 0;
   mass := 1;
