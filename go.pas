@@ -79,7 +79,7 @@ begin
   close(t);
 
   {it's handy to have a daily folder aswell}
-  destinationPath := '$rep\'+time.YYMMDD('')
+  destinationPath := '$rep\'+time.YYMMDD('');
   {$I-}
   mkDIR(destinationPath);
   {$I+}
