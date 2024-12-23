@@ -79,7 +79,11 @@ begin
   close(t);
 
   {it's handy to have a daily folder aswell}
-  safeCopy('$rep\'+time.YYMMDD(''));
+  destinationPath := '$rep\'+time.YYMMDD('')
+  {$I-}
+  mkDIR(destinationPath);
+  {$I+}
+  safeCopy(destinationPath);
 
   {and head...}
   safeCopy('$rep\head');
