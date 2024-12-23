@@ -60,7 +60,10 @@ function worldToCanvas(p: V3D): tPoint; forward;
 
 type
   tCar = class
+  const
+    CAR_SCALE = 0.5;
   protected
+    procedure drawTires(side: integer);
     procedure tractionSimple();
     procedure tractionComplex();
   public
@@ -79,7 +82,7 @@ type
 
     constructor create(aVox: tVoxelSprite);
 
-    function wheelPosition(dx,dy: integer): V3D;
+    function getWheelPosition(dx,dy: integer): V3D;
 
     procedure draw();
     procedure update();
@@ -101,18 +104,40 @@ begin
   constantDrag := 50;
 end;
 
+{draws tires. If side < 0 then tires behind car are drawn,
+ if side > 0 then tires infront are draw, and if side = 0 then all
+ tires are drawn}
+procedure tCar.drawTires(side: integer);
+var
+  i,j, dx, dy: int32;
+  tireAngle: single;
+begin
+  for i := 0 to 1 do
+    for j := 0 to 1 do begin
+      dx := i*2-1;
+      dy := j*2-1;
+      tireAngle := zAngle+(pi*(1-j));
+      if cos(tireAngle) * side >= 0 then
+      screen.markRegion(wheelVox.draw(
+        screen.canvas,
+        getWheelPosition(dx,dy),
+        tireAngle, getSec*10, pi/2,
+        1.5*CAR_SCALE)
+      );
+    end;
+end;
+
 procedure tCar.draw();
 var
   startTime: double;
-  dx, dy: int32;
-  bounds: tRect;
-const
-  CAR_SCALE = 0.5;
 begin
 
   startTime := getSec;
-  bounds := vox.draw(screen.canvas, pos, zAngle, 0, 0, CAR_SCALE);
-  screen.markRegion(bounds);
+
+  drawTires(-1);
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, CAR_SCALE));
+  drawTires(+1);
+
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
   else
@@ -120,14 +145,12 @@ begin
 end;
 
 {returns wheel positon in world space, e.g. -1, -1 for front left tire}
-function tCar.wheelPosition(dx,dy: integer): V3D;
+function tCar.getWheelPosition(dx,dy: integer): V3D;
 var
   p: V3D;
 begin
-  p := vox.getSize.toV3D * 0.5;
-  p := p * V3D.create(dx, dy, 0);
-  p.rotated(zAngle, 0, 0);
-  result := p;
+  p := V3D.create(20*dx, 10*dy, 5).rotated(0, 0, zAngle) * CAR_SCALE;
+  result := p + pos;
 end;
 
 procedure tCar.tractionSimple();

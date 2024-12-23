@@ -22,6 +22,7 @@ var
   {debugging stuff}
   VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
+  VX_SHOW_CORNERS: boolean = false;
   VX_GHOST_MODE: boolean = false;
 
 
@@ -352,12 +353,13 @@ var
     if yMax < yMin then exit;
 
     {debuging, show corners}
-
-    c.init(255,0,255);
-    canvas.putPixel(s1.x, s1.y, c);
-    canvas.putPixel(s2.x, s2.y, c);
-    canvas.putPixel(s3.x, s3.y, c);
-    canvas.putPixel(s4.x, s4.y, c);
+    if VX_SHOW_CORNERS then begin
+      c.init(255,0,255);
+      canvas.putPixel(s1.x, s1.y, c);
+      canvas.putPixel(s2.x, s2.y, c);
+      canvas.putPixel(s3.x, s3.y, c);
+      canvas.putPixel(s4.x, s4.y, c);
+    end;
 
     for y := yMin to yMax do
       screenLines[y].reset();
@@ -449,7 +451,7 @@ begin
   faceColor[6].init(0,0,128);
 
   isometricTransform.rotationX(-0.615); //~35 degrees
-  objToWorld.rotationXYZ(roll, 0, zAngle);
+  objToWorld.rotationXYZ(roll, pitch, zAngle);
 
   objToWorld := objToWorld.MM(isometricTransform);
   {transpose is inverse (for unitary)}
