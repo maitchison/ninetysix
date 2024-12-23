@@ -69,9 +69,9 @@ begin
   {$I-}
   mkDIR(destinationPath);
   {$I+}
-  dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
 
   assign(t,destinationPath+'/message.txt');
   rewrite(t);
