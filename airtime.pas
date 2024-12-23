@@ -61,9 +61,9 @@ function worldToCanvas(p: V3D): tPoint; forward;
 type
   tCar = class
   const
-    CAR_SCALE = 0.5; // 0.5
+    CAR_SCALE = 0.40; // 0.5
   protected
-    procedure drawTires(side: integer);
+    procedure drawWheels(side: integer);
     procedure tractionSimple();
     procedure tractionComplex();
   public
@@ -107,7 +107,7 @@ end;
 {draws tires. If side < 0 then tires behind car are drawn,
  if side > 0 then tires infront are draw, and if side = 0 then all
  tires are drawn}
-procedure tCar.drawTires(side: integer);
+procedure tCar.drawWheels(side: integer);
 var
   i,j, dx, dy: int32;
   tireAngle: single;
@@ -118,6 +118,11 @@ begin
       dx := i*2-1;
       dy := j*2-1;
       tireAngle := zAngle+(pi*(1-j));
+      if i = 0 then
+        tireAngle -= tilt/3
+      else
+        tireAngle -= tilt/5;
+
       if cos(tireAngle) * side >= 0 then
       screen.markRegion(wheelVox.draw(
         screen.canvas,
@@ -135,9 +140,9 @@ begin
 
   startTime := getSec;
 
-  drawTires(-1);
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, tilt/3, CAR_SCALE));
-  drawTires(+1);
+  drawWheels(-1);
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, CAR_SCALE));
+  drawWheels(+1);
 
   if carDrawTime = 0 then
     carDrawTime := (getSec - startTime)
@@ -201,12 +206,12 @@ procedure addSkidMark(pos: V3D);
 var
   drawPos: tPoint;
 begin
-  pos.x += ((rnd-rnd) / 256)*3;
-  pos.y += ((rnd-rnd) / 256)*3;
+  pos.x += ((rnd-rnd) / 256)*1.5;
+  pos.y += ((rnd-rnd) / 256)*1.5;
   drawPos := worldToCanvas(pos);
   screen.background.page.putPixel(
     drawPos.x, drawPos.y,
-    RGBA.create(0,0,0,32)
+    RGBA.create(0,0,0,16)
   );
 end;
 
