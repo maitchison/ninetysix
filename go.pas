@@ -86,8 +86,6 @@ begin
   close(t);
 
   safeCopy('$rep\'+time.YYMMDD('')+'_'+time.HHMMSS(''));
-  safeCopy('$rep\'+time.YYMMDD('')+'_xxxxxx');
-  safeCopy('$rep\'+time.YYMMDD(''));
   safeCopy('$rep\HEAD');
 
 end;
