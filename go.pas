@@ -70,7 +70,7 @@ begin
   mkDIR(destinationPath);
   {$I+}
   dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath);
-  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath);
+  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath);
 
   assign(t,destinationPath+'/message.txt');
