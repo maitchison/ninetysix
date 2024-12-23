@@ -44,27 +44,23 @@ created. If back exists, it is removed.}
 procedure safeCopy(destinationPath: string);
 begin
 
+  // not sure if needed, but wait for external filesystem to catch up.
   delay(1000);
 
   //stub
-  writeln('dest >'+destinationPath+'<');
   destinationPath := trim(destinationPath);
-  //dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
-  writeln('move');
-  dos.exec(getEnv('COMSPEC'), '/C move '+destinationPath+' '+destinationPath+'_tmp');
-  writeln('make');
+  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+  dos.exec(getEnv('COMSPEC'), '/C ren '+destinationPath+' '+destinationPath+'_tmp');
   try
     mkDIR(destinationPath);
   except
     // ignore
   end;
-  writeln('copy');
   dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy message.txt '+destinationPath+' > nul');
-  writeln('done');
-  //dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
 end;
 
 
