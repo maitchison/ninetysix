@@ -49,6 +49,7 @@ begin
   dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
+  dos.exec(getEnv('COMSPEC'), '/C copy message.txt '+destinationPath+' > nul');
   dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
 end;
 
@@ -65,27 +66,13 @@ begin
 
   time := now;
 
-  destinationPath := '$rep\'+time.YYMMDD('')+'_'+time.HHMMSS('');
-  {$I-}
-  mkDIR(destinationPath);
-  {$I+}
-  dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
-
-  assign(t,destinationPath+'/message.txt');
+  assign(t,'message.txt');
   rewrite(t);
   writeln(t, msg);
   close(t);
 
-  {it's handy to have a daily folder aswell}
-  destinationPath := '$rep\'+time.YYMMDD('');
-  {$I-}
-  mkDIR(destinationPath);
-  {$I+}
-  safeCopy(destinationPath);
-
-  {and head...}
+  safeCopy('$rep\'+time.YYMMDD('')+'_'+time.HHMMSS(''));
+  safeCopy('$rep\'+time.YYMMDD(''));
   safeCopy('$rep\head');
 
 end;
