@@ -190,8 +190,14 @@ end;
 {expects rect to include new point (if needed)}
 procedure tRect.expandToInclude(p: tPoint);
 begin
-  x := min(x, p.x);
-  y := min(y, p.y);
+  if p.x < x then begin
+    width += (x-p.x);
+    x := p.x;
+  end;
+  if p.y < y then begin
+    height += (y-p.y);
+    y := p.y;
+  end;
   width := max(width, p.x - x);
   height := max(height, p.y - y);
 end;
@@ -238,8 +244,9 @@ begin
   r := tRect.create(12, 14, 0, 0);
   r.expandToInclude(tPoint.create(15, 3));
   r.expandToInclude(tPoint.create(22, 19));
+  r.expandToInclude(tPoint.create(12, 2));
   assertEqual(r.left, 12);
-  assertEqual(r.top, 3);
+  assertEqual(r.top, 2);
   assertEqual(r.right, 22);
   assertEqual(r.bottom, 19);
 

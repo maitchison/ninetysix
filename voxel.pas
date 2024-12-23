@@ -280,7 +280,7 @@ var
   c, debugCol: RGBA;
   faceColor: array[1..6] of RGBA;
   size: V3D; {half size of cuboid}
-  cameraX, cameraY, cameraZ: V3D;
+  cameraX, cameraY, cameraZ, cameraDir: V3D;
   p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
   objToWorld: tMatrix4X4;
   worldToObj: tMatrix4X4;
@@ -340,10 +340,6 @@ var
     deltaY  - How much intersection point changes as we can accross down
     txDelta - How much t changes as we scan accross
     tyDelta - How much t changes as we scan down
-
-
-
-
   }
   procedure traceFace(faceID: byte; p1,p2,p3,p4: V3D);
   var
@@ -410,12 +406,12 @@ var
     end;
 
     case faceID of
-      1: aZ := cameraZ.z;
-      2: aZ := cameraZ.z;
-      3: aZ := cameraZ.x;
-      4: aZ := cameraZ.x;
-      5: aZ := cameraZ.y;
-      6: aZ := cameraZ.y;
+      1: aZ := cameraDir.z;
+      2: aZ := cameraDir.z;
+      3: aZ := cameraDir.x;
+      4: aZ := cameraDir.x;
+      5: aZ := cameraDir.y;
+      6: aZ := cameraDir.y;
     end;
     if aZ = 0 then exit; {should not happen?}
     invZ := 1/aZ;
@@ -429,8 +425,8 @@ var
       5: begin txDelta := -cameraX.y * invZ; tyDelta := -cameraY.y * invZ; end;
       6: begin txDelta := -cameraX.y * invZ; tyDelta := -cameraY.y * invZ; end;
     end;
-    deltaX := cameraX + cameraZ*txDelta;
-    deltaY := cameraY + cameraZ*tyDelta;
+    deltaX := cameraX + cameraDir*txDelta;
+    deltaY := cameraY + cameraDir*tyDelta;
 
     if cpuInfo.hasMMX then
       traceProc := traceScanline_MMX
@@ -449,8 +445,8 @@ var
        this resolves some precision errors}
       rayOrigin :=
         cameraX*((screenLines[y].xMin)-atPos.x+0.5) +
-        cameraY*(y-atPos.y+0.5) +
-        cameraZ*(0-atPos.z+0.5);
+        cameraY*(y-atPos.y+0.5)+
+        cameraDir*(0-atPos.z);
 
       case faceID of
         1: t := (-size.z-rayOrigin.z) * invZ;
@@ -462,13 +458,13 @@ var
         else t := 0;
       end;
 
-      pos := rayOrigin + cameraZ * (t+0.50); {start half way in a voxel}
+      pos := rayOrigin + cameraDir * (t+0.50); {start half way in a voxel}
       pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
 
       traceProc(
         canvas, self,
         screenLines[y].xMin, screenLines[y].xMax, y,
-        pos, cameraZ, deltaX, deltaY
+        pos, cameraDir, deltaX, deltaY
       );
     end;
   end;
@@ -488,6 +484,9 @@ begin
   faceColor[6].init(0,0,128);
 
   isometricTransform.rotationX(-0.615); //~35 degrees
+
+  atPos := isometricTransform.apply(atPos);
+
   objToWorld.rotationXYZ(roll, pitch, zAngle);
 
   objToWorld := objToWorld.MM(isometricTransform);
@@ -497,7 +496,7 @@ begin
   objToWorld.applyScale(scale);
   worldToObj.applyScale(1/scale);
 
-  {for the moment just hack the transform in here}
+  {for the moment just hack the translation in here}
   objToWorld.setM(4,1, atPos.x);
   objToWorld.setM(4,2, atPos.y);
   objToWorld.setM(4,3, atPos.z);
@@ -507,7 +506,8 @@ begin
 
   cameraX := worldToObj.apply(V3D.create(1,0,0,0));
   cameraY := worldToObj.apply(V3D.create(0,1,0,0));
-  cameraZ := worldToObj.apply(V3D.create(0,0,1,0)).normed();
+  cameraZ := worldToObj.apply(V3D.create(0,0,1,0));
+  cameraDir := cameraZ.normed();
 
   {get cube corners}
   {note: this would be great place to apply cropping}
@@ -521,7 +521,6 @@ begin
   p6 := objToWorld.apply(V3D.create(+size.x, -size.y, +size.z, 1));
   p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z, 1));
   p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z, 1));
-
 
   {trace each side of the cubeoid}
   traceFace(1, p1, p2, p3, p4);

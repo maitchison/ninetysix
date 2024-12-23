@@ -92,6 +92,7 @@ var
   col16: RGBA16;
   i,j: integer;
   dx,dy: single;
+  goodSamples: integer;
 begin
 
   size := voxSprite.getSize;
@@ -108,11 +109,13 @@ begin
 
     if keyDown(key_f6) then begin
       {5 point AA}
+      goodSamples := 0;
       if col.a > 0 then begin
         col16.r := col.r;
         col16.g := col.g;
         col16.b := col.b;
         col16.a := col.a;
+        inc(goodSamples);
       end else
         fillchar(col16, sizeof(col16), 0);
       for i := 0 to 1 do
@@ -130,13 +133,18 @@ begin
           col := trace_REF(voxSprite, pos+(deltaX*dx)+(deltaY*dy), dir, size);
           if col.a > 0 then begin
             col16.r += col.r; col16.g += col.g; col16.b += col.b; col16.a += col.a;
+            inc(goodSamples)
           end;
         end;
-      col16.r := col16.r div 5;
-      col16.g := col16.g div 5;
-      col16.b := col16.b div 5;
-      col16.a := col16.a div 5;
-      col := RGBA(col16);
+      if goodSamples = 0 then
+        col := RGBA.create(0,0,0,0)
+      else begin
+        col16.r := col16.r div goodSamples;
+        col16.g := col16.g div goodSamples;
+        col16.b := col16.b div goodSamples;
+        col16.a := col16.a div 5;
+        col := RGBA(col16);
+      end;
     end;
 
     pos += deltaX;

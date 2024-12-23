@@ -61,7 +61,7 @@ function worldToCanvas(p: V3D): tPoint; forward;
 type
   tCar = class
   const
-    CAR_SCALE = 0.5;
+    CAR_SCALE = 0.5; // 0.5
   protected
     procedure drawTires(side: integer);
     procedure tractionSimple();
@@ -111,6 +111,7 @@ procedure tCar.drawTires(side: integer);
 var
   i,j, dx, dy: int32;
   tireAngle: single;
+  flip: single;
 begin
   for i := 0 to 1 do
     for j := 0 to 1 do begin
@@ -120,9 +121,9 @@ begin
       if cos(tireAngle) * side >= 0 then
       screen.markRegion(wheelVox.draw(
         screen.canvas,
-        getWheelPosition(dx,dy),
-        tireAngle, getSec*10, pi/2,
-        1.5*CAR_SCALE)
+        getWheelPosition(dx, dy),
+        tireAngle, getSec*dy*vel.abs/200, pi/2,
+        1.85*CAR_SCALE) //slightly oversized wheels
       );
     end;
 end;
@@ -148,8 +149,9 @@ end;
 function tCar.getWheelPosition(dx,dy: integer): V3D;
 var
   p: V3D;
+  t1: single;
 begin
-  p := V3D.create(20*dx, 10*dy, 5).rotated(0, 0, zAngle) * CAR_SCALE;
+  p := V3D.create(-2+16*dx, 12*dy, +2).rotated(0, 0, zAngle) * CAR_SCALE;
   result := p + pos;
 end;
 
@@ -445,9 +447,7 @@ begin
   else
     mixerCpuUsage := -1;
 
-
   GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
-
   screen.markRegion(tRect.create(10, 10, 300, 22), FG_FLIP);
 end;
 
@@ -526,14 +526,14 @@ begin
 
     padding := round(60 * carScale/0.75);
 
-    screen.clearRegion(tRect.create(320-(padding div 2), 360-(padding div 2), padding, padding));
+    screen.clearAll();
 
     startTime := getSec;
 
     if benchmarkMode then begin
-      carVox.draw(screen.canvas, V3D.create(320, 360, 0), 0.3, 0, 0.2, carScale);
+      screen.markRegion(carVox.draw(screen.canvas, V3D.create(320, 440, 0), 0.3, 0, 0.2, carScale));
     end else
-      carVox.draw(screen.canvas, V3D.create(320, 360, 0), xTheta, 0, zTheta, carScale);
+      screen.markRegion(carVox.draw(screen.canvas, V3D.create(320, 440, 0), xTheta, 0, zTheta, carScale));
 
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)
@@ -541,9 +541,6 @@ begin
       carDrawTime := (carDrawTime * 0.90) + 0.10*(getSec - startTime);
 
     drawGUI();
-
-    screen.copyRegion(tRect.create(10, 10, 300, 25));
-    screen.copyRegion(tRect.create(320-(padding div 2), 360-(padding div 2), padding, padding));
 
     mixer.mute := keyDown(key_m);
     mixer.noise := keyDown(key_n);
@@ -560,6 +557,8 @@ begin
       else
         nextBellSound += (30/136)
     end;
+
+    screen.flipAll();
 
     if keyDown(key_e) then begin
       {force an error}

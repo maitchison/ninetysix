@@ -287,6 +287,12 @@ begin
   fgyMin := min(y1, fgyMin);
   fgxMax := max(x2, fgxMax);
   fgyMax := max(y2, fgyMax);
+
+  if keyDown(key_f3) then begin
+    s3Driver.fgColor := rgba.create(0,0,rnd);
+    s3Driver.fillRect(rect.x, rect.y, rect.width, rect.height);
+  end;
+
 end;
 
 {clears all parts of the screen marked for clearing
@@ -333,7 +339,7 @@ var
 begin
   stats.copyCells := 0; stats.copyRegions := 0;
   startTime := getSec;
-  for y := fgyMin to fgYMax do begin
+  for y := fgYMin to fgYMax do begin
     rle := 0;
     for x := fgXMin to fgXMax do begin
       if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
