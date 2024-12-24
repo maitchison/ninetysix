@@ -75,6 +75,55 @@ type
     vox: tVoxelSprite;
   end;
 
+{-----------------------------------------------------------}
+
+const
+  SNOW_PARTICLES = 128;
+
+type
+  tSnowParticle = record
+    phase: single;
+    pos: V3D;
+    procedure reset();
+    procedure update();
+    procedure draw();
+  end;
+
+var
+  snow: array[0..SNOW_PARTICLES-1] of tSnowParticle;
+
+procedure tSnowParticle.reset();
+begin
+  pos.x := (rnd*3)-384 + 320;
+  pos.y := rnd div 16;
+  pos.z := 0;
+  phase := rnd/256;
+end;
+
+procedure tSnowParticle.update();
+begin
+  pos.x += sin(phase*2+getSec);
+  pos.y += (3.5 + cos(getSec) + phase) * elapsed * 30;
+  if pos.y > 480 then
+    reset();
+end;
+
+procedure tSnowParticle.draw();
+var
+  dx,dy: integer;
+begin
+  dx := round(pos.x);
+  dy := round(pos.y);
+  screen.markRegion(tRect.create(dx-1, dy-1, 3, 3));
+  screen.canvas.putPixel(dx, dy, RGBA.create(250, 250, 250, 240));
+  screen.canvas.putPixel(dx-1, dy, RGBA.create(250, 250, 250, 140));
+  screen.canvas.putPixel(dx+1, dy, RGBA.create(250, 250, 250, 140));
+  screen.canvas.putPixel(dx, dy-1, RGBA.create(250, 250, 250, 140));
+  screen.canvas.putPixel(dx, dy+1, RGBA.create(250, 250, 250, 140));
+end;
+
+{-----------------------------------------------------------}
+
 var
   CC_RED,
   CC_POLICE,
@@ -115,7 +164,7 @@ type
 constructor tCar.create(aChassis: tCarChassis);
 begin
   inherited create();
-  pos := V3D.create(0, 0, 0);
+  pos := V3D.create(0,0,0);
   vel := V3D.create(0,0,0);
   zAngle := 0;
   tilt := 0;
@@ -543,6 +592,9 @@ var
   mixerCpuUsage: double;
 begin
 
+  //stub
+  exit;
+
   if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
 
@@ -566,6 +618,7 @@ var
   benchmarkMode: boolean;
   padding: integer;
   carScale: single;
+  i,j: integer;
 
 begin
 
@@ -589,6 +642,13 @@ begin
 
   startClock := getSec;
   lastClock := startClock;
+
+  for i := 0 to SNOW_PARTICLES-1 do begin
+    snow[i].reset();
+    snow[i].pos.y := rnd+rnd;
+    for j := 0 to rnd do
+      snow[i].update();
+  end;
 
   while True do begin
 
@@ -629,6 +689,12 @@ begin
     end;
 
     screen.clearAll();
+
+    {draw snow}
+    for i := 0 to SNOW_PARTICLES-1 do begin
+      snow[i].update();
+      snow[i].draw();
+    end;
 
     startTime := getSec;
 
