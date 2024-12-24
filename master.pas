@@ -250,7 +250,8 @@ begin
   {game stuff}
 //  convertBMP('title', 'c:\masters\airtime\title_640.bmp');
 //  convertBMP('track1', 'c:\masters\airtime\track1.bmp');
-//  convertBMP('car1', 'c:\masters\airtime\car1.bmp');
+  convertBMP('carRed16', 'c:\masters\airtime\carRed16.bmp');
+  convertBMP('carPolice16', 'c:\masters\airtime\carPolice16.bmp');
   convertBMP('wheel1', 'c:\masters\airtime\wheel.bmp');
 
   {gui stuff}

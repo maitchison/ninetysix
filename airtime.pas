@@ -38,7 +38,7 @@ var
   engineSFX: tSoundEffect;
   startSFX: tSoundEffect;
   trackSprite: tSprite;
-  carVox, wheelVox: tVoxelSprite;
+  car1Vox, car2Vox, wheelVox: tVoxelSprite;
 
   {global time keeper}
   elapsed: double = 0;
@@ -59,9 +59,21 @@ function worldToCanvas(p: V3D): tPoint; forward;
 {---------------------------------------------------------------------}
 
 type
+  tCarChassis = record
+    wheelPos: V3D;
+    wheelOffset: V3D;
+    wheelSize: single;
+    vox: tVoxelSprite;
+  end;
+
+var
+  CC_RED,
+  CC_POLICE: tCarChassis;
+
+type
   tCar = class
   const
-    CAR_SCALE = 2.40; // 0.5
+    CAR_SCALE = 0.75;
   protected
     procedure drawWheels(side: integer);
     procedure tractionSimple();
@@ -71,6 +83,7 @@ type
     vel: V3D;
     zAngle: single;
     tilt: single;
+    chassis: tCarChassis;
 
     mass: single;
     tireTraction: single;
@@ -78,23 +91,22 @@ type
     enginePower: single;
     dragCoefficent: single;
     constantDrag: single;
-    vox: tVoxelSprite;
     tireRotation: double;
 
-    constructor create(aVox: tVoxelSprite);
+    constructor create(aChassis: tCarChassis);
 
     function getWheelPos(dx,dy: integer): V3D;
+    function vox: tVoxelSprite;
 
     procedure draw();
     procedure update();
   end;
 
-constructor tCar.create(aVox: tVoxelSprite);
+constructor tCar.create(aChassis: tCarChassis);
 begin
   inherited create();
   pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
   vel := V3D.create(0,0,0);
-  vox := aVox;
   zAngle := 0;
   tilt := 0;
   mass := 1;
@@ -104,6 +116,7 @@ begin
   dragCoefficent := 0.0025;
   constantDrag := 50;
   tireRotation := 0.0;
+  chassis := aChassis;
 end;
 
 {draws tires. If side < 0 then tires behind car are drawn,
@@ -130,7 +143,7 @@ begin
         screen.canvas,
         getWheelPos(dx, dy),
         tireAngle, tireRotation * dy, pi/2,
-        1.85*CAR_SCALE) //slightly oversized wheels
+        1.0*CAR_SCALE)
       );
     end;
 end;
@@ -152,14 +165,18 @@ begin
     carDrawTime := (carDrawTime * 0.95) + 0.05*(getSec - startTime);
 end;
 
+function tCar.vox: tVoxelSprite;
+begin
+  result := chassis.vox;
+end;
+
 {returns wheel positon in world space, e.g. -1, -1 for front left tire}
 function tCar.getWheelPos(dx,dy: integer): V3D;
 var
   p: V3D;
-  t1: single;
 begin
-  p := V3D.create(-2+16*dx, 12*dy, +2).rotated(0, 0, zAngle) * CAR_SCALE;
-  result := p + pos;
+  p := chassis.wheelPos * V3D.create(dx, dy, 0) + chassis.wheelOffset;
+  result := p.rotated(0, 0, zAngle) * CAR_SCALE + self.pos;
 end;
 
 procedure tCar.tractionSimple();
@@ -384,6 +401,7 @@ begin
   if drawPos.x > 1024-BOUNDARY then vel.x -= (drawPos.x-(1024-BOUNDARY)) * 1.0;
   if drawPos.y > 480-BOUNDARY then vel.y -= (drawPos.y-(480-BOUNDARY)) * 1.0;
 
+  //stub
   tilt *= decayFactor(0.5);
 end;
 
@@ -440,7 +458,8 @@ begin
   titleBackground := loadSprite('title');
   trackSprite := loadSprite('track1');
 
-  carVox := tVoxelSprite.loadFromFile('res\car1', 32);
+  car1Vox := tVoxelSprite.loadFromFile('res\carRed16', 16);
+  car2Vox := tVoxelSprite.loadFromFile('res\carPolice16', 16);
   wheelVox := tVoxelSprite.loadFromFile('res\wheel1', 8);
 
   if cpuInfo.ram > 40*1024*1024 then
@@ -448,6 +467,21 @@ begin
     music := tSoundEffect.loadFromWave('res\music16.wav')
   else
     music := tSoundEffect.loadFromWave('res\music8.wav');
+
+  {setup chassis}
+  {todo: have these as meta data}
+  with CC_RED do begin
+    wheelPos := V3D.create(8, 7, 0);
+    wheelOffset := V3D.create(-1, 0, 0);
+    wheelSize := 1.0;
+    vox := car1Vox;
+  end;
+  with CC_POLICE do begin
+    wheelPos := V3D.create(10, 7, 0);
+    wheelOffset := V3D.create(+1, 0, 3);
+    wheelSize := 1.0;
+    vox := car2Vox;
+  end;
 
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
@@ -492,7 +526,7 @@ begin
 
   b := 0;
   benchmarkMode := false;
-  carScale := 0.75;
+  carScale := 1.5;
 
   titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
   titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
@@ -547,16 +581,14 @@ begin
       zTheta := zAngle / 180 * 3.1415;
     end;
 
-    padding := round(60 * carScale/0.75);
-
     screen.clearAll();
 
     startTime := getSec;
 
     if benchmarkMode then begin
-      screen.markRegion(carVox.draw(screen.canvas, V3D.create(320, 440, 0), 0.3, 0, 0.2, carScale));
+      screen.markRegion(car1Vox.draw(screen.canvas, V3D.create(320, 440, 0), 0.3, 0, 0.2, carScale));
     end else
-      screen.markRegion(carVox.draw(screen.canvas, V3D.create(320, 440, 0), xTheta, 0, zTheta, carScale));
+      screen.markRegion(car1Vox.draw(screen.canvas, V3D.create(320, 440, 0), xTheta, 0, zTheta, carScale));
 
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)
@@ -570,7 +602,7 @@ begin
 
     if keyDown(key_b) then begin
       benchmarkMode := true;
-      carScale := 2.0;
+      carScale := 3.0;
     end;
 
     if keyDown(key_s) and (getSec > nextBellSound) then begin
@@ -628,7 +660,7 @@ begin
 
   mixer.play(startSFX);
 
-  car := tCar.create(carVox);
+  car := tCar.create(CC_POLICE);
   car.pos := V3D.create(300,300,0);
 
   startClock := getSec;
