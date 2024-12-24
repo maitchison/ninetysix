@@ -35,9 +35,9 @@ type
   private
     fViewPort: tRect;
     // dirty grid
-    // support for up to 1024x128
+    // support for up to 2048x2048
     // pixel -> grid is divide by 8
-    flagGrid: array[0..127, 0..127] of byte;
+    flagGrid: array[0..256-1, 0..256-1] of byte;
     fgxMin,fgyMin,fgxMax,fgyMax: integer;
     s3Driver: tS3Driver;
 

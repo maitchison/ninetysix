@@ -26,6 +26,15 @@ uses
   go32;
 
 
+CONST
+
+  XMAS = True;
+
+  DEFAULT_CAR_SCALE = 0.75;
+
+  ENGINE_RANGE = 0.75; // 4.0
+  ENGINE_START = 0.5; // 0.5
+
 var
   {screen}
   screen: tScreen;
@@ -70,9 +79,6 @@ var
   CC_POLICE,
   CC_BOX,
   CC_SANTA: tCarChassis;
-
-const
-  DEFAULT_CAR_SCALE = 0.75;
 
 type
   tCar = class
@@ -309,7 +315,7 @@ begin
     // for the moment engine sound is speed, which is not quiet right
     // should be 'revs'
     mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
-    mixer.channels[3].pitch := 0.5 + clamp(vel.abs/250, 0, 4.0);
+    mixer.channels[3].pitch := (ENGINE_START + clamp(vel.abs/250, 0, ENGINE_RANGE));
 
     debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
@@ -403,8 +409,8 @@ begin
 
   if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
   if drawPos.y < BOUNDARY then vel.y += (BOUNDARY-drawPos.y) * 1.0;
-  if drawPos.x > 1024-BOUNDARY then vel.x -= (drawPos.x-(1024-BOUNDARY)) * 1.0;
-  if drawPos.y > 480-BOUNDARY then vel.y -= (drawPos.y-(480-BOUNDARY)) * 1.0;
+  if drawPos.x > screen.canvas.width-BOUNDARY then vel.x -= (drawPos.x-(screen.canvas.width-BOUNDARY)) * 1.0;
+  if drawPos.y > screen.canvas.height-BOUNDARY then vel.y -= (drawPos.y-(screen.canvas.height-BOUNDARY)) * 1.0;
 
   //stub
   tilt *= decayFactor(0.5);
@@ -423,6 +429,8 @@ procedure debugTextOut(dx,dy: integer; s: string);
 var
   r: tRect;
 begin
+  //stub
+  exit;
   r := textExtents(s).padded(2);
   r.x += dx;
   r.y += dy;
@@ -460,8 +468,15 @@ begin
 
   note('Loading Resources.');
 
-  titleBackground := loadSprite('title');
-  trackSprite := loadSprite('track1');
+  if XMAS then
+    titleBackground := loadSprite('XMAS_title')
+  else
+    titleBackground := loadSprite('title');
+
+  if XMAS then
+    trackSprite := loadSprite('XMAS_track')
+  else
+    trackSprite := loadSprite('track1');
 
   {setup chassis}
   {todo: have these as meta data}
@@ -490,17 +505,29 @@ begin
     vox := tVoxelSprite.loadFromFile('res\carSanta16', 16);
   end;
 
+  if XMAS then begin
+    CC_RED := CC_SANTA;
+    CC_BOX := CC_SANTA;
+  end;
+
   wheelVox := tVoxelSprite.loadFromFile('res\wheel1', 8);
 
-  if cpuInfo.ram > 40*1024*1024 then
-    {16bit music if we have the ram for it}
-    music := tSoundEffect.loadFromWave('res\music16.wav')
-  else
-    music := tSoundEffect.loadFromWave('res\music8.wav');
+  if XMAS then
+    music := tSoundEffect.loadFromWave('res\music3.wav')
+  else begin
+    if cpuInfo.ram > 40*1024*1024 then
+      {16bit music if we have the ram for it}
+      music := tSoundEffect.loadFromWave('res\music16.wav')
+    else
+      music := tSoundEffect.loadFromWave('res\music8.wav');
+  end;
 
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
-  engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
+  if XMAS then
+    engineSFX:= tSoundEffect.loadFromWave('res\slaybells.wav').asFormat(AF_16_STEREO)
+  else
+    engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
   startSFX := tSoundEffect.loadFromWave('res\start.wav').asFormat(AF_16_STEREO);
 
 end;
@@ -655,7 +682,7 @@ begin
   note('Main loop started');
 
   videoDriver.setMode(320,240,32);
-  videoDriver.setLogicalSize(1024,480);
+  videoDriver.setLogicalSize(trackSprite.width,trackSprite.height);
 
   screen.reset();
   screen.background := trackSprite;
@@ -664,7 +691,8 @@ begin
 
   // turn off music
   // todo: find a better way of doing this
-  mixer.channels[1].reset();
+  if not XMAS then
+    mixer.channels[1].reset();
 
   // start our sliding sound
   mixer.playRepeat(slideSFX, SCS_FIXED2);
@@ -673,9 +701,10 @@ begin
   mixer.playRepeat(engineSFX, SCS_FIXED3);
   mixer.channels[3].volume := 0.0;
 
-  mixer.play(startSFX);
+  if not XMAS then
+    mixer.play(startSFX);
 
-  car := tCar.create(CC_SANTA);
+  car := tCar.create(CC_RED);
   car.pos := V3D.create(300,300,0);
 
   startClock := getSec;

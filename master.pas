@@ -248,8 +248,10 @@ procedure processAll();
 begin
 
   {game stuff}
-//  convertBMP('title', 'c:\masters\airtime\title_640.bmp');
-//  convertBMP('track1', 'c:\masters\airtime\track1.bmp');
+  convertBMP('title', 'c:\masters\airtime\title_640.bmp');
+  convertBMP('XMAS_title', 'c:\masters\airtime\XMAS_title.bmp');
+  convertBMP('XMAS_track', 'c:\masters\airtime\XMAS_track.bmp');
+  //convertBMP('track1', 'c:\masters\airtime\track1.bmp');
   convertBMP('carRed16', 'c:\masters\airtime\carRed16.bmp');
   convertBMP('carPolice16', 'c:\masters\airtime\carPolice16.bmp');
   convertBMP('carBox16', 'c:\masters\airtime\carBox16.bmp');
