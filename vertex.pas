@@ -81,21 +81,28 @@ type
   tMatrix4x4 = record
     data: array[1..16] of single;
 
-    function getM(i,j: integer): single; inline;
+    function  getM(i,j: integer): single; inline;
     procedure setM(i,j: integer;value: single); inline;
 
-    function apply(p: V3D): V3D;
-    procedure applyScale(factor: single);
+    function  apply(p: V3D): V3D;
 
-    procedure rotationX(theta: single);
 
-    procedure rotationZYX(thetaZ, thetaY, thetaX: single);
-    procedure rotationXYZ(thetaX, thetaY, thetaZ: single);
+    procedure translate(v: V3D);
+    procedure scale(factor: single); overload;
+    procedure scale(x,y,z: single); overload;
 
-    function MM(other: tMatrix4x4): tMatrix4x4;
-    function transposed(): tMatrix4x4;
-    function cloned(): tMatrix4x4;
-    function toString(): string;
+    procedure setIdentity();
+    procedure setTranslate(v: V3D);
+    procedure setRotationX(theta: single);
+    procedure setRotationZYX(thetaZ, thetaY, thetaX: single);
+    procedure setRotationXYZ(thetaX, thetaY, thetaZ: single);
+
+    function  MM(other: tMatrix4x4): tMatrix4x4;
+    function  transposed(): tMatrix4x4;
+    function  cloned(): tMatrix4x4;
+    function  toString(): string;
+
+    class operator Multiply(a: tMatrix4x4; b: tMatrix4x4): tMatrix4x4;
   end;
 
 implementation
@@ -275,15 +282,7 @@ begin
   result.w := p.w; // ignore these
 end;
 
-procedure tMatrix4X4.applyScale(factor: single);
-var
-  i: integer;
-begin
-  for i := 1 to 16 do
-    data[i] *= factor;
-end;
-
-procedure tMatrix4X4.rotationZYX(thetaZ, thetaY, thetaX: single);
+procedure tMatrix4X4.setRotationZYX(thetaZ, thetaY, thetaX: single);
 var
   cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
@@ -312,7 +311,7 @@ begin
   data[16] := 1;
 end;
 
-procedure tMatrix4X4.rotationXYZ(thetaX, thetaY, thetaZ: single);
+procedure tMatrix4X4.setRotationXYZ(thetaX, thetaY, thetaZ: single);
 var
   cosX,sinX,cosY,sinY,cosZ,sinZ: single;
 begin
@@ -340,7 +339,55 @@ begin
   data[16] := 1;
 end;
 
-procedure tMatrix4X4.rotationX(theta: single);
+procedure tMatrix4X4.setIdentity();
+var
+  i: integer;
+begin
+  fillchar(self, sizeof(self), 0);
+  for i := 1 to 4 do
+    setM(i,i,1);
+end;
+
+procedure tMatrix4X4.translate(v: V3D);
+var
+  i: integer;
+begin
+  data[4] += v.x;
+  data[8] += v.y;
+  data[12] += v.z;
+end;
+
+procedure tMatrix4X4.scale(factor: single); overload;
+var
+  i: integer;
+begin
+  for i := 1 to 16 do
+    data[i] *= factor;
+end;
+
+procedure tMatrix4X4.scale(x,y,z: single); overload;
+var
+  i: integer;
+begin
+  for i := 1 to 4 do begin
+    data[0+i] *= x;
+    data[4+i] *= y;
+    data[8+i] *= z;
+  end;
+end;
+
+
+procedure tMatrix4X4.setTranslate(v: V3D);
+var
+  i: integer;
+begin
+  setIdentity;
+  setM(4, 1, v.x);
+  setM(4, 2, v.y);
+  setM(4, 3, v.z);
+end;
+
+procedure tMatrix4X4.setRotationX(theta: single);
 var
   cs,sn: single;
 begin
@@ -415,6 +462,13 @@ begin
   for i := 0 to 3 do
     result += format('%f %f %f', [data[i*4+1],data[i*4+2],data[i*4+3], data[i*4+4]]) + #13#10;
 end;
+
+class operator tMatrix4X4.Multiply(a: tMatrix4x4; b: tMatrix4x4): tMatrix4x4;
+begin
+  {todo: check this is the right way around}
+  result := a.MM(b);
+end;
+
 
 {-----------------------------------------------------}
 
@@ -575,27 +629,27 @@ begin
   assert(abs(p.abs-1) < 0.01);
 
   {rotate 45 degrees}
-  A.rotationZYX(degrees45,degrees45,degrees45);
+  A.setRotationZYX(degrees45,degrees45,degrees45);
   p := A.apply(pInitial);
   assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {rotate random degrees}
-  A.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  A.setRotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
   p := A.apply(pInitial);
   assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {rotate random degrees}
-  A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  A.setRotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
   p := A.apply(pInitial);
   assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f)', [p.toString, p.abs]));
 
   {check transpose looks ok}
-  A.rotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  A.setRotationZYX(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
   p := A.transposed().apply(pInitial);
   assert(abs(p.abs-1) < 0.01, format('Vector %s was not unit (%f) after transpose rotation', [p.toString, p.abs]));
 
   {make sure inverse kind of works}
-  A.rotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
+  A.setRotationXYZ(rnd/255-0.5, rnd/255-0.5, rnd/255-0.5);
   p := A.apply(pInitial);
   B := A.transposed();
   C := A.MM(B);

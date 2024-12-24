@@ -69,6 +69,7 @@ function worldToCanvas(p: V3D): tPoint; forward;
 
 type
   tCarChassis = record
+    carHeight: single;
     wheelPos: V3D;
     wheelOffset: V3D;
     wheelSize: single;
@@ -212,12 +213,20 @@ end;
 procedure tCar.draw();
 var
   startTime: double;
+  p: V3D;
 begin
 
   startTime := getSec;
 
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale*0.9, true));
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale*1.0, true));
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale*1.1, true));
+
+
   drawWheels(-1);
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale));
+  p := pos;
+  p.z -= chassis.carHeight;
+  screen.markRegion(vox.draw(screen.canvas, p, zAngle, 0, 0, scale));
   drawWheels(+1);
 
   if carDrawTime = 0 then
@@ -545,18 +554,21 @@ begin
   {setup chassis}
   {todo: have these as meta data}
   with CC_RED do begin
+    carHeight := 5;
     wheelPos := V3D.create(8, 7, 0);
     wheelOffset := V3D.create(-1, 0, 0);
     wheelSize := 1.0;
     vox := tVoxelSprite.loadFromFile('res\carRed16', 16);;
   end;
   with CC_POLICE do begin
+    carHeight := 5;
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
     wheelSize := 1.0;
     vox := tVoxelSprite.loadFromFile('res\carPolice16', 16);
   end;
   with CC_BOX do begin
+    carHeight := 5;
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
     wheelSize := 1.0;
@@ -567,6 +579,7 @@ begin
     wheelOffset := V3D.create(+1, 0, 3);
     wheelSize := 0.0;
     vox := tVoxelSprite.loadFromFile('res\carSanta16', 16);
+    carHeight := 16;
   end;
 
   if XMAS then begin

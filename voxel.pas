@@ -54,7 +54,7 @@ type
     function getSize(): V3D16;
     function getVoxel(x,y,z:int32): RGBA;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    function draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1): tRect;
+    function draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1;asShadow:boolean=false): tRect;
   end;
 
 implementation
@@ -272,20 +272,26 @@ begin
 end;
 
 {draw voxel sprite, with position given in world space.
-
 returns the bounding rect of the drawn object.
 }
-function tVoxelSprite.draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1): tRect;
+function tVoxelSprite.draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1;asShadow:boolean=false): tRect;
 var
   c, debugCol: RGBA;
   faceColor: array[1..6] of RGBA;
   size: V3D; {half size of cuboid}
   cameraX, cameraY, cameraZ, cameraDir: V3D;
-  p1,p2,p3,p4,p5,p6,p7,p8: V3D; {world space}
-  objToWorld: tMatrix4X4;
-  worldToObj: tMatrix4X4;
+  p: array[1..8] of V3D; {world space}
+
+
+  {view is identity as we have no camera}
+  model, projection: tMatrix4X4;
+  mvp, mvpInv: tMatrix4X4;
+
+  //objToWorld: tMatrix4X4;
+  //worldToObj: tMatrix4X4;
   isometricTransform : tMatrix4x4;
   lastTraceCount: int32;
+  i: integer;
 
   procedure scanSide(a, b: tPoint);
   var
@@ -293,6 +299,7 @@ var
     y: int32;
     x: single;
     deltaX: single;
+    yMin, yMax: integer;
   begin
     if a.y = b.y then begin
       {special case}
@@ -308,7 +315,13 @@ var
 
     x := a.x;
     deltaX := (b.x-a.x) / (b.y-a.y);
-    for y := a.y to b.y do begin
+    yMin := a.y;
+    if yMin < 0 then begin
+      x += deltaX * -yMin;
+      yMin := 0;
+    end;
+    yMax := min(b.y, canvas.height-1);
+    for y := yMin to yMax do begin
       screenLines[y].adjust(round(x));
       x += deltaX;
     end;
@@ -415,6 +428,14 @@ var
       exit;
     end;
 
+    if asShadow then begin
+      for y := yMin to yMax do
+        canvas.hline(
+          screenLines[y].xMin, y, screenLines[y].xMax,
+          rgba.create(0,0,0,48));
+      exit;
+    end;
+
     case faceID of
       1: aZ := cameraDir.z;
       2: aZ := cameraDir.z;
@@ -423,7 +444,7 @@ var
       5: aZ := cameraDir.y;
       6: aZ := cameraDir.y;
     end;
-    if aZ = 0 then exit; {should not happen?}
+    if aZ = 0 then exit; {this should not happen}
     invZ := 1/aZ;
 
     {calculate our deltas}
@@ -493,62 +514,65 @@ begin
   faceColor[5].init(0,0,255);
   faceColor[6].init(0,0,128);
 
-  isometricTransform.rotationX(-0.615); //~35 degrees
+  {note:
+    I make use of transpose to invert the rotation matrix, but
+    this means I need to apply scale and translate later on
+    which is a bit of a pain
+  }
 
-  atPos := isometricTransform.apply(atPos);
+  {set up our matrices}
+  model.setRotationXYZ(roll, pitch, zAngle);
+  if asShadow then
+    model.scale(1,1,0);
+  projection.setRotationX(-0.615); //~35 degrees
+  mvp := model * projection;
 
-  objToWorld.rotationXYZ(roll, pitch, zAngle);
+  {convert given world position}
+  atPos := projection.apply(atPos);
 
-  objToWorld := objToWorld.MM(isometricTransform);
-  {transpose is inverse (for unitary)}
-  worldToObj := objToWorld.transposed();
+  {calculate the inverse matrix}
+  mvpInv := mvp.transposed();
+  model.scale(scale);
+  mvp.scale(scale);
+  mvpInv.scale(1/scale);
 
-  objToWorld.applyScale(scale);
-  worldToObj.applyScale(1/scale);
+  {handle translation here as a bit of a hack, as I want the
+   inversion to be simple}
+  model.translate(atPos);
+  mvp.translate(atPos);
+  mvpInv.translate(atPos * -1);
 
-  {for the moment just hack the translation in here}
-  objToWorld.setM(4,1, atPos.x);
-  objToWorld.setM(4,2, atPos.y);
-  objToWorld.setM(4,3, atPos.z);
-  worldToObj.setM(4,1, -atPos.x);
-  worldToObj.setM(4,2, -atPos.y);
-  worldToObj.setM(4,3, -atPos.z);
-
-  cameraX := worldToObj.apply(V3D.create(1,0,0,0));
-  cameraY := worldToObj.apply(V3D.create(0,1,0,0));
-  cameraZ := worldToObj.apply(V3D.create(0,0,1,0));
+  cameraX := mvpInv.apply(V3D.create(1,0,0,0));
+  cameraY := mvpInv.apply(V3D.create(0,1,0,0));
+  cameraZ := mvpInv.apply(V3D.create(0,0,1,0));
   cameraDir := cameraZ.normed();
 
   {get cube corners}
   {note: this would be great place to apply cropping}
   size := V3D.create(fWidth/2,fHeight/2,fDepth/2);
+
   {object space -> world space}
-  p1 := objToWorld.apply(V3D.create(-size.x, -size.y, -size.z, 1));
-  p2 := objToWorld.apply(V3D.create(+size.x, -size.y, -size.z, 1));
-  p3 := objToWorld.apply(V3D.create(+size.x, +size.y, -size.z, 1));
-  p4 := objToWorld.apply(V3D.create(-size.x, +size.y, -size.z, 1));
-  p5 := objToWorld.apply(V3D.create(-size.x, -size.y, +size.z, 1));
-  p6 := objToWorld.apply(V3D.create(+size.x, -size.y, +size.z, 1));
-  p7 := objToWorld.apply(V3D.create(+size.x, +size.y, +size.z, 1));
-  p8 := objToWorld.apply(V3D.create(-size.x, +size.y, +size.z, 1));
+  p[1] := mvp.apply(V3D.create(-size.x, -size.y, -size.z, 1));
+  p[2] := mvp.apply(V3D.create(+size.x, -size.y, -size.z, 1));
+  p[3] := mvp.apply(V3D.create(+size.x, +size.y, -size.z, 1));
+  p[4] := mvp.apply(V3D.create(-size.x, +size.y, -size.z, 1));
+  p[5] := mvp.apply(V3D.create(-size.x, -size.y, +size.z, 1));
+  p[6] := mvp.apply(V3D.create(+size.x, -size.y, +size.z, 1));
+  p[7] := mvp.apply(V3D.create(+size.x, +size.y, +size.z, 1));
+  p[8] := mvp.apply(V3D.create(-size.x, +size.y, +size.z, 1));
 
   {trace each side of the cubeoid}
-  traceFace(1, p1, p2, p3, p4);
-  traceFace(2, p8, p7, p6, p5);
-  traceFace(3, p4, p8, p5, p1);
-  traceFace(4, p2, p6, p7, p3);
-  traceFace(5, p5, p6, p2, p1);
-  traceFace(6, p4, p3, p7, p8);
+  traceFace(1, p[1], p[2], p[3], p[4]);
+  traceFace(2, p[8], p[7], p[6], p[5]);
+  traceFace(3, p[4], p[8], p[5], p[1]);
+  traceFace(4, p[2], p[6], p[7], p[3]);
+  traceFace(5, p[5], p[6], p[2], p[1]);
+  traceFace(6, p[4], p[3], p[7], p[8]);
 
   {return our bounds}
-  result := tRect.create(p1.toPoint.x,p1.toPoint.y,0,0);
-  result.expandToInclude(p2.toPoint);
-  result.expandToInclude(p3.toPoint);
-  result.expandToInclude(p4.toPoint);
-  result.expandToInclude(p5.toPoint);
-  result.expandToInclude(p6.toPoint);
-  result.expandToInclude(p7.toPoint);
-  result.expandToInclude(p8.toPoint);
+  result := tRect.create(p[1].toPoint.x,p[1].toPoint.y,0,0);
+  for i := 2 to 8 do
+    result.expandToInclude(p[i].toPoint);
 
 end;
 
