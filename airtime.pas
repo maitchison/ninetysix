@@ -30,7 +30,8 @@ CONST
 
   XMAS = True;
 
-  DEFAULT_CAR_SCALE = 0.75;
+  DEFAULT_CAR_SCALE = 1.0; //0.75
+  SKID_VOLUME = 0.5; // 1.0
 
   ENGINE_RANGE = 0.75; // 4.0
   ENGINE_START = 0.5; // 0.5
@@ -114,7 +115,7 @@ type
 constructor tCar.create(aChassis: tCarChassis);
 begin
   inherited create();
-  pos := V3D.create(videoDriver.width div 2,videoDriver.height div 2,0);
+  pos := V3D.create(0, 0, 0);
   vel := V3D.create(0,0,0);
   zAngle := 0;
   tilt := 0;
@@ -296,7 +297,7 @@ begin
     tireHeat := 0.93 * tireHeat;
 
     {sound is always playing, we only adjust the volume}
-    skidVolume := clamp(slidingPower/5000, 0, 1.0);
+    skidVolume := clamp(slidingPower/5000, 0, 1.0) * SKID_VOLUME;
     //if skidVolume < mixer.channels[2].volume then alpha := EASE_OUT else alpha := EASE_IN;
     //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
     mixer.channels[2].volume := skidVolume * 0.65;
@@ -468,6 +469,20 @@ begin
 
   note('Loading Resources.');
 
+  {music first}
+  if XMAS then
+    music := tSoundEffect.loadFromWave('res\music3.wav')
+  else begin
+    if cpuInfo.ram > 40*1024*1024 then
+      {16bit music if we have the ram for it}
+      music := tSoundEffect.loadFromWave('res\music16.wav')
+    else
+      music := tSoundEffect.loadFromWave('res\music8.wav');
+  end;
+
+  mixer.play(music, SCS_FIXED1);
+
+
   if XMAS then
     titleBackground := loadSprite('XMAS_title')
   else
@@ -511,16 +526,6 @@ begin
   end;
 
   wheelVox := tVoxelSprite.loadFromFile('res\wheel1', 8);
-
-  if XMAS then
-    music := tSoundEffect.loadFromWave('res\music3.wav')
-  else begin
-    if cpuInfo.ram > 40*1024*1024 then
-      {16bit music if we have the ram for it}
-      music := tSoundEffect.loadFromWave('res\music16.wav')
-    else
-      music := tSoundEffect.loadFromWave('res\music8.wav');
-  end;
 
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
@@ -705,7 +710,7 @@ begin
     mixer.play(startSFX);
 
   car := tCar.create(CC_RED);
-  car.pos := V3D.create(300,300,0);
+  car.pos := V3D.create(screen.canvas.width div 2, screen.canvas.height div 2+300,0);
 
   startClock := getSec;
   lastClock := startClock;
@@ -730,7 +735,7 @@ begin
 
     drawPos := worldToCanvas(car.pos);
     camX += ((drawPos.x-CamX)*0.10);
-    camY += ((drawPos.y+50-CamY)*0.10); // why +50?
+    camY += ((drawPos.y-CamY)*0.10);
     car.draw();
 
     drawGUI();
@@ -792,7 +797,6 @@ begin
   videoDriver.setMode(640,480,32);
 
   screen := tScreen.create();
-  mixer.play(music, SCS_FIXED1);
 
   initMouse();
   initKeyboard();
