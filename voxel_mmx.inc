@@ -201,8 +201,7 @@ begin
       // shading
       mov cl, depth
       shl cl, 1             // todo: shading as part of sprite
-      add cl, depth
-      not cl                // cl = v = (255-(depth*3))
+      not cl                // cl = v = (255-(depth*2))
 
       mov ch, cl
       mov bx, cx

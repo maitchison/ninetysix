@@ -27,7 +27,6 @@ uses
 
 
 var
-
   {screen}
   screen: tScreen;
 
@@ -38,7 +37,7 @@ var
   engineSFX: tSoundEffect;
   startSFX: tSoundEffect;
   trackSprite: tSprite;
-  car1Vox, car2Vox, wheelVox: tVoxelSprite;
+  wheelVox: tVoxelSprite;
 
   {global time keeper}
   elapsed: double = 0;
@@ -68,12 +67,15 @@ type
 
 var
   CC_RED,
-  CC_POLICE: tCarChassis;
+  CC_POLICE,
+  CC_BOX,
+  CC_SANTA: tCarChassis;
+
+const
+  DEFAULT_CAR_SCALE = 0.75;
 
 type
   tCar = class
-  const
-    CAR_SCALE = 0.75;
   protected
     procedure drawWheels(side: integer);
     procedure tractionSimple();
@@ -84,6 +86,7 @@ type
     zAngle: single;
     tilt: single;
     chassis: tCarChassis;
+    scale: single;
 
     mass: single;
     tireTraction: single;
@@ -117,6 +120,7 @@ begin
   constantDrag := 50;
   tireRotation := 0.0;
   chassis := aChassis;
+  scale := DEFAULT_CAR_SCALE;
 end;
 
 {draws tires. If side < 0 then tires behind car are drawn,
@@ -128,6 +132,7 @@ var
   tireAngle: single;
   flip: single;
 begin
+  if chassis.wheelSize <= 0 then exit;
   for i := 0 to 1 do
     for j := 0 to 1 do begin
       dx := i*2-1;
@@ -143,7 +148,7 @@ begin
         screen.canvas,
         getWheelPos(dx, dy),
         tireAngle, tireRotation * dy, pi/2,
-        1.0*CAR_SCALE)
+        chassis.wheelSize*scale)
       );
     end;
 end;
@@ -156,7 +161,7 @@ begin
   startTime := getSec;
 
   drawWheels(-1);
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, CAR_SCALE));
+  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale));
   drawWheels(+1);
 
   if carDrawTime = 0 then
@@ -176,7 +181,7 @@ var
   p: V3D;
 begin
   p := chassis.wheelPos * V3D.create(dx, dy, 0) + chassis.wheelOffset;
-  result := p.rotated(0, 0, zAngle) * CAR_SCALE + self.pos;
+  result := p.rotated(0, 0, zAngle) * scale + self.pos;
 end;
 
 procedure tCar.tractionSimple();
@@ -458,8 +463,33 @@ begin
   titleBackground := loadSprite('title');
   trackSprite := loadSprite('track1');
 
-  car1Vox := tVoxelSprite.loadFromFile('res\carRed16', 16);
-  car2Vox := tVoxelSprite.loadFromFile('res\carPolice16', 16);
+  {setup chassis}
+  {todo: have these as meta data}
+  with CC_RED do begin
+    wheelPos := V3D.create(8, 7, 0);
+    wheelOffset := V3D.create(-1, 0, 0);
+    wheelSize := 1.0;
+    vox := tVoxelSprite.loadFromFile('res\carRed16', 16);;
+  end;
+  with CC_POLICE do begin
+    wheelPos := V3D.create(10, 7, 0);
+    wheelOffset := V3D.create(+1, 0, 3);
+    wheelSize := 1.0;
+    vox := tVoxelSprite.loadFromFile('res\carPolice16', 16);
+  end;
+  with CC_BOX do begin
+    wheelPos := V3D.create(10, 7, 0);
+    wheelOffset := V3D.create(+1, 0, 3);
+    wheelSize := 1.0;
+    vox := tVoxelSprite.loadFromFile('res\carBox16', 16);
+  end;
+  with CC_SANTA do begin
+    wheelPos := V3D.create(10, 7, 0);
+    wheelOffset := V3D.create(+1, 0, 3);
+    wheelSize := 0.0;
+    vox := tVoxelSprite.loadFromFile('res\carSanta16', 16);
+  end;
+
   wheelVox := tVoxelSprite.loadFromFile('res\wheel1', 8);
 
   if cpuInfo.ram > 40*1024*1024 then
@@ -467,21 +497,6 @@ begin
     music := tSoundEffect.loadFromWave('res\music16.wav')
   else
     music := tSoundEffect.loadFromWave('res\music8.wav');
-
-  {setup chassis}
-  {todo: have these as meta data}
-  with CC_RED do begin
-    wheelPos := V3D.create(8, 7, 0);
-    wheelOffset := V3D.create(-1, 0, 0);
-    wheelSize := 1.0;
-    vox := car1Vox;
-  end;
-  with CC_POLICE do begin
-    wheelPos := V3D.create(10, 7, 0);
-    wheelOffset := V3D.create(+1, 0, 3);
-    wheelSize := 1.0;
-    vox := car2Vox;
-  end;
 
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
@@ -586,9 +601,9 @@ begin
     startTime := getSec;
 
     if benchmarkMode then begin
-      screen.markRegion(car1Vox.draw(screen.canvas, V3D.create(320, 440, 0), 0.3, 0, 0.2, carScale));
+      screen.markRegion(CC_RED.vox.draw(screen.canvas, V3D.create(320, 440, 0), 0.3, 0, 0.2, carScale));
     end else
-      screen.markRegion(car1Vox.draw(screen.canvas, V3D.create(320, 440, 0), xTheta, 0, zTheta, carScale));
+      screen.markRegion(CC_RED.vox.draw(screen.canvas, V3D.create(320, 440, 0), xTheta, 0, zTheta, carScale));
 
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)
@@ -660,7 +675,7 @@ begin
 
   mixer.play(startSFX);
 
-  car := tCar.create(CC_POLICE);
+  car := tCar.create(CC_SANTA);
   car.pos := V3D.create(300,300,0);
 
   startClock := getSec;
@@ -699,6 +714,9 @@ begin
       car.tireTraction -= 10;
     if keyDown(key_2) then
       car.tireTraction += 10;
+
+    if keyDown(key_b) then
+      car.scale := 3.0;
 
     if keyDown(key_3) then
       delay(100); // pretend to be slow

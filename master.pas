@@ -252,6 +252,8 @@ begin
 //  convertBMP('track1', 'c:\masters\airtime\track1.bmp');
   convertBMP('carRed16', 'c:\masters\airtime\carRed16.bmp');
   convertBMP('carPolice16', 'c:\masters\airtime\carPolice16.bmp');
+  convertBMP('carBox16', 'c:\masters\airtime\carBox16.bmp');
+  convertBMP('carSanta16', 'c:\masters\airtime\carSanta16.bmp');
   convertBMP('wheel1', 'c:\masters\airtime\wheel.bmp');
 
   {gui stuff}
