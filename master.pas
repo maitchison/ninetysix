@@ -248,15 +248,19 @@ procedure processAll();
 begin
 
   {game stuff}
-  convertBMP('title', 'c:\masters\airtime\title_640.bmp');
-  convertBMP('XMAS_title', 'c:\masters\airtime\XMAS_title.bmp');
-  convertBMP('XMAS_track', 'c:\masters\airtime\XMAS_track.bmp');
-  //convertBMP('track1', 'c:\masters\airtime\track1.bmp');
+  convertBMP('title', 'c:\masters\airtime\title.bmp');
+
+  convertBMP('track1', 'c:\masters\airtime\track1.bmp');
+  convertBMP('track2', 'c:\masters\airtime\track2.bmp');
   convertBMP('carRed16', 'c:\masters\airtime\carRed16.bmp');
   convertBMP('carPolice16', 'c:\masters\airtime\carPolice16.bmp');
   convertBMP('carBox16', 'c:\masters\airtime\carBox16.bmp');
-  convertBMP('carSanta16', 'c:\masters\airtime\carSanta16.bmp');
   convertBMP('wheel1', 'c:\masters\airtime\wheel.bmp');
+
+  // christmas variation
+  convertBMP('XMAS_title', 'c:\masters\airtime\XMAS_title.bmp');
+
+  convertBMP('carSanta16', 'c:\masters\airtime\carSanta16.bmp');
 
   {gui stuff}
 //  convertBMP('ec_frame', 'c:\masters\gui\ec_frame.bmp');

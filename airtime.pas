@@ -540,7 +540,6 @@ begin
 
   mixer.play(music, SCS_FIXED1);
 
-
   if XMAS then
     titleBackground := loadSprite('XMAS_title')
   else
