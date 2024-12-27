@@ -1,5 +1,5 @@
 {replacement for built in math library}
-unit math;
+unit myMath;
 
 {
   Math imports sysutils, and we don't like that, so rewrite the

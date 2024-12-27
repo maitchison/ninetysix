@@ -5,7 +5,7 @@ uses
   startup,
   debug,
   utils,
-  math,
+  myMath,
   vga,
   vesa,
   graph32,
