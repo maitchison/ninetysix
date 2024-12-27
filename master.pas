@@ -186,6 +186,10 @@ end;
 
 {-----------------------------------------------}
 
+type
+  // apply some changes to a page, and output a new page
+  tProcessProc = function(input: tPage): tPage;
+
 var
   resourceLibrary: tResourceLibrary;
 
@@ -193,7 +197,7 @@ const
   DEFAULT_SRC_FOLDER = 'd:\masters\airtime\';
 
 {e.g. convert('title', 'c:\masters\airtime\title.bmp')}
-procedure convertImage(filename: string;srcPath:string); overload;
+procedure convertImage(filename: string;srcPath:string;processProc: tProcessProc=nil); overload;
 var
   res: tResource;
   id: int32;
@@ -234,6 +238,8 @@ begin
     dstFile := dstPath;
     modifiedTime := fileModifiedTime(srcFile);
     img := tPage.Load(srcFile);
+    if assigned(processProc) then
+      img := processProc(img);
     saveLC96(dstFile, img);
     textAttr := $0A;
     writeln(format('[%dx%d]',[img.width, img.height]));
@@ -246,9 +252,30 @@ end;
 
 
 {e.g. convert('title.bmp')}
-procedure convertImage(filename: string); overload;
+procedure convertImage(filename: string;processProc: tProcessProc=nil); overload;
 begin
-  convertImage(removeExtension(filename), 'c:\masters\airtime\'+filename);
+  convertImage(removeExtension(filename), 'c:\masters\airtime\'+filename, processProc);
+end;
+
+function mapTerrainColors(page: tPage): tPage;
+var
+  x,y: int32;
+  col: RGBA;
+
+  {sets each RGB to 0, 128, or 255 (rounded to nearest)}
+  function quantise(x: integer): integer;
+  begin
+    exit(round(2*x / 256)*128);
+  end;
+
+begin
+  for y := 0 to page.height-1 do
+    for x := 0 to page.width-1 do begin
+      col := page.getPixel(x,y);
+      col.init(quantise(col.r), quantise(col.g), quantise(col.b), quantise(col.a));
+      page.setPixel(x, y, col);
+    end;
+  exit(page);
 end;
 
 procedure processAll();
@@ -259,7 +286,7 @@ begin
   convertImage('track1.png');
   convertImage('track2.png');
   convertImage('track2_height.bmp');
-  convertImage('track2_terrain.bmp');
+  convertImage('track2_terrain.bmp', mapTerrainColors);
   convertImage('carRed16.png');
   convertImage('carPolice16.png');
   convertImage('carBox16.png');
