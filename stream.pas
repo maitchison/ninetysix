@@ -73,7 +73,7 @@ type
     function  readNibble: byte; inline;
     function  readWord: word; inline;
     function  readDWord: dword; inline;
-    function  readVLC: dword;
+    function  readVLC: dword; inline;
     function  readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
     function  readBytes(n: int32): tBytes;
 
@@ -357,7 +357,7 @@ begin
   result := bytes[pos] + (bytes[pos+1] shl 8) + (bytes[pos+2] shl 16) + (bytes[pos+3] shl 24);
 end;
 
-function tStream.readVLC: dword;
+function tStream.readVLC: dword; inline;
 var
   value: dword;
   b: byte;
@@ -687,7 +687,7 @@ begin
   result := (b >= 8) and (b < 16);
 end;
 
-function tStream.readVLCSegment(n: int32;outBuffer: tDWords=nil): tDWords;
+function tStream.readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
 var
   ctrlCode: word;
   b: byte;
@@ -695,6 +695,7 @@ var
   i: int32;
   bytes: tBytes;
   packingBits: int32;
+
 begin
 
   if not assigned(outBuffer) then

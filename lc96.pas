@@ -41,6 +41,10 @@ const
   VER_BIG = 0;
   VER_SMALL = 2;
 
+var
+  {stores byte(negDecode(x))}
+  BYTE_DELTA_LOOKUP: array[0..255] of byte;
+
 {-------------------------------------------------------}
 { Private }
 {-------------------------------------------------------}
@@ -170,8 +174,9 @@ begin
 end;
 
 var
-  {todo: move all this into a clas}
-  global_deltas: tDwords;
+  {todo: move all this into a class}
+  gDeltaCodes: tDwords;   // delta codes
+  gDeltas: array[0..64-1] of byte;   // actual bytes needed to add to get new pixel color
 
 {Decode a 4x4 patch at given location.}
 {reference implementation}
@@ -190,19 +195,19 @@ begin
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
   if withAlpha then
-    s.readVLCSegment(16*4, global_deltas)
+    s.readVLCSegment(16*4, gDeltaCodes)
   else
-    s.readVLCSegment(16*3, global_deltas);
+    s.readVLCSegment(16*3, gDeltaCodes);
   s.byteAlign();
 
   dPos := 0;
   for y := 0 to 3 do begin
     for x := 0 to 3 do begin
-      dr := global_deltas[dpos]; inc(dpos);
-      dg := global_deltas[dpos]; inc(dpos);
-      db := global_deltas[dpos]; inc(dpos);
+      dr := gDeltaCodes[dpos]; inc(dpos);
+      dg := gDeltaCodes[dpos]; inc(dpos);
+      db := gDeltaCodes[dpos]; inc(dpos);
       if withAlpha then begin
-        da := global_deltas[dpos]; inc(dpos);
+        da := gDeltaCodes[dpos]; inc(dpos);
       end;
       if choiceCode and $8000 = $8000 then
         src := page.getPixel(atX+x, atY+y-1)
@@ -226,7 +231,7 @@ begin
 end;
 
 {Decode a 4x4 patch at given location.}
-procedure decodePatch(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
+procedure decodePatch_ASM(s: tStream; page: tPage; atX,atY: int32;withAlpha: boolean);
 var
   i,j: int32;
   c: RGBA;
@@ -238,67 +243,164 @@ var
   dPos: word;
   ofs: dword;
 
+  pixelsPtr,ppLeft,ppAbove: pointer;
+  deltasPtr, deltaCodesPtr: pointer;
+
+  DELTA_INC: dword;
+  deltaBytes: dword;
+  lineBytes: dword;
+
+  tmp1,tmp2: dword;
+  xPos: dword;
+
 begin
   {output deltas}
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
 
   if withAlpha then
-    s.readVLCSegment(16*4, global_deltas)
+    DELTA_INC := 4
   else
-    s.readVLCSegment(16*3, global_deltas);
+    DELTA_INC := 3;
 
+  deltaBytes := 16 * DELTA_INC;
+  lineBytes := 4 * page.width;
+
+  s.readVLCSegment(deltaBytes, gDeltaCodes);
   s.byteAlign();
 
-  ofs := (atX + (atY*page.width)) * 4;
+  pixelsPtr := page.pixels;
+  ppLeft := pixelsPtr - 4;
+  ppAbove := pixelsPtr - lineBytes;
+  ofs := (atX + (dword(atY)*page.width)) * 4;
+  deltasPtr := @gDeltas[0];
+  deltaCodesPtr := @gDeltaCodes[0];
 
-  {eventually this will all be asm...}
-  dPos := 0;
-  da := 0;
-  for y := 0 to 3 do begin
-    for x := 0 to 3 do begin
+  // convert our codes into actual byte deltas
+  // note:
+  //  input is either 4 or 3 dwords, but output is always 4 bytes
+  //  in the case we don't have alpha, all the deltas for alpha will be 0.
+  asm
+    pushad
 
-      dr := global_deltas[dpos]; inc(dpos);
-      dg := global_deltas[dpos]; inc(dpos);
-      db := global_deltas[dpos]; inc(dpos);
-      if withAlpha then begin
-        da := global_deltas[dpos]; inc(dpos);
-      end;
+    // -----------------------
+    // Convert deltas
 
-      if choiceCode and $8000 = $8000 then begin
-        if (atY = 0) and (y = 0) then
-          src.init(0,0,0)
-        else
-          pDword(@src)^ := pDword(page.pixels+ofs-(4*page.width))^
-      end else begin
-        if (atX = 0) and (x = 0) then
-          src.init(0,0,0)
-        else
-          pDword(@src)^ := pDword(page.pixels+ofs-4)^;
-      end;
+    mov esi, deltaCodesPtr
+    mov edi, deltasPtr
+    mov cx, 16
+  @LOOP:
+    // red
+    mov eax, dword ptr [esi]
+    mov al, byte ptr [BYTE_DELTA_LOOKUP+eax]
+    mov byte ptr [edi+2], al
+    add esi, 4
+    // green
+    mov eax, dword ptr [esi]
+    mov al, byte ptr [BYTE_DELTA_LOOKUP+eax]
+    mov byte ptr [edi+1], al
+    add esi, 4
+    // blue
+    mov eax, dword ptr [esi]
+    mov al, byte ptr [BYTE_DELTA_LOOKUP+eax]
+    mov byte ptr [edi+0], al
+    add esi, 4
 
-      c.r := applyByteDelta(src.r, dr);
-      c.g := applyByteDelta(src.g, dg);
-      c.b := applyByteDelta(src.b, db);
+    // alpha
+    mov al,0
+    cmp DELTA_INC, 3
+    je @NO_ALPHA
 
-      if withAlpha then
-        {check this is right}
-        c.a := applyByteDelta(src.a, da)
-      else
-        c.a := 255;
+  @WITH_ALPHA:
+    mov eax, dword ptr [esi]
+    mov al, byte ptr [BYTE_DELTA_LOOKUP+eax]
+    add esi, 4
 
-      pDword(page.pixels+ofs)^ := pDword(@c)^;
+  @NO_ALPHA:
+    mov byte ptr [edi+3], al
 
-      choiceCode := choiceCode shl 1;
+    add edi, 4
 
-      ofs += 4;
+    dec cx
+    jnz @LOOP
 
-    end;
+    // -----------------------
+    // Apply deltas
 
-    ofs += ((page.width-4) * 4);
+    mov esi, deltasPtr
+    mov edi, ofs
+    mov ebx, choiceCode
+    xor ecx, ecx
+    mov ch,  4
 
+    // EAX = pixel color
+    // EBX =  - | - | choiceCode
+    // ECX =  - | - | xlp | ylp
+    // EDX = pixel deltas
+    // ESI = global_deltas
+    // EDI = pixelOffset
+
+  @YLOOP:
+
+    mov cl, 4
+    mov eax,  atX
+    mov xPos, eax
+
+  @XLOOP:
+
+    // check high bit of choice code
+    mov eax, $ff000000          // this is the default color for out of bounds
+    shl bx, 1
+
+    jc @COPY_ABOVE
+
+  @COPY_LEFT:
+    cmp xPos, 0
+    jz @APPLY
+    add edi, ppLeft
+    mov eax, dword ptr [edi]
+    sub edi, ppLeft
+    jmp @APPLY
+
+  @COPY_ABOVE:
+    cmp edi, lineBytes
+    jl @APPLY
+    add edi, ppAbove
+    mov eax,  dword ptr [edi]
+    sub edi, ppAbove
+
+  @APPLY:
+    // apply the byte delta
+    // note: MMX would be great here...
+    mov edx, dword ptr [esi]
+    add al, dl
+    add ah, dh
+    ror eax, 16
+    ror edx, 16
+    add al, dl
+    add ah, dh
+    ror eax, 16
+
+    add edi, pixelsPtr
+    mov dword ptr [edi], eax
+    sub edi, pixelsPtr
+
+    add edi, 4
+    add esi, 4
+
+    inc xPos
+
+    dec cl
+    jnz @XLOOP
+
+    add edi, lineBytes
+    sub edi, 16
+
+    dec ch
+    jnz @YLOOP
+
+    popad
   end;
-
 end;
 
 function decodeLC96(s: tStream): tPage;
@@ -376,7 +478,7 @@ begin
 
   for py := 0 to result.height div 4-1 do
     for px := 0 to result.width div 4-1 do
-      decodePatch(data, result, px*4, py*4, hasAlpha);
+      decodePatch_ASM(data, result, px*4, py*4, hasAlpha);
 
   data.free;
 end;
@@ -559,12 +661,18 @@ begin
 
 end;
 
+var
+  i: integer;
+
 initialization
 
   {todo: move this out of global}
-  global_deltas := nil;
-  setLength(global_deltas, 16*4);
-  filldword(global_deltas[0], length(global_deltas), 0);
+  setLength(gDeltaCodes, 64);
+  fillDWord(gDeltaCodes[0], 16, 0);
+  fillChar(gDeltas, 16, 0);
+
+  for i := 0 to 255 do
+    BYTE_DELTA_LOOKUP[i] := byte(negDecode(i));
 
   tLC96Test.create('LC96');
 
