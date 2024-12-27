@@ -80,7 +80,7 @@ type
     class operator implicit(this: RGBA32): RGBA;
     class operator implicit(other: RGBA): RGBA32;
 
-    function ToString(): ShortString;
+    function toString(): ShortString;
 
     class operator add(a,b: RGBA32): RGBA32;
     class operator multiply(a: RGBA32; b: single): RGBA32;
@@ -98,6 +98,7 @@ const
   ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
 
 type
+
   tPage = class
     width, height,bpp: Word;
     isRef: boolean;
@@ -125,15 +126,32 @@ type
 
     function checkForAlpha: boolean;
 
+    class function Load(filename: string): tPage;
   end;
 
-function LoadBMP(const FileName: string): TPage;
+  tImageLoaderProc = function(filename: string): tPage;
+
+
+function loadBMP(const FileName: string): tPage;
 procedure makePageRandom(page: tPage);
 
 procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 procedure assertEqual(a, b: tPage); overload;
 
+procedure registerImageLoader(aExtension: string; aProc: tImageLoaderProc);
+
 implementation
+
+type
+  tImageLoaderEntry = record
+    extension: string;
+    proc: tImageLoaderProc;
+  end;
+
+var
+  imageLoaderRegistery: array of tImageLoaderEntry;
+
+function getImageLoader(aExtension: string): tImageLoaderProc; forward;
 
 {returns value v at brightness b [0..1] with gamma correction}
 function gammaCorrect(v: byte; b: single): byte;
@@ -940,6 +958,16 @@ begin
         setPixel(x,y, RGBA.create(0,0,0,0));
 end;
 
+class function tPage.Load(filename: string): tPage;
+var
+  proc: tImageLoaderProc;
+begin
+  proc := getImageLoader(extractExtension(filename));
+  if assigned(proc) then
+    exit(proc(filename))
+  else
+    error('No image loader for file "'+filename+'"');
+end;
 
 {-------------------------------------------------}
 
@@ -974,5 +1002,30 @@ begin
       assertEqual(a.getPixel(x,y), b.getPixel(x,y), format('at %d,%d ',[x, y]));
 end;
 
+{-------------------------------------------------}
+
+{returns imageLoader for extension, or nil if none assigned.}
+function getImageLoader(aExtension: string): tImageLoaderProc;
+var
+  i: integer;
 begin
+  aExtension := toLowerCase(aExtension);
+  for i := 0 to length(imageLoaderRegistery)-1 do
+    with imageLoaderRegistery[i] do
+      if aExtension = extension then
+        exit(proc);
+  exit;
+end;
+
+procedure registerImageLoader(aExtension: string; aProc: tImageLoaderProc);
+begin
+  setLength(imageLoaderRegistery, length(imageLoaderRegistery)+1);
+  with imageLoaderRegistery[length(imageLoaderRegistery)-1] do begin
+    extension := toLowerCase(aExtension);
+    proc := aProc;
+  end;
+end;
+
+initialization
+  registerImageLoader('bmp', @loadBMP);
 end.

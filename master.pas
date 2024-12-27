@@ -191,15 +191,13 @@ var
 const
   DEFAULT_SRC_FOLDER = 'd:\masters\airtime\';
 
-procedure convertBMP(filename: string;srcPath:string='');
+procedure convertImage(filename: string;srcPath:string);
 var
   res: tResource;
   id: int32;
   dstPath: string;
 begin
 
-  if srcPath= '' then
-    srcPath := DEFAULT_SRC_FOLDER+filename+'.bmp';
   dstPath := 'res\'+filename+'.p96';
 
   textAttr := $07;
@@ -242,6 +240,19 @@ begin
 
   resourceLibrary.updateResource(res);
   resourceLibrary.serialize('resources.ini');
+end;
+
+{e.g. convert('title', 'c:\masters\airtime\title.bmp')}
+procedure convert(filename: string;srcPath: string); overload;
+var
+  extension: string;
+begin
+end;
+
+{e.g. convert('title.bmp')}
+procedure convert(filename: string); overload;
+begin
+  convert(removeExtension(filename), 'c:\masters\airtime\'+filename);
 end;
 
 procedure processAll();

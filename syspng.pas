@@ -61,5 +61,6 @@ begin
   end;
 end;
 
-begin
+initialization
+  registerImageLoader('png', @loadPNG);
 end.

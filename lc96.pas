@@ -568,6 +568,8 @@ initialization
 
   tLC96Test.create('LC96');
 
+  registerImageLoader('p96', @loadLC96);
+
 finalization
 
 end.
