@@ -10,6 +10,7 @@ uses
   graph32,
   crt,
   dos,
+  sysPNG,
   lc96;
 
 var
@@ -191,7 +192,8 @@ var
 const
   DEFAULT_SRC_FOLDER = 'd:\masters\airtime\';
 
-procedure convertImage(filename: string;srcPath:string);
+{e.g. convert('title', 'c:\masters\airtime\title.bmp')}
+procedure convertImage(filename: string;srcPath:string); overload;
 var
   res: tResource;
   id: int32;
@@ -231,7 +233,7 @@ begin
     srcFile := srcPath;
     dstFile := dstPath;
     modifiedTime := fileModifiedTime(srcFile);
-    img := loadBMP(srcFile);
+    img := tPage.Load(srcFile);
     saveLC96(dstFile, img);
     textAttr := $0A;
     writeln(format('[%dx%d]',[img.width, img.height]));
@@ -242,36 +244,30 @@ begin
   resourceLibrary.serialize('resources.ini');
 end;
 
-{e.g. convert('title', 'c:\masters\airtime\title.bmp')}
-procedure convert(filename: string;srcPath: string); overload;
-var
-  extension: string;
-begin
-end;
 
 {e.g. convert('title.bmp')}
-procedure convert(filename: string); overload;
+procedure convertImage(filename: string); overload;
 begin
-  convert(removeExtension(filename), 'c:\masters\airtime\'+filename);
+  convertImage(removeExtension(filename), 'c:\masters\airtime\'+filename);
 end;
 
 procedure processAll();
 begin
 
   {game stuff}
-  convertBMP('title', 'c:\masters\airtime\title.bmp');
-
-  convertBMP('track1', 'c:\masters\airtime\track1.bmp');
-  convertBMP('track2', 'c:\masters\airtime\track2.bmp');
-  convertBMP('carRed16', 'c:\masters\airtime\carRed16.bmp');
-  convertBMP('carPolice16', 'c:\masters\airtime\carPolice16.bmp');
-  convertBMP('carBox16', 'c:\masters\airtime\carBox16.bmp');
-  convertBMP('wheel1', 'c:\masters\airtime\wheel.bmp');
+  convertImage('title.bmp');
+  convertImage('track1.png');
+  convertImage('track2.png');
+  convertImage('track2_height.bmp');
+  convertImage('track2_terrain.bmp');
+  convertImage('carRed16.png');
+  convertImage('carPolice16.png');
+  convertImage('carBox16.png');
+  convertImage('wheel.png');
 
   // christmas variation
-  convertBMP('XMAS_title', 'c:\masters\airtime\XMAS_title.bmp');
-
-  convertBMP('carSanta16', 'c:\masters\airtime\carSanta16.bmp');
+  convertImage('XMAS_title.bmp');
+  convertImage('carSanta16.png');
 
   {gui stuff}
 //  convertBMP('ec_frame', 'c:\masters\gui\ec_frame.bmp');
@@ -313,7 +309,6 @@ begin
 end;
 
 {-------------------------------------------}
-
 
 begin
   runTests();
