@@ -961,11 +961,14 @@ end;
 class function tPage.Load(filename: string): tPage;
 var
   proc: tImageLoaderProc;
+  startTime: double;
 begin
   proc := getImageLoader(extractExtension(filename));
-  if assigned(proc) then
-    exit(proc(filename))
-  else
+  if assigned(proc) then begin
+    startTime := getSec;
+    result := proc(filename);
+    info(format(' -loaded %s (%dx%d) in %fs', [filename, result.width, result.height, getSec-startTime]));
+  end else
     error('No image loader for file "'+filename+'"');
 end;
 
@@ -1014,7 +1017,7 @@ begin
     with imageLoaderRegistery[i] do
       if aExtension = extension then
         exit(proc);
-  exit;
+  exit(nil);
 end;
 
 procedure registerImageLoader(aExtension: string; aProc: tImageLoaderProc);

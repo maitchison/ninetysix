@@ -43,7 +43,7 @@ type
 
   public
     canvas: tPage;
-    background: tSprite;
+    background: tPage;
     backgroundColor: RGBA;
     SHOW_DIRTY_RECTS: boolean;
     stats: tScreenStats;
@@ -229,8 +229,8 @@ begin
 
   if not assigned(background) then
     error('background not assigned');
-  if background.page.width <> canvas.width then
-    error(format('background width must match canvas, %d != %d ', [background.page.width, canvas.width]));
+  if background.width <> canvas.width then
+    error(format('background width must match canvas, %d != %d ', [background.width, canvas.width]));
 
   if (y < 0) or (y >= canvas.height) then exit;
 
@@ -238,7 +238,7 @@ begin
   x2 := min(canvas.width-1, x2);
 
   canvasPixels := canvas.pixels;
-  backgroundPixels := background.page.pixels;
+  backgroundPixels := background.pixels;
   ofs := (x1 + (y * canvas.width))*4;
   len := (x2-x1)+1;
   if len <= 0 then exit;

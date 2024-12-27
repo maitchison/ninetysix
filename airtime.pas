@@ -23,6 +23,7 @@ uses
   mix,
   font,
   sound,
+  raceTrack,
   go32;
 
 
@@ -41,12 +42,12 @@ var
   screen: tScreen;
 
   {resources}
-  titleBackground: tSprite;
+  titleBackground: tPage;
   music: tSoundEffect;
   slideSFX: tSoundEffect;
   engineSFX: tSoundEffect;
   startSFX: tSoundEffect;
-  trackSprite: tSprite;
+  track: tRaceTrack;
   wheelVox: tVoxelSprite;
 
   {global time keeper}
@@ -298,7 +299,7 @@ begin
   pos.x += ((rnd-rnd) / 256)*1.5;
   pos.y += ((rnd-rnd) / 256)*1.5;
   drawPos := worldToCanvas(pos);
-  screen.background.page.putPixel(
+  screen.background.putPixel(
     drawPos.x, drawPos.y,
     RGBA.create(0,0,0,16)
   );
@@ -513,42 +514,32 @@ end;
 
 {-------------------------------------------------}
 
-function loadSprite(filename: shortstring): tSprite;
-var
-  startTime: double;
-begin
-  startTime := getSec;
-  result := tSprite.create(loadLC96('res\'+filename+'.p96'));
-  note(format(' -loaded %s (%dx%d) in %fs', [filename, result.width, result.height, getSec-startTime]));
-end;
-
 procedure loadResources();
+var
+  musicPostfix: string;
 begin
 
   note('Loading Resources.');
 
+  if cpuInfo.ram > 70*1024*1024 then
+    {8bit music if we don't have enough ram.}
+    musicPostfix := '_8bit'
+  else
+    musicPostfix := '';
+
+
   {music first}
   if XMAS then
-    music := tSoundEffect.loadFromWave('res\music3.wav')
-  else begin
-    if cpuInfo.ram > 40*1024*1024 then
-      {16bit music if we have the ram for it}
-      music := tSoundEffect.loadFromWave('res\music16.wav')
-    else
-      music := tSoundEffect.loadFromWave('res\music8.wav');
-  end;
+    music := tSoundEffect.loadFromWave('res\music2'+musicPostfix+'.wav')
+  else
+    music := tSoundEffect.loadFromWave('res\music1'+musicPostfix+'.wav');
 
   mixer.play(music, SCS_FIXED1);
 
   if XMAS then
-    titleBackground := loadSprite('XMAS_title')
+    titleBackground := tPage.Load('res\XMAS_title.p96')
   else
-    titleBackground := loadSprite('title');
-
-  if XMAS then
-    trackSprite := loadSprite('XMAS_track')
-  else
-    trackSprite := loadSprite('track1');
+    titleBackground := tPage.Load('res\title.p96');
 
   {setup chassis}
   {todo: have these as meta data}
@@ -640,12 +631,12 @@ begin
   benchmarkMode := false;
   carScale := 1.5;
 
-  titleBackground.page.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
-  titleBackground.page.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
-  titleBackground.page.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
+  titleBackground.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
+  titleBackground.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
+  titleBackground.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
-  textOut(titleBackground.page, 640-140+1, 480-25+1, 'v0.1a (09/12/2024)', RGBA.create(0,0,0));
-  textOut(titleBackground.page, 640-140, 480-25, 'v0.1a (09/12/2024)', RGBA.create(250,250,250,240));
+  textOut(titleBackground, 640-140+1, 480-25+1, 'v0.1a (09/12/2024)', RGBA.create(0,0,0));
+  textOut(titleBackground, 640-140, 480-25, 'v0.1a (09/12/2024)', RGBA.create(250,250,250,240));
 
   screen.background := titleBackground;
 
@@ -754,6 +745,14 @@ begin
   end;
 end;
 
+procedure setTrackDisplay(page: tPage);
+begin
+  screen.reset();
+  screen.background := page;
+  screen.clear();
+  screen.pageFlip();
+end;
+
 procedure mainLoop();
 var
   startClock,lastClock,thisClock: double;
@@ -764,13 +763,12 @@ var
 begin
   note('Main loop started');
 
-  videoDriver.setMode(320,240,32);
-  videoDriver.setLogicalSize(trackSprite.width,trackSprite.height);
+  track := tRaceTrack.Create('res/track2');
 
-  screen.reset();
-  screen.background := trackSprite;
-  screen.clear();
-  screen.pageFlip();
+  videoDriver.setMode(320,240,32);
+  videoDriver.setLogicalSize(track.width,track.height);
+
+  setTrackDisplay(track.background);
 
   // turn off music
   // todo: find a better way of doing this
@@ -827,6 +825,13 @@ begin
     if keyDown(key_2) then
       car.tireTraction += 10;
 
+    if keyDown(key_9) then
+      setTrackDisplay(track.background);
+    if keyDown(key_8) then
+      setTrackDisplay(track.terrainMap);
+    if keyDown(key_7) then
+      setTrackDisplay(track.heightMap);
+
     if keyDown(key_b) then
       car.scale := 3.0;
 
@@ -842,6 +847,9 @@ begin
 
     if keyDown(key_q) or keyDown(key_esc) then break;
   end;
+
+  track.free;
+
 end;
 
 begin
