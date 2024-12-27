@@ -32,9 +32,9 @@ type
     }
 
   protected
-    bytes: tBytes;   {length(bytes) is the capcity}
+    bytes: tBytes;   {length(bytes) is the capacity}
     bytesLen: dword; {bytesLen is the number of actual bytes used}
-    pos: int32;       {current position in stream}
+    pos: int32;      {current position in stream}
     midByte: boolean;
 
   private
@@ -96,6 +96,9 @@ type
   end;
 
 implementation
+
+{$I stream_ref.inc}
+{$I stream_asm.inc}
 
 {------------------------------------------------------}
 
@@ -691,11 +694,7 @@ function tStream.readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
 var
   ctrlCode: word;
   b: byte;
-  w: word;
-  i: int32;
-  bytes: tBytes;
   packingBits: int32;
-
 begin
 
   if not assigned(outBuffer) then
@@ -713,10 +712,7 @@ begin
     exit(outBuffer);
   end;
 
-  for i := 0 to n-1 do
-    outBuffer[i] := readVLC;
-
-  self.byteAlign();
+  readVLCSequence_ASM(self, n, outBuffer);
 
   exit(outBuffer);
 end;
