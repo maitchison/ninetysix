@@ -23,6 +23,7 @@ type
 
     constructor create(width, height: int32); overload;
     constructor create(left, top, width, height: int32); overload;
+    procedure init(left, top, width, height: int32);
     procedure pad(padding: int32);
     function  padded(padding: int32): tRect;
 
@@ -81,6 +82,14 @@ begin
 end;
 
 constructor tRect.create(left, top, width, height: int32); overload;
+begin
+  self.x := left;
+  self.y := top;
+  self.width := width;
+  self.height := height;
+end;
+
+procedure tRect.init(left, top, width, height: int32);
 begin
   self.x := left;
   self.y := top;

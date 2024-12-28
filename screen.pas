@@ -38,7 +38,7 @@ type
     // support for up to 2048x2048
     // pixel -> grid is divide by 8
     flagGrid: array[0..256-1, 0..256-1] of byte;
-    fgxMin,fgyMin,fgxMax,fgyMax: integer;
+    clearBounds, flipBounds: tRect;
     s3Driver: tS3Driver;
 
   public
@@ -112,10 +112,8 @@ begin
   canvas := tPage.Create(videoDriver.width, videoDriver.height);
 
   fillchar(flagGrid, sizeof(flagGrid), 0);
-  fgxMin := (canvas.width div 8)-1;
-  fgyMin := (canvas.height div 8)-1;
-  fgxMax := 0;
-  fgyMax := 0;
+  clearBounds.init(256, 256, -256, -256);
+  flipBounds.init(256, 256, -256, -256);
 
   bounds := tRect.create(width, height);
 
@@ -283,10 +281,14 @@ begin
     for x := x1 to x2 do
       flagGrid[x,y] := flags;
 
-  fgxMin := min(x1, fgxMin);
-  fgyMin := min(y1, fgyMin);
-  fgxMax := max(x2, fgxMax);
-  fgyMax := max(y2, fgyMax);
+  if (flags and FG_FLIP = FG_FLIP) then begin
+    flipBounds.expandToInclude(tPoint.create(x1, y1));
+    flipBounds.expandToInclude(tPoint.create(x2, y2));
+  end;
+  if (flags and FG_CLEAR = FG_CLEAR) then begin
+    clearBounds.expandToInclude(tPoint.create(x1, y1));
+    clearBounds.expandToInclude(tPoint.create(x2, y2));
+  end;
 
   if keyDown(key_f3) then begin
     s3Driver.fgColor := rgba.create(0,0,rnd);
@@ -305,9 +307,9 @@ var
 begin
   stats.clearCells := 0; stats.clearRegions := 0;
   startTime := getSec;
-  for y := fgyMin to fgyMax do begin
+  for y := clearBounds.top to clearBounds.bottom do begin
     rle := 0;
-    for x := fgxMin to fgxMax do begin
+    for x := clearBounds.left to clearBounds.right do begin
       if (flagGrid[x,y] and FG_CLEAR) = FG_CLEAR then begin
         if rle = 0 then xStart := x;
         inc(stats.clearCells);
@@ -327,6 +329,7 @@ begin
     end;
   end;
   stats.clearTime := getSec - startTime;
+  clearBounds.init(256,256,-256, -256);
 end;
 
 {flips all valid regions}
@@ -339,9 +342,9 @@ var
 begin
   stats.copyCells := 0; stats.copyRegions := 0;
   startTime := getSec;
-  for y := fgYMin to fgYMax do begin
+  for y := flipBounds.top to flipBounds.bottom do begin
     rle := 0;
-    for x := fgXMin to fgXMax do begin
+    for x := flipBounds.left to flipBOunds.right do begin
       if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
         if rle = 0 then xStart := x;
         inc(stats.copyCells);
@@ -361,6 +364,7 @@ begin
     end;
   end;
   stats.copyTime := getSec - startTime;
+  flipBounds.init(256,256,-256, -256);
 end;
 
 {clears region on canvas with background color}
