@@ -782,7 +782,7 @@ var
 begin
   for i := 0 to length(TIMERS)-1 do
     debugTextOut(
-      drawPos.x, drawPos.y+i*15,
+      drawPos.x, drawPos.y-50+i*15,
       format(
         '%s: %f (%f)',
         [TIMERS[i].tag, 1000*TIMERS[i].elapsed, 1000*TIMERS[i].maxElapsed]
@@ -847,44 +847,47 @@ begin
 
     screen.clearAll();
 
-    startTimer('update');
     car.update();
-    stopTimer('update');
 
     drawPos := worldToCanvas(car.pos);
-    camX += ((drawPos.x-CamX)*0.10);
-    camY += ((drawPos.y-CamY)*0.10);
-    car.draw();
+    camX += ((drawPos.x-CamX)*decayFactor(0.5));
+    camY += ((drawPos.y-CamY)*decayFactor(0.5));
 
+    startTimer('draw_car');
+    car.draw();
+    stopTimer('draw_car');
+
+    startTimer('gui');
     drawGUI();
+    stopTimer('draw_car');
 
     {debugging}
+    startTimer('debug');
     screen.SHOW_DIRTY_RECTS := keyDown(key_d);
-
-    {more debuggug}
     if keyDown(key_9) then
       setTrackDisplay(track.background);
     if keyDown(key_8) then
       setTrackDisplay(track.terrainMap);
     if keyDown(key_7) then
       setTrackDisplay(track.heightMap);
-
     if keyDown(key_b) then
       car.scale := 3.0;
-
     if keyDown(key_3) then
       delay(100); // pretend to be slow
-
     debugShowTimers(drawPos);
+    stopTimer('debug');
 
     startTimer('vsync');
     videoDriver.waitVSync();
     stopTimer('vsync');
 
+    startTimer('setOfs');
     screen.setViewPort(
       round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2),
       false
     );
+    stopTimer('setOfs');
+
     screen.flipAll();
 
     if keyDown(key_q) or keyDown(key_esc) then break;

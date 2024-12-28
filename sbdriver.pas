@@ -291,6 +291,7 @@ begin
   {
     If currentBuffer=true, then we are writing to the second block, and DMA offs should be < HALF_BUFFER_SIZE/2
     If currentBuffer=false, then we are writing to the first block, and DMA offs should be > HALF_BUFFER_SIZE/2
+    Note: i have no idea why the logic below is reverse to this, but it works?
   }
   requiredCorrection := false;
   if (currentBuffer and (debug_dma_ofs < HALF_BUFFER_SIZE div 2)) then requiredCorrection := true;
