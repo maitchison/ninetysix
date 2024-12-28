@@ -515,7 +515,8 @@ procedure debugTextOut(dx,dy: integer; s: string);
 var
   r: tRect;
 begin
-  r := textExtents(s).padded(2);
+  // grr, otherwise the letter 'p' gets left behind.
+  r := textExtents(s).padded(4);
   r.x += dx;
   r.y += dy;
   screen.markRegion(r);
@@ -844,9 +845,7 @@ begin
     lastClock := thisClock;
     inc(frameCount);
 
-    startTimer('clear');
     screen.clearAll();
-    stopTimer('clear');
 
     startTimer('update');
     car.update();
@@ -886,9 +885,7 @@ begin
       round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2),
       false
     );
-    startTimer('flip');
     screen.flipAll();
-    stopTimer('flip');
 
     if keyDown(key_q) or keyDown(key_esc) then break;
 

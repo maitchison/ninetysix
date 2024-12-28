@@ -11,10 +11,8 @@ type
   tTimer = class
     tag: string;
     startTime: double;
-    endTime: double;
-    maxElapsed: double;
+    elapsed, maxElapsed: double;
     constructor Create(aTag: string);
-    function  elapsed(): double;
     procedure reset(aTag: string);
     procedure start();
     procedure stop();
@@ -78,13 +76,8 @@ procedure tTimer.reset(aTag: string);
 begin
   tag := aTag;
   startTime := 0;
-  endTime := 0;
+  elapsed := 0;
   maxElapsed := 0;
-end;
-
-function tTimer.elapsed(): double;
-begin
-  result := endTime - startTime;
 end;
 
 procedure tTimer.start();
@@ -94,7 +87,7 @@ end;
 
 procedure tTimer.stop();
 begin
-  endTime := getSec;
+  elapsed := getSec-startTime;
   if elapsed > maxElapsed then
     maxElapsed := elapsed
   else

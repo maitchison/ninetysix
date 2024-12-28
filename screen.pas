@@ -12,6 +12,7 @@ uses
   graph32,
   sprite,
   vga,
+  timer,
   s3;
 
 const
@@ -25,8 +26,6 @@ type
     copyCells: int32;
     clearRegions: int32;
     clearCells: int32;
-    copyTime: single;
-    clearTime: single;
     procedure reset();
   end;
 
@@ -303,10 +302,9 @@ procedure tScreen.clearAll();
 var
   x, y: integer;
   xStart, rle: integer;
-  startTime: double;
 begin
   stats.clearCells := 0; stats.clearRegions := 0;
-  startTime := getSec;
+  startTimer('clear');
   for y := clearBounds.top to clearBounds.bottom do begin
     rle := 0;
     for x := clearBounds.left to clearBounds.right do begin
@@ -328,8 +326,8 @@ begin
       stats.clearRegions += 1;
     end;
   end;
-  stats.clearTime := getSec - startTime;
   clearBounds.init(256,256,-256, -256);
+  stopTimer('clear');
 end;
 
 {flips all valid regions}
@@ -338,10 +336,9 @@ procedure tScreen.flipAll();
 var
   x,y: integer;
   xStart, rle: integer;
-  startTime: double;
 begin
+  startTimer('flip');
   stats.copyCells := 0; stats.copyRegions := 0;
-  startTime := getSec;
   for y := flipBounds.top to flipBounds.bottom do begin
     rle := 0;
     for x := flipBounds.left to flipBOunds.right do begin
@@ -363,8 +360,8 @@ begin
       stats.copyRegions += 1;
     end;
   end;
-  stats.copyTime := getSec - startTime;
   flipBounds.init(256,256,-256, -256);
+  stopTimer('flip');
 end;
 
 {clears region on canvas with background color}

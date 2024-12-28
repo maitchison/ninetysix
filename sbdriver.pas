@@ -58,7 +58,7 @@ const
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 8*1024;     //2k is better, but 4k fixes a few glitches on load
+  BUFFER_SIZE = 4*1024;     //2k is better, but 4k fixes a few glitches on load
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 
@@ -278,7 +278,6 @@ begin
     mov al, 0
     out dx,al    {reset flip flop}
 
-
     mov dx, $C6
     in  al, dx
     mov bl, al
@@ -289,14 +288,17 @@ begin
   end;
 
   {buf0 should be half_buffer_words, buf1 should be buffer_words}
-  expectedBuffer := boolean(trunc(round(debug_dma_ofs / (HALF_BUFFER_SIZE div 2))-1));
-  if currentBuffer <> expectedBuffer then begin
-    currentBuffer := expectedBuffer;
+  {
+    If currentBuffer=true, then we are writing to the second block, and DMA offs should be < HALF_BUFFER_SIZE/2
+    If currentBuffer=false, then we are writing to the first block, and DMA offs should be > HALF_BUFFER_SIZE/2
+  }
+  requiredCorrection := false;
+  if (currentBuffer and (debug_dma_ofs < HALF_BUFFER_SIZE div 2)) then requiredCorrection := true;
+  if (not currentBuffer and (debug_dma_ofs > HALF_BUFFER_SIZE div 2)) then requiredCorrection := true;
+  if requiredCorrection then begin
+    currentBuffer := not currentBuffer;
     inc(debug_dma_page_corrections);
-    requiredCorrection := true;
-  end else
-    requiredCorrection := false;
-
+  end;
 
   if currentBuffer then
     bufOfs := dosOffset + HALF_BUFFER_SIZE
