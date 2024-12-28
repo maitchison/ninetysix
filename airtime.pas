@@ -29,7 +29,7 @@ uses
 
 CONST
 
-  XMAS = True;
+  XMAS: boolean = False;
 
   DEFAULT_CAR_SCALE = 1.0; //0.75
   SKID_VOLUME = 0.5; // 1.0
@@ -112,8 +112,14 @@ type
     procedure draw();
   end;
 
-var
-  snow: array[0..SNOW_PARTICLES-1] of tSnowParticle;
+  tSnowField = class
+    snow: array[0..SNOW_PARTICLES-1] of tSnowParticle;
+    procedure reset();
+    procedure update();
+    procedure draw();
+    constructor Create();
+  end;
+
 
 procedure tSnowParticle.reset();
 begin
@@ -144,6 +150,41 @@ begin
   screen.canvas.putPixel(dx, dy-1, RGBA.create(250, 250, 250, 140));
   screen.canvas.putPixel(dx, dy+1, RGBA.create(250, 250, 250, 140));
 end;
+
+procedure tSnowField.reset();
+var
+  i,j: integer;
+begin
+  for i := 0 to SNOW_PARTICLES-1 do begin
+    snow[i].reset();
+    snow[i].pos.y := rnd+rnd;
+    for j := 0 to rnd do
+      snow[i].update();
+  end;
+end;
+
+procedure tSnowField.update();
+var
+  i: integer;
+begin
+  for i := 0 to SNOW_PARTICLES-1 do
+    snow[i].update();
+end;
+
+procedure tSnowField.draw();
+var
+  i: integer;
+begin
+  for i := 0 to SNOW_PARTICLES-1 do
+    snow[i].draw();
+end;
+
+constructor tSnowField.Create();
+begin
+  inherited Create();
+  reset();
+end;
+
 
 {-----------------------------------------------------------}
 
@@ -602,6 +643,7 @@ var
   padding: integer;
   carScale: single;
   i,j: integer;
+  snow: tSnowField;
 
 begin
 
@@ -626,12 +668,7 @@ begin
   startClock := getSec;
   lastClock := startClock;
 
-  for i := 0 to SNOW_PARTICLES-1 do begin
-    snow[i].reset();
-    snow[i].pos.y := rnd+rnd;
-    for j := 0 to rnd do
-      snow[i].update();
-  end;
+  if xmas then snow := tSnowField.create() else snow := nil;
 
   while True do begin
 
@@ -673,10 +710,9 @@ begin
 
     screen.clearAll();
 
-    {draw snow}
-    for i := 0 to SNOW_PARTICLES-1 do begin
-      snow[i].update();
-      snow[i].draw();
+    if assigned(snow) then begin
+      snow.update();
+      snow.draw();
     end;
 
     startTime := getSec;
@@ -723,6 +759,9 @@ begin
     if keyDown(key_p) and keyDown(key_l) and keyDown(key_y) then mainLoop();
     if keyDown(key_q) or keyDown(key_esc) then break;
   end;
+
+  if assigned(snow) then snow.free;
+
 end;
 
 procedure setTrackDisplay(page: tPage);
@@ -827,7 +866,19 @@ begin
 
 end;
 
+procedure processArgs();
+var
+  i: integer;
 begin
+  for i := 1 to ParamCount do begin
+    if toLowerCase(paramStr(i)) = '--xmas' then
+      xmas := true;
+  end;
+end;
+
+begin
+
+  processArgs();
 
   if cpuInfo.ram < 30*1024*1024 then
     error('Application required 30MB of ram.');
