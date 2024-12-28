@@ -24,6 +24,7 @@ uses
   font,
   sound,
   raceTrack,
+  timer,
   go32;
 
 
@@ -458,9 +459,11 @@ begin
     else terrain := TERRAIN_DEF[TD_SPACE];
   end;
 
+  (*
   debugTextOut(drawPos.x, drawPos.y+50,
     format('%s %f', [terrain.tag, terrain.friction])
   );
+  *)
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
@@ -772,6 +775,19 @@ begin
   screen.pageFlip();
 end;
 
+procedure debugShowTimers(drawPos: tPoint);
+var
+  i: integer;
+begin
+  for i := 0 to length(TIMERS)-1 do
+    debugTextOut(
+      drawPos.x, drawPos.y+i*15,
+      format(
+        '%s: %f (%f)',
+        [TIMERS[i].tag, 1000*TIMERS[i].elapsed, 1000*TIMERS[i].maxElapsed]
+      ));
+end;
+
 procedure mainLoop();
 var
   startClock,lastClock,thisClock: double;
@@ -780,6 +796,7 @@ var
   drawPos: tPoint;
 
 begin
+
   note('Main loop started');
 
   track := tRaceTrack.Create('res/track2');
@@ -815,18 +832,25 @@ begin
 
   while True do begin
 
+    startTimer('frame');
+
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
     if keyDown(key_space) then
       elapsed /= 100;
     gameTime += elapsed;
+
     lastClock := thisClock;
     inc(frameCount);
 
+    startTimer('clear');
     screen.clearAll();
+    stopTimer('clear');
 
+    startTimer('update');
     car.update();
+    stopTimer('update');
 
     drawPos := worldToCanvas(car.pos);
     camX += ((drawPos.x-CamX)*0.10);
@@ -852,14 +876,23 @@ begin
     if keyDown(key_3) then
       delay(100); // pretend to be slow
 
+    debugShowTimers(drawPos);
+
+    startTimer('vsync');
+    videoDriver.waitVSync();
+    stopTimer('vsync');
+
     screen.setViewPort(
       round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2),
       false
     );
-    videoDriver.waitVSync();
+    startTimer('flip');
     screen.flipAll();
+    stopTimer('flip');
 
     if keyDown(key_q) or keyDown(key_esc) then break;
+
+    stopTimer('frame');
   end;
 
   track.free;
