@@ -77,6 +77,27 @@ type
     vox: tVoxelSprite;
   end;
 
+  tTerrainDef = record
+    tag: string;
+    friction: single;
+    traction: single;
+    bumpiness: single;
+  end;
+
+const
+  TD_SPACE = 0;
+  TD_DIRT = 1;
+  TD_GRASS = 2;
+  TD_BARRIER = 3;
+
+var
+  TERRAIN_DEF: array[0..3] of tTerrainDef = (
+    (tag:'space';   friction:0.0; traction:410;  bumpiness:100),
+    (tag:'dirt';    friction:0.0; traction:410;  bumpiness:10),
+    (tag:'grass';   friction:4.0; traction:210;  bumpiness:30),
+    (tag:'barrier'; friction:0.0; traction:1000; bumpiness:100)
+  );
+
 {-----------------------------------------------------------}
 
 const
@@ -136,8 +157,7 @@ type
   tCar = class
   protected
     procedure drawWheels(side: integer);
-    procedure tractionSimple();
-    procedure tractionComplex();
+    procedure tireModel();
   public
     pos: V3D;
     vel: V3D;
@@ -145,9 +165,10 @@ type
     tilt: single;
     chassis: tCarChassis;
     scale: single;
+    terrain: tTerrainDef;
 
     mass: single;
-    tireTraction: single;
+    tireTractionModifier: single;
     tireHeat: single;       //reduces traction
     enginePower: single;
     dragCoefficent: single;
@@ -172,7 +193,7 @@ begin
   tilt := 0;
   mass := 1;
   enginePower := 300;
-  tireTraction := 410;
+  tireTractionModifier := 1;
   tireHeat := 0;
   dragCoefficent := 0.0025;
   constantDrag := 50;
@@ -250,48 +271,6 @@ begin
   result := p.rotated(0, 0, zAngle) * scale + self.pos;
 end;
 
-procedure tCar.tractionSimple();
-var
-  targetVelocity: v3d;
-  tractionForce: v3d;
-  drag, coefficent: single;
-  dragForce: v3d;
-begin
-
-  {simplified traction model}
-  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
-  tractionForce := ((targetVelocity-vel)*mass);
-  if keyDown(key_x) then begin
-    {perfect traction}
-  end else if keyDown(key_z) then begin
-    tractionForce.clip(0) {no traction}
-  end else begin
-    {standard traction}
-    {note: tires are usually better than engine in terms of acceleration}
-    tractionForce.clip(1000);
-  end;
-
-  vel += tractionForce * (elapsed/mass);
-
-  {-----------------------------------}
-  {drag
-    constant is static resistance
-    linear is rolling sitance nad internal friction
-    quadratic is due to air resistance
-  }
-
-  (*
-  drag := 30000.0 + 100.0*vel.abs + 10.0*vel.abs2;
-  if (drag*elapsed/mass > vel.abs) then
-    vel *= 0
-  else begin
-    dragForce := vel.normed() * drag;
-    vel -= dragForce * (elapsed/mass);
-  end;
-  *)
-
-end;
-
 procedure addSkidMark(pos: V3D);
 var
   drawPos: tPoint;
@@ -305,7 +284,7 @@ begin
   );
 end;
 
-procedure tCar.tractionComplex();
+procedure tCar.tireModel();
 var
   slipAngle, dirAngle, velAngle: single;
   dir: v3d;
@@ -347,7 +326,7 @@ begin
       tractionForce.clip(9999999) {perfect traction}
     else begin
       {model how well our tires work}
-      tractionForce.clip(clamp(tireTraction-(tireHeat*2), 0, tireTraction));
+      tractionForce.clip(tireTractionModifier * clamp(terrain.traction-(tireHeat*2), 0, terrain.traction));
     end;
 
     slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
@@ -357,10 +336,7 @@ begin
 
     {sound is always playing, we only adjust the volume}
     skidVolume := clamp(slidingPower/5000, 0, 1.0) * SKID_VOLUME;
-    //if skidVolume < mixer.channels[2].volume then alpha := EASE_OUT else alpha := EASE_IN;
-    //mixer.channels[2].volume := alpha * mixer.channels[2].volume + (1-alpha)*skidVolume;
     mixer.channels[2].volume := skidVolume * 0.65;
-    //mixer.channels[2].pitch := clamp(0.85+tireHeat/400, 0.85, 2.0);
 
     // write skidmarks to map
     if (skidVolume > 0.05) and assigned(screen.background) then begin
@@ -377,44 +353,18 @@ begin
     mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
     mixer.channels[3].pitch := (ENGINE_START + clamp(vel.abs/250, 0, ENGINE_RANGE));
 
-    debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
+    //debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
 
     vel += tractionForce * (elapsed / mass);
 
   end;
 
-  debugTextOut(
+  {debugTextOut(
     drawPos.x-120, drawPos.y+50,
     format('vel:%.1f slipa:%.1f tf:%.1f/%.1f fps:%.2f',
     [vel.abs, slipAngle, tractionForce.abs, requiredTractionForce.abs, 1/elapsed]
-  ));
+  ));}
 
-  (*
-
-  {linear until a point then constant, but really I want this to
-   decrease after a point}
-  lateralForceCap := min(slipAngle, slipThreshold) * 40000;
-  if keyDown(key_x) then
-    lateralForceCap := 0;
-  if keyDown(key_z) then
-    lateralForceCap := 99999999999;
-
-  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
-
-  tractionForce := ((targetVelocity-vel)*mass).rotated(0,0,-zAngle);
-
-  tractionForce.x := 0;  {logatudinal, could be used for breaking.}
-  tractionForce.y := clamp(tractionForce.y, -lateralForceCap, +lateralForceCap);
-  tractionForce.z := 0;
-
-  screen.clearRegion(tRect.create(300, 300, 200, 20));
-
-  screen.copyRegion(tRect.create(300, 300, 200, 20));
-
-   tractionForce := tractionForce.rotated(0,0,+zAngle);
-
-  vel += tractionForce * (1/mass);
-  *)
 end;
 
 procedure tCar.update();
@@ -423,8 +373,8 @@ var
   dir: v3d;
   engineForce, lateralForce, dragForce: v3d;
   targetVelocity: v3d;
-  x,y: single;
   drawPos: tPoint;
+  terrainColor: RGBA;
 const
   BOUNDARY = 50;
 begin
@@ -446,27 +396,40 @@ begin
   if keyDown(key_up) then
     engineForce := dir * enginePower;
 
-  {movement from last rame}
-  {note: we correct for isometric projection here}
-  pos += vel * elapsed; {stub on the *100}
+  {movement from last frame}
+  pos += vel * elapsed;
+  drawPos := worldToCanvas(pos);
+
+  {figure out why terrain we are on}
+  {note: this is a bit of a weird way to do it, but oh well}
+  terrainColor := track.terrainMap.getPixel(drawPos.x, drawPos.y);
+
+  case terrainColor.to32 of
+    $FFFF0000: terrain := TERRAIN_DEF[TD_DIRT];
+    $FF00FF00: terrain := TERRAIN_DEF[TD_GRASS];
+    $FFFFFF00: terrain := TERRAIN_DEF[TD_BARRIER];
+    else terrain := TERRAIN_DEF[TD_SPACE];
+  end;
+
+  debugTextOut(drawPos.x, drawPos.y+50,
+    format('%s %f', [terrain.tag, terrain.friction])
+  );
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
   tireRotation += elapsed * vel.abs / 20;
 
   {handle traction}
-  self.tractionComplex();
+  self.tireModel();
 
   {handle drag}
-  drag := constantDrag + dragCoefficent * vel.abs2;
+  drag := self.constantDrag + terrain.friction * vel.abs + (dragCoefficent) * vel.abs2;
   dragForce := vel.normed() * drag;
   dragForce *= (elapsed/mass);
   dragForce.clip(vel.abs);
   vel -= dragForce;
 
-  {boundaries}
-  drawPos := worldToCanvas(pos);
-
+  {apply boundaries}
   if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
   if drawPos.y < BOUNDARY then vel.y += (BOUNDARY-drawPos.y) * 1.0;
   if drawPos.x > screen.canvas.width-BOUNDARY then vel.x -= (drawPos.x-(screen.canvas.width-BOUNDARY)) * 1.0;
@@ -489,8 +452,6 @@ procedure debugTextOut(dx,dy: integer; s: string);
 var
   r: tRect;
 begin
-  //stub
-  exit;
   r := textExtents(s).padded(2);
   r.x += dx;
   r.y += dy;
@@ -820,11 +781,6 @@ begin
     screen.SHOW_DIRTY_RECTS := keyDown(key_d);
 
     {more debuggug}
-    if keyDown(key_1) then
-      car.tireTraction -= 10;
-    if keyDown(key_2) then
-      car.tireTraction += 10;
-
     if keyDown(key_9) then
       setTrackDisplay(track.background);
     if keyDown(key_8) then

@@ -58,7 +58,7 @@ const
   }
 
   //buffer size in bytes
-  BUFFER_SIZE = 4*1024;     //2k is better, but 4k fixes a few glitches on load
+  BUFFER_SIZE = 8*1024;     //2k is better, but 4k fixes a few glitches on load
   HALF_BUFFER_SIZE = BUFFER_SIZE div 2;
 
 
