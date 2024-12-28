@@ -92,10 +92,10 @@ const
 
 var
   TERRAIN_DEF: array[0..3] of tTerrainDef = (
-    (tag:'space';   friction:0.0; traction:410;  bumpiness:100),
-    (tag:'dirt';    friction:0.0; traction:410;  bumpiness:10),
-    (tag:'grass';   friction:4.0; traction:210;  bumpiness:30),
-    (tag:'barrier'; friction:0.0; traction:1000; bumpiness:100)
+    (tag:'space';   friction:0.0; traction:410;  bumpiness:0.00),
+    (tag:'dirt';    friction:0.0; traction:410;  bumpiness:0.00),
+    (tag:'grass';   friction:4.0; traction:210;  bumpiness:0.03),
+    (tag:'barrier'; friction:0.0; traction:1000; bumpiness:0.00)
   );
 
 {-----------------------------------------------------------}
@@ -159,10 +159,12 @@ type
     procedure drawWheels(side: integer);
     procedure tireModel();
   public
+
     pos: V3D;
     vel: V3D;
-    zAngle: single;
-    tilt: single;
+    angle: V3D;
+    steeringAngle: single;
+
     chassis: tCarChassis;
     scale: single;
     terrain: tTerrainDef;
@@ -189,8 +191,8 @@ begin
   inherited create();
   pos := V3D.create(0,0,0);
   vel := V3D.create(0,0,0);
-  zAngle := 0;
-  tilt := 0;
+  angle := V3D.create(0,0,0);
+  steeringAngle := 0;
   mass := 1;
   enginePower := 300;
   tireTractionModifier := 1;
@@ -216,17 +218,17 @@ begin
     for j := 0 to 1 do begin
       dx := i*2-1;
       dy := j*2-1;
-      tireAngle := zAngle+(pi*(1-j));
+      tireAngle := angle.z+(pi*(1-j));
       if i = 0 then
-        tireAngle -= tilt/3
+        tireAngle -= 3
       else
-        tireAngle -= tilt/5;
+        tireAngle -= steeringAngle*(3/5);
 
       if cos(tireAngle) * side >= 0 then
       screen.markRegion(wheelVox.draw(
         screen.canvas,
         getWheelPos(dx, dy),
-        tireAngle, tireRotation * dy, pi/2,
+        V3D.create(pi/2, tireRotation * dy, tireAngle),
         chassis.wheelSize*scale)
       );
     end;
@@ -240,15 +242,15 @@ begin
 
   startTime := getSec;
 
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale*0.9, true));
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale*1.0, true));
-  screen.markRegion(vox.draw(screen.canvas, pos, zAngle, 0, 0, scale*1.1, true));
+  screen.markRegion(vox.draw(screen.canvas, pos, angle, scale*0.9, true));
+  screen.markRegion(vox.draw(screen.canvas, pos, angle, scale*1.0, true));
+  screen.markRegion(vox.draw(screen.canvas, pos, angle, scale*1.1, true));
 
 
   drawWheels(-1);
   p := pos;
   p.z -= chassis.carHeight;
-  screen.markRegion(vox.draw(screen.canvas, p, zAngle, 0, 0, scale));
+  screen.markRegion(vox.draw(screen.canvas, p, angle, scale));
   drawWheels(+1);
 
   if carDrawTime = 0 then
@@ -268,7 +270,7 @@ var
   p: V3D;
 begin
   p := chassis.wheelPos * V3D.create(dx, dy, 0) + chassis.wheelOffset;
-  result := p.rotated(0, 0, zAngle) * scale + self.pos;
+  result := p.rotated(angle.x, angle.y, angle.z) * scale + self.pos;
 end;
 
 procedure addSkidMark(pos: V3D);
@@ -299,7 +301,7 @@ var
   marks: integer;
 begin
 
-  dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+  dir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
   drawPos := worldToCanvas(pos);
 
   if elapsed <= 0 then exit;
@@ -315,7 +317,7 @@ begin
     {calculate the slip angle}
     slipAngle := radToDeg(arcCos(vel.dot(dir) / vel.abs));
 
-    targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,zAngle);
+    targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,angle.z);
     {force required to correct velocity *this* frame}
     requiredTractionForce := (targetVelocity-vel)*(mass/elapsed);
     tractionForce := requiredTractionForce;
@@ -375,23 +377,27 @@ var
   targetVelocity: v3d;
   drawPos: tPoint;
   terrainColor: RGBA;
+  isOnGround: boolean;
 const
   BOUNDARY = 50;
 begin
 
-  dir := v3d.create(-1,0,0).rotated(0,0,zAngle);
+  dir := v3d.create(-1,0,0).rotated(0,0,angle.z);
   dragForce := v3d.create(0,0,0);
   engineForce := v3d.create(0,0,0);
   lateralForce := v3d.create(0,0,0);
 
+  // for the moment assume we are on the ground
+  isOnGround := true;
+
   {process input}
   if keyDown(key_left) then begin
-    zAngle -= elapsed*2.5;
-    tilt += elapsed*1.0;
+    angle.z -= elapsed*2.5;
+    steeringAngle += elapsed*0.3;
   end;
   if keyDown(key_right) then begin
-    zAngle += elapsed*2.5;
-    tilt -= elapsed*1.0;
+    angle.z += elapsed*2.5;
+    steeringAngle -= elapsed*0.3;
   end;
   if keyDown(key_up) then
     engineForce := dir * enginePower;
@@ -429,14 +435,27 @@ begin
   dragForce.clip(vel.abs);
   vel -= dragForce;
 
+  {handle bumps}
+  angle.x += ((rnd/256)-0.5) * vel.abs * elapsed * terrain.bumpiness;
+  angle.y += ((rnd/256)-0.5) * vel.abs * elapsed * terrain.bumpiness;
+  angle.z += ((rnd/256)-0.5) * vel.abs * elapsed * terrain.bumpiness;
+
   {apply boundaries}
   if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
   if drawPos.y < BOUNDARY then vel.y += (BOUNDARY-drawPos.y) * 1.0;
   if drawPos.x > screen.canvas.width-BOUNDARY then vel.x -= (drawPos.x-(screen.canvas.width-BOUNDARY)) * 1.0;
   if drawPos.y > screen.canvas.height-BOUNDARY then vel.y -= (drawPos.y-(screen.canvas.height-BOUNDARY)) * 1.0;
 
-  //stub
-  tilt *= decayFactor(0.5);
+  {return setting back to zero}
+  steeringAngle *= decayFactor(0.5);
+
+  {return angles back to 0}
+  if isOnGround then begin
+    angle.x *= decayFactor(0.2);
+    angle.y *= decayFactor(0.2);
+  end;
+
+
 end;
 
 {---------------------------------------------------------------------}
@@ -663,9 +682,9 @@ begin
     startTime := getSec;
 
     if benchmarkMode then begin
-      screen.markRegion(CC_RED.vox.draw(screen.canvas, V3D.create(320, 440, 0), 0.3, 0, 0.2, carScale));
+      screen.markRegion(CC_RED.vox.draw(screen.canvas, V3D.create(320, 440, 0), V3D.create(0.3, 0, 0.2), carScale));
     end else
-      screen.markRegion(CC_RED.vox.draw(screen.canvas, V3D.create(320, 440, 0), xTheta, 0, zTheta, carScale));
+      screen.markRegion(CC_RED.vox.draw(screen.canvas, V3D.create(320, 440, 0), V3D.create(xTheta, 0, zTheta), carScale));
 
     if carDrawTime = 0 then
       carDrawTime := (getSec - startTime)

@@ -54,7 +54,7 @@ type
     function getSize(): V3D16;
     function getVoxel(x,y,z:int32): RGBA;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    function draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1;asShadow:boolean=false): tRect;
+    function draw(canvas: tPage;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
 
 implementation
@@ -274,7 +274,7 @@ end;
 {draw voxel sprite, with position given in world space.
 returns the bounding rect of the drawn object.
 }
-function tVoxelSprite.draw(canvas: tPage;atPos: V3D; zAngle: single=0; pitch: single=0; roll: single=0; scale: single=1;asShadow:boolean=false): tRect;
+function tVoxelSprite.draw(canvas: tPage;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
 var
   c, debugCol: RGBA;
   faceColor: array[1..6] of RGBA;
@@ -521,7 +521,7 @@ begin
   }
 
   {set up our matrices}
-  model.setRotationXYZ(roll, pitch, zAngle);
+  model.setRotationXYZ(angle.x, angle.y, angle.z);
   if asShadow then
     model.scale(1,1,0);
   projection.setRotationX(-0.615); //~35 degrees
