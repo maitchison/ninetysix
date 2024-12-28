@@ -609,12 +609,31 @@ end;
 procedure unpack8(inBuf: pByte; outBuf: pDWord;n: dWord);
 var
   i: integer;
+  inPtr, outPtr: pointer;
 begin
+  asm
+    pushad
+    mov ecx, n
+    mov esi, inBuf
+    mov edi, outBuf
+  @PACKLOOP:
+
+    movzx eax, byte ptr [esi]
+    inc esi
+    mov dword ptr [edi], eax
+    add edi, 4
+
+    dec ecx
+    jnz @PACKLOOP
+    popad
+  end;
+  {
   for i := 1 to n do begin
     move(packing8[inBuf^], outBuf^, 4);
     inc(inBuf);
     inc(outBuf);
   end;
+  }
 end;
 
 {General unpacking routine.
