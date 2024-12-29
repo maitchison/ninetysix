@@ -84,21 +84,20 @@ type
     tag: string;
     friction: single;
     traction: single;
-    bumpiness: single;
   end;
 
 const
-  TD_SPACE = 0;
+  TD_AIR = 0;
   TD_DIRT = 1;
   TD_GRASS = 2;
   TD_BARRIER = 3;
 
 var
   TERRAIN_DEF: array[0..3] of tTerrainDef = (
-    (tag:'space';   friction:0.0; traction:410;  bumpiness:0.00),
-    (tag:'dirt';    friction:0.0; traction:410;  bumpiness:0.00),
-    (tag:'grass';   friction:4.0; traction:210;  bumpiness:0.03),
-    (tag:'barrier'; friction:0.0; traction:1000; bumpiness:0.00)
+    (tag:'air';     friction:0.0; traction:0),
+    (tag:'dirt';    friction:0.0; traction:410),
+    (tag:'grass';   friction:4.0; traction:210),
+    (tag:'barrier'; friction:0.0; traction:1000)
   );
 
 {-----------------------------------------------------------}
@@ -209,7 +208,6 @@ type
     angle: V3D;
     steeringAngle: single;
     currentTerrain: tTerrainDef;
-    isOnGround: boolean;
 
     chassis: tCarChassis;
     scale: single;
@@ -224,6 +222,7 @@ type
 
     constructor create(aChassis: tCarChassis);
 
+    function isOnGround: boolean;
     function getWheelPos(dx,dy: integer): V3D;
     function getWheelAngle(dx,dy: integer): single;
     function vox: tVoxelSprite;
@@ -307,6 +306,11 @@ begin
   result := chassis.vox;
 end;
 
+function tCar.isOnGround: boolean;
+begin
+  result := currentTerrain.tag <> 'air';
+end;
+
 {returns wheel positon in world space, e.g. -1, -1 for front left tire}
 function tCar.getWheelPos(dx,dy: integer): V3D;
 var
@@ -357,66 +361,67 @@ var
   marks: integer;
 begin
 
-  facingDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
-  wheelDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z + steeringAngle * (3/5));
-  drawPos := worldToCanvas(pos);
-
   if elapsed <= 0 then exit;
 
   {-----------------------------------}
   {tire traction}
 
-  if vel.abs < 0.1 then begin
-    {perfect traction for small speeds}
-    slipAngle := 0;
-    //...
-  end else begin
-    {calculate the slip angle}
-    slipAngle := radToDeg(arcCos(vel.dot(wheelDir) / vel.abs));
+  // todo: switch this to decay
+  tireHeat := 0.93 * tireHeat;
 
-    targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,angle.z);
-    {force required to correct velocity *this* frame}
-    requiredTractionForce := (targetVelocity-vel)*(mass/elapsed);
-    tractionForce := requiredTractionForce;
+  if vel.abs < 0.1 then
+    {perfect traction for at small speeds}
+    exit;
 
-    if keyDown(key_z) then
-      tractionForce.clip(0) {no traction}
-    else if keyDown(key_x) then
-      tractionForce.clip(9999999) {perfect traction}
-    else begin
-      {model how well our tires work}
-      tractionForce.clip(tireTractionModifier * clamp(currentTerrain.traction-(tireHeat*2), 0, currentTerrain.traction));
-    end;
+  if not isOnGround then
+    exit;
 
-    slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
+  facingDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
+  wheelDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z + steeringAngle * (3/5));
+  drawPos := worldToCanvas(pos);
 
-    tireHeat += slidingPower / 1000;
-    tireHeat := 0.93 * tireHeat;
+  {calculate the slip angle}
+  slipAngle := radToDeg(arcCos(vel.dot(wheelDir) / vel.abs));
 
-    {sound is always playing, we only adjust the volume}
-    skidVolume := clamp(slidingPower/5000, 0, 1.0) * SKID_VOLUME;
-    mixer.channels[2].volume := skidVolume * 0.65;
+  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,angle.z);
+  {force required to correct velocity *this* frame}
+  requiredTractionForce := (targetVelocity-vel)*(mass/elapsed);
+  tractionForce := requiredTractionForce;
 
-    // write skidmarks to map
-    if (skidVolume > 0.05) and assigned(screen.background) then begin
-      marks := trunc(skidVolume * 20);
-      for i := 1 to marks do begin
-        t := (rnd/256) * elapsed;
-        addSkidmark(getWheelPos(+1, -1)+vel*t);
-        addSkidmark(getWheelPos(+1, +1)+vel*t);
-      end;
-    end;
-
-    // for the moment engine sound is speed, which is not quiet right
-    // should be 'revs'
-    mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
-    mixer.channels[3].pitch := (ENGINE_START + clamp(vel.abs/250, 0, ENGINE_RANGE));
-
-    //debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
-
-    vel += tractionForce * (elapsed / mass);
-
+  if keyDown(key_z) then
+    tractionForce.clip(0) {no traction}
+  else if keyDown(key_x) then
+    tractionForce.clip(9999999) {perfect traction}
+  else begin
+    {model how well our tires work}
+    tractionForce.clip(tireTractionModifier * clamp(currentTerrain.traction-(tireHeat*2), 0, currentTerrain.traction));
   end;
+
+  slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
+
+  tireHeat += slidingPower / 1000;
+
+  {sound is always playing, we only adjust the volume}
+  skidVolume := clamp(slidingPower/5000, 0, 1.0) * SKID_VOLUME;
+  mixer.channels[2].volume := skidVolume * 0.65;
+
+  // write skidmarks to map
+  if (skidVolume > 0.05) and assigned(screen.background) then begin
+    marks := trunc(skidVolume * 20);
+    for i := 1 to marks do begin
+      t := (rnd/256) * elapsed;
+      addSkidmark(getWheelPos(+1, -1)+vel*t);
+      addSkidmark(getWheelPos(+1, +1)+vel*t);
+    end;
+  end;
+
+  // for the moment engine sound is speed, which is not quiet right
+  // should be 'revs'
+  mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
+  mixer.channels[3].pitch := (ENGINE_START + clamp(vel.abs/250, 0, ENGINE_RANGE));
+
+  //debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
+  vel += tractionForce * (elapsed / mass);
 
   {debugTextOut(
     drawPos.x-120, drawPos.y+50,
@@ -445,7 +450,7 @@ begin
     $FFFF0000: result := TERRAIN_DEF[TD_DIRT];
     $FF00FF00: result := TERRAIN_DEF[TD_GRASS];
     $FFFFFF00: result := TERRAIN_DEF[TD_BARRIER];
-    else result := TERRAIN_DEF[TD_SPACE];
+    else result := TERRAIN_DEF[TD_DIRT];
   end;
 
 end;
@@ -470,15 +475,15 @@ procedure tCar.processMap();
 var
   terrainColor: RGBA;
   terrain: tTerrainDef;
+  terrainHeight: single;
   i,j: integer;
   height: array[0..1, 0..1] of single;
   wheelPos: array[0..1, 0..1] of V3D;
+
 begin
-  // for the moment assume we are on the ground
-  self.isOnGround := true;
 
   self.currentTerrain := sampleTerrain(self.pos);
-  self.pos.z := sampleHeight(self.pos);
+  terrainHeight := sampleHeight(self.pos);
 
   for i := 0 to 1 do
     for j := 0 to 1 do begin
@@ -487,16 +492,32 @@ begin
       height[i,j] := sampleHeight(wheelPos[i,j]);
       self.currentTerrain.traction += terrain.traction;
       self.currentTerrain.friction += terrain.friction;
-      self.currentTerrain.bumpiness += terrain.bumpiness;
     end;
 
   {sample slope}
-  self.angle.x := (height[0, 1] - height[0, 0]) / (wheelPos[0, 1]- wheelPos[0, 0]).abs;
-  self.angle.y := -(height[1, 0] - height[0, 0]) / (wheelPos[1, 0]- wheelPos[0, 0]).abs;
+  if isOnGround then begin
+    self.angle.x := (height[0, 1] - height[0, 0]) / (wheelPos[0, 1]- wheelPos[0, 0]).abs;
+    self.angle.y := -(height[1, 0] - height[0, 0]) / (wheelPos[1, 0]- wheelPos[0, 0]).abs;
+  end;
 
   self.currentTerrain.traction /= 5;
   self.currentTerrain.friction /= 5;
-  self.currentTerrain.bumpiness /= 5;
+
+  {normal force}
+
+  if terrainHeight < pos.z then begin
+    //vel.z := (pos.z - terrainHeight) / elapsed;
+    // todo:
+    vel.z := 0;
+    if pos.z < -1 then pos.z := -1;
+  end else if terrainHeight > pos.z+1 then begin
+    // looks like we're falling
+    vel.z += 200 * elapsed;
+    self.currentTerrain := TERRAIN_DEF[TD_AIR]
+  end else begin
+    // this means we're within suspention range
+    vel.z -= 100 * elapsed;
+  end;
 
 end;
 
@@ -526,7 +547,8 @@ begin
     angle.z += elapsed*2.5;
     steeringAngle -= elapsed*0.3;
   end;
-  if keyDown(key_up) then
+
+  if keyDown(key_up) and isOnGround then
     engineForce := dir * enginePower;
 
   {movement from last frame}
@@ -552,11 +574,6 @@ begin
   dragForce *= (elapsed/mass);
   dragForce.clip(vel.abs);
   vel -= dragForce;
-
-  {handle bumps}
-  angle.x += ((rnd/256)-0.5) * vel.abs * elapsed * currentTerrain.bumpiness;
-  angle.y += ((rnd/256)-0.5) * vel.abs * elapsed * currentTerrain.bumpiness;
-  angle.z += ((rnd/256)-0.5) * vel.abs * elapsed * currentTerrain.bumpiness;
 
   {apply boundaries}
   if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
@@ -759,8 +776,6 @@ begin
     thisClock := getSec;
     elapsed := thisClock-lastClock;
     smoothElapsed := smoothElapsed * 0.95 + elapsed * 0.05;
-    if keyDown(key_space) then
-      elapsed /= 100;
     gameTime += elapsed;
     lastClock := thisClock;
     inc(frameCount);
@@ -913,8 +928,6 @@ begin
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
-    if keyDown(key_space) then
-      elapsed /= 100;
     gameTime += elapsed;
 
     lastClock := thisClock;
@@ -938,6 +951,8 @@ begin
 
     {debugging}
     startTimer('debug');
+    if keyDown(key_space) then
+      car.vel.z := -100;
     screen.SHOW_DIRTY_RECTS := keyDown(key_d);
     if keyDown(key_9) then
       setTrackDisplay(track.background);
