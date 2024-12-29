@@ -470,9 +470,9 @@ procedure tCar.processMap();
 var
   terrainColor: RGBA;
   terrain: tTerrainDef;
-  height, avHeight: single;
   i,j: integer;
-  wheelPos: V3D;
+  height: array[0..1, 0..1] of single;
+  wheelPos: array[0..1, 0..1] of V3D;
 begin
   // for the moment assume we are on the ground
   self.isOnGround := true;
@@ -482,13 +482,17 @@ begin
 
   for i := 0 to 1 do
     for j := 0 to 1 do begin
-      wheelPos := getWheelPos(i*2-1, j*2-1);
-      terrain := sampleTerrain(wheelPos);
-      height := sampleHeight(wheelPos);
+      wheelPos[i,j] := getWheelPos(i*2-1, j*2-1);
+      terrain := sampleTerrain(wheelPos[i,j]);
+      height[i,j] := sampleHeight(wheelPos[i,j]);
       self.currentTerrain.traction += terrain.traction;
       self.currentTerrain.friction += terrain.friction;
       self.currentTerrain.bumpiness += terrain.bumpiness;
     end;
+
+  {sample slope}
+  self.angle.x := (height[0, 1] - height[0, 0]) / (wheelPos[0, 1]- wheelPos[0, 0]).abs;
+  self.angle.y := -(height[1, 0] - height[0, 0]) / (wheelPos[1, 0]- wheelPos[0, 0]).abs;
 
   self.currentTerrain.traction /= 5;
   self.currentTerrain.friction /= 5;
