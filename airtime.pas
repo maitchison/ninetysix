@@ -284,10 +284,11 @@ begin
 
   startTime := getSec;
 
-  screen.markRegion(vox.draw(screen.canvas, pos, angle, scale*0.9, true));
-  screen.markRegion(vox.draw(screen.canvas, pos, angle, scale*1.0, true));
-  screen.markRegion(vox.draw(screen.canvas, pos, angle, scale*1.1, true));
-
+  p := pos;
+  p.z := 0;
+  screen.markRegion(vox.draw(screen.canvas, p, angle, scale*0.9, true));
+  screen.markRegion(vox.draw(screen.canvas, p, angle, scale*1.0, true));
+  screen.markRegion(vox.draw(screen.canvas, p, angle, scale*1.1, true));
 
   drawWheels(-1);
   p := pos;
@@ -432,6 +433,8 @@ var
   col: RGBA;
 begin
 
+  // unlike the canvas, terrain and height are projected onto the xy plane
+  pos.z := 0;
   drawPos := worldToCanvas(pos);
 
   {figure out why terrain we are on}
@@ -447,21 +450,41 @@ begin
 
 end;
 
+{return height at world position}
+function sampleHeight(pos: V3D): single;
+var
+  drawPos: tPoint;
+  col: RGBA;
+begin
+  // unlike the canvas, terrain and height are projected onto the xy plane
+  pos.z := 0;
+  drawPos := worldToCanvas(pos);
+  {figure out why terrain we are on}
+  {note: this is a bit of a weird way to do it, but oh well}
+  col := track.heightMap.getPixel(drawPos.x, drawPos.y);
+  result := (128-col.r)/3;
+end;
+
 {figure out what terrain we are on and handle height}
 procedure tCar.processMap();
 var
   terrainColor: RGBA;
   terrain: tTerrainDef;
+  height, avHeight: single;
   i,j: integer;
+  wheelPos: V3D;
 begin
   // for the moment assume we are on the ground
   self.isOnGround := true;
 
   self.currentTerrain := sampleTerrain(self.pos);
+  self.pos.z := sampleHeight(self.pos);
 
   for i := 0 to 1 do
     for j := 0 to 1 do begin
-      terrain := sampleTerrain(getWheelPos(i*2-1, j*2-1));
+      wheelPos := getWheelPos(i*2-1, j*2-1);
+      terrain := sampleTerrain(wheelPos);
+      height := sampleHeight(wheelPos);
       self.currentTerrain.traction += terrain.traction;
       self.currentTerrain.friction += terrain.friction;
       self.currentTerrain.bumpiness += terrain.bumpiness;
@@ -509,7 +532,7 @@ begin
   self.processMap();
 
   debugTextOut(drawPos.x-100, drawPos.y,
-    format('%s %f', [currentTerrain.tag, currentTerrain.friction])
+    format('%s %f (%s)', [currentTerrain.tag, currentTerrain.friction, pos.toString])
   );
 
   {engine in 'spaceship' mode}
