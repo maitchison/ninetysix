@@ -155,7 +155,7 @@ begin
   pixelsPtr := canvas.pixels;
 
   // show debug regions
-  if keyDown(key_f2) then begin
+  if keyDown(key_f8) then begin
     s3Driver.fgColor := rgba.create(rnd,rnd,0);
     s3Driver.fillRect(rect.x, rect.y, rect.width, rect.height);
     exit;
@@ -323,6 +323,7 @@ begin
         inc(stats.clearCells);
         inc(rle);
         flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
+        flipBounds.expandToInclude(tPoint.create(x, y));
       end else begin
         if rle > 0 then begin
           clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
@@ -384,6 +385,12 @@ begin
 
   rect.clipTo(bounds);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
+
+  {debugging}
+  if keyDown(key_f7) then begin
+    canvas.fillRect(rect, rgba.create(rnd, 0, 0));
+    exit;
+  end;
 
   if assigned(background) then begin
     {calculate padding}
