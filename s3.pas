@@ -28,6 +28,10 @@ type
 
 
 procedure S3SetHardwareCursorLocation(x,y: int16);
+procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
+procedure S3Scissors(x1,y1,x2,y2:int16);
+procedure S3SetLogicalWidth(width:word);
+function  S3GetLogicalWidth(): word;
 
 implementation
 
@@ -318,7 +322,42 @@ begin
       ((status and HW_BUSY) = 0);
 end;
 
-procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16); pascal;
+procedure S3Scissors(x1,y1,x2,y2:int16);
+begin
+  S3Wait();
+  writew($BEE8, SCISSORS_T SHL 12 + y1);
+  writew($BEE8, SCISSORS_L SHL 12 + x1);
+  writew($BEE8, SCISSORS_B SHL 12 + y2);
+  writew($BEE8, SCISSORS_R SHL 12 + x2);
+end;
+
+{width in pixels, must be even and <= 2048}
+procedure S3SetLogicalWidth(width:word);
+var
+  reg: byte;
+begin
+  {no support for widths this large}
+  if (width) >= 4096 then exit;
+  S3UnlockRegs();
+  writeReg(CR, $13, (width shr 1) and $ff);
+  reg := readReg(CR, $51) and %11001111;
+  writeReg(CR, $51, reg or ((width shr 9) shl 4));
+  S3LockRegs();
+end;
+
+function S3GetLogicalWidth(): word;
+var
+  regLow, regHigh: byte;
+begin
+  S3UnlockRegs();
+  regLow := readReg(CR, $13);
+  regHigh := (readReg(CR, $51) and %00110000) shr 4;
+  S3LockRegs();
+  result := ((regHigh shl 8) + regLow) * 2;
+end;
+
+
+procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
 
 var x1,y1,x2,y2: int16;
 
@@ -333,15 +372,6 @@ begin
   yPos := True;
 
   S3UnlockRegs();
-
-  S3Wait;
-
-  {scissors}
-
-  writew($BEE8, SCISSORS_T SHL 12 + 0);
-  writew($BEE8, SCISSORS_L SHL 12 + 0);
-  writew($BEE8, SCISSORS_B SHL 12 + 480);
-  writew($BEE8, SCISSORS_R SHL 12 + 640);
 
   S3Wait;
 
@@ -370,8 +400,11 @@ begin
   writew(CUR_Y, srcy);
   writew(DST_X, dstx);
   writew(DST_Y, dsty);
-  writew($BEE8, height + (MIN_AXIS_PCNT shl 12));
-  writew(MAJ_AXIS_PCNT, width);
+  {note: width and height should both be -1, but some some reason this doesn't
+   work... dosbox-x bug?}
+  writew(MAJ_AXIS_PCNT, width-1);
+  writew($BEE8, height - 1 + (MIN_AXIS_PCNT shl 12));
+
   writew($BEE8, $A000); {PIXEL_CNTL}
 
   S3Wait;
@@ -437,9 +470,11 @@ procedure UploadScreen_ASM();
 var
   pixelsPtr: pointer;
   lfb_seg: word;
+  pixelCnt: dword;
 begin
   pixelsPtr := @pixels;
   lfb_seg := videoDriver.LFB_SEG;
+  pixelCnt := videoDriver.physicalWidth * videoDriver.physicalHeight;
   asm
     push es
     push ds
@@ -453,7 +488,7 @@ begin
 
     mov esi, PixelsPtr
 
-    mov ecx, 640*480
+    mov ecx, pixelCnt
     rep movsd
 
     pop eax

@@ -18,8 +18,6 @@ type
   protected
     {the resolution of the screen}
     fPhysicalWidth,fPhysicalHeight:word;
-    {logical dimensions, which may be larger when uing fullscreen scrolling}
-    fLogicalWidth,fLogicalHeight:word;
     fBPP: word;
     fLFB_SEG: word;
 
@@ -31,6 +29,12 @@ type
     function getLFB_SEG: word;
 
   public
+
+    //stub: public
+    {logical dimensions, which may be larger when uing fullscreen scrolling}
+    fLogicalWidth,fLogicalHeight:word;
+
+
     constructor create();
 
     property width:word read getLogicalWidth;

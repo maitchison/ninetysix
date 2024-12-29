@@ -274,6 +274,8 @@ end;
 
 {Sets the logical screen width, allowing for smooth scrolling}
 procedure tVesaDriver.setLogicalSize(width, height: word);
+var
+  actualWidth: word;
 begin
   info(format('Setting logical size: %dx%d', [width, height]));
   asm
@@ -289,6 +291,18 @@ begin
   end;
   fLogicalWidth := width;
   fLogicalHeight := height;
+  asm
+    pusha
+    xor cx, cx
+    mov ax, $4F06
+    mov bl, $01
+    int $10
+    mov [actualWidth], cx
+    popa
+  end;
+  if actualWidth <> width then error(format(
+    'Could not set logical size %d, instead got %d', [width, actualWidth]
+    ));
 end;
 
 {Set display start address (in pixels)}

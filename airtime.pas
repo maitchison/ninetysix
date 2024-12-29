@@ -25,11 +25,13 @@ uses
   sound,
   raceTrack,
   timer,
-  go32;
+  go32,
+  s3;
 
 
 CONST
 
+  VSYNC: boolean = False;
   XMAS: boolean = False;
 
   DEFAULT_CAR_SCALE = 1.0; //0.75
@@ -262,7 +264,7 @@ begin
       dy := j*2-1;
       tireAngle := angle.z+(pi*(1-j));
       if i = 0 then
-        tireAngle -= 3
+        tireAngle -= steeringAngle
       else
         tireAngle -= steeringAngle*(3/5);
 
@@ -782,7 +784,7 @@ var
 begin
   for i := 0 to length(TIMERS)-1 do
     debugTextOut(
-      drawPos.x, drawPos.y-50+i*15,
+      drawPos.x+50, drawPos.y-50+i*15,
       format(
         '%s: %f (%f)',
         [TIMERS[i].tag, 1000*TIMERS[i].elapsed, 1000*TIMERS[i].maxElapsed]
@@ -795,7 +797,6 @@ var
   car: tCar;
   camX, camY: single;
   drawPos: tPoint;
-
 begin
 
   note('Main loop started');
@@ -803,12 +804,14 @@ begin
   track := tRaceTrack.Create('res/track2');
 
   videoDriver.setMode(320,240,32);
-  videoDriver.setLogicalSize(track.width,track.height);
+  videoDriver.setLogicalSize(track.width, track.height);
+
+  // super inefficent... but needed for dosbox-x due to vsync issues
+  screen.scrollMode := SSM_COPY;
 
   setTrackDisplay(track.background);
 
   // turn off music
-  // todo: find a better way of doing this
   if not XMAS then
     mixer.channels[1].reset();
 
@@ -822,7 +825,7 @@ begin
   if not XMAS then
     mixer.play(startSFX);
 
-  car := tCar.create(CC_RED);
+  car := tCar.create(CC_BOX);
   car.pos := V3D.create(screen.canvas.width div 2, screen.canvas.height div 2+300,0);
 
   startClock := getSec;
@@ -878,7 +881,8 @@ begin
     stopTimer('debug');
 
     startTimer('vsync');
-    videoDriver.waitVSync();
+    if VSYNC then
+      videoDriver.waitVSync();
     stopTimer('vsync');
 
     startTimer('setOfs');
@@ -905,7 +909,9 @@ var
 begin
   for i := 1 to ParamCount do begin
     if toLowerCase(paramStr(i)) = '--xmas' then
-      xmas := true;
+      XMAS := true;
+    if toLowerCase(paramStr(i)) = '--vsync' then
+      VSYNC := true;
   end;
 end;
 

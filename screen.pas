@@ -29,6 +29,11 @@ type
     procedure reset();
   end;
 
+  tScreenScrollMode = (
+    SSM_OFFSET,  // just update the screen offset
+    SSM_COPY     // copy region using S3
+  );
+
   tScreen = class
 
   private
@@ -47,6 +52,7 @@ type
     SHOW_DIRTY_RECTS: boolean;
     stats: tScreenStats;
     bounds: tRect;    // logical bounds of canvas
+    scrollMode: tScreenScrollMode;
 
   private
     procedure copyLine(x1, x2, y: int32);
@@ -100,6 +106,7 @@ begin
   canvas := nil;
   SHOW_DIRTY_RECTS := false;
   s3Driver := tS3Driver.create();
+  scrollMode := SSM_OFFSET;
   reset();
 end;
 
@@ -134,7 +141,7 @@ procedure tScreen.copyRegion(rect: tRect);
 var
   y,yMin,yMax: int32;
   pixelsPtr: pointer;
-  ofs,len: dword;
+  srcOfs,dstOfs,len: dword;
   lfb_seg: word;
 begin
   {todo: support S3 upload (but maybe make sure regions are small enough
@@ -155,7 +162,10 @@ begin
   end;
 
   for y := rect.top to rect.bottom-1 do begin
-    ofs := (rect.left + (y * canvas.width))*4;
+    srcOfs := (rect.left + (y * canvas.width))*4;
+    dstOfs := (rect.left + (y * canvas.width))*4;
+    if scrollMode = SSM_COPY then
+      dstOfs += videoDriver.logicalWidth * videoDriver.physicalHeight * 4;
     len := rect.width;
     asm
       push es
@@ -164,10 +174,10 @@ begin
       push ecx
 
       mov es,  lfb_seg
-      mov edi, ofs
+      mov edi, dstOfs
 
       mov esi, pixelsPtr
-      add esi, ofs
+      add esi, srcOfs
 
       mov ecx, len
       rep movsd
@@ -407,15 +417,53 @@ begin
   clearRegion(tRect.create(canvas.width, canvas.height));
 end;
 
-procedure tScreen.setViewPort(x,y: int32;waitRetrace: boolean=false);
+procedure transferLine(canvas: tPage; x,y: int32; ylp: integer);
+var
+  lfb_seg: word;
+  srcOffset,dstOffset: dword;
+  pixelCnt: dword;
 begin
+  lfb_seg := videoDriver.LFB_SEG;
+  dstOffset := (ylp * canvas.width)*4;
+  srcOffset := dword(canvas.pixels) + ((x + y * videoDriver.logicalWidth) * 4);
+  pixelCnt := videoDriver.physicalWidth;
+  asm
+    cli
+    pushad
+    push es
+
+    mov es, [lfb_seg]
+    mov edi, dstOffset
+
+    mov esi, srcOffset
+
+    mov ecx, pixelCnt
+    rep movsd
+
+    pop es
+    popad
+    sti
+  end;
+
+end;
+
+procedure tScreen.setViewPort(x,y: int32;waitRetrace: boolean=false);
+var
+  ylp: integer;
+begin
+
   if x < 0 then x := 0;
   if y < 0 then y := 0;
   if x > (canvas.width-videoDriver.physicalWidth) then
     x := (canvas.width-videoDriver.physicalWidth);
   if y > (canvas.height-videoDriver.physicalHeight) then
     y := (canvas.height-videoDriver.physicalHeight);
-  videoDriver.setDisplayStart(x,y,waitRetrace);
+  case scrollMode of
+    SSM_OFFSET: videoDriver.setDisplayStart(x,y,waitRetrace);
+    SSM_COPY:
+      for ylp := 0 to videoDriver.physicalHeight-1 do
+        transferLine(canvas, x, y+ylp, ylp);
+  end;
 end;
 
 {-------------------------------------------------}
