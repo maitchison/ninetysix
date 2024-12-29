@@ -451,12 +451,25 @@ end;
 procedure tCar.processMap();
 var
   terrainColor: RGBA;
+  terrain: tTerrainDef;
+  i,j: integer;
 begin
   // for the moment assume we are on the ground
   self.isOnGround := true;
 
   self.currentTerrain := sampleTerrain(self.pos);
 
+  for i := 0 to 1 do
+    for j := 0 to 1 do begin
+      terrain := sampleTerrain(getWheelPos(i*2-1, j*2-1));
+      self.currentTerrain.traction += terrain.traction;
+      self.currentTerrain.friction += terrain.friction;
+      self.currentTerrain.bumpiness += terrain.bumpiness;
+    end;
+
+  self.currentTerrain.traction /= 5;
+  self.currentTerrain.friction /= 5;
+  self.currentTerrain.bumpiness /= 5;
 
 end;
 
@@ -495,11 +508,9 @@ begin
 
   self.processMap();
 
-  (*
-  debugTextOut(drawPos.x, drawPos.y+50,
-    format('%s %f', [terrain.tag, terrain.friction])
+  debugTextOut(drawPos.x-100, drawPos.y,
+    format('%s %f', [currentTerrain.tag, currentTerrain.friction])
   );
-  *)
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
