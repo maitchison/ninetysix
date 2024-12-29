@@ -208,10 +208,11 @@ type
     vel: V3D;
     angle: V3D;
     steeringAngle: single;
+    currentTerrain: tTerrainDef;
+    isOnGround: boolean;
 
     chassis: tCarChassis;
     scale: single;
-    terrain: tTerrainDef;
 
     mass: single;
     tireTractionModifier: single;
@@ -224,8 +225,10 @@ type
     constructor create(aChassis: tCarChassis);
 
     function getWheelPos(dx,dy: integer): V3D;
+    function getWheelAngle(dx,dy: integer): single;
     function vox: tVoxelSprite;
 
+    procedure processMap();
     procedure draw();
     procedure update();
   end;
@@ -262,13 +265,8 @@ begin
     for j := 0 to 1 do begin
       dx := i*2-1;
       dy := j*2-1;
-      tireAngle := angle.z+(pi*(1-j));
-      if i = 0 then
-        tireAngle -= steeringAngle
-      else
-        tireAngle -= steeringAngle*(3/5);
-
-      if cos(tireAngle) * side >= 0 then
+      tireAngle := getWheelAngle(dx, dy);
+      if cos(tireAngle) * side < 0 then continue;
       screen.markRegion(wheelVox.draw(
         screen.canvas,
         getWheelPos(dx, dy),
@@ -317,6 +315,19 @@ begin
   result := p.rotated(angle.x, angle.y, angle.z) * scale + self.pos;
 end;
 
+function tCar.getWheelAngle(dx,dy: integer): single;
+var
+  i,j: integer;
+begin
+  i := (dx + 1) div 2;
+  j := (dy + 1) div 2;
+  result := angle.z+(pi*(1-j));
+  if i = 0 then
+    result -= steeringAngle
+  else
+    result -= steeringAngle*(3/5);
+end;
+
 procedure addSkidMark(pos: V3D);
 var
   drawPos: tPoint;
@@ -332,8 +343,8 @@ end;
 
 procedure tCar.tireModel();
 var
-  slipAngle, dirAngle, velAngle: single;
-  dir: v3d;
+  slipAngle: single;
+  facingDir, wheelDir: V3D;
   requiredTractionForce, tractionForce: v3d;
   targetVelocity: v3d;
   slidingPower: int32;
@@ -345,7 +356,8 @@ var
   marks: integer;
 begin
 
-  dir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
+  facingDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
+  wheelDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z + steeringAngle * (3/5));
   drawPos := worldToCanvas(pos);
 
   if elapsed <= 0 then exit;
@@ -359,7 +371,7 @@ begin
     //...
   end else begin
     {calculate the slip angle}
-    slipAngle := radToDeg(arcCos(vel.dot(dir) / vel.abs));
+    slipAngle := radToDeg(arcCos(vel.dot(wheelDir) / vel.abs));
 
     targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,angle.z);
     {force required to correct velocity *this* frame}
@@ -372,7 +384,7 @@ begin
       tractionForce.clip(9999999) {perfect traction}
     else begin
       {model how well our tires work}
-      tractionForce.clip(tireTractionModifier * clamp(terrain.traction-(tireHeat*2), 0, terrain.traction));
+      tractionForce.clip(tireTractionModifier * clamp(currentTerrain.traction-(tireHeat*2), 0, currentTerrain.traction));
     end;
 
     slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
@@ -413,6 +425,41 @@ begin
 
 end;
 
+{return terrain at world position}
+function sampleTerrain(pos: V3D): tTerrainDef;
+var
+  drawPos: tPoint;
+  col: RGBA;
+begin
+
+  drawPos := worldToCanvas(pos);
+
+  {figure out why terrain we are on}
+  {note: this is a bit of a weird way to do it, but oh well}
+  col := track.terrainMap.getPixel(drawPos.x, drawPos.y);
+
+  case col.to32 of
+    $FFFF0000: result := TERRAIN_DEF[TD_DIRT];
+    $FF00FF00: result := TERRAIN_DEF[TD_GRASS];
+    $FFFFFF00: result := TERRAIN_DEF[TD_BARRIER];
+    else result := TERRAIN_DEF[TD_SPACE];
+  end;
+
+end;
+
+{figure out what terrain we are on and handle height}
+procedure tCar.processMap();
+var
+  terrainColor: RGBA;
+begin
+  // for the moment assume we are on the ground
+  self.isOnGround := true;
+
+  self.currentTerrain := sampleTerrain(self.pos);
+
+
+end;
+
 procedure tCar.update();
 var
   drag: single;
@@ -420,8 +467,7 @@ var
   engineForce, lateralForce, dragForce: v3d;
   targetVelocity: v3d;
   drawPos: tPoint;
-  terrainColor: RGBA;
-  isOnGround: boolean;
+
 const
   BOUNDARY = 50;
 begin
@@ -430,9 +476,6 @@ begin
   dragForce := v3d.create(0,0,0);
   engineForce := v3d.create(0,0,0);
   lateralForce := v3d.create(0,0,0);
-
-  // for the moment assume we are on the ground
-  isOnGround := true;
 
   {process input}
   if keyDown(key_left) then begin
@@ -450,16 +493,7 @@ begin
   pos += vel * elapsed;
   drawPos := worldToCanvas(pos);
 
-  {figure out why terrain we are on}
-  {note: this is a bit of a weird way to do it, but oh well}
-  terrainColor := track.terrainMap.getPixel(drawPos.x, drawPos.y);
-
-  case terrainColor.to32 of
-    $FFFF0000: terrain := TERRAIN_DEF[TD_DIRT];
-    $FF00FF00: terrain := TERRAIN_DEF[TD_GRASS];
-    $FFFFFF00: terrain := TERRAIN_DEF[TD_BARRIER];
-    else terrain := TERRAIN_DEF[TD_SPACE];
-  end;
+  self.processMap();
 
   (*
   debugTextOut(drawPos.x, drawPos.y+50,
@@ -475,16 +509,16 @@ begin
   self.tireModel();
 
   {handle drag}
-  drag := self.constantDrag + terrain.friction * vel.abs + (dragCoefficent) * vel.abs2;
+  drag := self.constantDrag + currentTerrain.friction * vel.abs + (dragCoefficent) * vel.abs2;
   dragForce := vel.normed() * drag;
   dragForce *= (elapsed/mass);
   dragForce.clip(vel.abs);
   vel -= dragForce;
 
   {handle bumps}
-  angle.x += ((rnd/256)-0.5) * vel.abs * elapsed * terrain.bumpiness;
-  angle.y += ((rnd/256)-0.5) * vel.abs * elapsed * terrain.bumpiness;
-  angle.z += ((rnd/256)-0.5) * vel.abs * elapsed * terrain.bumpiness;
+  angle.x += ((rnd/256)-0.5) * vel.abs * elapsed * currentTerrain.bumpiness;
+  angle.y += ((rnd/256)-0.5) * vel.abs * elapsed * currentTerrain.bumpiness;
+  angle.z += ((rnd/256)-0.5) * vel.abs * elapsed * currentTerrain.bumpiness;
 
   {apply boundaries}
   if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
@@ -518,7 +552,7 @@ var
   r: tRect;
 begin
   // grr, otherwise the letter 'p' gets left behind.
-  r := textExtents(s).padded(4);
+  r := textExtents(s).padded(2);
   r.x += dx;
   r.y += dy;
   screen.markRegion(r);
