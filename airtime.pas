@@ -28,11 +28,23 @@ uses
   go32,
   s3;
 
+type
+  tAirtimeConfig = record
+    VSYNC: boolean;
+    XMAS: boolean;
+    DEBUG: boolean;
+    FPS: boolean;
+  end;
+
+const
+  config: tAirtimeConfig = (
+    VSYNC:false;
+    XMAS:false;
+    DEBUG:false;
+    FPS:true;
+  );
 
 CONST
-
-  VSYNC: boolean = False;
-  XMAS: boolean = False;
 
   DEFAULT_CAR_SCALE = 1.0;
 
@@ -738,14 +750,14 @@ begin
 
 
   {music first}
-  if XMAS then
+  if config.XMAS then
     music := tSoundEffect.loadFromWave('res\music2'+musicPostfix+'.wav')
   else
     music := tSoundEffect.loadFromWave('res\music1'+musicPostfix+'.wav');
 
   mixer.play(music, SCS_FIXED1);
 
-  if XMAS then
+  if config.XMAS then
     titleBackground := tPage.Load('res\XMAS_title.p96')
   else
     titleBackground := tPage.Load('res\title.p96');
@@ -781,7 +793,7 @@ begin
     carHeight := 16;
   end;
 
-  if XMAS then begin
+  if config.XMAS then begin
     CC_RED := CC_SANTA;
     CC_BOX := CC_SANTA;
   end;
@@ -790,7 +802,7 @@ begin
 
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
-  if XMAS then
+  if config.XMAS then
     engineSFX:= tSoundEffect.loadFromWave('res\slaybells.wav').asFormat(AF_16_STEREO)
   else
     engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
@@ -859,7 +871,7 @@ begin
   startClock := getSec;
   lastClock := startClock;
 
-  if xmas then snow := tSnowField.create() else snow := nil;
+  if config.XMAS then snow := tSnowField.create() else snow := nil;
 
   while True do begin
 
@@ -995,7 +1007,7 @@ begin
   setTrackDisplay(track.background);
 
   // turn off music
-  if not XMAS then
+  if not config.XMAS then
     mixer.channels[1].reset();
 
   // start our sliding sound
@@ -1005,7 +1017,7 @@ begin
   mixer.playRepeat(engineSFX, SCS_FIXED3);
   mixer.channels[3].volume := 0.0;
 
-  if not XMAS then
+  if not config.XMAS then
     mixer.play(startSFX);
 
   car := tCar.create(CC_BOX);
@@ -1069,7 +1081,7 @@ begin
     stopTimer('debug');
 
     startTimer('vsync');
-    if VSYNC then
+    if config.VSYNC then
       videoDriver.waitVSync();
     stopTimer('vsync');
 
@@ -1097,9 +1109,13 @@ var
 begin
   for i := 1 to ParamCount do begin
     if toLowerCase(paramStr(i)) = '--xmas' then
-      XMAS := true;
+      config.XMAS := true;
     if toLowerCase(paramStr(i)) = '--vsync' then
-      VSYNC := true;
+      config.VSYNC := true;
+    if toLowerCase(paramStr(i)) = '--debug' then
+      config.DEBUG := true;
+    if toLowerCase(paramStr(i)) = '--fps' then
+      config.FPS := true;
   end;
 end;
 
