@@ -16,12 +16,11 @@ var
   frameSprite: tSprite = nil;
 
 procedure GUILabel(page: tPage; atX, atY: integer; s: string);
+procedure GUIText(page: tPage; atX, atY: integer; s: string;shadow:boolean=false);
 
 implementation
 
 procedure GUILabel(page: tPage; atX, atY: integer; s: string);
-var
-  padX, padY: integer;
 begin
   if not assigned(panelSprite) or not assigned(frameSprite) then
     error('Tried to draw gui component before InitGUI called.');
@@ -35,6 +34,16 @@ begin
   TextOut(page, atX+1, atY+1, s, RGBA.create(10, 10, 10, 100));
   TextOut(page, atX, atY, s, RGBA.create(245, 250, 253, 240));
 end;
+
+procedure GUIText(page: tPage; atX, atY: integer; s: string;shadow:boolean=false);
+begin
+  if not assigned(panelSprite) or not assigned(frameSprite) then
+    error('Tried to draw gui component before InitGUI called.');
+  if shadow then
+    textOut(page, atX+1, atY+1, s, RGBA.create(10, 10, 10, 100));
+  textOut(page, atX, atY, s, RGBA.create(245, 250, 253, 240));
+end;
+
 
 procedure InitGui();
 begin

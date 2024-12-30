@@ -11,7 +11,8 @@ type
   tTimer = class
     tag: string;
     startTime: double;
-    elapsed, maxElapsed: double;
+    elapsed, maxElapsed, avElapsed: double;
+    cycles: int32;
     constructor Create(aTag: string);
     procedure reset(aTag: string);
     procedure start();
@@ -78,6 +79,8 @@ begin
   startTime := 0;
   elapsed := 0;
   maxElapsed := 0;
+  avElapsed := 0;
+  cycles := 0;
 end;
 
 procedure tTimer.start();
@@ -86,12 +89,22 @@ begin
 end;
 
 procedure tTimer.stop();
+var
+  alpha: single;
 begin
   elapsed := getSec-startTime;
+  if cycles = 0 then
+    avElapsed := elapsed
+  else begin
+    // this means we average roughly over 1-second
+    alpha := clamp(elapsed, 0.01, 0.5);
+    avElapsed := ((1-alpha) * avElapsed) + (alpha * elapsed);
+  end;
   if elapsed > maxElapsed then
     maxElapsed := elapsed
   else
-    maxElapsed *= 0.99;
+    maxElapsed *= 0.995;
+  inc(cycles);
 end;
 
 function tTimer.toString(): string;

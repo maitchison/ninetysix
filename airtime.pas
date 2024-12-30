@@ -837,6 +837,29 @@ begin
   screen.markRegion(tRect.create(10, 10, 300, 22), FG_FLIP);
 end;
 
+procedure drawFPS();
+var
+  fps: double;
+  avElapsed: single;
+  timer: tTimer;
+  atX, atY: int32;
+  bounds: tRect;
+begin
+  timer := getTimer('frame');
+  if not assigned(timer) then exit;
+  avElapsed := timer.avElapsed;
+  if avElapsed <= 0 then
+    fps := -1
+  else
+    fps := 1 / avElapsed;
+  atX := screen.getViewport().right-86;
+  atY := screen.getViewport().top;
+  bounds := tRect.create(atX, atY, 86, 22);
+  screen.canvas.fillrect(bounds, RGBA.create(0,0,0,128));
+  GUIText(screen.canvas, atX+2, atY+2, format('FPS:%f', [fps]));
+  screen.markRegion(bounds);
+end;
+
 procedure titleScreen();
 var
   thisClock, startClock, lastClock: double;
@@ -877,6 +900,8 @@ begin
   if config.XMAS then snow := tSnowField.create() else snow := nil;
 
   while True do begin
+
+    timer.startTimer('frame');
 
     if keyDown(key_1) then
       VX_GHOST_MODE := not keyDown(key_leftshift);
@@ -931,7 +956,7 @@ begin
     else
       carDrawTime := (carDrawTime * 0.90) + 0.10*(getSec - startTime);
 
-    drawGUI();
+    drawFPS();
 
     mixer.mute := keyDown(key_m);
     mixer.noise := keyDown(key_n);
@@ -960,8 +985,11 @@ begin
       end;
     end;
 
+    timer.stopTimer('frame');
+
     if keyDown(key_p) and keyDown(key_l) and keyDown(key_y) then mainLoop();
     if keyDown(key_q) or keyDown(key_esc) then break;
+
   end;
 
   if assigned(snow) then snow.free;
@@ -1056,16 +1084,13 @@ begin
 
     car.update();
 
+    {move camera}
     drawPos :=  worldToCanvas(car.pos);
     camX += ((drawPos.x-CamX)*decayFactor(0.5));
     camY += ((drawPos.y-CamY)*decayFactor(0.5));
 
     startTimer('draw_car');
     car.draw();
-    stopTimer('draw_car');
-
-    startTimer('gui');
-    drawGUI();
     stopTimer('draw_car');
 
     {debugging}
@@ -1089,6 +1114,12 @@ begin
     if config.DEBUG then
       debugShowTimers(drawPos);
     stopTimer('debug');
+
+    {gui}
+    startTimer('gui');
+    drawGUI();
+    drawFPS();
+    stopTimer('gui');
 
     startTimer('vsync');
     if config.VSYNC then
