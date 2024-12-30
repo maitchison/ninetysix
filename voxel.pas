@@ -304,8 +304,10 @@ var
     if a.y = b.y then begin
       {special case}
       y := a.y;
-      screenLines[y].adjust(a.x);
-      screenLines[y].adjust(b.x);
+      if (y >= 0) and (y < canvas.height) then begin
+        screenLines[y].adjust(a.x);
+        screenLines[y].adjust(b.x);
+      end;
       exit;
     end;
 
@@ -411,6 +413,9 @@ var
       canvas.putPixel(s3.x, s3.y, c);
       canvas.putPixel(s4.x, s4.y, c);
     end;
+
+    // stub:
+    note(format('%d %d', [yMin, yMax]));
 
     for y := yMin to yMax do
       screenLines[y].reset();
