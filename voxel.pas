@@ -414,9 +414,6 @@ var
       canvas.putPixel(s4.x, s4.y, c);
     end;
 
-    // stub:
-    note(format('%d %d', [yMin, yMax]));
-
     for y := yMin to yMax do
       screenLines[y].reset();
 
