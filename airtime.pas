@@ -664,8 +664,10 @@ begin
   {debugTextOut(drawPos.x-100, drawPos.y,
     format('%s %f (%s)', [currentTerrain.tag, currentTerrain.friction, pos.toString])
   );}
-  debugTextOut(drawPos.x-150, drawPos.y,    format('%s', [pos.toString]));
-  debugTextOut(drawPos.x-150, drawPos.y+20, format('%s', [vel.toString]));
+  if config.DEBUG then begin
+    debugTextOut(drawPos.x-150, drawPos.y,    format('%s', [pos.toString]));
+    debugTextOut(drawPos.x-150, drawPos.y+20, format('%s', [vel.toString]));
+  end;
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
@@ -1077,7 +1079,8 @@ begin
       car.scale := 3.0;
     if keyDown(key_3) then
       delay(100); // pretend to be slow
-    debugShowTimers(drawPos);
+    if config.DEBUG then
+      debugShowTimers(drawPos);
     stopTimer('debug');
 
     startTimer('vsync');
