@@ -37,7 +37,7 @@ type
   tScreen = class
 
   private
-    fViewPort: tRect;
+    viewport: tRect;
     // dirty grid
     // support for up to 2048x2048
     // pixel -> grid is divide by 8
@@ -67,7 +67,7 @@ type
     procedure hLine(x1, x2, y: int32;col: RGBA);
 
     function  getViewPort(): tRect;
-    procedure setViewPort(x,y: int32;waitRetrace: boolean=false);
+    procedure setViewPort(x,y: int32);
 
     procedure reset();
 
@@ -99,6 +99,39 @@ end;
 
 {-------------------------------------------------}
 
+procedure transferLineToScreen(canvas: tPage; x,y: int32; yDest: integer);
+var
+  lfb_seg: word;
+  srcOffset,dstOffset: dword;
+  pixelCnt: dword;
+begin
+  lfb_seg := videoDriver.LFB_SEG;
+  dstOffset := (yDest * canvas.width)*4;
+  srcOffset := dword(canvas.pixels) + ((x + y * videoDriver.logicalWidth) * 4);
+  pixelCnt := videoDriver.physicalWidth;
+  asm
+    cli
+    pushad
+    push es
+
+    mov es, [lfb_seg]
+    mov edi, dstOffset
+
+    mov esi, srcOffset
+
+    mov ecx, pixelCnt
+    rep movsd
+
+    pop es
+    popad
+    sti
+  end;
+
+end;
+
+{-------------------------------------------------}
+
+
 constructor tScreen.Create();
 begin
   inherited create();
@@ -108,7 +141,7 @@ begin
   SHOW_DIRTY_RECTS := false;
   s3Driver := tS3Driver.create();
   scrollMode := SSM_OFFSET;
-  fViewPort := tRect.create(0,0);
+  viewport := tRect.create(0,0);
   reset();
 end;
 
@@ -123,7 +156,7 @@ begin
   clearBounds.init(256, 256, -256, -256);
   flipBounds.init(256, 256, -256, -256);
 
-  fViewport := tRect.create(0, 0, videoDriver.physicalWidth, videoDriver.physicalHeight);
+  viewport := tRect.create(0, 0, videoDriver.physicalWidth, videoDriver.physicalHeight);
   bounds := tRect.create(width, height);
 
   stats.reset();
@@ -354,35 +387,38 @@ begin
   startTimer('flip');
   stats.copyCells := 0; stats.copyRegions := 0;
 
-  if scrollMode = SSM_COPY then begin
-    // in copy mode we flip everything when the viewport is updated
-    // todo: perform copy here
-    stopTimer('flip');
-    exit;
-  end;
-
-  for y := flipBounds.top to flipBounds.bottom do begin
-    rle := 0;
-    for x := flipBounds.left to flipBOunds.right do begin
-      if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
-        if rle = 0 then xStart := x;
-        inc(stats.copyCells);
-        inc(rle);
-        flagGrid[x,y] := (flagGrid[x,y] xor FG_FLIP)
-      end else begin
+  case scrollMode of
+    SSM_COPY: begin
+      for y := 0 to videoDriver.physicalHeight-1 do
+        transferLineToScreen(canvas, viewport.x, viewport.y+y, y);
+      end;
+    SSM_OFFSET: begin
+      videoDriver.setDisplayStart(viewport.x,viewport.y);
+      for y := flipBounds.top to flipBounds.bottom do begin
+        rle := 0;
+        for x := flipBounds.left to flipBounds.right do begin
+          if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
+            if rle = 0 then xStart := x;
+            inc(stats.copyCells);
+            inc(rle);
+            flagGrid[x,y] := (flagGrid[x,y] xor FG_FLIP)
+          end else begin
+            if rle > 0 then begin
+              copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+              stats.copyRegions += 1;
+              rle := 0;
+            end;
+          end;
+        end;
         if rle > 0 then begin
           copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
           stats.copyRegions += 1;
-          rle := 0;
         end;
       end;
+      flipBounds.init(256,256,-256, -256);
     end;
-    if rle > 0 then begin
-      copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
-      stats.copyRegions += 1;
-    end;
+    else Error('Invalid copy mode');
   end;
-  flipBounds.init(256,256,-256, -256);
   stopTimer('flip');
 end;
 
@@ -435,60 +471,22 @@ begin
   clearRegion(tRect.create(canvas.width, canvas.height));
 end;
 
-procedure transferLine(canvas: tPage; x,y: int32; ylp: integer);
-var
-  lfb_seg: word;
-  srcOffset,dstOffset: dword;
-  pixelCnt: dword;
-begin
-  lfb_seg := videoDriver.LFB_SEG;
-  dstOffset := (ylp * canvas.width)*4;
-  srcOffset := dword(canvas.pixels) + ((x + y * videoDriver.logicalWidth) * 4);
-  pixelCnt := videoDriver.physicalWidth;
-  asm
-    cli
-    pushad
-    push es
-
-    mov es, [lfb_seg]
-    mov edi, dstOffset
-
-    mov esi, srcOffset
-
-    mov ecx, pixelCnt
-    rep movsd
-
-    pop es
-    popad
-    sti
-  end;
-
-end;
-
 function tScreen.getViewPort(): tRect;
 begin
-  result := fViewPort;
+  result := viewport;
 end;
 
-procedure tScreen.setViewPort(x,y: int32;waitRetrace: boolean=false);
-var
-  ylp: integer;
+{update the viewport coordinates. Will be applied when flipAll is called}
+procedure tScreen.setViewPort(x,y: int32);
 begin
-
   if x < 0 then x := 0;
   if y < 0 then y := 0;
   if x > (canvas.width-videoDriver.physicalWidth) then
     x := (canvas.width-videoDriver.physicalWidth);
   if y > (canvas.height-videoDriver.physicalHeight) then
     y := (canvas.height-videoDriver.physicalHeight);
-  case scrollMode of
-    SSM_OFFSET: videoDriver.setDisplayStart(x,y,waitRetrace);
-    SSM_COPY:
-      for ylp := 0 to videoDriver.physicalHeight-1 do
-        transferLine(canvas, x, y+ylp, ylp);
-  end;
-  fViewPort.x := x;
-  fViewPort.y := y;
+  viewport.x := x;
+  viewport.y := y;
 end;
 
 {-------------------------------------------------}

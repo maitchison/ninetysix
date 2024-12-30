@@ -1088,6 +1088,7 @@ begin
     drawPos :=  worldToCanvas(car.pos);
     camX += ((drawPos.x-CamX)*decayFactor(0.5));
     camY += ((drawPos.y-CamY)*decayFactor(0.5));
+    screen.setViewPort(round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2));
 
     startTimer('draw_car');
     car.draw();
@@ -1125,13 +1126,6 @@ begin
     if config.VSYNC then
       videoDriver.waitVSync();
     stopTimer('vsync');
-
-    startTimer('setOfs');
-    screen.setViewPort(
-      round(camX)-(videoDriver.physicalWidth div 2), round(camY)-(videoDriver.physicalHeight div 2),
-      false
-    );
-    stopTimer('setOfs');
 
     screen.flipAll();
 
