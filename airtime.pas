@@ -26,6 +26,7 @@ uses
   raceTrack,
   timer,
   go32,
+  mydos,
   s3;
 
 type
@@ -994,6 +995,7 @@ var
   car: tCar;
   camX, camY: single;
   drawPos: tPoint;
+  dosVersion: string;
 begin
 
   note('Main loop started');
@@ -1004,7 +1006,12 @@ begin
   videoDriver.setLogicalSize(track.width, track.height);
 
   // super inefficent... but needed for dosbox-x due to vsync issues
-  screen.scrollMode := SSM_COPY;
+  dosVersion := getDosVersion();
+  note('Dos version detected: '+dosVersion);
+  if (dosVersion = 'dosbox-x') or (dosVersion = 'dosbox') then begin
+    note(' - using copy method due to VSYNC issues.');
+    screen.scrollMode := SSM_COPY;
+  end;
 
   setTrackDisplay(track.background);
 
