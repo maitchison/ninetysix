@@ -573,6 +573,8 @@ begin
   result := tRect.create(p[1].toPoint.x,p[1].toPoint.y,0,0);
   for i := 2 to 8 do
     result.expandToInclude(p[i].toPoint);
+  {seems like we're off by one for some reason}
+  result.pad(1);
 
 end;
 

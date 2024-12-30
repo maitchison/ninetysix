@@ -627,7 +627,9 @@ begin
     end;
   end else begin
     if keyDown(key_down) and isOnGround then
-      engineForce := dir * (-0.5 * enginePower);
+      // silly that tires resist backwards, so have to overpower it here
+      // once laterial force is only lateral, this should be changed.
+      engineForce := dir * (-1.5 * enginePower);
     if keyDown(key_up) and isOnGround then
       engineForce := dir * enginePower;
   end;
