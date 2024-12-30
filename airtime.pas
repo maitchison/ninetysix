@@ -629,7 +629,7 @@ begin
     if keyDown(key_down) and isOnGround then
       // silly that tires resist backwards, so have to overpower it here
       // once laterial force is only lateral, this should be changed.
-      engineForce := dir * (-1.5 * enginePower);
+      engineForce := dir * (-1.75 * enginePower);
     if keyDown(key_up) and isOnGround then
       engineForce := dir * enginePower;
   end;
@@ -1009,7 +1009,8 @@ begin
     mixer.play(startSFX);
 
   car := tCar.create(CC_BOX);
-  car.pos := V3D.create(screen.canvas.width div 2, screen.canvas.height div 2+300,0);
+  car.pos := V3D.create(810, 600, 0);
+  car.angle.z := degTorad(90+60);
 
   startClock := getSec;
   lastClock := startClock;
@@ -1034,7 +1035,7 @@ begin
 
     car.update();
 
-    drawPos := worldToCanvas(car.pos);
+    drawPos :=  worldToCanvas(car.pos);
     camX += ((drawPos.x-CamX)*decayFactor(0.5));
     camY += ((drawPos.y-CamY)*decayFactor(0.5));
 
