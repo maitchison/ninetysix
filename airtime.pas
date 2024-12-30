@@ -34,11 +34,20 @@ CONST
   VSYNC: boolean = False;
   XMAS: boolean = False;
 
-  DEFAULT_CAR_SCALE = 1.0; //0.75
-  SKID_VOLUME = 0.5; // 1.0
+  DEFAULT_CAR_SCALE = 1.0;
 
-  ENGINE_RANGE = 0.75; // 4.0
-  ENGINE_START = 0.5; // 0.5
+  {todo: put as part of chassis def}
+  SKID_VOLUME = 1.0;
+  ENGINE_RANGE = 4.0;
+  ENGINE_START = 0.5;
+
+  //sled numbers
+
+  //SKID_VOLUME = 0.5;
+  //ENGINE_RANGE = 0.75;
+  //ENGINE_START = 0.5;
+
+  GRAVITY = 400;
 
 var
   {screen}
@@ -48,6 +57,7 @@ var
   titleBackground: tPage;
   music: tSoundEffect;
   slideSFX: tSoundEffect;
+  landSFX: tSoundEffect;
   engineSFX: tSoundEffect;
   startSFX: tSoundEffect;
   track: tRaceTrack;
@@ -207,6 +217,7 @@ type
     vel: V3D;
     angle: V3D;
     steeringAngle: single;
+    suspensionTravel: single;
     currentTerrain: tTerrainDef;
 
     chassis: tCarChassis;
@@ -227,10 +238,55 @@ type
     function getWheelAngle(dx,dy: integer): single;
     function vox: tVoxelSprite;
 
-    procedure processMap();
+    procedure updatePhysics();
+    procedure updateTerrain();
     procedure draw();
     procedure update();
   end;
+
+{--------------------------------------------------------}
+{helpers}
+
+{return terrain at world position}
+function sampleTerrain(pos: V3D): tTerrainDef;
+var
+  drawPos: tPoint;
+  col: RGBA;
+begin
+
+  // unlike the canvas, terrain and height are projected onto the xy plane
+  pos.z := 0;
+  drawPos := worldToCanvas(pos);
+
+  {figure out why terrain we are on}
+  {note: this is a bit of a weird way to do it, but oh well}
+  col := track.terrainMap.getPixel(drawPos.x, drawPos.y);
+
+  case col.to32 of
+    $FFFF0000: result := TERRAIN_DEF[TD_DIRT];
+    $FF00FF00: result := TERRAIN_DEF[TD_GRASS];
+    $FFFFFF00: result := TERRAIN_DEF[TD_BARRIER];
+    else result := TERRAIN_DEF[TD_DIRT];
+  end;
+
+end;
+
+{return height at world position}
+function sampleHeight(pos: V3D): single;
+var
+  drawPos: tPoint;
+  col: RGBA;
+begin
+  // unlike the canvas, terrain and height are projected onto the xy plane
+  pos.z := 0;
+  drawPos := worldToCanvas(pos);
+  {figure out why terrain we are on}
+  {note: this is a bit of a weird way to do it, but oh well}
+  col := track.heightMap.getPixel(drawPos.x, drawPos.y);
+  result := (128-col.r)/3;
+end;
+
+{--------------------------------------------------------}
 
 constructor tCar.create(aChassis: tCarChassis);
 begin
@@ -283,8 +339,9 @@ begin
 
   startTime := getSec;
 
+  {draw shadow}
   p := pos;
-  p.z := 0;
+  p.z := sampleHeight(pos);
   screen.markRegion(vox.draw(screen.canvas, p, angle, scale*0.9, true));
   screen.markRegion(vox.draw(screen.canvas, p, angle, scale*1.0, true));
   screen.markRegion(vox.draw(screen.canvas, p, angle, scale*1.1, true));
@@ -316,7 +373,9 @@ function tCar.getWheelPos(dx,dy: integer): V3D;
 var
   p: V3D;
 begin
-  p := chassis.wheelPos * V3D.create(dx, dy, 0) + chassis.wheelOffset;
+  p := chassis.wheelPos * V3D.create(dx, dy, 0);
+  p += chassis.wheelOffset;
+  p.z += suspensionTravel;
   result := p.rotated(angle.x, angle.y, angle.z) * scale + self.pos;
 end;
 
@@ -350,8 +409,10 @@ procedure tCar.tireModel();
 var
   slipAngle: single;
   facingDir, wheelDir: V3D;
-  requiredTractionForce, tractionForce: v3d;
-  targetVelocity: v3d;
+  requiredTractionForce, tractionForce: V3D;
+  targetVelocity,lateralDelta: V3D;
+  xyVel: V3D;
+  tireTransform: tMatrix4x4;
   slidingPower: int32;
   skidVolume: single;
   alpha: single;
@@ -369,23 +430,35 @@ begin
   // todo: switch this to decay
   tireHeat := 0.93 * tireHeat;
 
-  if vel.abs < 0.1 then
+  xyVel := V3D.create(vel.x, vel.y, 0);
+
+  if xyVel.abs < 0.1 then
     {perfect traction for at small speeds}
     exit;
 
   if not isOnGround then
     exit;
 
+  tireTransform.setRotationXYZ(angle.x, angle.y, angle.z + steeringAngle * (3/5));
+
   facingDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
-  wheelDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z + steeringAngle * (3/5));
+  wheelDir := tireTransform.apply(V3D.create(-1,0,0));
   drawPos := worldToCanvas(pos);
 
   {calculate the slip angle}
-  slipAngle := radToDeg(arcCos(vel.dot(wheelDir) / vel.abs));
+  slipAngle := radToDeg(arcCos(xyVel.dot(wheelDir) / xyVel.abs));
 
-  targetVelocity := v3d.create(-vel.abs,0,0).rotated(0,0,angle.z);
+  targetVelocity := v3d.create(-xyVel.abs,0,0).rotated(0,0,angle.z);
+
+  {figure out how much of the difference our tires can take care of}
+  lateralDelta := (targetVelocity-xyVel);
+  lateralDelta := tireTransform.transposed.apply(lateralDelta);
+  lateralDelta.y := 0; // could apply breaks here.
+  lateralDelta.z := 0;
+  lateralDelta := tireTransform.apply(lateralDelta);
+
   {force required to correct velocity *this* frame}
-  requiredTractionForce := (targetVelocity-vel)*(mass/elapsed);
+  requiredTractionForce := (lateralDelta)*(mass/elapsed);
   tractionForce := requiredTractionForce;
 
   if keyDown(key_z) then
@@ -410,15 +483,15 @@ begin
     marks := trunc(skidVolume * 20);
     for i := 1 to marks do begin
       t := (rnd/256) * elapsed;
-      addSkidmark(getWheelPos(+1, -1)+vel*t);
-      addSkidmark(getWheelPos(+1, +1)+vel*t);
+      addSkidmark(getWheelPos(+1, -1)+xyVel*t);
+      addSkidmark(getWheelPos(+1, +1)+xyVel*t);
     end;
   end;
 
   // for the moment engine sound is speed, which is not quiet right
   // should be 'revs'
-  mixer.channels[3].volume := clamp(vel.abs/200, 0, 1.0);
-  mixer.channels[3].pitch := (ENGINE_START + clamp(vel.abs/250, 0, ENGINE_RANGE));
+  mixer.channels[3].volume := clamp(xyVel.abs/200, 0, 1.0);
+  mixer.channels[3].pitch := (ENGINE_START + clamp(xyVel.abs/250, 0, ENGINE_RANGE));
 
   //debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
   vel += tractionForce * (elapsed / mass);
@@ -431,55 +504,69 @@ begin
 
 end;
 
-{return terrain at world position}
-function sampleTerrain(pos: V3D): tTerrainDef;
+procedure tCar.updatePhysics();
 var
-  drawPos: tPoint;
-  col: RGBA;
+  terrainDelta: single;
+  modelTransform: tMatrix4x4;
+  carAccel, carVel: V3D;
+  factor: single;
+
+  suspensionRange,halfSuspensionRange: single;
 begin
 
-  // unlike the canvas, terrain and height are projected onto the xy plane
-  pos.z := 0;
-  drawPos := worldToCanvas(pos);
+  {apply physics}
+  terrainDelta := sampleHeight(self.pos) - pos.z;
 
-  {figure out why terrain we are on}
-  {note: this is a bit of a weird way to do it, but oh well}
-  col := track.terrainMap.getPixel(drawPos.x, drawPos.y);
+  {todo: part of chassis def}
+  suspensionRange := 4;
+  halfSuspensionRange := suspensionRange/2;
 
-  case col.to32 of
-    $FFFF0000: result := TERRAIN_DEF[TD_DIRT];
-    $FF00FF00: result := TERRAIN_DEF[TD_GRASS];
-    $FFFFFF00: result := TERRAIN_DEF[TD_BARRIER];
-    else result := TERRAIN_DEF[TD_DIRT];
+  {accleration in car frame}
+  modelTransform.setRotationXYZ(angle.x, angle.y, angle.z);
+  carAccel := modelTransform.apply(V3D.create(0, 0, GRAVITY));
+  carVel := modelTransform.apply(vel);
+
+  if terrainDelta < 0 then begin
+    // play sound scrape
+    mixer.play(landSFX);
+    pos.z += terrainDelta;
   end;
 
-end;
+  if terrainDelta < halfSuspensionRange then begin
+    // suspension pushes us up.
+    factor := clamp((halfSuspensionRange - terrainDelta)/halfSuspensionRange, 0, 1);
+    carAccel += V3D.create(0, 0, -2000*factor);
+  end;
 
-{return height at world position}
-function sampleHeight(pos: V3D): single;
-var
-  drawPos: tPoint;
-  col: RGBA;
-begin
-  // unlike the canvas, terrain and height are projected onto the xy plane
-  pos.z := 0;
-  drawPos := worldToCanvas(pos);
-  {figure out why terrain we are on}
-  {note: this is a bit of a weird way to do it, but oh well}
-  col := track.heightMap.getPixel(drawPos.x, drawPos.y);
-  result := (128-col.r)/3;
+  if (terrainDelta > halfSuspensionRange) and (terrainDelta <= suspensionRange) then begin
+    // point at which we loose some traction
+    factor := halfSuspensionRange-(terrainDelta-halfSuspensionRange);
+    self.currentTerrain.traction *= factor;
+    self.currentTerrain.friction *= factor;
+    // this helps us to stick to the ground a bit
+    carAccel += V3D.create(0, 0, 150*(1-factor));
+  end;
+
+  if terrainDelta >= suspensionRange then begin
+    // point at which ties loose contact with terrain
+    self.currentTerrain := TERRAIN_DEF[TD_AIR]
+  end;
+
+  suspensionTravel := clamp(terrainDelta-halfSuspensionRange, -halfSuspensionRange, halfSuspensionRange);
+
+  vel += modelTransform.transposed.apply(carAccel) * elapsed;
+
 end;
 
 {figure out what terrain we are on and handle height}
-procedure tCar.processMap();
+procedure tCar.updateTerrain();
 var
   terrainColor: RGBA;
   terrain: tTerrainDef;
-  terrainHeight: single;
+  terrainHeight, terrainDelta: single;
   i,j: integer;
   height: array[0..1, 0..1] of single;
   wheelPos: array[0..1, 0..1] of V3D;
-
 begin
 
   self.currentTerrain := sampleTerrain(self.pos);
@@ -502,23 +589,6 @@ begin
 
   self.currentTerrain.traction /= 5;
   self.currentTerrain.friction /= 5;
-
-  {normal force}
-
-  if terrainHeight < pos.z then begin
-    //vel.z := (pos.z - terrainHeight) / elapsed;
-    // todo:
-    vel.z := 0;
-    if pos.z < -1 then pos.z := -1;
-  end else if terrainHeight > pos.z+1 then begin
-    // looks like we're falling
-    vel.z += 200 * elapsed;
-    self.currentTerrain := TERRAIN_DEF[TD_AIR]
-  end else begin
-    // this means we're within suspention range
-    vel.z -= 100 * elapsed;
-  end;
-
 end;
 
 procedure tCar.update();
@@ -555,11 +625,13 @@ begin
   pos += vel * elapsed;
   drawPos := worldToCanvas(pos);
 
-  self.processMap();
+  self.updateTerrain();
 
-  debugTextOut(drawPos.x-100, drawPos.y,
+  {debugTextOut(drawPos.x-100, drawPos.y,
     format('%s %f (%s)', [currentTerrain.tag, currentTerrain.friction, pos.toString])
-  );
+  );}
+  debugTextOut(drawPos.x-150, drawPos.y,    format('%s', [pos.toString]));
+  debugTextOut(drawPos.x-150, drawPos.y+20, format('%s', [vel.toString]));
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
@@ -567,6 +639,7 @@ begin
 
   {handle traction}
   self.tireModel();
+  self.updatePhysics();
 
   {handle drag}
   drag := self.constantDrag + currentTerrain.friction * vel.abs + (dragCoefficent) * vel.abs2;
@@ -589,8 +662,6 @@ begin
     angle.x *= decayFactor(0.2);
     angle.y *= decayFactor(0.2);
   end;
-
-
 end;
 
 {---------------------------------------------------------------------}
@@ -675,8 +746,8 @@ begin
   end;
   with CC_BOX do begin
     carHeight := 5;
-    wheelPos := V3D.create(10, 7, 0);
-    wheelOffset := V3D.create(+1, 0, 3);
+    wheelPos := V3D.create(9, 7, 0);
+    wheelOffset := V3D.create(-1, 0, 1);
     wheelSize := 1.0;
     vox := tVoxelSprite.loadFromFile('res\carBox16', 16);
   end;
@@ -702,6 +773,8 @@ begin
   else
     engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
   startSFX := tSoundEffect.loadFromWave('res\start.wav').asFormat(AF_16_STEREO);
+
+  landSFX := tSoundEffect.loadFromWave('res\land.wav').asFormat(AF_16_STEREO);
 
 end;
 
@@ -928,6 +1001,7 @@ begin
     {time keeping}
     thisClock := getSec;
     elapsed := thisClock-lastClock;
+    if keyDown(key_s) then elapsed /= 10;
     gameTime += elapsed;
 
     lastClock := thisClock;
@@ -952,7 +1026,10 @@ begin
     {debugging}
     startTimer('debug');
     if keyDown(key_space) then
-      car.vel.z := -100;
+      car.vel.z -= 1000*elapsed;
+    if keyDown(key_g) then
+      {extra gravity}
+      car.vel.z += 1000*elapsed;
     screen.SHOW_DIRTY_RECTS := keyDown(key_d);
     if keyDown(key_9) then
       setTrackDisplay(track.background);
