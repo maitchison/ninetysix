@@ -56,10 +56,7 @@ var
   {resources}
   titleBackground: tPage;
   music: tSoundEffect;
-  slideSFX: tSoundEffect;
-  landSFX: tSoundEffect;
-  engineSFX: tSoundEffect;
-  startSFX: tSoundEffect;
+  slideSFX, landSFX, boostSFX, engineSFX, startSFX: tSoundEffect;
   track: tRaceTrack;
   wheelVox: tVoxelSprite;
 
@@ -219,6 +216,7 @@ type
     steeringAngle: single;
     suspensionTravel: single;
     currentTerrain: tTerrainDef;
+    nitroTimer: single;
 
     chassis: tCarChassis;
     scale: single;
@@ -303,6 +301,7 @@ begin
   constantDrag := 50;
   tireRotation := 0.0;
   chassis := aChassis;
+  nitroTimer := 0;
   scale := DEFAULT_CAR_SCALE;
 end;
 
@@ -511,7 +510,6 @@ var
   modelTransform: tMatrix4x4;
   carAccel, carVel: V3D;
   factor: single;
-
   suspensionRange,halfSuspensionRange: single;
 begin
 
@@ -519,7 +517,7 @@ begin
   terrainDelta := sampleHeight(self.pos) - pos.z;
 
   {todo: part of chassis def}
-  suspensionRange := 4;
+  suspensionRange := 6;
   halfSuspensionRange := suspensionRange/2;
 
   {accleration in car frame}
@@ -527,9 +525,10 @@ begin
   carAccel := modelTransform.apply(V3D.create(0, 0, GRAVITY));
   carVel := modelTransform.apply(vel);
 
-  if terrainDelta < 0 then begin
-    // play sound scrape
-    mixer.play(landSFX);
+  if (terrainDelta < 0) then begin
+    // play sound scrape for big impact
+    if carVel.z > 100 then
+      mixer.play(landSFX);
     pos.z += terrainDelta;
   end;
 
@@ -619,8 +618,28 @@ begin
     steeringAngle -= elapsed*0.3;
   end;
 
-  if keyDown(key_up) and isOnGround then
-    engineForce := dir * enginePower;
+  if (nitroTimer > 0) then begin
+    if (isOnGround) then
+      engineForce := dir * enginePower*2;
+    nitroTimer -= elapsed;
+    if nitroTimer < 0 then begin
+      nitroTimer := -10; // 10 second cool-down
+    end;
+  end else begin
+    if keyDown(key_down) and isOnGround then
+      engineForce := dir * (-0.5 * enginePower);
+    if keyDown(key_up) and isOnGround then
+      engineForce := dir * enginePower;
+  end;
+
+  if keyDown(key_c) and (nitroTimer = 0) then begin
+    // play sound nitro
+    mixer.play(boostSFX);
+    nitroTimer := 2.0;
+  end;
+
+  if (nitroTimer < 0) then
+    nitroTimer := min(nitroTimer + elapsed, 0);
 
   {movement from last frame}
   pos += vel * elapsed;
@@ -776,6 +795,7 @@ begin
   startSFX := tSoundEffect.loadFromWave('res\start.wav').asFormat(AF_16_STEREO);
 
   landSFX := tSoundEffect.loadFromWave('res\land.wav').asFormat(AF_16_STEREO);
+  boostSFX := tSoundEffect.loadFromWave('res\boost.wav').asFormat(AF_16_STEREO);
 
 end;
 
