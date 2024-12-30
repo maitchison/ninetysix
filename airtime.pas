@@ -408,7 +408,7 @@ end;
 procedure tCar.tireModel();
 var
   slipAngle: single;
-  facingDir, wheelDir: V3D;
+  wheelDir: V3D;
   requiredTractionForce, tractionForce: V3D;
   targetVelocity,lateralDelta: V3D;
   xyVel: V3D;
@@ -420,6 +420,7 @@ var
   i: integer;
   t: single;
   marks: integer;
+  tireAngle: single;
 begin
 
   if elapsed <= 0 then exit;
@@ -430,7 +431,7 @@ begin
   // todo: switch this to decay
   tireHeat := 0.93 * tireHeat;
 
-  xyVel := V3D.create(vel.x, vel.y, 0);
+  xyVel := vel; xyVel.z := 0;
 
   if xyVel.abs < 0.1 then
     {perfect traction for at small speeds}
@@ -439,23 +440,23 @@ begin
   if not isOnGround then
     exit;
 
-  tireTransform.setRotationXYZ(angle.x, angle.y, angle.z + steeringAngle * (3/5));
+  tireAngle := angle.z + steeringAngle * (3/5);
 
-  facingDir := v3d.create(-1,0,0).rotated(angle.x, angle.y, angle.z);
-  wheelDir := tireTransform.apply(V3D.create(-1,0,0));
   drawPos := worldToCanvas(pos);
+  tireTransform.setRotationXYZ(angle.x, angle.y, tireAngle);
+  wheelDir := V3D.create(-1,0,0).rotated(0,0,tireAngle);
 
-  {calculate the slip angle}
   slipAngle := radToDeg(arcCos(xyVel.dot(wheelDir) / xyVel.abs));
-
-  targetVelocity := v3d.create(-xyVel.abs,0,0).rotated(0,0,angle.z);
+  targetVelocity := V3D.create(-xyVel.abs,0,0).rotated(0,0,tireAngle);
 
   {figure out how much of the difference our tires can take care of}
   lateralDelta := (targetVelocity-xyVel);
-  lateralDelta := tireTransform.transposed.apply(lateralDelta);
-  lateralDelta.y := 0; // could apply breaks here.
+
+  lateralDelta := lateralDelta.rotated(0, 0, -tireAngle);
+
   lateralDelta.z := 0;
-  lateralDelta := tireTransform.apply(lateralDelta);
+
+  lateralDelta := lateralDelta.rotated(0, 0, +tireAngle);
 
   {force required to correct velocity *this* frame}
   requiredTractionForce := (lateralDelta)*(mass/elapsed);
@@ -496,10 +497,10 @@ begin
   //debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
   vel += tractionForce * (elapsed / mass);
 
-  {debugTextOut(
+{  debugTextOut(
     drawPos.x-120, drawPos.y+50,
     format('vel:%.1f slipa:%.1f tf:%.1f/%.1f fps:%.2f',
-    [vel.abs, slipAngle, tractionForce.abs, requiredTractionForce.abs, 1/elapsed]
+    [xyVel.abs, slipAngle, tractionForce.abs, requiredTractionForce.abs, 1/elapsed]
   ));}
 
 end;
