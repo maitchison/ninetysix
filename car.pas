@@ -272,9 +272,6 @@ begin
   watch('wheelDir', wheelDir.abs);
   watch('tireAngle', radToDeg(tireAngle));
 
-
-
-
   {figure out how much of the difference our tires can take care of}
   lateralDelta := (targetVelocity-xyVel);
   lateralDelta := lateralDelta.rotated(0, 0, -tireAngle);
@@ -351,6 +348,8 @@ begin
     if carVel.z > 100 then
       mixer.play(landSFX, SCS_SELFOVERWRITE);
     pos.z += terrainDelta;
+    if vel.z > 0 then
+      vel.z := -vel.z * 0.75;
   end;
 
   if terrainDelta < halfSuspensionRange then begin

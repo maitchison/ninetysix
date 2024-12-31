@@ -471,7 +471,7 @@ begin
   {find a slot to use}
   result := getFreeChannel(sfx, channelSelection);
   if not assigned(result) then begin
-    note(format('playing %s but no free channels', [sfx.toString] ));
+    //note(format('playing %s but no free channels', [sfx.toString] ));
     exit;
   end;
 
@@ -479,7 +479,7 @@ begin
     offsetString := format(' (%.2fs)', [timeOffset])
   else
     offsetString := '';
-  note(format('playing %s channel %d%s', [sfx.toString, result.id, offsetString]));
+  //note(format('playing %s channel %d%s', [sfx.toString, result.id, offsetString]));
 
   ticksOffset := round(timeOffset*44100);
 
