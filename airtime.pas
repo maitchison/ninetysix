@@ -3,33 +3,16 @@ program airtime;
 
 uses
   startup,
-  debug,
-  utils,
-  myMath,
-  vga,
-  vesa,
-  graph32,
-  graph2d,
-  test,
-  sbDriver,
-  mouse,
-  keyboard,
-  vertex,
-  sprite,
-  gui,
+  {$i units.inc},
+  {other stuff}
   lc96,
-  voxel,
-  screen,
-  mix,
   font,
-  sound,
+  s3,
+  {airtime}
   raceTrack,
-  timer,
-  go32,
-  mydos,
   car,
-  configfile,
-  s3;
+  {fpc}
+  go32;
 
 var
   {screen}

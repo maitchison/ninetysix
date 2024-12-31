@@ -3,20 +3,8 @@ unit car;
 interface
 
 uses
-  debug,
-  utils,
-  graph2d,
-  graph32,
-  voxel,
-  raceTrack,
-  screen,
-  sound,
-  mymath,
-  keyboard,
-  mix,
-  configfile,
-  vertex;
-
+  {$i units.inc},
+  raceTrack;
 
 const
   DEFAULT_CAR_SCALE = 1.0;

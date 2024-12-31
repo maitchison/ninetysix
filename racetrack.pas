@@ -3,12 +3,7 @@ unit raceTrack;
 
 interface
 
-uses
-  debug,
-  utils,
-  vertex,
-  graph2d,
-  graph32;
+uses {$i units.inc};
 
 type
 
