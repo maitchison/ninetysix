@@ -8,6 +8,8 @@ type
     XMAS: boolean;
     DEBUG: boolean;
     FPS: boolean;
+    HIGHRES: boolean;
+    FORCE_COPY: boolean;
   end;
 
 const
@@ -16,6 +18,8 @@ const
     XMAS:false;
     DEBUG:false;
     FPS:true;
+    HIGHRES: false;
+    FORCE_COPY: false;
   );
 
 implementation
@@ -36,6 +40,10 @@ begin
       config.DEBUG := true;
     if toLowerCase(paramStr(i)) = '--fps' then
       config.FPS := true;
+    if toLowerCase(paramStr(i)) = '--highres' then
+      config.HIGHRES := true;
+    if toLowerCase(paramStr(i)) = '--force_copy' then
+      config.FORCE_COPY := true;
   end;
 end;
 

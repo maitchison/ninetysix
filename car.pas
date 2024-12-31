@@ -381,7 +381,7 @@ begin
   if (terrainDelta > chassis.suspensionRange*0.9) and
     (terrainDelta < chassis.suspensionRange*1.1)
     and (carVel.z < 0) then
-    carAccel += V3D.create(0, 0, -4000);
+    carAccel += V3D.create(0, 0, -1000);
 
   watch('carAccel', carAccel);
 

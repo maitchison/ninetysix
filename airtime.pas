@@ -169,10 +169,11 @@ begin
 
   note('Loading Resources.');
 
-  if cpuInfo.ram > 70*1024*1024 then
+  if cpuInfo.ram < 70*1024*1024 then begin
     {8bit music if we don't have enough ram.}
-    musicPostfix := '_8bit'
-  else
+    musicPostfix := '_8bit';
+    note('Low memory detected, using 8bit music.');
+  end else
     musicPostfix := '';
 
 
@@ -213,6 +214,7 @@ begin
     setDefault();
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
+    wheelSize := 0;
     vox := tVoxelSprite.loadFromFile('res\carSanta16', 16);
   end;
 
@@ -449,23 +451,29 @@ var
   car: tCar;
   camX, camY: single;
   drawPos: tPoint;
-  dosVersion: string;
 begin
 
   note('Main loop started');
 
   track := tRaceTrack.Create('res/track2');
 
-  videoDriver.setMode(320,240,32);
+  if not config.HIGHRES then
+    videoDriver.setMode(320,240,32);
+
   videoDriver.setLogicalSize(track.width, track.height);
 
   // super inefficent... but needed for dosbox-x due to vsync issues
-  dosVersion := getDosVersion();
-  note('Dos version detected: '+dosVersion);
-  if (dosVersion = 'dosbox-x') or (dosVersion = 'dosbox') then begin
-    note(' - using copy method due to VSYNC issues.');
+  note('Dos version detected: '+DOS_VERSION);
+  if config.FORCE_COPY then begin
+    note('Force enabling SSM_COPY mode');
     screen.scrollMode := SSM_COPY;
+  end else begin
+    if (DOS_VERSION = 'dosbox-x') or (DOS_VERSION = 'dosbox') then begin
+      note(' - using copy method due to VSYNC issues.');
+      screen.scrollMode := SSM_COPY;
+    end;
   end;
+
 
   setTrackDisplay(track.background);
 

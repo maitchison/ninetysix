@@ -4,6 +4,9 @@ interface
 
 function getDosVersion(): string;
 
+var
+  DOS_VERSION: string;
+
 implementation
 
 uses utils, dos;
@@ -14,6 +17,7 @@ var
   t: text;
 begin
   try
+    {note: this seems to kill music for some reason}
     exec(GetEnv('COMSPEC'), '/c ver > dosver.tmp');
     assign(t, 'dosver.tmp');
     reset(t);
@@ -24,6 +28,8 @@ begin
       exit('dosbox-x');
     if pos('dosbox', s) > 0 then
       exit('dosbox');
+    if pos('windows 98', s) > 0 then
+      exit('win98');
     exit('dos');
   except
     exit('unknown');
@@ -31,4 +37,5 @@ begin
 end;
 
 begin
+  DOS_VERSION := getDosVersion();
 end.
