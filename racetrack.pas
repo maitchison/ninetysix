@@ -110,8 +110,8 @@ begin
   inherited create();
   {for the moment this is just a series of files}
   background := tPage.Load(filename+'.p96');
-  heightMap := tPage.Load(filename+'_height.p96');
-  terrainMap := tPage.Load(filename+'_terrain.p96');
+  heightMap := tPage.Load(filename+'h.p96');
+  terrainMap := tPage.Load(filename+'t.p96');
   if (terrainMap.width <> background.width)  or (terrainMap.height <> background.height) then error('TerrainMap dims do not background');
   if (heightMap.width <> background.width)  or (heightMap.height <> background.height) then error('HeightMap dims do not background');
 end;

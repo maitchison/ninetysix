@@ -171,7 +171,7 @@ begin
 
   if cpuInfo.ram < 70*1024*1024 then begin
     {8bit music if we don't have enough ram.}
-    musicPostfix := '_8bit';
+    musicPostfix := '_8';
     note('Low memory detected, using 8bit music.');
   end else
     musicPostfix := '';
