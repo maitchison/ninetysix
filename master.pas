@@ -285,16 +285,16 @@ begin
   convertImage('title.bmp');
   convertImage('track1.png');
   convertImage('track2.png');
-  convertImage('track2_height.bmp');
-  convertImage('track2_terrain.bmp', mapTerrainColors);
-  convertImage('carRed16.png');
-  convertImage('carPolice16.png');
-  convertImage('carBox16.png');
+  convertImage('track2h.bmp');
+  convertImage('track2t.bmp', mapTerrainColors);
+  convertImage('carRed.png');
+  convertImage('carPol.png');
+  convertImage('carBox.png');
   convertImage('wheel.png');
 
   {christmas variation}
-  convertImage('XMAS_title.bmp');
-  convertImage('carSanta16.png');
+  convertImage('titleX.bmp');
+  convertImage('carSanta.png');
 
 
   convertImage('button', 'c:\masters\gui\EC_Button_Pressed.png');
