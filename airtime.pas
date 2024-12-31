@@ -380,6 +380,9 @@ begin
       carScale := 3.0;
     end;
 
+    if GUIButton(screen, 320-(150 div 2), 405, 'PLAY') then
+      mainLoop();
+
     screen.flipAll();
 
     if keyDown(key_e) then begin

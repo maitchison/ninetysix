@@ -292,10 +292,12 @@ begin
   convertImage('carBox16.png');
   convertImage('wheel.png');
 
-  // christmas variation
+  {christmas variation}
   convertImage('XMAS_title.bmp');
   convertImage('carSanta16.png');
 
+
+  convertImage('button', 'c:\masters\gui\EC_Button_Pressed.png');
   {gui stuff}
 //  convertBMP('ec_frame', 'c:\masters\gui\ec_frame.bmp');
 //  convertBMP('panel', 'c:\masters\gui\panel.bmp');

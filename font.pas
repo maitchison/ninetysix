@@ -31,7 +31,7 @@ type
   end;
 
 procedure textOut(page: TPage; atX, atY: integer; s: string;col: RGBA);
-function textExtents(s: string): TRect;
+function textExtents(s: string): tRect;
 
 implementation
 
