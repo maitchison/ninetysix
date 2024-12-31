@@ -87,9 +87,6 @@ var
   col: RGBA;
 begin
 
-  //stub:
-  exit(0);
-
   // unlike the canvas, terrain and height are projected onto the xy plane
   pos.z := 0;
   drawPos := worldToCanvas(pos);

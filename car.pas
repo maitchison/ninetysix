@@ -264,12 +264,21 @@ begin
   tireAngle := angle.z + steeringAngle * (1/5);
   wheelDir := V3D.create(-1,0,0).rotated(0,0,tireAngle);
 
+  {note: slip angle is wrong here (in that it can be 180 degrees
+   but we're not using it... why?}
   slipAngle := radToDeg(arcCos(xyVel.dot(wheelDir) / xyVel.abs));
   targetVelocity := V3D.create(-xyVel.abs,0,0).rotated(0,0,tireAngle);
+  watch('slipAngle', slipAngle);
+  watch('wheelDir', wheelDir.abs);
+  watch('tireAngle', radToDeg(tireAngle));
+
+
+
 
   {figure out how much of the difference our tires can take care of}
   lateralDelta := (targetVelocity-xyVel);
   lateralDelta := lateralDelta.rotated(0, 0, -tireAngle);
+  watch('lateralDelta', lateralDelta);
   lateralDelta.x := 0;
   lateralDelta.z := 0;
   lateralDelta := lateralDelta.rotated(0, 0, +tireAngle);
@@ -354,14 +363,14 @@ begin
     factor := halfSuspensionRange-(terrainDelta-halfSuspensionRange);
     self.currentTerrain.traction *= factor;
     self.currentTerrain.friction *= factor;
-    // this helps us to stick to the ground a bit
-    carAccel += V3D.create(0, 0, 150*(1-factor));
   end;
 
   if terrainDelta >= suspensionRange then begin
-    // point at which ties loose contact with terrain
+    // point at which tires loose contact with terrain
     self.currentTerrain := TERRAIN_DEF[TD_AIR]
   end;
+
+  watch('carAccel', carAccel);
 
   suspensionTravel := clamp(terrainDelta-halfSuspensionRange, -halfSuspensionRange, halfSuspensionRange);
 
@@ -378,6 +387,7 @@ var
   i,j: integer;
   height: array[0..1, 0..1] of single;
   wheelPos: array[0..1, 0..1] of V3D;
+  slopeX, slopeY: single;
 begin
 
   self.currentTerrain := track.sampleTerrain(self.pos);
@@ -394,8 +404,10 @@ begin
 
   {sample slope}
   if isOnGround then begin
-    self.angle.x := (height[0, 1] - height[0, 0]) / (wheelPos[0, 1]- wheelPos[0, 0]).abs;
-    self.angle.y := -(height[1, 0] - height[0, 0]) / (wheelPos[1, 0]- wheelPos[0, 0]).abs;
+    slopeX := (height[0, 1] - height[0, 0]) / (wheelPos[0, 1]- wheelPos[0, 0]).abs;
+    slopeY := (height[1, 0] - height[0, 0]) / (wheelPos[1, 0]- wheelPos[0, 0]).abs;
+    self.angle.x := arctan(slopeX);
+    self.angle.y := arctan(-slopeY);
   end;
 
   self.currentTerrain.traction /= 5;
