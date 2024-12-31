@@ -192,32 +192,28 @@ begin
   {setup chassis}
   {todo: have these as meta data}
   with CC_RED do begin
-    carHeight := 5;
+    setDefault();
     wheelPos := V3D.create(8, 7, 0);
     wheelOffset := V3D.create(-1, 0, 0);
-    wheelSize := 1.0;
     vox := tVoxelSprite.loadFromFile('res\carRed16', 16);;
   end;
   with CC_POLICE do begin
-    carHeight := 5;
+    setDefault();
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
-    wheelSize := 1.0;
     vox := tVoxelSprite.loadFromFile('res\carPolice16', 16);
   end;
   with CC_BOX do begin
-    carHeight := 5;
+    setDefault();
     wheelPos := V3D.create(9, 7, 0);
     wheelOffset := V3D.create(-1, 0, 1);
-    wheelSize := 1.0;
     vox := tVoxelSprite.loadFromFile('res\carBox16', 16);
   end;
   with CC_SANTA do begin
+    setDefault();
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
-    wheelSize := 0.0;
     vox := tVoxelSprite.loadFromFile('res\carSanta16', 16);
-    carHeight := 16;
   end;
 
   if config.XMAS then begin

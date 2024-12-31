@@ -29,7 +29,9 @@ type
     wheelPos: V3D;
     wheelOffset: V3D;
     wheelSize: single;
+    suspensionRange: single;
     vox: tVoxelSprite;
+    procedure setDefault();
   end;
 
   tCar = class
@@ -101,6 +103,18 @@ var
 begin
   rate := ln(2.0) / decayTime;
   result := exp(-rate*elapsed);
+end;
+
+{--------------------------------------------------------}
+
+procedure tCarChassis.setDefault();
+begin
+  carHeight := 5.0;
+  wheelPos := V3D.create(8, 7, 0);
+  wheelOffset := V3D.create(-1, 0, 0);
+  wheelSize := 1.0;
+  suspensionRange := 10.0;
+  vox := nil;
 end;
 
 {--------------------------------------------------------}
@@ -327,15 +341,14 @@ var
   modelTransform: tMatrix4x4;
   carAccel, carVel: V3D;
   factor: single;
-  suspensionRange,halfSuspensionRange: single;
+  halfSuspensionRange: single;
 begin
 
   {apply physics}
   terrainDelta := track.sampleHeight(self.pos) - pos.z;
 
   {todo: part of chassis def}
-  suspensionRange := 6;
-  halfSuspensionRange := suspensionRange/2;
+  halfSuspensionRange := chassis.suspensionRange/2;
 
   {accleration in car frame}
   modelTransform.setRotationXYZ(angle.x, angle.y, angle.z);
@@ -358,16 +371,11 @@ begin
     carAccel += V3D.create(0, 0, -2000*factor);
   end;
 
-  if (terrainDelta > halfSuspensionRange) and (terrainDelta <= suspensionRange) then begin
+  if (terrainDelta > halfSuspensionRange) and (terrainDelta <= chassis.suspensionRange) then begin
     // point at which we loose some traction
     factor := halfSuspensionRange-(terrainDelta-halfSuspensionRange);
     self.currentTerrain.traction *= factor;
     self.currentTerrain.friction *= factor;
-  end;
-
-  if terrainDelta >= suspensionRange then begin
-    // point at which tires loose contact with terrain
-    self.currentTerrain := TERRAIN_DEF[TD_AIR]
   end;
 
   watch('carAccel', carAccel);
@@ -390,9 +398,15 @@ var
   slopeX, slopeY: single;
 begin
 
-  self.currentTerrain := track.sampleTerrain(self.pos);
   terrainHeight := track.sampleHeight(self.pos);
+  if -pos.z + terrainHeight >= chassis.suspensionRange then begin
+    // point at which tires loose contact with terrain
+    self.currentTerrain := TERRAIN_DEF[TD_AIR];
+    exit;
+  end;
 
+  {sample terrain}
+  self.currentTerrain := track.sampleTerrain(self.pos);
   for i := 0 to 1 do
     for j := 0 to 1 do begin
       wheelPos[i,j] := getWheelPos(i*2-1, j*2-1);
@@ -420,15 +434,19 @@ var
   dir, engineForce: V3D;
 begin
 
-  dir := v3d.create(-1,0,0).rotated(0,0,angle.z);
+  dir := V3D.create(-1,0,0).rotated(0,0,angle.z);
+  engineForce := V3D.create(0,0,0);
+
+  {stub}
+  watch('terrain', currentTerrain.tag);
 
   {process input}
   if keyDown(key_left) then begin
-    angle.z -= elapsed*2.5;
+    angle.z -= elapsed*2.5
     steeringAngle += elapsed*0.3;
   end;
   if keyDown(key_right) then begin
-    angle.z += elapsed*2.5;
+    angle.z += elapsed*2.5
     steeringAngle -= elapsed*0.3;
   end;
 
