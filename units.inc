@@ -1,5 +1,6 @@
 {main stuff}
   debug,
+  watches,
   test,
   utils,
   configFile,

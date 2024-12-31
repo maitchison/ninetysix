@@ -38,7 +38,6 @@ var
 
 procedure mainLoop(); forward;
 function decayFactor(const decayTime: single): single; forward;
-procedure debugTextOut(dx,dy: integer; s: string); forward;
 
 const
   SNOW_PARTICLES = 128;
@@ -134,7 +133,7 @@ var
   CC_BOX,
   CC_SANTA: tCarChassis;
 
-procedure debugTextOut(dx,dy: integer; s: string);
+procedure debugTextOut(dx,dy: integer; s: string;col: RGBA); overload;
 var
   r: tRect;
 begin
@@ -143,11 +142,12 @@ begin
   r.x += dx;
   r.y += dy;
   screen.markRegion(r);
-  textOut(
-    screen.canvas,
-    dx, dy, s,
-    RGBA.create(255,255,255)
-  )
+  textOut(screen.canvas, dx, dy, s, col);
+end;
+
+procedure debugTextOut(dx,dy: integer; s: string); overload;
+begin
+  debugTextOut(dx, dy, s, RGBA.create(255,255,255));
 end;
 
 {returns decay factor for with given halflife (in seconds) over current
@@ -426,6 +426,25 @@ begin
       ));
 end;
 
+procedure debugShowWatches();
+var
+  i: integer;
+  secSinceUpdate: single;
+  col: RGBA;
+begin
+  for i := 0 to length(watches.WATCHES)-1 do begin
+    secSinceUpdate := getSec - watches.WATCHES[i].lastUpdated;
+    if secSinceUpdate < 0.1 then
+      col := RGBA.create(255,255,128)
+    else
+      col := RGBA.create(192,192,192);
+    debugTextOut(
+      screen.getViewport.x, screen.getViewport.y+i*15,
+      watches.WATCHES[i].toString, col
+    );
+  end;
+end;
+
 procedure mainLoop();
 var
   startClock,lastClock,thisClock: double;
@@ -516,8 +535,10 @@ begin
       car.scale := 3.0;
     if keyDown(key_3) then
       delay(100); // pretend to be slow
-    if config.DEBUG then
+    if config.DEBUG then begin
       debugShowTimers(drawPos);
+      debugShowWatches();
+    end;
     stopTimer('debug');
 
     {gui}

@@ -26,7 +26,6 @@ type
     function sampleHeight(pos: V3D): single;
     function sampleTerrain(pos: V3D): tTerrainDef;
 
-
     constructor Create(filename: string);
     destructor Destroy();
   end;
@@ -87,6 +86,10 @@ var
   drawPos: tPoint;
   col: RGBA;
 begin
+
+  //stub:
+  exit(0);
+
   // unlike the canvas, terrain and height are projected onto the xy plane
   pos.z := 0;
   drawPos := worldToCanvas(pos);

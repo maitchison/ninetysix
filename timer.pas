@@ -112,6 +112,5 @@ begin
   result := format('%s: %f (%f)', [tag, elapsed, maxElapsed]);
 end;
 
-
 begin
 end.

@@ -227,17 +227,17 @@ procedure tCar.processTireModel(elapsed: single);
 var
   slipAngle: single;
   wheelDir: V3D;
-  requiredTractionForce, tractionForce: V3D;
+  requiredTractionDelta, tractionDelta: V3D;
   targetVelocity,lateralDelta: V3D;
   xyVel: V3D;
-  tireTransform: tMatrix4x4;
-  slidingPower: int32;
   skidVolume: single;
+  slidingHeat: single;
   alpha: single;
   i: integer;
   t: single;
   marks: integer;
   tireAngle: single;
+  tireGrip: single;
 begin
 
   if elapsed <= 0 then exit;
@@ -245,8 +245,12 @@ begin
   {-----------------------------------}
   {tire traction}
 
-  // todo: switch this to decay
-  tireHeat := 0.93 * tireHeat;
+  tireHeat *= decayFactor(0.5, elapsed);
+  watch('tireHeat', tireHeat);
+  {sound is always playing, we only adjust the volume}
+  skidVolume := clamp(tireHeat, 0, 1.0) * SKID_VOLUME;
+  mixer.channels[2].volume := skidVolume * 0.65;
+
 
   xyVel := vel; xyVel.z := 0;
 
@@ -258,7 +262,6 @@ begin
     exit;
 
   tireAngle := angle.z + steeringAngle * (3/5);
-  tireTransform.setRotationXYZ(angle.x, angle.y, tireAngle);
   wheelDir := V3D.create(-1,0,0).rotated(0,0,tireAngle);
 
   slipAngle := radToDeg(arcCos(xyVel.dot(wheelDir) / xyVel.abs));
@@ -267,29 +270,34 @@ begin
   {figure out how much of the difference our tires can take care of}
   lateralDelta := (targetVelocity-xyVel);
   lateralDelta := lateralDelta.rotated(0, 0, -tireAngle);
-  lateralDelta.z := 0;
+{  lateralDelta.x := 0;
+  lateralDelta.z := 0;}
   lateralDelta := lateralDelta.rotated(0, 0, +tireAngle);
 
-  {force required to correct velocity *this* frame}
-  requiredTractionForce := (lateralDelta)*(mass/elapsed);
-  tractionForce := requiredTractionForce;
+  {change in velocity required to correct velocity}
+  requiredTractionDelta := lateralDelta;
+  tractionDelta := requiredTractionDelta;
 
   if keyDown(key_z) then
-    tractionForce.clip(0) {no traction}
+    tractionDelta.clip(0) {no traction}
   else if keyDown(key_x) then
-    tractionForce.clip(9999999) {perfect traction}
+    tractionDelta.clip(9999999) {perfect traction}
   else begin
     {model how well our tires work}
-    tractionForce.clip(tireTractionModifier * clamp(currentTerrain.traction-(tireHeat*2), 0, currentTerrain.traction));
+    tireGrip := tireTractionModifier * clamp(currentTerrain.traction-(tireHeat*2), 0, currentTerrain.traction);
+    watch('tireGrip', tireGrip);
+
+    tractionDelta.clip(elapsed * tireGrip);
   end;
 
-  slidingPower := trunc(requiredTractionForce.abs - tractionForce.abs);
+  {some of our sliding goes into heat}
+  slidingHeat := requiredTractionDelta.abs - tractionDelta.abs;
+  slidingHeat := clamp(slidingHeat, 0, 100 * elapsed);
 
-  tireHeat += slidingPower / 1000;
+  tireHeat += slidingHeat;
 
-  {sound is always playing, we only adjust the volume}
-  skidVolume := clamp(slidingPower/5000, 0, 1.0) * SKID_VOLUME;
-  mixer.channels[2].volume := skidVolume * 0.65;
+  watch('tireHeat', tireHeat);
+  watch('slidingHeat', slidingHeat);
 
   // write skidmarks to map
   if (skidVolume > 0.05) then begin
@@ -304,7 +312,7 @@ begin
   mixer.channels[3].volume := clamp(xyVel.abs/200, 0, 1.0);
   mixer.channels[3].pitch := (ENGINE_START + clamp(xyVel.abs/250, 0, ENGINE_RANGE));
 
-  vel += tractionForce * (elapsed / mass);
+  vel += tractionDelta;
 
 end;
 

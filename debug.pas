@@ -303,7 +303,6 @@ begin
   LogFileOpen := False;
 end;
 
-
 var
   small: integer;
   programFilename: string;
