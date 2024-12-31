@@ -565,6 +565,8 @@ end;
 
 begin
 
+  watches.ENABLE_WATCHES := config.DEBUG;
+
   if cpuInfo.ram < 30*1024*1024 then
     error('Application required 30MB of ram.');
 

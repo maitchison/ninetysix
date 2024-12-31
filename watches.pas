@@ -21,7 +21,9 @@ procedure Watch(aTag: string; aValue: string); overload;
 procedure Watch(aTag: string; aValue: single); overload;
 procedure Watch(aTag: string; aValue: V3D); overload;
 
-var WATCHES: array of tWatch;
+var
+  WATCHES: array of tWatch;
+  ENABLE_WATCHES: boolean = false;
 
 implementation
 
@@ -46,6 +48,7 @@ procedure Watch(aTag, aValue: string); overload;
 var
   watch: tWatch;
 begin
+  if not ENABLE_WATCHES then exit;
   watch := getWatch(aTag);
   if not assigned(watch) then begin
     watch := tWatch.Create(aTag);
@@ -57,11 +60,13 @@ end;
 
 procedure Watch(aTag: string; aValue: single); overload;
 begin
+  if not ENABLE_WATCHES then exit;
   Watch(aTag, format('%f', [aValue]));
 end;
 
 procedure Watch(aTag: string; aValue: V3D); overload;
 begin
+  if not ENABLE_WATCHES then exit;
   Watch(aTag, aValue.toString);
 end;
 
@@ -82,5 +87,6 @@ end;
 
 {------------------------------------------------------}
 
-begin
+initialization
+  WATCHES := nil;
 end.

@@ -428,9 +428,12 @@ var
   i: integer;
 begin
   case strategy of
-    SCS_SELFOVERWRITE:
-      //NIY
-      exit(nil);
+    SCS_SELFOVERWRITE: begin
+      for i := 1 to NUM_CHANNELS do
+        if channels[i].sfx = sfx then
+          exit(channels[i]);
+      exit(getFreeChannel(sfx, SCS_NEXTFREE));
+    end;
     SCS_NEXTFREE: begin
       for i := 1 to NUM_CHANNELS do
         if not channels[i].inUse then

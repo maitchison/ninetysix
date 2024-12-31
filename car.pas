@@ -342,13 +342,14 @@ begin
 
   {accleration in car frame}
   modelTransform.setRotationXYZ(angle.x, angle.y, angle.z);
+  modelTransform := modelTransform.transposed();
   carAccel := modelTransform.apply(V3D.create(0, 0, GRAVITY));
   carVel := modelTransform.apply(vel);
 
   if (terrainDelta < 0) then begin
     // play sound scrape for big impact
     if carVel.z > 100 then
-      mixer.play(landSFX);
+      mixer.play(landSFX, SCS_SELFOVERWRITE);
     pos.z += terrainDelta;
   end;
 
