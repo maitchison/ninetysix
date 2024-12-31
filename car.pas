@@ -45,6 +45,8 @@ type
     procedure processTireModel(elapsed: single);
     procedure processPhysics(elapsed: single);
     procedure processTerrain(elapsed: single);
+    procedure processInput(elapsed: single);
+    procedure processMovement(elapsed: single);
 
   public
 
@@ -232,7 +234,6 @@ var
   slidingPower: int32;
   skidVolume: single;
   alpha: single;
-  drawPos: tPoint;
   i: integer;
   t: single;
   marks: integer;
@@ -257,8 +258,6 @@ begin
     exit;
 
   tireAngle := angle.z + steeringAngle * (3/5);
-
-  drawPos := track.worldToCanvas(pos);
   tireTransform.setRotationXYZ(angle.x, angle.y, tireAngle);
   wheelDir := V3D.create(-1,0,0).rotated(0,0,tireAngle);
 
@@ -267,11 +266,8 @@ begin
 
   {figure out how much of the difference our tires can take care of}
   lateralDelta := (targetVelocity-xyVel);
-
   lateralDelta := lateralDelta.rotated(0, 0, -tireAngle);
-
   lateralDelta.z := 0;
-
   lateralDelta := lateralDelta.rotated(0, 0, +tireAngle);
 
   {force required to correct velocity *this* frame}
@@ -297,12 +293,10 @@ begin
 
   // write skidmarks to map
   if (skidVolume > 0.05) then begin
-    marks := trunc(skidVolume * 20);
-    for i := 1 to marks do begin
-      t := (rnd/256) * elapsed;
-      addSkidmark(getWheelPos(+1, -1)+xyVel*t);
-      addSkidmark(getWheelPos(+1, +1)+xyVel*t);
-    end;
+    if (skidVolume * 100) > rnd then
+      addSkidmark(getWheelPos(+1, -1));
+    if (skidVolume * 100) > rnd then
+      addSkidmark(getWheelPos(+1, +1));
   end;
 
   // for the moment engine sound is speed, which is not quiet right
@@ -310,14 +304,7 @@ begin
   mixer.channels[3].volume := clamp(xyVel.abs/200, 0, 1.0);
   mixer.channels[3].pitch := (ENGINE_START + clamp(xyVel.abs/250, 0, ENGINE_RANGE));
 
-  //debugTextOut(drawPos.x, drawPos.y-50, format('%.1f %.1f', [slidingPower/5000, tireHeat]));
   vel += tractionForce * (elapsed / mass);
-
-{  debugTextOut(
-    drawPos.x-120, drawPos.y+50,
-    format('vel:%.1f slipa:%.1f tf:%.1f/%.1f fps:%.2f',
-    [xyVel.abs, slipAngle, tractionForce.abs, requiredTractionForce.abs, 1/elapsed]
-  ));}
 
 end;
 
@@ -408,22 +395,13 @@ begin
   self.currentTerrain.friction /= 5;
 end;
 
-procedure tCar.update(elapsed: single);
+{figure out what terrain we are on and handle height}
+procedure tCar.processInput(elapsed: single);
 var
-  drag: single;
-  dir: v3d;
-  engineForce, lateralForce, dragForce: v3d;
-  targetVelocity: v3d;
-  drawPos: tPoint;
-
-const
-  BOUNDARY = 50;
+  dir, engineForce: V3D;
 begin
 
   dir := v3d.create(-1,0,0).rotated(0,0,angle.z);
-  dragForce := v3d.create(0,0,0);
-  engineForce := v3d.create(0,0,0);
-  lateralForce := v3d.create(0,0,0);
 
   {process input}
   if keyDown(key_left) then begin
@@ -460,19 +438,22 @@ begin
   if (nitroTimer < 0) then
     nitroTimer := min(nitroTimer + elapsed, 0);
 
-  {movement from last frame}
-  pos += vel * elapsed;
-  drawPos := track.worldToCanvas(pos);
-
-  self.processTerrain(elapsed);
-
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
   tireRotation += elapsed * vel.abs / 20;
 
-  {handle traction}
-  self.processTireModel(elapsed);
-  self.processPhysics(elapsed);
+end;
+
+procedure tCar.processMovement(elapsed: single);
+var
+  drawPos: tPoint;
+  dragForce: V3D;
+  drag: single;
+const
+  BOUNDARY = 50;
+begin
+
+  pos += vel * elapsed;
 
   {handle drag}
   drag := self.constantDrag + currentTerrain.friction * vel.abs + (dragCoefficent) * vel.abs2;
@@ -482,6 +463,7 @@ begin
   vel -= dragForce;
 
   {apply boundaries}
+  drawPos := track.worldToCanvas(pos);
   if drawPos.x < BOUNDARY then vel.x += (BOUNDARY-drawPos.x) * 1.0;
   if drawPos.y < BOUNDARY then vel.y += (BOUNDARY-drawPos.y) * 1.0;
   if drawPos.x > track.width-BOUNDARY then vel.x -= (drawPos.x-(track.width-BOUNDARY)) * 1.0;
@@ -494,6 +476,28 @@ begin
   if isOnGround then begin
     angle.x *= decayFactor(0.2, elapsed);
     angle.y *= decayFactor(0.2, elapsed);
+  end;
+end;
+
+procedure tCar.update(elapsed: single);
+const
+  updatePerTick = 0.001;
+var
+  updates: integer;
+begin
+  updateRemaining += elapsed;
+  updates := 0;
+  while updateRemaining > updatePerTick do begin
+    if updates >= 100 then
+      {too many updates, we'll just move slowly in this case}
+      break;
+    processTerrain(updatePerTick);
+    processInput(updatePerTick);
+    processTireModel(updatePerTick);
+    processPhysics(updatePerTick);
+    processMovement(updatePerTick);
+    updateRemaining -= updatePerTick;
+    inc(updates);
   end;
 end;
 
