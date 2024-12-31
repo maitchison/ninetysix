@@ -60,6 +60,7 @@ type
     currentTerrain: tTerrainDef;
     nitroTimer: single;
     updateRemaining: single;
+    revs: single;
 
     chassis: tCarChassis;
     track: tRaceTrack;
@@ -326,11 +327,6 @@ begin
       addSkidmark(getWheelPos(+1, +1));
   end;
 
-  // for the moment engine sound is speed, which is not quiet right
-  // should be 'revs'
-  mixer.channels[3].volume := clamp(xyVel.abs/200, 0, 1.0);
-  mixer.channels[3].pitch := (ENGINE_START + clamp(xyVel.abs/250, 0, ENGINE_RANGE));
-
   vel += tractionDelta;
 
 end;
@@ -362,7 +358,7 @@ begin
       mixer.play(landSFX, SCS_SELFOVERWRITE);
     pos.z += terrainDelta;
     if vel.z > 0 then
-      vel.z := -vel.z * 0.75;
+      vel.z := -vel.z * 0.33;
   end;
 
   if terrainDelta < halfSuspensionRange then begin
@@ -376,7 +372,16 @@ begin
     factor := halfSuspensionRange-(terrainDelta-halfSuspensionRange);
     self.currentTerrain.traction *= factor;
     self.currentTerrain.friction *= factor;
+    // this just helps pull us towards the ground, and also
+    // dampens things.
+    carAccel += V3D.create(0, 0, 200*factor);
   end;
+
+  {give us a 'flying boost' if we do actually leave suspension range}
+  if (terrainDelta > chassis.suspensionRange*0.9) and
+    (terrainDelta < chassis.suspensionRange*1.1)
+    and (carVel.z < 0) then
+    carAccel += V3D.create(0, 0, -4000);
 
   watch('carAccel', carAccel);
 
@@ -437,16 +442,13 @@ begin
   dir := V3D.create(-1,0,0).rotated(0,0,angle.z);
   engineForce := V3D.create(0,0,0);
 
-  {stub}
-  watch('terrain', currentTerrain.tag);
-
   {process input}
   if keyDown(key_left) then begin
-    angle.z -= elapsed*2.5
+    angle.z -= elapsed*2.5;
     steeringAngle += elapsed*0.3;
   end;
   if keyDown(key_right) then begin
-    angle.z += elapsed*2.5
+    angle.z += elapsed*2.5;
     steeringAngle -= elapsed*0.3;
   end;
 
@@ -454,15 +456,31 @@ begin
     if (isOnGround) then
       engineForce := dir * enginePower*2;
     nitroTimer -= elapsed;
-    if nitroTimer < 0 then begin
+    if nitroTimer < 0 then
       nitroTimer := -10; // 10 second cool-down
-    end;
   end else begin
     if keyDown(key_down) and isOnGround then
       engineForce := dir * (-0.5 * enginePower);
     if keyDown(key_up) and isOnGround then
-      engineForce := dir * enginePower;
+      engineForce := dir * enginePower
   end;
+
+  {when on ground match revs to velocity}
+  if isOnGround then begin
+    revs := decayFactor(0.1, elapsed) * revs + (1-decayFactor(0.1, elapsed)) * vel.abs;
+  end else begin
+    revs *= decayFactor(1.5, elapsed);
+    if keyDown(key_up) then
+      {otherwise rev the engine as needed}
+      revs += enginePower * elapsed;
+  end;
+
+  // for the moment engine sound is speed, which is not quiet right
+  // should be 'revs'
+  mixer.channels[3].volume := clamp(revs/200, 0, 1.0);
+  mixer.channels[3].pitch := (ENGINE_START + clamp(revs/250, 0, ENGINE_RANGE));
+
+  watch('revs', revs);
 
   if keyDown(key_c) and (nitroTimer = 0) then begin
     // play sound nitro

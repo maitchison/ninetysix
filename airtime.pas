@@ -283,6 +283,7 @@ var
   carScale: single;
   i,j: integer;
   snow: tSnowField;
+  verStr: string;
 
 begin
 
@@ -296,8 +297,9 @@ begin
   titleBackground.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
   titleBackground.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
 
-  textOut(titleBackground, 640-140+1, 480-25+1, 'v0.1a (09/12/2024)', RGBA.create(0,0,0));
-  textOut(titleBackground, 640-140, 480-25, 'v0.1a (09/12/2024)', RGBA.create(250,250,250,240));
+  verStr := 'v0.4 (31/12/2024)';
+  textOut(titleBackground, 640-140+1, 480-25+1, verStr, RGBA.create(0,0,0));
+  textOut(titleBackground, 640-140, 480-25, verStr, RGBA.create(250,250,250,240));
 
   screen.background := titleBackground;
 
@@ -477,7 +479,7 @@ begin
     mixer.play(startSFX);
 
   car := tCar.create(CC_BOX, track);
-  car.pos := V3D.create(810, 600, 0);
+  car.pos := V3D.create(810, 600, -car.chassis.suspensionRange/2);
   car.angle.z := degTorad(90+60);
 
   startClock := getSec;
