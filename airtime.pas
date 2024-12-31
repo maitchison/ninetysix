@@ -536,7 +536,7 @@ begin
     if keyDown(key_3) then
       delay(100); // pretend to be slow
     if config.DEBUG then begin
-      debugShowTimers(drawPos);
+      //debugShowTimers(drawPos);
       debugShowWatches();
     end;
     stopTimer('debug');

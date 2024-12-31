@@ -10,7 +10,7 @@ const
   DEFAULT_CAR_SCALE = 1.0;
 
   {todo: put as part of chassis def}
-  SKID_VOLUME = 1.0;
+  SKID_VOLUME = 0.75;
   ENGINE_RANGE = 4.0;
   ENGINE_START = 0.5;
 
@@ -245,12 +245,11 @@ begin
   {-----------------------------------}
   {tire traction}
 
-  tireHeat *= decayFactor(0.5, elapsed);
+  tireHeat *= decayFactor(0.1, elapsed);
   watch('tireHeat', tireHeat);
   {sound is always playing, we only adjust the volume}
-  skidVolume := clamp(tireHeat, 0, 1.0) * SKID_VOLUME;
-  mixer.channels[2].volume := skidVolume * 0.65;
-
+  skidVolume := clamp(tireHeat/100, 0, 1.0) * SKID_VOLUME;
+  mixer.channels[2].volume := skidVolume;
 
   xyVel := vel; xyVel.z := 0;
 
@@ -261,7 +260,8 @@ begin
   if not isOnGround then
     exit;
 
-  tireAngle := angle.z + steeringAngle * (3/5);
+  // works best if we only add a small amount of steering angle
+  tireAngle := angle.z + steeringAngle * (1/5);
   wheelDir := V3D.create(-1,0,0).rotated(0,0,tireAngle);
 
   slipAngle := radToDeg(arcCos(xyVel.dot(wheelDir) / xyVel.abs));
@@ -270,8 +270,8 @@ begin
   {figure out how much of the difference our tires can take care of}
   lateralDelta := (targetVelocity-xyVel);
   lateralDelta := lateralDelta.rotated(0, 0, -tireAngle);
-{  lateralDelta.x := 0;
-  lateralDelta.z := 0;}
+  lateralDelta.x := 0;
+  lateralDelta.z := 0;
   lateralDelta := lateralDelta.rotated(0, 0, +tireAngle);
 
   {change in velocity required to correct velocity}
@@ -284,15 +284,14 @@ begin
     tractionDelta.clip(9999999) {perfect traction}
   else begin
     {model how well our tires work}
-    tireGrip := tireTractionModifier * clamp(currentTerrain.traction-(tireHeat*2), 0, currentTerrain.traction);
+    tireGrip := tireTractionModifier * clamp(currentTerrain.traction-(tireHeat), 0, currentTerrain.traction);
     watch('tireGrip', tireGrip);
-
     tractionDelta.clip(elapsed * tireGrip);
   end;
 
   {some of our sliding goes into heat}
   slidingHeat := requiredTractionDelta.abs - tractionDelta.abs;
-  slidingHeat := clamp(slidingHeat, 0, 100 * elapsed);
+  slidingHeat := clamp(slidingHeat/100, 0, 1000 * elapsed);
 
   tireHeat += slidingHeat;
 
@@ -300,10 +299,10 @@ begin
   watch('slidingHeat', slidingHeat);
 
   // write skidmarks to map
-  if (skidVolume > 0.05) then begin
-    if (skidVolume * 100) > rnd then
+  if (skidVolume > 0.01) then begin
+    if (skidVolume * 400) > rnd then
       addSkidmark(getWheelPos(+1, -1));
-    if (skidVolume * 100) > rnd then
+    if (skidVolume * 400) > rnd then
       addSkidmark(getWheelPos(+1, +1));
   end;
 
@@ -430,9 +429,7 @@ begin
     end;
   end else begin
     if keyDown(key_down) and isOnGround then
-      // silly that tires resist backwards, so have to overpower it here
-      // once laterial force is only lateral, this should be changed.
-      engineForce := dir * (-1.75 * enginePower);
+      engineForce := dir * (-0.5 * enginePower);
     if keyDown(key_up) and isOnGround then
       engineForce := dir * enginePower;
   end;
@@ -489,7 +486,7 @@ end;
 
 procedure tCar.update(elapsed: single);
 const
-  updatePerTick = 0.001;
+  updatePerTick = 0.002;
 var
   updates: integer;
 begin

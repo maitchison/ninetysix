@@ -39,7 +39,7 @@ const
 
   TERRAIN_DEF: array[0..3] of tTerrainDef = (
     (tag:'air';     friction:0.0; traction:0),
-    (tag:'dirt';    friction:0.0; traction:410),
+    (tag:'dirt';    friction:0.0; traction:310),
     (tag:'grass';   friction:4.0; traction:210),
     (tag:'barrier'; friction:0.0; traction:1000)
   );
