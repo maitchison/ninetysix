@@ -31,7 +31,9 @@ procedure closeMouse();
 
 implementation
 
-uses s3;
+uses
+  s3,
+  graph32;
 
 procedure installMouseProc(userproc : pointer; userproclen : longint); forward;
 procedure removeMouseProc; forward;
@@ -215,6 +217,9 @@ const
   CURSOR_FOREGROUND = 2;
   CURSOR_NOT_SCREEN = 3;
 begin
+
+  S3SetCursorFGColor(RGBA.create(255,255,255));
+  S3SetCursorBGColor(RGBA.create(0,0,0));
 
   for x := 0 to 63 do
     for y := 0 to 63 do begin

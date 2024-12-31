@@ -17,7 +17,7 @@ type
   tS3Driver = class
 
     fgColor: RGBA;
-    bgCOlor: RGBA;
+    bgColor: RGBA;
 
   public
     constructor create();
@@ -32,6 +32,10 @@ procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
 procedure S3Scissors(x1,y1,x2,y2:int16);
 procedure S3SetLogicalWidth(width:word);
 function  S3GetLogicalWidth(): word;
+procedure S3SetFGColor(col: RGBA);
+procedure S3SetBGColor(col: RGBA);
+procedure S3SetCursorFGColor(col: RGBA);
+procedure S3SetCursorBGColor(col: RGBA);
 
 implementation
 
@@ -185,6 +189,7 @@ CONST
   ALT_PCNT = 8148;
   CMD = 8118;
 }
+  BKGD_COLOR = $A2E8;
   FRGD_COLOR = $A6E8;
   FRGD_MIX = $BAE8;
   CUR_X = $86E8;
@@ -356,12 +361,45 @@ begin
   result := ((regHigh shl 8) + regLow) * 2;
 end;
 
+procedure S3SetFGColor(col: RGBA);
+begin
+  S3UnlockRegs();
+  s3wait();
+  writed(FRGD_COLOR, col.to32);
+  S3LockRegs();
+end;
+
+procedure S3SetBGColor(col: RGBA);
+begin
+  S3UnlockRegs();
+  s3wait();
+  writed(BKGD_COLOR, col.to32);
+  S3LockRegs();
+end;
+
+procedure S3SetCursorFGColor(col: RGBA);
+begin
+  S3UnlockRegs();
+  S3Wait();
+  writeReg(CR, $4A, col.r);
+  writeReg(CR, $4A, col.g);
+  writeReg(CR, $4A, col.b);
+  S3LockRegs();
+end;
+
+procedure S3SetCursorBGColor(col: RGBA);
+begin
+  S3UnlockRegs();
+  S3Wait();
+  writeReg(CR, $4B, col.r);
+  writeReg(CR, $4B, col.g);
+  writeReg(CR, $4B, col.b);
+  S3LockRegs();
+end;
 
 procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
-
-var x1,y1,x2,y2: int16;
-
 var
+  x1,y1,x2,y2: int16;
   XPOS: boolean;
   YPOS: boolean;
   commandCode: word;
@@ -784,9 +822,9 @@ begin
       pixels += BLOCK_SIZE * 4;
     end;
   end;
-
-
 end;
+
+
 
 procedure tS3Driver.fillRect(x1,y1,width,height:int16);
 begin
