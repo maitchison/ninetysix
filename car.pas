@@ -563,7 +563,7 @@ begin
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
   if config.XMAS then
-    engineSFX:= tSoundEffect.loadFromWave('res\bells.wav').asFormat(AF_16_STEREO)
+    engineSFX:= tSoundEffect.loadFromWave('res\bell.wav').asFormat(AF_16_STEREO)
   else
     engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
 
