@@ -808,6 +808,10 @@ begin
   {MMX blending path}
   asm
 
+    // if mixer interupt runs during thi timer then we'll have
+    // fpu in invalid state, so block them during the hline
+    cli
+
     pushad
 
     mov esi, self
@@ -822,32 +826,32 @@ begin
     mov cl, c[3]
 
     {replicate alpha across the words}
-    mov       ch, cl
+    mov        ch, cl
     shl        ecx, 8
     mov        cl, ch
     movd       mm3, ecx
-    punpcklbw mm3, mm0        // MM3 <- 0 0 0 A | 0 A 0 A
+    punpcklbw  mm3, mm0        // MM3 <- 0 0 0 A | 0 A 0 A
 
     {replicate = 255-alpha accross the words}
-    mov       cl, 255
+    mov        cl, 255
     sub        cl, ch
     mov        ch, cl
     shl        ecx, 8
-    mov       cl, ch
+    mov        cl, ch
     movd       mm4, ecx
-    punpcklbw mm4, mm0      // MM4 <- 0 `A 0 `A | 0 `A 0 `A}
+    punpcklbw  mm4, mm0      // MM4 <- 0 `A 0 `A | 0 `A 0 `A}
 
     {expand and premultiply our source color}
     movd       mm2, eax      // MM2 <-  0  0  0  0|  0 Rs Gs Bs
-    punpcklbw mm2, mm0      // MM2 <-  0  0  0 Rs|  0 Gs  0 Bs
+    punpcklbw  mm2, mm0      // MM2 <-  0  0  0 Rs|  0 Gs  0 Bs
     pmullw     mm2, mm3      // MM2 <-  0  A*Rs A*Gs A*bs
 
-    mov ecx, count
+    mov       ecx, count
 
   @LOOP:
 
     {read source pixel}
-    mov edx, [edi]
+    mov       edx, [edi]
 
     {do the blend}
     movd      mm1, edx      // MM1 <-  0  0  0  0|  0 Rd Gd Bd
@@ -872,6 +876,8 @@ begin
     popad
 
     emms
+
+    sti
 
   end;
 end;

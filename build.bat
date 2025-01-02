@@ -9,7 +9,7 @@ dt.exe
 call dt.bat
 
 set VERSION=04
-set BUILD_DIR=builds\%VERSION%
+set BUILD_DIR=\builds\%VERSION%
 set MAIN=airtime
 
 echo Build dir is '%BUILD_DIR%'
