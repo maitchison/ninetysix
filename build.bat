@@ -10,6 +10,7 @@ call dt.bat
 
 set VERSION=04
 set BUILD_DIR=\builds\%VERSION%
+set LATEST_DIR=\builds\latest
 set MAIN=airtime
 
 echo Build dir is '%BUILD_DIR%'
@@ -56,6 +57,13 @@ deltree /y _tmp
 
 mkdir %BUILD_DIR%\res
 copy res\*.* %BUILD_DIR%\res
+
+:: ---------------------------------
+:: Update Latest
+:: ---------------------------------
+
+deltree /y %LATEST_DIR%
+xcopy %BUILD_DIR% %LATEST_DIR% /E /I
 
 goto :end
 
