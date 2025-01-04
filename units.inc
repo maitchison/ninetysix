@@ -3,6 +3,7 @@
   watches,
   test,
   utils,
+  types,
   configFile,
 {some base units}
   mymath,

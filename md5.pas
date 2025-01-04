@@ -5,12 +5,10 @@ interface
 uses
   test,
   debug,
-  crt,
+  types,
   utils;
 
 type
-  tBytes = array of Byte;
-
   tDigestData = packed record
     case integer of
       0: (asBytes: array[0..15] of byte);

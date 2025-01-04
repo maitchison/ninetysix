@@ -10,10 +10,12 @@ interface
 uses
   debug,
   test,
+  types,
   utils;
 
 type
 
+  {todo: switch to tStringList}
   tLines = array of string;
   tLineRefs = array of int32;
   tScores = array of int16;

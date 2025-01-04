@@ -1,10 +1,12 @@
 {Quick and dirty test case support}
-unit Test;
+unit test;
 
 interface
 
+uses
+  types;
+
 type
-  tBytes = array of byte;
 
   tTestSuite = class
   private

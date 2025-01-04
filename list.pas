@@ -4,30 +4,70 @@ interface
 
 uses
   test,
-  debug,
-  utils;
+  types,
+  debug;
 
 type
-  {A python style sliced array of strings}
-  tList = record
-    {[startPos..endPos)}
+
+  tIntList = record
     startPos,endPos: int32;
-    data: tDwords;
-    constructor create(const data: array of dword);
+    data: array of int32;
+    constructor create(const data: array of int32);
     function len: int32;
-    function slice(aStartPos, aEndPos: int32): tList;
-    procedure append(x: dword);
-    function clone(): tList;
-    function head: dWord;
-    function tail: tList;
+    function slice(aStartPos, aEndPos: int32): tIntList;
+    procedure append(x: int32);
+    function clone(): tIntList;
+    function head: int32;
+    function tail: tIntList;
 
     function toString: string;
 
-    function getItem(index: int32): dword;
-    procedure setItem(index: int32;value:dword);
+    function getItem(index: int32): int32;
+    procedure setItem(index: int32; value: int32);
 
-    property items[index: int32]: dWord read getItem write setItem; default;
-    class operator add(a: tList;b: dword): tList;
+    property items[index: int32]: int32 read getItem write setItem; default;
+    class operator add(a: tIntList;b: int32): tIntList;
+
+  private
+    function deref(index: int32): int32;
+
+  end;
+
+  tEnumerator = record
+    private
+      fIndex: Integer;
+      fArray: array of string;
+      function GetCurrent: string;
+    public
+      function moveNext: boolean;
+      property current: string read getCurrent;
+    end;
+
+
+  tStringList = record
+
+    startPos,endPos: int32;
+    data: array of string;
+    constructor create(const data: array of string);
+    function len: int32;
+    function slice(aStartPos, aEndPos: int32): tStringList;
+    procedure append(x: string); overload;
+    procedure append(x: tStringList); overload;
+    function clone(): tStringList;
+    function head: string;
+    function tail: tStringList;
+    function contains(item: string): boolean;
+
+    function toString: string;
+
+    function getItem(index: int32): string;
+    procedure setItem(index: int32; value: string);
+
+    property items[index: int32]: string read getItem write setItem; default;
+    class operator add(a: tStringList;b: string): tStringList;
+    class operator add(a: tStringList;b: tStringList): tStringList;
+
+    function getEnumerator(): tEnumerator;
 
   private
     function deref(index: int32): int32;
@@ -37,55 +77,55 @@ type
 
 implementation
 
+uses utils;
+
 {----------------------------------------------------}
-{ tList }
+{ tIntList }
 {----------------------------------------------------}
 
-function tList.toString: string;
+function tIntList.toString: string;
 var
   i: int32;
 begin
   result := '[';
   for i := startPos to endPos-1 do
-    result += intToStr(data[i]) + ',';
+    result += intToStr(int32(data[i])) + ',';
   result[length(result)] := ']';
 end;
 
-function tList.deref(index: int32): int32;
+function tIntList.deref(index: int32): int32;
 begin
   if index < 0 then index += endPos else index += startPos;
   result := index;
 end;
 
-function tList.head: dWord;
+function tIntList.head(): int32;
 begin
   result := self[-1];
 end;
 
-function tList.tail: tList;
+function tIntList.tail(): tIntList;
 begin
   result := slice(0, -1);
 end;
 
-class operator tList.add(a: tList;b: dword): tList;
+class operator tIntList.add(a: tIntList;b: int32): tIntList;
 begin
   result := a.clone();
   result.append(b);
 end;
 
-
-function tList.getItem(index: int32): dword;
+function tIntList.getItem(index: int32): int32;
 begin
   result := data[deref(index)];
 end;
 
-procedure tList.setItem(index: int32;value:dWord);
+procedure tIntList.setItem(index: int32;value:int32);
 begin
   data[deref(index)] := value;
 end;
 
-
-constructor tList.create(const data: array of dword);
+constructor tIntList.create(const data: array of int32);
 var
   i: int32;
 begin
@@ -95,12 +135,12 @@ begin
     append(data[i]);
 end;
 
-function tList.len: int32;
+function tIntList.len: int32;
 begin
   result := endPos-startPos;
 end;
 
-procedure tList.append(x: dword);
+procedure tIntList.append(x: int32);
 begin
   {note: this is not a good way to handle append, maybe a different
     'stringbuilder' like class}
@@ -112,11 +152,10 @@ begin
     {cannot append to non-trivial slice}
     error(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
   end;
-
 end;
 
 {create a sliced copy}
-function tList.slice(aStartPos, aEndPos: int32): tList;
+function tIntList.slice(aStartPos, aEndPos: int32): tIntList;
 begin
   aStartPos := deref(aStartPos);
   aEndPos := deref(aEndPos);
@@ -129,7 +168,131 @@ begin
 end;
 
 {create a copy of this slice without any slicing}
-function tList.clone(): tList;
+function tIntList.clone(): tIntList;
+var
+  i: int32;
+begin
+  result.startPos := 0;
+  result.endPos := len;
+  result.data := nil;
+  setLength(result.data, len);
+  for i := 0 to len-1 do
+    result.data[i] := self.data[startPos+i];
+end;
+
+{----------------------------------------------------}
+{ tStringList }
+{----------------------------------------------------}
+
+function tStringList.toString: string;
+var
+  i: int32;
+begin
+  result := '[';
+  for i := startPos to endPos-1 do
+    result += data[i] + ',';
+  result[length(result)] := ']';
+end;
+
+function tStringList.deref(index: int32): int32;
+begin
+  if index < 0 then index += endPos else index += startPos;
+  result := index;
+end;
+
+function tStringList.head(): string;
+begin
+  result := self[-1];
+end;
+
+function tStringList.tail(): tStringList;
+begin
+  result := slice(0, -1);
+end;
+
+class operator tStringList.add(a: tStringList;b: string): tStringList; overload;
+begin
+  result := a.clone();
+  result.append(b);
+end;
+
+class operator tStringList.add(a: tStringList;b: tStringList): tStringList; overload;
+begin
+  result := a.clone();
+  result.append(b);
+end;
+
+function tStringList.getItem(index: int32): string;
+begin
+  result := data[deref(index)];
+end;
+
+procedure tStringList.setItem(index: int32;value: string);
+begin
+  data[deref(index)] := value;
+end;
+
+constructor tStringList.create(const data: array of string);
+var
+  s: string;
+begin
+  startPos := 0;
+  endPos := 0;
+  for s in data do
+    append(s);
+end;
+
+function tStringList.len: int32;
+begin
+  result := endPos-startPos;
+end;
+
+procedure tStringList.append(x: string); overload;
+begin
+  {note: this is not a good way to handle append, maybe a different
+    'stringbuilder' like class}
+  if (startPos = 0) and (endPos = length(self.data)) then begin
+    setLength(self.data, length(self.data)+1);
+    data[length(self.data)-1] := x;
+    inc(endPos);
+  end else begin
+    {cannot append to non-trivial slice}
+    error(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
+  end;
+end;
+
+procedure tStringList.append(x: tStringList); overload;
+var
+  s: string;
+begin
+  for s in x do
+    self.append(s);
+end;
+
+function tStringList.contains(item: string): boolean;
+var
+  s: string;
+begin
+  for s in self.data do
+    if s = item then exit(true);
+  exit(false);
+end;
+
+{create a sliced copy}
+function tStringList.slice(aStartPos, aEndPos: int32): tStringList;
+begin
+  aStartPos := deref(aStartPos);
+  aEndPos := deref(aEndPos);
+  if (aStartPos < 0) or (aStartPos >= length(data)) then runError(201);
+  if (aEndPos < 0) or (aEndPos >= length(data)) then runError(201);
+  if aStartPos > aEndPos then runError(201);
+  result.startPos := aStartPos;
+  result.endPos := aEndPos;
+  result.data := self.data;
+end;
+
+{create a copy of this slice without any slicing}
+function tStringList.clone(): tStringList;
 var
   i: int32;
 begin
@@ -142,6 +305,23 @@ begin
 end;
 
 
+function tEnumerator.moveNext: boolean;
+begin
+  inc(fIndex);
+  result := fIndex < length(fArray);
+end;
+
+function tEnumerator.getCurrent: string;
+begin
+  result := fArray[fIndex];
+end;
+
+function tStringList.getEnumerator(): tEnumerator;
+begin
+  result.fArray := data;
+  result.fIndex := -1;
+end;
+
 {-----------------------------------------------------}
 
 type
@@ -151,9 +331,10 @@ type
 
 procedure tListTest.run();
 var
-  list: tList;
+  list: tIntList;
+  s1,s2: tStringList;
 begin
-  list := tList.create([1,2,3,4,5,6]);
+  list := tIntList.create([1,2,3,4,5,6]);
   assertEqual(list.len, 6);
   assertEqual(list[0], 1);
   assertEqual(list[-1], 6);
@@ -173,6 +354,10 @@ begin
   assertEqual(list[-1], 22);
   assertEqual(list[-2], 3);
   assertEqual(length(list.data), 2);
+
+  s1 := tStringList.create(['a','b']);
+  s2 := tStringList.create(['c','d']);
+  assertEqual((s1+s2).toString, '[a,b,c,d]');
 
 end;
 

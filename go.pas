@@ -37,6 +37,7 @@ uses
   hashMap,
   md5,
   list,
+  filesystem,
   dos;
 
 var
@@ -159,12 +160,12 @@ begin
 end;
 
 {output the longest common subsequence.}
-procedure printDif(newLines,oldLines: tLines;matching: tList);
+procedure printDif(newLines,oldLines: tLines;matching: tIntList);
 var
   i,j,k,z: int32;
   map: tHashMap;
   hash: word;
-  oldS,newS: tList;
+  oldS,newS: tIntList;
   new,old,cur: string;
   linesRemoved: int32;
   linesAdded: int32;
@@ -213,11 +214,11 @@ begin
   {which lines in old file should be shown for context}
   fillchar(importantLines, sizeof(importantLines), false);
 
-  oldS := tList.create([]);
+  oldS := tIntList.create([]);
   for i := 1 to length(oldLines) do
     oldS.append(i);
 
-  newS := tList.create([]);
+  newS := tIntList.create([]);
   for i := 1 to length(newLines) do
     newS.append(i);
 
@@ -351,7 +352,7 @@ var
 procedure benchmark();
 var
   startTime, elapsed: double;
-  merge: tList;
+  merge: tIntList;
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
@@ -373,7 +374,7 @@ begin
   sln := diff.run(new, old);
   elapsed := getSec-startTime;
 
-  merge := tList.create([]);
+  merge := tIntList.create([]);
   for i := 0 to length(sln)-1 do
     merge.append(sln[i]);
   writeln(merge.toString);
@@ -389,10 +390,9 @@ begin
   writeln('NM         ',length(new)*length(old));
 end;
 
-
 procedure diff(filename: string);
 var
-  merge: tList;
+  merge: tIntList;
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
@@ -405,7 +405,7 @@ begin
   diff := tDiff.create();
 
   sln := diff.run(new, old);
-  merge := tList.create([]);
+  merge := tIntList.create([]);
   for i := 0 to length(sln)-1 do
     merge.append(sln[i]);
   printDif(new, old, merge);
@@ -416,32 +416,6 @@ begin
   write('Message:');
   readln(msg);
   commit(msg);
-end;
-
-{todo: change to string list}
-function listFiles(path: string): tLines;
-var
-  sr: SearchRec;
-begin
-  result := nil;
-  findFirst(path, AnyFile, sr);
-  while DosError = 0 do begin
-    if sr.size > 0 then begin
-      setLength(result, length(result)+1);
-      result[length(result)-1] := toLowerCase(sr.name);
-    end;
-    findNext(sr);
-  end;
-  findClose(sr);
-end;
-
-function listContains(l: tLines;item: string): boolean;
-var
-  s: string;
-begin
-  for s in l do
-    if s = item then exit(true);
-  exit(false);
 end;
 
 (*
@@ -478,22 +452,21 @@ begin
   result := t1 <> t2;
 end;
 
-function getSourceFiles(path: string): tLines;
+function getSourceFiles(path: string): tStringList;
 begin
   {todo: proper .gitignore style decision on what to include}
   if (length(path) > 0) and (path[length(path)] <> '\') then
     path += '\';
-  {note, a+b+c concatination procues invalid results}
-  result := listFiles(path+'*.pas');
-  result += listFiles(path+'*.bat');
-  result += listFiles(path+'*.inc');
+  result := fsListFiles(path+'*.pas');
+  result += fsListFiles(path+'*.bat');
+  result += fsListFiles(path+'*.inc');
 end;
 
 {show all changed / added / deleted files}
 procedure status();
 var
-  workingSpaceFiles: tLines;
-  headFiles: tLines;
+  workingSpaceFiles: tStringList;
+  headFiles: tStringList;
   filename: string;
   added,removed,changed: int32;
 begin
@@ -505,7 +478,7 @@ begin
   changed := 0;
 
   for filename in workingSpaceFiles do begin
-    if not listContains(headFiles, filename) then begin
+    if not headFiles.contains(filename) then begin
       textattr := 10;
       writeln('[+] added ', filename);
       inc(added);
@@ -519,7 +492,7 @@ begin
   end;
 
   for filename in headFiles do begin
-    if not listContains(workingSpaceFiles, filename) then begin
+    if not workingSpaceFiles.contains(filename) then begin
       textattr := 12;
       writeln('removed ', filename);
       inc(removed);
@@ -535,19 +508,19 @@ end;
 {show all diff on all modified files}
 procedure diffOnModified();
 var
-  workingSpaceFiles: tLines;
-  headFiles: tLines;
+  workingSpaceFiles: tStringList;
+  headFiles: tStringList;
   filename: string;
   changed: int32;
 begin
   workingSpaceFiles := getSourceFiles('');
-  headFiles := getSourceFIles('$rep\head\');
+  headFiles := getSourceFiles('$rep\head\');
   changed := 0;
 
   outputLn('');
 
   for filename in workingSpaceFiles do begin
-    if not listContains(headFiles, filename) then begin
+    if not headFiles.contains(filename) then begin
     end else begin
       if wasModified(filename, '$rep\head\'+filename) then begin
         outputLn('----------------------------------------');
@@ -567,7 +540,7 @@ var
   command: string;
 
 begin
-
+  WRITE_TO_SCREEN := true;
   test.runTestSuites();
 
   if (paramCount = 0) then

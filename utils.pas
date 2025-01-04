@@ -9,6 +9,7 @@ interface
 
 uses
   dos,
+  types,
   go32;
 
 {todo:
@@ -21,10 +22,6 @@ uses
 }
 
 type
-
-  tBytes = array of byte;
-  tWords = array of word;
-  tDWords = array of dword;
 
   tMyDateTime = record
 
