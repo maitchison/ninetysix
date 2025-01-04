@@ -29,12 +29,13 @@ Block header
 }
 
 uses
+  debug,
   test,
   crt, {remove this?}
   diff,
-  debug,
   utils,
   hashMap,
+  myHash,
   dos;
 
 // not sure if needed, but wait for external filesystem to catch up.
@@ -732,7 +733,10 @@ var
 
 begin
 
+  {todo: move this to the new system}
   runTests();
+
+  test.runTestSuites();
 
   if (paramCount = 0) then
     command := 'status'
