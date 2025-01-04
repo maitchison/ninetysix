@@ -11,6 +11,7 @@ uses
   dos;
 
 function fsListFiles(path: string): tStringList;
+function fsListFolders(path: string): tStringList;
 
 implementation
 
@@ -26,6 +27,21 @@ begin
     if sr.size > 0 then begin
       result += toLowerCase(sr.name);
     end;
+    findNext(sr);
+  end;
+  findClose(sr);
+end;
+
+{returns a list of all folders in path}
+function fsListFolders(path: string): tStringList;
+var
+  sr: SearchRec;
+begin
+  result := tStringList.create([]);
+  findFirst(path+'\*', AnyFile, sr);
+  while DosError = 0 do begin
+    if ((sr.attr and Directory) = Directory) and (sr.name <> '.') and (sr.name <> '..') then
+      result += toLowerCase(sr.name);
     findNext(sr);
   end;
   findClose(sr);

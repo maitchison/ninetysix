@@ -35,7 +35,6 @@ type
   public
 
     constructor create(path: string);
-
     function toString(): string;
   end;
 
@@ -46,7 +45,11 @@ type
   end;
 
   tCheckpoint = class
+    fileList: array of tFileRef;
+    constructor create();
+    procedure reset();
     procedure loadV1(path: string);
+    procedure writeOut(path: string);
   end;
 
 const
@@ -67,7 +70,7 @@ begin
   fModified := 0;
   try
     assign(f, path);
-    reset(f,1);
+    system.reset(f,1);
     getFTime(f, fModified);
     fSize := fileSize(f);
   finally
@@ -120,45 +123,86 @@ end;
 
 {-------------------------------------------------------------}
 
+constructor tCheckpoint.create();
+begin
+  fileList := nil;
+end;
+
+procedure tCheckpoint.reset();
+var
+  fileRef: tFileRef;
+begin
+  if assigned(fileList) then
+    for fileRef in fileList do
+      fileRef.free();
+  fileList := nil;
+end;
+
 {loads an old style 'files as they are' V1 checkpoint folder}
 procedure tCheckpoint.loadV1(path: string);
 var
-  fileList: tStringList;
   filename: string;
   fileRef: tFileRef;
+  files: tStringList;
   t: tIniFile;
-
+  i: integer;
 begin
 
-  t := tIniFile.create('test.ini');
+  reset();
 
   writeln('processing '+path);
   if not path.endsWith('\') then path += '\';
 
   // get all files in folder
-  fileList := fsListFiles(path+'*.*');
+  files := fsListFiles(path+'*.*');
+  setLength(fileList, files.len);
 
   // create file reference for each one (including hash)
-  for filename in fileList do begin
-    fileRef := tFileRef.create(path+filename);
+  for i := 0 to files.len-1 do begin
+    fileRef := tFileRef.create(path+files[i]);
     fileRef.calculateHash();
-    t.writeObject('file', fileRef);
+    fileList[i] := fileRef;
   end;
   // create hash for every file
   // write new files to object store
   // link each object
 
+end;
+
+procedure tCheckpoint.writeOut(path: string);
+var
+  t: tINIFile;
+  fileRef: tFileRef;
+begin
+  t := tIniFile.create(path);
+  for fileRef in fileList do
+    t.writeObject('file', fileRef);
   t.free();
 end;
 
+procedure processRepo();
 var
-  cp: tCheckpoint;
+  checkpoint: tCheckpoint;
+  folders: tStringList;
+  folder: string;
+begin
+  checkpoint := tCheckpoint.create();
+
+  folders := fsListFolders('$REP');
+  for folder in folders do begin
+    checkpoint.loadV1('$REP\'+folder);
+    checkpoint.writeOut('repo\'+folder+'.txt');
+  end;
+
+  checkpoint.free;
+end;
 
 begin
   textattr := $07;
   clrscr;
   WRITE_TO_SCREEN := true;
   test.runTestSuites();
-  cp := tCheckpoint.create();
-  cp.loadV1('$REP\HEAD\');
+
+  processRepo();
+
 end.

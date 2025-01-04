@@ -119,6 +119,7 @@ begin
   ioError := ioResult;
   if ioError <> 0 then error('Error writing '+fileName+' (error:'+intToStr(ioError)+')');
 
+  {todo: update to new inifile unit}
   try
     for i := 0 to numResources-1 do begin
       res := resource[i];
