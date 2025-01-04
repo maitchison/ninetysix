@@ -87,6 +87,7 @@ function tIntList.toString: string;
 var
   i: int32;
 begin
+  if len = 0 then exit('[]');
   result := '[';
   for i := startPos to endPos-1 do
     result += intToStr(int32(data[i])) + ',';
@@ -188,6 +189,7 @@ function tStringList.toString: string;
 var
   i: int32;
 begin
+  if len = 0 then exit('[]');
   result := '[';
   for i := startPos to endPos-1 do
     result += data[i] + ',';
@@ -354,6 +356,9 @@ begin
   assertEqual(list[-1], 22);
   assertEqual(list[-2], 3);
   assertEqual(length(list.data), 2);
+
+  list := tIntList.create([]);
+  assertEqual(list.toString, '[]');
 
   s1 := tStringList.create(['a','b']);
   s2 := tStringList.create(['c','d']);

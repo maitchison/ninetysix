@@ -49,6 +49,11 @@ type
     procedure printToLog();
   end;
 
+type
+  tStringHelper = record helper for string
+    function EndsWith(const Suffix: string; IgnoreCase: Boolean = False): Boolean;
+  end;
+
 var
   CPUInfo: tCPUInfo;
 
@@ -87,6 +92,7 @@ function exists(filename: string): boolean;
 function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
 function extractFilename(const path: string): string;
+function extractPath(const path: string): string;
 function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
@@ -493,6 +499,15 @@ begin
     if path[i] in ['\', '/'] then
       exit(copy(path, i+1, length(path)));
   exit(path);
+end;
+
+{return a path without filename.}
+function extractPath(const path: string): string;
+var
+  filename: string;
+begin
+  filename := extractFilename(path);
+  result := copy(path, 1, length(path) - length(filename));
 end;
 
 function comma(value: int64; width: word; padding: char=' '): string;
@@ -905,6 +920,26 @@ begin
 end;
 
 {--------------------------------------------------------}
+{ String helpers}
+{--------------------------------------------------------}
+
+function tStringHelper.endsWith(const Suffix: string; IgnoreCase: Boolean): Boolean;
+var
+  MainStr, SubStr: string;
+begin
+  if Length(Suffix) > Length(Self) then
+    Exit(False);
+  if IgnoreCase then begin
+    MainStr := toLowerCase(Self);
+    SubStr := toLowerCase(Suffix);
+  end else begin
+    MainStr := Self;
+    SubStr := Suffix;
+  end;
+  result := copy(MainStr, Length(MainStr) - Length(SubStr) + 1, Length(SubStr)) = SubStr;
+end;
+
+{--------------------------------------------------------}
 
 type
   tUtilsTest = class(tTestSuite)
@@ -945,6 +980,7 @@ begin
   assertEqual(extractFilename('FISH.COM'), 'FISH.COM');
   assertEqual(extractFilename('c:\FISH.COM'), 'FISH.COM');
   assertEqual(extractFilename('c:\src\airtime.exe'), 'airtime.exe');
+  assertEqual(extractPath('c:\src\airtime.exe'), 'c:\src\');
 
   assertEqual(removeExtension('fish.com'), 'fish');
   assertEqual(removeExtension('fish'), 'fish');
@@ -955,6 +991,11 @@ begin
   assertEqual(comma(100), '100');
   assertEqual(comma(1200), '1,200');
   assertEqual(comma(987654321), '987,654,321');
+
+
+  {test string helpers}
+  assert('fish'.endswith('sh'));
+  assert(not 'fish'.endswith('ash'));
 
 end;
 

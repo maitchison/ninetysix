@@ -14,7 +14,8 @@ function fsListFiles(path: string): tStringList;
 
 implementation
 
-{returns a list of all files in filesystem}
+{returns a list of all files in filesystem matching path
+e.g. c:\src\*.pas}
 function fsListFiles(path: string): tStringList;
 var
   sr: SearchRec;

@@ -540,8 +540,6 @@ var
   command: string;
 
 begin
-  WRITE_TO_SCREEN := true;
-  test.runTestSuites();
 
   if (paramCount = 0) then
     command := 'status'
