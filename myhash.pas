@@ -187,7 +187,6 @@ var
   bytes: tBytes;
   i: integer;
 begin
-  {todo: fast reference, don't use tbytes}
   bytes := nil;
   setLength(bytes, length(s));
   for i := 0 to length(s)-1 do
