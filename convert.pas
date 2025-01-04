@@ -9,6 +9,7 @@ uses
   list,
   filesystem,
   md5,
+  iniFile,
   dos;
 
 type
@@ -23,11 +24,15 @@ type
 
     procedure calculateHash();
 
+  published
+
     property name: string read fName;
     property path: string read fPath;
     property hash: string read fHash;
     property size: int64 read fSize;
     property modified: int32 read fModified;
+
+  public
 
     constructor create(path: string);
 
@@ -54,6 +59,7 @@ constructor tFileRef.create(path: string);
 var
   f: file;
 begin
+  inherited create();
   fName := extractFilename(path);
   fPath := extractPath(path);
   fHash := ''; //hash is defered.
@@ -120,7 +126,12 @@ var
   fileList: tStringList;
   filename: string;
   fileRef: tFileRef;
+  t: tIniFile;
+
 begin
+
+  t := tIniFile.create('test.ini');
+
   writeln('processing '+path);
   if not path.endsWith('\') then path += '\';
 
@@ -131,11 +142,13 @@ begin
   for filename in fileList do begin
     fileRef := tFileRef.create(path+filename);
     fileRef.calculateHash();
-    writeln(fileRef.toString);
+    t.writeObject('file', fileRef);
   end;
   // create hash for every file
   // write new files to object store
   // link each object
+
+  t.free();
 end;
 
 var
