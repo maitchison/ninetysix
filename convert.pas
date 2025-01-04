@@ -8,21 +8,27 @@ uses
   utils,
   list,
   filesystem,
-  md5;
+  md5,
+  dos;
 
 type
   tFileRef = class
   protected
     fPath: string;
-    fFileName: string;
+    fName: string;
     fHash: string;
-    fFileSize: int64;
+    fSize: int64;
+    fModified: int32;
   public
 
     procedure calculateHash();
 
-    property filename: string read fFileName;
+    property name: string read fName;
+    property path: string read fPath;
     property hash: string read fHash;
+    property size: int64 read fSize;
+    property modified: int32 read fModified;
+
     constructor create(path: string);
 
     function toString(): string;
@@ -33,7 +39,6 @@ type
     files: array of tFileRef;
     function lookupByHash(hash: string): tFileRef;
   end;
-
 
   tCheckpoint = class
     procedure loadV1(path: string);
@@ -46,10 +51,22 @@ const
 {-------------------------------------------------------------}
 
 constructor tFileRef.create(path: string);
+var
+  f: file;
 begin
-  fFileName := extractFilename(path);
+  fName := extractFilename(path);
   fPath := extractPath(path);
-  fHash := '';
+  fHash := ''; //hash is defered.
+  fSize := 0;
+  fModified := 0;
+  try
+    assign(f, path);
+    reset(f,1);
+    getFTime(f, fModified);
+    fSize := fileSize(f);
+  finally
+    close(f);
+  end;
 end;
 
 {calculates the hash for this file (not done by default)}
@@ -59,16 +76,15 @@ var
   bytesRead: int32;
   buffer: array of byte;
 begin
-  assign(f, self.fpath + '\' + self.filename);
+  assign(f, self.fPath + '\' + self.fName);
   try
     reset(f, 1);
-    fFileSize := fileSize(f);
-    if (fFileSize > MAX_FILESIZE) then
+    if (fSize > MAX_FILESIZE) then
       error('Tried to process file that was too large');
-    setLength(buffer, fFileSize);
-    blockread(f, buffer[0], fFileSize, bytesRead);
-    if bytesRead <> fFileSize then
-      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fFileSize, bytesRead]));
+    setLength(buffer, fSize);
+    blockread(f, buffer[0], fSize, bytesRead);
+    if bytesRead <> fSize then
+      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fSize, bytesRead]));
     fHash := MD5.hash(buffer).toHex;
   finally
     close(f);
@@ -82,7 +98,7 @@ begin
     result := copy(fHash, 1, 8)+ ' '
   else
     result := '';
-  result := result + fFilename;
+  result := result + fName;
 end;
 
 {-------------------------------------------------------------}
