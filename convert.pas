@@ -11,17 +11,20 @@ uses
   md5;
 
 type
-
-
   tFileRef = class
   protected
     fPath: string;
     fFileName: string;
     fHash: string;
+    fFileSize: int64;
   public
+
+    procedure calculateHash();
+
     property filename: string read fFileName;
     property hash: string read fHash;
     constructor create(path: string);
+
     function toString(): string;
   end;
 
@@ -33,11 +36,12 @@ type
 
 
   tCheckpoint = class
-
     procedure loadV1(path: string);
-
   end;
 
+const
+  {fine for text files, but don't process large binary files}
+  MAX_FILESIZE = 128*1024;
 
 {-------------------------------------------------------------}
 
@@ -48,11 +52,37 @@ begin
   fHash := '';
 end;
 
+{calculates the hash for this file (not done by default)}
+procedure tFileRef.calculateHash();
+var
+  f: file;
+  bytesRead: int32;
+  buffer: array of byte;
+begin
+  assign(f, self.fpath + '\' + self.filename);
+  try
+    reset(f, 1);
+    fFileSize := fileSize(f);
+    if (fFileSize > MAX_FILESIZE) then
+      error('Tried to process file that was too large');
+    setLength(buffer, fFileSize);
+    blockread(f, buffer[0], fFileSize, bytesRead);
+    if bytesRead <> fFileSize then
+      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fFileSize, bytesRead]));
+    fHash := MD5.hash(buffer).toHex;
+  finally
+    close(f);
+  end;
+
+end;
+
 function tFileRef.toString(): string;
 begin
-  result := fFilename;
   if hash <> '' then
-    result += ' 0x'+copy(fHash, 1, 8);
+    result := copy(fHash, 1, 8)+ ' '
+  else
+    result := '';
+  result := result + fFilename;
 end;
 
 {-------------------------------------------------------------}
@@ -84,6 +114,7 @@ begin
   // create file reference for each one (including hash)
   for filename in fileList do begin
     fileRef := tFileRef.create(path+filename);
+    fileRef.calculateHash();
     writeln(fileRef.toString);
   end;
   // create hash for every file

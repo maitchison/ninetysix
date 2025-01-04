@@ -26,6 +26,9 @@ type
       1: (M: array[0..15] of dword);
     end;
 
+function hash(bytes: tBytes): tDigest; overload;
+function hash(s: ansistring): tDigest; overload;
+
 implementation
 
 {------------------------------------------------------}
@@ -77,7 +80,7 @@ end;
 
 {------------------------------------------------------}
 
-function MD5(bytes: tBytes): tDigest; overload;
+function hash(bytes: tBytes): tDigest; overload;
 const
   s: array[0..63] of dword =
   (7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
@@ -180,7 +183,7 @@ begin
 
 end;
 
-function MD5(s: ansistring): tDigest; overload;
+function hash(s: ansistring): tDigest; overload;
 var
   bytes: tBytes;
   i: integer;
@@ -189,7 +192,7 @@ begin
   setLength(bytes, length(s));
   for i := 0 to length(s)-1 do
     bytes[i] := ord(s[i+1]);
-  result := MD5(bytes);
+  result := hash(bytes);
 end;
 
 {--------------------------------------------------}
@@ -211,9 +214,9 @@ begin
   assertEqual(leftRotate(5, 34), 20);
 
   {md5}
-  assertEqual(MD5('').toHex, 'd41d8cd98f00b204e9800998ecf8427e');
-  assertEqual(MD5('a').toHex, '0cc175b9c0f1b6a831c399e269772661');
-  assertEqual(MD5('The quick brown fox jumps over the lazy dog').toHex, '9e107d9d372bb6826bd81d3542a419d6');
+  assertEqual(hash('').toHex, 'd41d8cd98f00b204e9800998ecf8427e');
+  assertEqual(hash('a').toHex, '0cc175b9c0f1b6a831c399e269772661');
+  assertEqual(hash('The quick brown fox jumps over the lazy dog').toHex, '9e107d9d372bb6826bd81d3542a419d6');
 
 end;
 
