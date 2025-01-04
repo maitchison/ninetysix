@@ -1,4 +1,4 @@
-unit myhash;
+unit md5;
 
 interface
 
@@ -197,11 +197,11 @@ end;
 {--------------------------------------------------}
 
 type
-  tHashTest = class(tTestSuite)
+  tMD5Test = class(tTestSuite)
     procedure run; override;
   end;
 
-procedure tHashTest.run();
+procedure tMD5Test.run();
 begin
 
   {helpers}
@@ -220,5 +220,5 @@ begin
 end;
 
 initialization
-  tHashTest.create('Hash');
+  tMD5Test.create('MD5');
 end.

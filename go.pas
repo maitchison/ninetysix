@@ -35,8 +35,12 @@ uses
   diff,
   utils,
   hashMap,
-  myHash,
+  md5,
+  list,
   dos;
+
+var
+  newLines, oldLines: tLines;
 
 // not sure if needed, but wait for external filesystem to catch up.
 procedure fsWait();
@@ -90,143 +94,6 @@ begin
   safeCopy('$rep\HEAD');
 
 end;
-
-{----------------------------------------------------}
-{ tSlice }
-{----------------------------------------------------}
-
-type
-  {A python style sliced array}
-  tSlice = record
-    {[startPos..endPos)}
-    startPos,endPos: int32;
-    data: tDwords;
-    constructor create(const data: array of dword);
-    function len: int32;
-    function slice(aStartPos, aEndPos: int32): tSlice;
-    procedure append(x: dword);
-    function clone(): tSlice;
-    function head: dWord;
-    function tail: tSlice;
-
-    function toString: string;
-
-    function getItem(index: int32): dword;
-    procedure setItem(index: int32;value:dword);
-
-    property items[index: int32]: dWord read getItem write setItem; default;
-    class operator add(a: tSlice;b: dword): tSlice;
-
-  private
-    function deref(index: int32): int32;
-
-  end;
-
-var
-  newLines, oldLines: tLines;
-
-function tSlice.toString: string;
-var
-  i: int32;
-begin
-  result := '[';
-  for i := startPos to endPos-1 do
-    result += intToStr(data[i]) + ',';
-  result[length(result)] := ']';
-end;
-
-function tSlice.deref(index: int32): int32;
-begin
-  if index < 0 then index += endPos else index += startPos;
-  result := index;
-end;
-
-function tSlice.head: dWord;
-begin
-  result := self[-1];
-end;
-
-function tSlice.tail: tSlice;
-begin
-  result := slice(0, -1);
-end;
-
-class operator tSlice.add(a: tSlice;b: dword): tSlice;
-begin
-  result := a.clone();
-  result.append(b);
-end;
-
-
-function tSlice.getItem(index: int32): dword;
-begin
-  result := data[deref(index)];
-end;
-
-procedure tSlice.setItem(index: int32;value:dWord);
-begin
-  data[deref(index)] := value;
-end;
-
-
-constructor tSlice.create(const data: array of dword);
-var
-  i: int32;
-begin
-  startPos := 0;
-  endPos := 0;
-  for i := 0 to length(data)-1 do
-    append(data[i]);
-end;
-
-function tSlice.len: int32;
-begin
-  result := endPos-startPos;
-end;
-
-procedure tSlice.append(x: dword);
-begin
-  {note: this is not a good way to handle append, maybe a different
-    'stringbuilder' like class}
-  if (startPos = 0) and (endPos = length(self.data)) then begin
-    setLength(self.data, length(self.data)+1);
-    data[length(self.data)-1] := x;
-    inc(endPos);
-  end else begin
-    {cannot append to non-trivial slice}
-    error(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
-  end;
-
-end;
-
-{create a sliced copy}
-function tSlice.slice(aStartPos, aEndPos: int32): tSlice;
-begin
-  aStartPos := deref(aStartPos);
-  aEndPos := deref(aEndPos);
-  if (aStartPos < 0) or (aStartPos >= length(data)) then runError(201);
-  if (aEndPos < 0) or (aEndPos >= length(data)) then runError(201);
-  if aStartPos > aEndPos then runError(201);
-  result.startPos := aStartPos;
-  result.endPos := aEndPos;
-  result.data := self.data;
-end;
-
-{create a copy of this slice without any slicing}
-function tSlice.clone(): tSlice;
-var
-  i: int32;
-begin
-  result.startPos := 0;
-  result.endPos := len;
-  result.data := nil;
-  setLength(result.data, len);
-  for i := 0 to len-1 do
-    result.data[i] := self.data[startPos+i];
-end;
-
-
-{-----------------------------------------------------}
 
 var
   LINES_SINCE_PAGE: byte = 0;
@@ -292,12 +159,12 @@ begin
 end;
 
 {output the longest common subsequence.}
-procedure printDif(newLines,oldLines: tLines;matching: tSlice);
+procedure printDif(newLines,oldLines: tLines;matching: tList);
 var
   i,j,k,z: int32;
   map: tHashMap;
   hash: word;
-  oldS,newS: tSlice;
+  oldS,newS: tList;
   new,old,cur: string;
   linesRemoved: int32;
   linesAdded: int32;
@@ -346,11 +213,11 @@ begin
   {which lines in old file should be shown for context}
   fillchar(importantLines, sizeof(importantLines), false);
 
-  oldS := tSlice.create([]);
+  oldS := tList.create([]);
   for i := 1 to length(oldLines) do
     oldS.append(i);
 
-  newS := tSlice.create([]);
+  newS := tList.create([]);
   for i := 1 to length(newLines) do
     newS.append(i);
 
@@ -478,45 +345,13 @@ begin
 
 end;
 
-procedure testSlice();
-var
-  slice: tSlice;
-begin
-  slice := tSlice.create([1,2,3,4,5,6]);
-  assertEqual(slice.len, 6);
-  assertEqual(slice[0], 1);
-  assertEqual(slice[-1], 6);
-  assertEqual(slice[-2], 5);
-
-  slice := slice.slice(2,3);
-  assertEqual(slice.len, 1);
-  assertEqual(slice[0], 3);
-
-  slice := slice + 22;
-  assertEqual(slice.len, 2);
-  assertEqual(slice[-1], 22);
-  assertEqual(slice[-2], 3);
-
-  slice := slice.clone();
-  assertEqual(slice.len, 2);
-  assertEqual(slice[-1], 22);
-  assertEqual(slice[-2], 3);
-  assertEqual(length(slice.data), 2);
-
-end;
-
-procedure runTests();
-begin
-  testSlice();
-end;
-
 var
   msg: string;
 
 procedure benchmark();
 var
   startTime, elapsed: double;
-  merge: tSlice;
+  merge: tList;
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
@@ -538,7 +373,7 @@ begin
   sln := diff.run(new, old);
   elapsed := getSec-startTime;
 
-  merge := tSlice.create([]);
+  merge := tList.create([]);
   for i := 0 to length(sln)-1 do
     merge.append(sln[i]);
   writeln(merge.toString);
@@ -557,7 +392,7 @@ end;
 
 procedure diff(filename: string);
 var
-  merge: tSlice;
+  merge: tList;
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
@@ -570,7 +405,7 @@ begin
   diff := tDiff.create();
 
   sln := diff.run(new, old);
-  merge := tSlice.create([]);
+  merge := tList.create([]);
   for i := 0 to length(sln)-1 do
     merge.append(sln[i]);
   printDif(new, old, merge);
@@ -732,9 +567,6 @@ var
   command: string;
 
 begin
-
-  {todo: move this to the new system}
-  runTests();
 
   test.runTestSuites();
 
