@@ -46,7 +46,7 @@ type
 
   tCheckpoint = class
     messageText: string;
-    username: string;
+    author: string;
     date: tDateTime;
     fileList: array of tFileRef;
     constructor create();
@@ -161,7 +161,8 @@ begin
 
   if files.contains('message.txt') then begin
     messageText := loadString(path+'message.txt');
-    username := 'matthew';
+    author := 'matthew';
+    date := tMyDateTime.FromDosTC(fileModifiedTime(path+'message.txt'));
   end else begin
     messageText := '- no message text - ';
   end;
@@ -187,6 +188,8 @@ begin
 
   t.writeSection('commit');
   t.writeString('message', messageText);
+  t.writeString('author', author);
+  t.writeFloat('date', date);
   t.writeBlank();
 
   for fileRef in fileList do

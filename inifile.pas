@@ -59,7 +59,7 @@ end;
 
 procedure tIniFile.writeFloat(name: string; value: double);
 begin
-  writeln(t, format('%s=%f', [name, value]));
+  writeln(t, format('%s=%.9f', [name, value]));
 end;
 
 procedure tIniFile.writeString(name: string; value: string);

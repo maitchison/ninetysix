@@ -38,6 +38,8 @@ type
     class operator Implicit(AValue: TMyDateTime): TDateTime;
     class operator Add(a,b: TMyDateTime): TMyDateTime;
 
+    class function FromDosTC(dosTime: dword): tMyDateTime; static;
+
     function YYMMDD(sep: string='-'): string;
     function HHMMSS(sep: string=':'): string;
   end;
@@ -121,7 +123,7 @@ function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double; inline;
-function  fileModifiedTime(fileName: string): longint;
+function  fileModifiedTime(fileName: string): dword;
 
 procedure dumpString(s: string; filename: string);
 function  loadString(filename: string): string;
@@ -726,8 +728,8 @@ begin
   result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
 end;
 
-{returns timestamp for file modified time, or -1 if file not found.}
-function fileModifiedTime(fileName: string): longint;
+{returns timestamp for file modified time, or 0 if file not found.}
+function fileModifiedTime(fileName: string): dword;
 var
   f: file;
   t: longint;
@@ -737,7 +739,7 @@ begin
   reset(f);
   {$I+}
   if IOResult <> 0 then
-    exit(-1);
+    exit(0);
   getFTime(f, t);
   close(f);
   exit(t);
@@ -889,6 +891,28 @@ begin
   hour := time mod 24;
 end;
 
+class function TMyDateTime.FromDosTC(dosTime: dword): tMyDateTime;
+var
+  DosDate, DosTimePart: Word;
+  Year, Month, Day: Word;
+  Hour, Minute, Second: Word;
+
+begin
+  DosDate := dosTime shr 16;
+  DosTimePart := dosTime and $ffff;
+
+  // Decode the date
+  Year := 1980 + (DosDate shr 9);       // Bits 15-9
+  Month := (DosDate shr 5) and $0F;     // Bits 8-5
+  Day := DosDate and $1F;               // Bits 4-0
+
+  // Decode the time
+  Hour := DosTimePart shr 11;           // Bits 15-11
+  Minute := (DosTimePart shr 5) and $3F;// Bits 10-5
+  Second := (DosTimePart and $1F) * 2;  // Bits 4-0
+
+  result := encodeDate(Year, Month, Day) + encodeTime(Hour, Minute, Second, 0);
+end;
 
 function TMyDateTime.YYMMDD(sep: string='-'): string;
 var
