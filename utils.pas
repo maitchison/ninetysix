@@ -123,6 +123,9 @@ function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double; inline;
 function  fileModifiedTime(fileName: string): longint;
 
+procedure dumpString(s: string; filename: string);
+function  loadString(filename: string): string;
+
 function  getTickCount(): int64;
 function  getMSCount(): int64;
 
@@ -738,6 +741,29 @@ begin
   getFTime(f, t);
   close(f);
   exit(t);
+end;
+
+
+procedure dumpString(s: string; filename: string);
+var
+  t: text;
+begin
+  assign(t, filename);
+  rewrite(t);
+  writeln(t, s);
+  close(t);
+end;
+
+function loadString(filename: string): string;
+var
+  t: text;
+  s: string;
+begin
+  assign(t, filename);
+  reset(t);
+  readln(t, s);
+  close(t);
+  result := s;
 end;
 
 {interleave pos and negative numbers into a whole number}

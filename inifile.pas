@@ -21,6 +21,7 @@ type
     procedure writeString(name: string; value: string);
     procedure writeSection(name: string);
     procedure writeObject(name: string; value: tObject);
+    procedure writeBlank();
 
     constructor Create(filename: string);
     destructor Destroy(); override;
@@ -71,6 +72,11 @@ begin
   writeln(t, format('[%s]', [name]));
 end;
 
+procedure tIniFile.writeBlank();
+begin
+  writeln(t);
+end;
+
 {writes object out to text file}
 procedure tIniFile.writeObject(name: string; value: tObject);
 var
@@ -107,7 +113,7 @@ begin
     freeMem(pp);
   end;
 
-  writeln(t);
+  writeBlank();
 end;
 
 {----------------------------------------------}

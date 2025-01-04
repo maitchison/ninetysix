@@ -35,7 +35,7 @@ type
   public
 
     constructor create(path: string);
-    function toString(): string;
+    function toString(): string; override;
   end;
 
   {a database of object files}
@@ -45,6 +45,9 @@ type
   end;
 
   tCheckpoint = class
+    messageText: string;
+    username: string;
+    date: tDateTime;
     fileList: array of tFileRef;
     constructor create();
     procedure reset();
@@ -144,7 +147,6 @@ var
   filename: string;
   fileRef: tFileRef;
   files: tStringList;
-  t: tIniFile;
   i: integer;
 begin
 
@@ -156,6 +158,13 @@ begin
   // get all files in folder
   files := fsListFiles(path+'*.*');
   setLength(fileList, files.len);
+
+  if files.contains('message.txt') then begin
+    messageText := loadString(path+'message.txt');
+    username := 'matthew';
+  end else begin
+    messageText := '- no message text - ';
+  end;
 
   // create file reference for each one (including hash)
   for i := 0 to files.len-1 do begin
@@ -175,6 +184,11 @@ var
   fileRef: tFileRef;
 begin
   t := tIniFile.create(path);
+
+  t.writeSection('commit');
+  t.writeString('message', messageText);
+  t.writeBlank();
+
   for fileRef in fileList do
     t.writeObject('file', fileRef);
   t.free();
@@ -185,13 +199,17 @@ var
   checkpoint: tCheckpoint;
   folders: tStringList;
   folder: string;
+  counter: integer;
 begin
   checkpoint := tCheckpoint.create();
 
   folders := fsListFolders('$REP');
+  counter := 0;
   for folder in folders do begin
     checkpoint.loadV1('$REP\'+folder);
     checkpoint.writeOut('repo\'+folder+'.txt');
+    inc(counter);
+    if counter > 10 then exit;
   end;
 
   checkpoint.free;
