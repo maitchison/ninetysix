@@ -29,7 +29,6 @@ type
 
     property path: string read fPath write fPath;
     property hash: string read fHash write fHash;
-    property size: int64 read fSize write fSize;
     property modified: int32 read fModified write fModified;
 
   public
@@ -314,8 +313,8 @@ begin
     if files[i] = 'message.txt' then continue;
     {not: no subfolder support yet, but we'll add it here}
     fileRef := tFileRef.create(files[i], path);
-    if fileRef.size > MAX_FILESIZE then begin
-      warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.size/1024]));
+    if fileRef.fSize > MAX_FILESIZE then begin
+      warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.fSize/1024]));
       fileRef.free;
       continue;
     end;

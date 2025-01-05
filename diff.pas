@@ -1,9 +1,15 @@
 {Unit for finding diffs between two files}
 unit diff;
 
+{helps a lot with performance}
+{$R-,Q-}
+{$OPTIMIZATION ON, LEVEL3}
+
 {$MODE delphi}
 
 interface
+
+
 
 {todo: support LCS accross a line aswell}
 
@@ -159,10 +165,13 @@ end;
 
 {returns the length of the longest common subsequence between a[:i], and b[:i]}
 function tDiff.solve(i,j: int32): int32;
+var
+  u,v: int32;
 begin
 
   {lookup cache}
   result := getScore(i,j);
+
   if result >= 0 then
     exit(result);
 
@@ -176,13 +185,14 @@ begin
   if a[i-1] = b[j-1] then begin
     result := solve(i-1,j-1)+1;
   end else begin
-    result := max(solve(i, j-1), solve(i-1, j));
+    u := solve(i, j-1);
+    v := solve(i-1, j);
+    if u > v then result := u else result := v;
   end;
 
   {...and store the result}
-  setScore(i, j ,result);
+  setScore(i, j, result);
 end;
-
 
 procedure tDiff.debugPrintPaths();
 var
