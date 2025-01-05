@@ -158,6 +158,14 @@ function tDiff.run(newLines, oldLines: tLines): tLineRefs;
 var
   m,n: int32;
 begin
+
+  {special cases for empty files }
+  if (length(oldLines) = 0) or (length(newLines) = 0) then begin
+    {new file, no lines match}
+    setLength(result, 0);
+    exit;
+  end;
+
   init(newLines, oldLines);
   solve(length(a), length(b));
   result := extractSolution();

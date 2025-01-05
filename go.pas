@@ -40,8 +40,123 @@ uses
   filesystem,
   dos;
 
+type
+  tDiffStats = record
+    files: int32;
+    added: int64;
+    removed: int64;
+    changed: int64;
+    function net: int64;
+    procedure print();
+    procedure clear();
+
+    class operator add(a,b: tDiffStats): tDiffStats;
+  end;
+
+{--------------------------------------------------------}
+
 var
   newLines, oldLines: tLines;
+  totalStats: tDiffStats;
+
+var
+  LINES_SINCE_PAGE: byte = 0;
+  SILENT: boolean = false;
+  USE_PAGING: boolean = true;
+  PAUSE_AT_END: boolean = false;
+
+{--------------------------------------------------------}
+{ helpers }
+{--------------------------------------------------------}
+
+function textRows: byte;
+begin
+  result := mem[$0040:$0084]+1;
+end;
+
+procedure output(s: string);
+begin
+  {todo: detect line wrap}
+  if SILENT then exit;
+  write(s);
+end;
+
+{outputs a line of text, with support for paging}
+procedure outputLn(s: string);
+begin
+  if SILENT then exit;
+  writeln(s);
+
+
+  if not USE_PAGING then exit;
+
+  inc(LINES_SINCE_PAGE);
+  if LINES_SINCE_PAGE+2 >= textRows() then begin
+    textAttr := WHITE;
+    write('                            ---- Continue -----');
+    case readkey of
+      'q': USE_PAGING := false;
+      // done, or down... i.e. go to bottom and wait.
+      'd': begin USE_PAGING := false; PAUSE_AT_END := true; end;
+      #27: halt;
+    end;
+    LINES_SINCE_PAGE := 0;
+    writeln();
+  end;
+end;
+
+procedure outputX(a: string; b: string; c: string; col: byte);
+var
+  oldTextAttr: byte;
+begin
+  oldTextAttr := textAttr;
+  textAttr := LIGHTGRAY;
+  output(a);
+  textAttr := col;
+  output(b);
+  textAttr := LIGHTGRAY;
+  outputln(c);
+  textAttr := oldTextAttr;
+end;
+
+{--------------------------------------------------------}
+
+function tDiffStats.net: int64;
+begin
+  result := added - removed;
+end;
+
+procedure tDiffStats.clear();
+begin
+  files := 0;
+  added := 0;
+  removed := 0;
+  changed := 0;
+end;
+
+procedure tDiffStats.print();
+var
+  plus: string;
+begin
+  if net > 0 then plus := '+' else plus := '';
+  if added > 0 then
+    outputX('Added   ', lpad(intToStr(added), 4),   ' lines.', LIGHTGREEN);
+  if removed > 0 then
+    outputX('Removed ', lpad(intToStr(removed), 4), ' lines.', LIGHTRED);
+  if changed > 0 then
+    outputX('Changed ', lpad(intToStr(changed), 4), ' lines.', CYAN);
+  outputX('Net     ',   lpad(plus+intToStr(net), 4),' lines.', YELLOW);
+end;
+
+class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
+begin
+  result.files := a.files + b.files;
+  result.added := a.added + b.added;
+  result.removed := a.removed + b.removed;
+  result.changed := a.changed + b.changed;
+end;
+
+{--------------------------------------------------------}
 
 // not sure if needed, but wait for external filesystem to catch up.
 procedure fsWait();
@@ -96,49 +211,6 @@ begin
 
 end;
 
-var
-  LINES_SINCE_PAGE: byte = 0;
-
-function textRows: byte;
-begin
-(*
-  asm
-    pushad
-    mov ax, $0300
-    mov bh, 0
-    int $10
-    inc dl
-    mov [result], dl
-    popad
-    end;
-  *)
-  result := mem[$0040:$0084]+1;
-end;
-
-
-procedure output(s: string);
-begin
-  {todo: detect line wrap}
-  write(s);
-end;
-
-{outputs a line of text, with support for paging}
-procedure outputLn(s: string);
-begin
-  writeln(s);
-  inc(LINES_SINCE_PAGE);
-  if LINES_SINCE_PAGE+2 >= textRows() then begin
-    textAttr := 15;
-    write('---- Continue -----');
-    case readkey of
-      #27: halt;
-      'q': halt;
-    end;
-    LINES_SINCE_PAGE := 0;
-    writeln();
-  end;
-end;
-
 {-----------------------------------------------------}
 
 function readFile(filename: string): tLines;
@@ -147,6 +219,9 @@ var
   line: string;
   lines: tLines;
 begin
+
+  if not fs.exists(filename) then exit(nil);
+
   assign(t, filename);
   reset(t);
   lines := nil;
@@ -159,57 +234,73 @@ begin
   result := lines;
 end;
 
-{output the longest common subsequence.}
-procedure printDif(newLines,oldLines: tLines;matching: tIntList);
+{output the longest common subsequence. Returns stats}
+function processDiff(newLines,oldLines: tLines;matching: tIntList): tDiffStats;
+
 var
   i,j,k,z: int32;
   map: tHashMap;
   hash: word;
   oldS,newS: tIntList;
   new,old,cur: string;
-  linesRemoved: int32;
-  linesAdded: int32;
   isFirst: boolean;
-  netLines: int32;
   plus: string;
   clock: int32;
-
 var
   importantLines: array[0..1024-1] of boolean;
 
-procedure markImportant(pos: int32);
-var
-  i: int32;
-begin
-
-  for i := pos-2 to pos+2 do
-    if (i >= 0) and (i < 1024) then
-      importantLines[i] := true;
-end;
-
-function fix(s: string): string;
-var
-  i: integer;
-  c: byte;
-begin
-  result := '';
-  for i := 1 to length(s) do begin
-    c := ord(s[i]);
-    if c = 9 then
-      result += '  '
-    else if (c < 32) or (c >= 128) then
-      result += '#('+intToStr(c)+')'
-    else
-      result += chr(c);
+  procedure markImportant(pos: int32);
+  var
+    i: int32;
+  begin
+    for i := pos-2 to pos+2 do
+      if (i >= 0) and (i < 1024) then
+        importantLines[i] := true;
   end;
 
-  if length(result) > 60 then begin
-    setLength(result,60);
-    result += '...';
+  function fix(s: string): string;
+  var
+    i: integer;
+    c: byte;
+  begin
+    result := '';
+    for i := 1 to length(s) do begin
+      c := ord(s[i]);
+      if c = 9 then
+        result += '  '
+      else if (c < 32) or (c >= 128) then
+        result += '#('+intToStr(c)+')'
+      else
+        result += chr(c);
+    end;
+
+    if length(result) > 60 then begin
+      setLength(result,60);
+      result += '...';
+    end;
   end;
-end;
+
+  procedure processTail();
+  begin
+    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
+      textAttr := LIGHTRED;
+      outputLn(intToStr(j, 4, '0')+' [-] '+fix(oldLines[j]));
+      inc(j);
+      inc(result.removed);
+    end;
+
+    while (i < length(newLines)) and (newLines[i] <> cur) do begin
+      textAttr := LIGHTGREEN;
+      outputLn('     [+] '+fix(newLines[i]));
+      inc(i);
+      inc(result.added);
+    end;
+  end;
 
 begin
+
+  result.clear();
+  result.files := 1;
 
   {which lines in old file should be shown for context}
   fillchar(importantLines, sizeof(importantLines), false);
@@ -222,10 +313,9 @@ begin
   for i := 1 to length(newLines) do
     newS.append(i);
 
-  {fast path for identical files}
-
+  {detect identical files}
   if matching.len = max(oldS.len, newS.len) then begin
-    textAttr := 15;
+    textAttr := WHITE;
     outputLn('Files are identical.');
     exit;
   end;
@@ -265,16 +355,12 @@ begin
     end;
   end;
 
-
   {------------------------------------}
 
   i := 0;
   j := 0;
   k := 0;
   clock := 0;
-
-  linesAdded := 0;
-  linesRemoved := 0;
 
   outputLn('');
 
@@ -285,7 +371,7 @@ begin
     cur := oldLines[matching[k]-1];
     isFirst := true;
 
-    textAttr := 7; // light gray
+    textAttr := LIGHTGRAY;
 
     while (newLines[i] = cur) and (oldLines[j] = cur) do begin
       if isFirst then begin
@@ -294,17 +380,17 @@ begin
 
       if (j > 0) and (j < length(importantLines)) and (not importantLines[j-1]) and (importantLines[j]) then begin
         {chunk header}
-        textAttr := 8;
+        textAttr := DARKGRAY;
         for z := 1 to 14 do
           output(' ');
         for z := 1 to 55 do
           output(chr(196));
         outputLn('');
-        textAttr := 7; //cyan}
+        textAttr := LIGHTGRAY;
       end;
 
       if (j < length(importantLines)) and importantLines[j] then
-        outputLn(intToStr(j, 4, '0')+'     '+fix(cur));
+        outputLn(intToStr(j, 4, '0')+' [ ] '+fix(cur));
 
       inc(i);
       inc(j);
@@ -317,32 +403,13 @@ begin
         break;
       end;
     end;
-
-    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
-      textAttr := 12; // light red
-      outputLn(intToStr(j, 4, '0')+' [-] '+fix(oldLines[j]));
-      inc(j);
-      inc(linesRemoved);
-    end;
-
-    while (i < length(newLines)) and (newLines[i] <> cur) do begin
-      textAttr := 10; // light green
-      outputLn('     [+] '+fix(newLines[i]));
-      inc(i);
-      inc(linesAdded);
-    end;
-
+    processTail();
   end;
 
-  netLines := linesAdded-linesRemoved;
-  if netLines > 0 then plus := '+' else plus := '';
+  processTail();
 
   outputLn('');
-  textAttr := 15; // white
-  outputLn('Added '+intToStr(linesAdded)+' lines.');
-  outputLn('Removed '+intToStr(linesRemoved)+' lines.');
-  outputLn('Net '+plus+intToStr(netLines)+' lines.');
-  outputLn('Total lines changed '+intToStr(linesAdded+linesRemoved)+' lines.');
+  textAttr := WHITE;
 
 end;
 
@@ -379,8 +446,6 @@ begin
     merge.append(sln[i]);
   writeln(merge.toString);
 
-  {printDif(new, old, merge);}
-
   writeln('final score -> ',diff.scores[(length(new)*length(old))-1]);
 
   writeln(format('Took %f seconds', [elapsed]));
@@ -390,7 +455,7 @@ begin
   writeln('NM         ',length(new)*length(old));
 end;
 
-procedure diff(filename: string);
+function runDiff(filename: string): tDiffStats;
 var
   merge: tIntList;
   sln: tLineRefs;
@@ -398,7 +463,6 @@ var
   diff: tDiff;
   i: integer;
 begin
-  {for the moment just show diff on go.pas}
   new := readFile(filename);
   old := readFile('$rep/head/'+filename);
 
@@ -408,7 +472,7 @@ begin
   merge := tIntList.create([]);
   for i := 0 to length(sln)-1 do
     merge.append(sln[i]);
-  printDif(new, old, merge);
+  result := processDiff(new, old, merge);
 end;
 
 procedure promptAndCommit();
@@ -506,31 +570,64 @@ begin
 end;
 
 {show all diff on all modified files}
-procedure diffOnModified();
+procedure diffOnWorkspace();
 var
   workingSpaceFiles: tStringList;
   headFiles: tStringList;
   filename: string;
-  changed: int32;
+  fileStats: tDiffStats;
+  stats: tDiffStats;
 begin
+
+  totalStats.clear();
+
   workingSpaceFiles := getSourceFiles('');
   headFiles := getSourceFiles('$rep\head\');
-  changed := 0;
+
+  fileStats.clear();
 
   outputLn('');
 
+  for filename in headFiles do begin
+    if workingSpaceFiles.contains(filename) then continue;
+    textAttr := WHITE;
+    outputLn('----------------------------------------');
+    outputX (' Removed ',filename, '', LIGHTRED);
+    outputLn('----------------------------------------');
+    stats := runDiff(filename);
+    inc(fileStats.removed);
+  end;
+
   for filename in workingSpaceFiles do begin
     if not headFiles.contains(filename) then begin
+      textAttr := WHITE;
+      outputLn('----------------------------------------');
+      outputX (' Added ',filename, '', LIGHTGREEN);
+      outputLn('----------------------------------------');
+      stats := runDiff(filename);
+      inc(fileStats.added);
     end else begin
       if wasModified(filename, '$rep\head\'+filename) then begin
+        textAttr := WHITE;
         outputLn('----------------------------------------');
-        outputLn('Modifications to '+filename);
-        diff(filename);
+        outputX (' Modified ', filename, '', YELLOW);
+        outputLn('----------------------------------------');
+        stats := runDiff(filename);
+        textAttr := WHITE;
+        //outputln(filename+':');
+        totalStats += stats;
+        inc(fileStats.changed);
       end;
     end;
   end;
 
-  textattr := 15;
+  {todo: put summary here}
+
+  textAttr := WHITE;
+  outputLn('----------------------------------------');
+  outputln(' Total');
+  outputLn('----------------------------------------');
+  totalStats.print();
 end;
 
 
@@ -541,8 +638,11 @@ var
 
 begin
 
+  totalStats.clear();
+
   // screen is hard to read due to a dosbox-x bug, so we clear it
   // for visibility.
+  textAttr := WHITE;
   clrscr;
 
   if (paramCount = 0) then
@@ -551,7 +651,7 @@ begin
     command := paramSTR(1);
 
   if command = 'diff' then
-    diffOnModified()
+    diffOnWorkspace()
   else if command = 'commit' then
     promptAndCommit()
   else if command = 'benchmark' then
@@ -560,5 +660,9 @@ begin
     status()
   else
     Error('Invalid command "'+command+'"');
+
+  textAttr := WHITE;
+
+  if PAUSE_AT_END then readkey;
 
 end.

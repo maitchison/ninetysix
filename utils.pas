@@ -118,9 +118,9 @@ function split(s: string; c: char; var left: string; var right: string): boolean
 function negDecode(x: dword): int32; inline;
 function negEncode(x: int32): dword; inline;
 
-function bytesForBits(x: int32): int32;
-function toBytes(x: array of dword): tBytes; overload;
-function toBytes(x: array of word): tBytes; overload;
+function  bytesForBits(x: int32): int32;
+function  toBytes(x: array of dword): tBytes; overload;
+function  toBytes(x: array of word): tBytes; overload;
 
 procedure Wait(ms: integer);
 function  RND(): byte; assembler; register;
