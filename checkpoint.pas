@@ -143,7 +143,7 @@ end;
 {full path to file}
 function tFileRef.fqn: string;
 begin
-  result := concatPath(fRoot, fPath);
+  result := joinPath(fRoot, fPath);
 end;
 
 {calculates the hash for this file (not done by default)}
@@ -190,7 +190,7 @@ begin
     exit(false);
   note(format(' -adding object %s <- %s',[copy(hash, 1, 8), objectPath]));
   srcFile := objectPath;
-  dstFile := concatPath(root, hash);
+  dstFile := joinPath(root, hash);
   fs.copyFile(srcFile, dstFile);
   fs.setModified(dstFile, fs.getModified(srcFile));
 
@@ -241,7 +241,7 @@ var
   i: integer;
 begin
   clear();
-  fileList := FS.listFiles(concatPath(root, '*.*'));
+  fileList := FS.listFiles(joinPath(root, '*.*'));
   setLength(files, fileList.len);
   for i := 0 to fileList.len-1 do begin
     files[i] := tFileRef.create(fileList[i], root);
@@ -257,7 +257,7 @@ begin
   fileList := nil;
   clear();
   repoFolder := aRepoFolder;
-  objectStore := tObjectStore.create(concatPath(repoFolder, 'store'));
+  objectStore := tObjectStore.create(joinPath(repoFolder, 'store'));
 end;
 
 destructor tCheckpointManager.destroy();
@@ -307,7 +307,7 @@ begin
   if files.contains('message.txt') then begin
     message := loadString(path+'message.txt');
     author := 'matthew';
-    date := tMyDateTime.FromDosTC(FS.getModified(concatPath(path, 'message.txt')));
+    date := tMyDateTime.FromDosTC(FS.getModified(joinPath(path, 'message.txt')));
   end else begin
     message := '- no message text - ';
   end;
@@ -338,8 +338,8 @@ var
 begin
   fs.mkdir(dstFolder);
   for fileRef in fileList do begin
-    dstFile := concatPath(dstFolder, fileRef.path);
-    srcFile := concatPath(objectStore.root, fileRef.hash);
+    dstFile := joinPath(dstFolder, fileRef.path);
+    srcFile := joinPath(objectStore.root, fileRef.hash);
     {todo: support subfolders}
     fs.copyFile(srcFile, dstFile);
     fs.setModified(dstFile, fileRef.modified);
@@ -354,7 +354,7 @@ end;
 {returns path to checkpoint file}
 function tCheckpointManager.getCheckpointPath(checkpointName: string): string;
 begin
-  result := concatPath(repoFolder, checkpointName)+'.txt';
+  result := joinPath(repoFolder, checkpointName)+'.txt';
 end;
 
 function tCheckpointManager.objectFactory(s: string): tObject;
@@ -373,13 +373,19 @@ var
   currentFileRef: tFileRef;
   reader: tINIReader;
   obj: tObject;
+  checkpointPath: string;
 
 begin
+
+  checkpointPath := getCheckpointPath(checkpointName);
+  if not fs.exists(checkpointPath) then
+    error(format('Checkpoint "%s" does not exist.', [checkpointPath]));
+
   currentFileRef := nil;
 
   clear();
 
-  reader := tINIReader.create(getCheckpointPath(checkpointName), objectFactory);
+  reader := tINIReader.create(checkpointPath, objectFactory);
 
   while not reader.eof do begin
     obj := reader.readObject();

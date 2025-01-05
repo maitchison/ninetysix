@@ -69,6 +69,10 @@ var
   USE_PAGING: boolean = true;
   PAUSE_AT_END: boolean = false;
 
+var
+  WORKSPACE: string = '';
+  HEAD: string = '$rep\HEAD\';
+
 {--------------------------------------------------------}
 { helpers }
 {--------------------------------------------------------}
@@ -500,6 +504,7 @@ begin
   writeln('NM         ',length(new)*length(old));
 end;
 
+{todo: make paths fully qualified, and drop HEAD, WORKSPACE here}
 function runDiff(filename: string; otherFilename: string=''; printOutput: boolean=true): tDiffStats;
 var
   merge: tIntList;
@@ -515,8 +520,8 @@ begin
 
   if otherFilename = '' then otherFilename := filename;
 
-  new := readFile(filename);
-  old := readFile('$rep/head/'+otherFilename);
+  new := readFile(joinPath(WORKSPACE, filename));
+  old := readFile(joinPath(HEAD, otherFilename));
 
   diff := tDiff.create();
 
@@ -534,24 +539,6 @@ begin
   write('Message:');
   readln(msg);
   commit(msg);
-end;
-
-function wasModified(file1, file2: string): boolean;
-var
-  t1,t2: longint;
-  f1,f2: file;
-begin
-  t1 := 0;
-  t2 := 0;
-  assign(f1, file1);
-  assign(f2, file2);
-  reset(f1);
-  reset(f2);
-  getFTime(f1, t1);
-  getFTime(f2, t2);
-  close(f1);
-  close(f2);
-  result := t1 <> t2;
 end;
 
 function getSourceFiles(path: string): tStringList;
@@ -576,7 +563,7 @@ var
 begin
   result := '';
 
-  ourFileSize := fs.fileSize(originalFile);
+  ourFileSize := fs.fileSize(joinPath(WORKSPACE, originalFile));
 
   // we don't check very small files
   if ourFileSize < 64 then exit;
@@ -584,7 +571,7 @@ begin
   for filename in filesToCheck do begin
     // do not check ourselves
     if filename = originalFile then continue;
-    fileSizeRatio := fs.fileSize(concatPath('$rep\head\', filename)) / ourFileSize;
+    fileSizeRatio := fs.fileSize(joinPath(HEAD, filename)) / ourFileSize;
     //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
     if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
     stats := runDiff(originalFile, filename, false);
@@ -610,8 +597,8 @@ begin
 
   writeln();
   renamedFiles.clear();
-  workingSpaceFiles := getSourceFiles('');
-  headFiles := getSourceFiles('$rep\head\');
+  workingSpaceFiles := getSourceFiles(WORKSPACE);
+  headFiles := getSourceFiles(HEAD);
   added := 0;
   removed := 0;
   changed := 0;
@@ -641,10 +628,9 @@ begin
       output(pad('[+] added ' + filename, 40, ' '));
       stats.printShort();
       outputln('');
-
       inc(added);
     end else begin
-      if wasModified(filename, '$rep\head\'+filename) then begin
+      if fs.wasModified(joinPath(WORKSPACE, filename), joinPath(HEAD, filename)) then begin
         textattr := WHITE;
         stats := runDiff(filename, filename, false);
         output(pad('[~] modified ' + filename, 40, ' '));
@@ -688,8 +674,8 @@ begin
 
   totalStats.clear();
 
-  workingSpaceFiles := getSourceFiles('');
-  headFiles := getSourceFiles('$rep\head\');
+  workingSpaceFiles := getSourceFiles(WORKSPACE);
+  headFiles := getSourceFiles(HEAD);
 
   fileStats.clear();
 
@@ -737,7 +723,7 @@ begin
       totalStats += stats;
       inc(fileStats.added);
     end else begin
-      if not wasModified(filename, '$rep\head\'+filename) then continue;
+      if not fs.wasModified(joinPath(WORKSPACE, filename), joinPath(HEAD, filename)) then continue;
       textAttr := WHITE;
       outputLn('----------------------------------------');
       outputX (' Modified ', filename, '', YELLOW);
@@ -770,38 +756,59 @@ var
   checkpoint: string;
   previousCheckpoint: string;
   folderA, folderB: string;
+  counter: int32;
 
 begin
+
+  textAttr := WHITE;
+
   cpm := tCheckpointManager.create('$repo');
 
-  checkpoints := fs.listFiles('$repo');
+  checkpoints := fs.listFiles('$repo\*.txt');
   checkpoints.sort();
 
+  writeln('performing setup');
+
   previousCheckpoint := '';
-  folderA := concatPath('$repo', 'a');
-  folderB := concatPath('$repo', 'b');
+  folderA := joinPath('$repo', 'a');
+  folderB := joinPath('$repo', 'b');
   fs.delFolder(folderA);
   fs.delFolder(folderB);
   fs.mkdir(folderA);
 
+  writeln('setup complete');
+
+  WORKSPACE := folderA;
+  HEAD := folderB;
+
+  counter := 0;
+
   for checkpoint in checkpoints do begin
+
+    writeln('processing '+checkpoint);
     {exclude any folders not matching the expected format}
     {expected format is yyyymmdd_hhmmss
     {which I had regex here...}
     if not checkpoint.endsWith('.txt', True) then continue;
+
+    {folderA is the newer checkpoint}
 
     {del old folder}
     fs.delFolder(folderB);
 
     {swap new to old}
     fs.rename(folderA, folderB);
+    fs.mkdir(folderA);
 
     {export new folder}
     cpm.load(removeExtension(checkpoint));
     cpm.exportToFolder(folderA);
 
     // stub
-    break;
+    if counter > 3 then
+      break;
+    counter += 1;
+
   end;
   cpm.free;
 end;

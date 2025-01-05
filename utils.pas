@@ -98,7 +98,7 @@ function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
 function extractFilename(const path: string): string;
 function extractPath(const path: string): string;
-function concatPath(const path, filename: string): string;
+function joinPath(const path, filename: string): string;
 function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
@@ -505,8 +505,10 @@ begin
   result := copy(path, 1, length(path) - length(filename));
 end;
 
-function concatPath(const path, filename: string): string;
+function joinPath(const path, filename: string): string;
 begin
+  if path = '' then exit(filename);
+  if filename = '' then exit(path);
   if path.endswith('\') or path.endswith('/') then
     result := path+filename
   else
@@ -1076,9 +1078,9 @@ begin
   assertEqual(comma(1200), '1,200');
   assertEqual(comma(987654321), '987,654,321');
 
-  assertEqual(concatPath('c:\dos', 'go.exe'), 'c:\dos\go.exe');
-  assertEqual(concatPath('c:\dos\', 'go.exe'), 'c:\dos\go.exe');
-  assertEqual(concatPath('c:\dos/', 'go.exe'), 'c:\dos/go.exe');
+  assertEqual(joinPath('c:\dos', 'go.exe'), 'c:\dos\go.exe');
+  assertEqual(joinPath('c:\dos\', 'go.exe'), 'c:\dos\go.exe');
+  assertEqual(joinPath('c:\dos/', 'go.exe'), 'c:\dos/go.exe');
 
   {test string helpers}
   assert('fish'.endsWith('sh'));

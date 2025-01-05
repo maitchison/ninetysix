@@ -19,6 +19,8 @@ type
     procedure setModified(fileName: string;time: dword);
     function  getModified(fileName: string): dword;
 
+    function  wasModified(fileA, fileB: string): boolean;
+
     procedure rename(a,b: string);
     procedure delFolder(path: string);
 
@@ -28,18 +30,18 @@ type
   end;
 
 var
-  FS: tFilesystem;
+  fs: tFilesystem;
 
 implementation
 
 procedure tFileSystem.rename(a,b: string);
 begin
-  dos.exec(getEnv('COMSPEC'), '/C ren '+a+' '+b);
+  dos.exec(getEnv('COMSPEC'), format('/C ren %s %s > nul', [a, b]));
 end;
 
 procedure tFileSystem.delFolder(path: string);
 begin
-  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+path);
+  dos.exec(getEnv('COMSPEC'), format('/C deltree /y %s > nul', [path]));
 end;
 
 function tFileSystem.exists(filename: string): boolean;
@@ -90,6 +92,14 @@ begin
     exit;
   dos.setFTime(f, time);
   close(f);
+end;
+
+{checks if two files share the same modified timestamp}
+function tFileSystem.wasModified(fileA, fileB: string): boolean;
+begin
+  if not exists(fileA) then error('File not found '+fileA);
+  if not exists(fileB) then error('File not found '+fileB);
+  result := getModified(fileA) <> getModified(fileB);
 end;
 
 {returns timestamp for file modified time, or 0 if file not found.}
