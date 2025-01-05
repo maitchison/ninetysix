@@ -43,7 +43,6 @@ uses
 
 type
   tDiffStats = record
-    files: int32;
     added: int64;
     removed: int64;
     changed: int64;
@@ -51,7 +50,7 @@ type
     function net: int64;
     function unchanged: int64;
     procedure print();
-    procedure printShort();
+    procedure printShort(padding: integer=3);
     procedure clear();
 
     class operator add(a,b: tDiffStats): tDiffStats;
@@ -141,7 +140,6 @@ end;
 
 procedure tDiffStats.clear();
 begin
-  files := 0;
   added := 0;
   removed := 0;
   changed := 0;
@@ -164,7 +162,7 @@ begin
   outputX  ('Net       ', lpad(plus+intToStr(net), 4),  ' lines.', YELLOW);
 end;
 
-procedure tDiffStats.printShort();
+procedure tDiffStats.printShort(padding: integer=3);
 var
   plus: string;
   oldTextAttr: byte;
@@ -173,14 +171,14 @@ begin
   textAttr := LIGHTGRAY;
   output('(');
   textAttr := LIGHTGREEN;
-  output(intToStr(added, 3, ' ')+' ');
+  output(intToStr(added, padding, ' ')+' ');
   textAttr := LIGHTRED;
-  output(intToStr(removed, 3, ' ')+' ');
+  output(intToStr(removed, padding, ' ')+' ');
   {textAttr := CYAN;
-  if changed > 0 then output(intToStr(changed, 3, ' ')+' ');}
+  if changed > 0 then output(intToStr(changed, padding, ' ')+' ');}
   textAttr := YELLOW;
   if net > 0 then plus := '+' else plus := '';
-  output(lpad(plus+intToStr(net), 3, ' '));
+  output(lpad(plus+intToStr(net), padding, ' '));
   textAttr := LIGHTGRAY;
   output(')');
   textAttr := oldTextAttr;
@@ -188,7 +186,6 @@ end;
 
 class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
 begin
-  result.files := a.files + b.files;
   result.added := a.added + b.added;
   result.removed := a.removed + b.removed;
   result.changed := a.changed + b.changed;
@@ -322,7 +319,6 @@ var
 begin
 
   result.clear();
-  result.files := 1;
   result.newLen := length(newLines);
 
   {which lines in old file should be shown for context}
@@ -516,7 +512,8 @@ var
 begin
 
   oldSilent := SILENT;
-  SILENT := not printOutput;
+  if not printOutput then
+    SILENT := true;
 
   if otherFilename = '' then otherFilename := filename;
 
@@ -595,7 +592,7 @@ var
   stats: tDiffStats;
 begin
 
-  writeln();
+  outputln('');
   renamedFiles.clear();
   workingSpaceFiles := getSourceFiles(WORKSPACE);
   headFiles := getSourceFiles(HEAD);
@@ -655,13 +652,13 @@ begin
 
   textattr := WHITE;
   if (added = 0) and (removed = 0) and (changed = 0) and (renamed = 0) then
-    writeln('No changes.');
-  writeln();
+    outputLn('No changes.');
+  outputLn('');
 
 end;
 
 {show all diff on all modified files}
-procedure diffOnWorkspace();
+function diffOnWorkspace(): tDiffStats;
 var
   workingSpaceFiles: tStringList;
   headFiles: tStringList;
@@ -744,6 +741,8 @@ begin
   outputLn('----------------------------------------');
   totalStats.print();
 
+  result := totalStats;
+
 end;
 
 {--------------------------------------------------}
@@ -757,7 +756,9 @@ var
   previousCheckpoint: string;
   folderA, folderB: string;
   counter: int32;
-
+  stats: tDiffStats;
+var
+  csvFile: text;
 begin
 
   textAttr := WHITE;
@@ -767,8 +768,6 @@ begin
   checkpoints := fs.listFiles('$repo\*.txt');
   checkpoints.sort();
 
-  writeln('performing setup');
-
   previousCheckpoint := '';
   folderA := joinPath('$repo', 'a');
   folderB := joinPath('$repo', 'b');
@@ -776,16 +775,19 @@ begin
   fs.delFolder(folderB);
   fs.mkdir(folderA);
 
-  writeln('setup complete');
-
   WORKSPACE := folderA;
   HEAD := folderB;
 
   counter := 0;
 
+  assign(csvFile, 'stats.csv');
+  rewrite(csvFile);
+
+  writeln(csvFile, 'Checkpoint, Date, Added, Removed, Changed');
+
   for checkpoint in checkpoints do begin
 
-    writeln('processing '+checkpoint);
+    write(pad(checkpoint, 40, ' '));
     {exclude any folders not matching the expected format}
     {expected format is yyyymmdd_hhmmss
     {which I had regex here...}
@@ -804,12 +806,21 @@ begin
     cpm.load(removeExtension(checkpoint));
     cpm.exportToFolder(folderA);
 
-    // stub
-    if counter > 3 then
-      break;
+    SILENT := true;
+    stats := diffOnWorkspace();
+    SILENT := false;
+    stats.printShort(6);
+    writeln();
+
+    // write stats to file
+    writeln(csvFile,
+      format('"%s", %.9f, %d, %d, %d', [checkpoint, cpm.date, stats.added, stats.removed, stats.changed])
+    );
+
     counter += 1;
 
   end;
+  close(csvFile);
   cpm.free;
 end;
 
