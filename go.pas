@@ -457,9 +457,9 @@ begin
   {todo: proper .gitignore style decision on what to include}
   if (length(path) > 0) and (path[length(path)] <> '\') then
     path += '\';
-  result := fsListFiles(path+'*.pas');
-  result += fsListFiles(path+'*.bat');
-  result += fsListFiles(path+'*.inc');
+  result := fs.listFiles(path+'*.pas');
+  result += fs.listFiles(path+'*.bat');
+  result += fs.listFiles(path+'*.inc');
 end;
 
 {show all changed / added / deleted files}
@@ -540,6 +540,10 @@ var
   command: string;
 
 begin
+
+  // screen is hard to read due to a dosbox-x bug, so we clear it
+  // for visibility.
+  clrscr;
 
   if (paramCount = 0) then
     command := 'status'

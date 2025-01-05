@@ -27,14 +27,15 @@ type
 
   published
 
-    property path: string read fPath;
-    property hash: string read fHash;
-    property size: int64 read fSize;
-    property modified: int32 read fModified;
+    property path: string read fPath write fPath;
+    property hash: string read fHash write fHash;
+    property size: int64 read fSize write fSize;
+    property modified: int32 read fModified write fModified;
 
   public
 
-    constructor create(aPath: string;aRoot: string = '');
+    constructor create(); overload;
+    constructor create(aPath: string;aRoot: string = ''); overload;
     function toString(): string; override;
   end;
 
@@ -59,6 +60,7 @@ type
     messageText: string;
     author: string;
     date: tDateTime;
+    id: string;
     fileList: array of tFileRef;
 
     {where our files came from}
@@ -90,16 +92,25 @@ const
 
 {-------------------------------------------------------------}
 
-constructor tFileRef.create(aPath: string;aRoot: string='');
+
+constructor tFileRef.create(); overload;
+begin
+  inherited create();
+  fPath := '';
+  fRoot := '';
+  fHash := '';
+  fSize := 0;
+  fModified := 0;
+end;
+
+constructor tFileRef.create(aPath: string;aRoot: string=''); overload;
 var
   f: file;
 begin
-  inherited create();
+  create();
+
   fPath := aPath;
   fRoot := aRoot;
-  fHash := ''; //hash is defered.
-  fSize := 0;
-  fModified := 0;
 
   {$I-}
   assign(f, self.fqn);
@@ -304,12 +315,6 @@ begin
   error('NIY');
 end;
 
-{read checkpoint metadata from file}
-procedure tCheckpointManager.load(checkpointName: string);
-begin
-  error('NIY');
-end;
-
 function tCheckpointManager.hasCheckpoint(checkpointName: string): boolean;
 begin
   result := fs.exists(getCheckpointPath(checkpointName));
@@ -321,13 +326,43 @@ begin
   result := concatPath(repoFolder, checkpointName)+'.txt';
 end;
 
+{read checkpoint metadata from file}
+procedure tCheckpointManager.load(checkpointName: string);
+var
+  lines: tStringList;
+  line: string;
+  currentSection: string;
+  currentFileRef: tFileRef;
+begin
+  currentFileRef := nil;
+  {no good way to read ini files yet, so just do this by hand}
+  lines.load(getCheckpointPath(checkpointName));
+  for line in lines do begin
+
+    if line.startsWith('[') and line.endsWith(']') then begin
+      currentSection := copy(line, 2, length(line)-2);
+      if currentSection = 'file' then
+        currentFileRef := tFileRef.create();
+      continue;
+    end;
+
+    if currentSection = 'commit' then begin
+    end else if currentSection = 'file' then begin
+      {note: this could be done automatically... and I could amke commit
+       load the CMP stuff too}
+      if line.startsWith('path=') then
+    end else begin
+      warn(format('ignoring section [%s]', [currentSection]));
+    end;
+  end;
+end;
+
 {saves the checkpoint to repo}
 procedure tCheckpointManager.save(checkpointName: string);
 var
-  t: tINIFile;
+  t: tINIWriter;
   fileRef: tFileRef;
   commitID: tDigest;
-  lines: tStringList;
   i: integer;
 begin
 
@@ -336,7 +371,7 @@ begin
   writeObjects();
 
   {then write out the files, just so we can get the hash}
-  t := tIniFile.create(getCheckpointPath(checkpointName));
+  t := tINIWriter.create(getCheckpointPath(checkpointName));
   try
     for fileRef in fileList do
       t.writeObject('file', fileRef);
@@ -345,14 +380,14 @@ begin
   end;
 
   {next hash the ini file for our commit id}
-  commitID := hash(loadString(getCheckpointPath(checkpointName)));
+  id := hash(loadString(getCheckpointPath(checkpointName))).toHex;
 
   {then write out the complete file}
-  t := tIniFile.create(getCheckpointPath(checkpointName));
+  t := tINIWriter.create(getCheckpointPath(checkpointName));
   try
     t.writeSection('commit');
     t.writeString('message', messageText);
-    t.writeString('id', commitID.toHex);
+    t.writeString('id', id);
     t.writeString('author', author);
     t.writeFloat('date', date);
     t.writeBlank();
@@ -375,11 +410,11 @@ end;
 
 procedure processOldRepo();
 var
-  checkpoint: tCheckpointManager;
+  cpm: tCheckpointManager;
   folders: tStringList;
   folder: string;
 begin
-  checkpoint := tCheckpointManager.create('repo');
+  cpm := tCheckpointManager.create('repo');
 
   folders := FS.listFolders('$REP');
   folders.sort();
@@ -391,14 +426,26 @@ begin
     if length(folder) <> 15 then continue;
     if folder[9] <> '_' then continue;
 
-    if checkpoint.hasCheckpoint(folder) then continue;
+    if cpm.hasCheckpoint(folder) then continue;
 
-    checkpoint.readFromFolder('$REP\'+folder);
-    checkpoint.save(folder);
+    cpm.readFromFolder('$REP\'+folder);
+    cpm.save(folder);
   end;
 
-  checkpoint.free;
+  cpm.free;
 end;
+
+procedure viewCheckpoint();
+var
+  cpm: tCheckpointManager;
+begin
+  cpm := tCheckpointManager.create('repo');
+
+  cpm.load('20241129_093958');
+
+  cpm.free;
+end;
+
 
 begin
   textattr := $07;
@@ -406,6 +453,7 @@ begin
   WRITE_TO_SCREEN := true;
   test.runTestSuites();
 
-  processOldRepo();
+  //processOldRepo();
+  viewCheckpoint();
 
 end.

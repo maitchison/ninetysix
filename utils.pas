@@ -53,7 +53,10 @@ type
 
 type
   tStringHelper = record helper for string
-    function EndsWith(const Suffix: string; IgnoreCase: Boolean = False): Boolean;
+    function startsWith(const prefix: string; ignoreCase: boolean = false): boolean;
+    function endsWith(const suffix: string; ignoreCase: boolean = false): boolean;
+    function toLower(): string;
+    function trim(): string;
   end;
 
 var
@@ -105,6 +108,8 @@ function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: array of byte): string;
 function bytesToSanStr(bytes: tBytes): string;
 function strToInt(s: string): int64;
+function strToFlt(s: string): double;
+function strToBool(s: string): boolean;
 function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
 function lpad(s: string;len: int32;padding: char=' '): string;
@@ -563,6 +568,28 @@ begin
   result := value;
 end;
 
+function strToFlt(s: string): double;
+var
+  value: double;
+  code: word;
+begin
+  {todo: better way to handle errors}
+  val(s, value, code);
+  if code <> 0 then debug.Error(Format('Invalid float "%s"', [s]));
+  result := value;
+end;
+
+function strToBool(s: string): boolean;
+var
+  value: double;
+  code: word;
+begin
+  s := s.toLower;
+  if s = 'false' then exit(false);
+  if s = 'true' then exit(true);
+  error(format('Invalid boolean literal %s expecting [true, false]', [s]));
+end;
+
 {remove whitespace from begining and end of string.}
 function trim(s: string): string;
 var
@@ -949,7 +976,7 @@ end;
 { String helpers}
 {--------------------------------------------------------}
 
-function tStringHelper.endsWith(const Suffix: string; IgnoreCase: Boolean): Boolean;
+function tStringHelper.endsWith(const suffix: string; ignoreCase: boolean): boolean;
 var
   MainStr, SubStr: string;
 begin
@@ -965,6 +992,33 @@ begin
   result := copy(MainStr, Length(MainStr) - Length(SubStr) + 1, Length(SubStr)) = SubStr;
 end;
 
+
+function tStringHelper.startsWith(const prefix: string; ignoreCase: boolean): boolean;
+var
+  MainStr, SubStr: string;
+begin
+  if length(prefix) > length(Self) then
+    exit(false);
+  if ignoreCase then begin
+    mainStr := toLowerCase(Self);
+    subStr := toLowerCase(prefix);
+  end else begin
+    mainStr := self;
+    subStr := prefix;
+  end;
+  result := copy(mainStr, 1, length(subStr)) = subStr;
+end;
+
+function tStringHelper.toLower(): string;
+begin
+  result := utils.toLowerCase(self);
+end;
+
+function tStringHelper.trim(): string;
+begin
+  result := utils.trim(self);
+end;
+
 {--------------------------------------------------------}
 
 type
@@ -977,6 +1031,10 @@ var
   a,b: string;
   i: int32;
 begin
+  assertEqual(StrToFlt('123'), 123);
+  assertClose(StrToFlt('-7.2'), -7.2);
+  assert(strToBool('True'));
+  assert(not strToBool('False'));
   assertEqual(StrToInt('123'), 123);
   assertEqual(StrToInt('7'), 7);
   assertEqual(Trim(' Fish'), 'Fish');
@@ -1023,8 +1081,15 @@ begin
   assertEqual(concatPath('c:\dos/', 'go.exe'), 'c:\dos/go.exe');
 
   {test string helpers}
-  assert('fish'.endswith('sh'));
+  assert('fish'.endsWith('sh'));
   assert(not 'fish'.endswith('ash'));
+  assert('fish'.endswith('fish'));
+  assert(not 'fish'.endswith('fishy'));
+
+  assert('fish'.startsWith('fi'));
+  assert('fish'.startsWith('fish'));
+  assert(not 'fish'.startsWith('fishy'));
+  assert(not 'fish'.startsWith('fia'));
 
 end;
 
