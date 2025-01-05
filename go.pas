@@ -298,6 +298,7 @@ begin
 
   result.clear();
   result.files := 1;
+  result.newLen := length(newLines);
 
   {which lines in old file should be shown for context}
   fillchar(importantLines, sizeof(importantLines), false);
@@ -309,8 +310,6 @@ begin
   newS := tIntList.create([]);
   for i := 1 to length(newLines) do
     newS.append(i);
-
-  result.newLen := newS.len;
 
   {detect identical files}
   if matching.len = max(oldS.len, newS.len) then begin
@@ -510,22 +509,6 @@ begin
   commit(msg);
 end;
 
-(*
-function filesMatch(file1, file2: string): boolean;
-var
-  a,b: tLines;
-  i: int32;
-begin
-  a := readLines(file1);
-  b := readLines(file2);
-  if length(a) <> length(b) exit(false);
-  for i := 0 to length(a)-1 do
-    if a[i] <> b[i] then
-       exit(false);
-  exit(true);
-end;
-*)
-
 function wasModified(file1, file2: string): boolean;
 var
   t1,t2: longint;
@@ -554,49 +537,6 @@ begin
   result += fs.listFiles(path+'*.inc');
 end;
 
-{show all changed / added / deleted files}
-procedure status();
-var
-  workingSpaceFiles: tStringList;
-  headFiles: tStringList;
-  filename: string;
-  added,removed,changed: int32;
-begin
-  writeln();
-  workingSpaceFiles := getSourceFiles('');
-  headFiles := getSourceFIles('$rep\head\');
-  added := 0;
-  removed := 0;
-  changed := 0;
-
-  for filename in workingSpaceFiles do begin
-    if not headFiles.contains(filename) then begin
-      textattr := 10;
-      writeln('[+] added ', filename);
-      inc(added);
-    end else begin
-      if wasModified(filename, '$rep\head\'+filename) then begin
-        textattr := 15;
-        writeln('[~] modified ', filename);
-        inc(changed);
-      end;
-    end;
-  end;
-
-  for filename in headFiles do begin
-    if not workingSpaceFiles.contains(filename) then begin
-      textattr := 12;
-      writeln('removed ', filename);
-      inc(removed);
-    end;
-  end;
-
-  textattr := 15;
-  if (added = 0) and (removed = 0) and (changed = 0) then
-    writeln('No changes.');
-  writeln();
-end;
-
 {checks if originalFile is very similar to any of the other files in
  filesToCheck, and if so returns the matching new filename}
 function checkForRename(originalFile: string; filesToCheck: tStringList): string;
@@ -620,7 +560,7 @@ begin
     if filename = originalFile then continue;
     fileSizeRatio := fs.fileSize(concatPath('$rep\head\', filename)) / ourFileSize;
     //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
-    if (fileSizeRatio > 1.2) or (fileSizeRatio < 0.8) then continue;
+    if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
     oldSilent := SILENT;
     SILENT := true;
     stats := runDiff(originalFile, filename);
@@ -631,6 +571,68 @@ begin
     result := filename;
     exit;
   end;
+end;
+
+
+{show all changed / added / deleted files}
+procedure status();
+var
+  workingSpaceFiles: tStringList;
+  renamedFiles: tStringList;
+  headFiles: tStringList;
+  filename, renamedFile: string;
+  added,removed,changed,renamed: int32;
+begin
+  writeln();
+  renamedFiles.clear();
+  workingSpaceFiles := getSourceFiles('');
+  headFiles := getSourceFiles('$rep\head\');
+  added := 0;
+  removed := 0;
+  changed := 0;
+  renamed := 0;
+
+  // look for files that were renamed
+  for filename in workingSpaceFiles do begin
+    if headFiles.contains(filename) then continue;
+    renamedFile := checkForRename(filename, headFiles);
+    if renamedFile <> '' then begin
+      textattr := LIGHTBLUE;
+      writeln('[>] renamed ', filename, ' to ', renamedFile);
+      inc(renamed);
+    end;
+    renamedFiles += filename;
+    renamedFiles += renamedFile;
+  end;
+
+  for filename in workingSpaceFiles do begin
+    if renamedFiles.contains(filename) then continue;
+    if not headFiles.contains(filename) then begin
+      textattr := LIGHTGREEN;
+      writeln('[+] added ', filename);
+      inc(added);
+    end else begin
+      if wasModified(filename, '$rep\head\'+filename) then begin
+        textattr := WHITE;
+        writeln('[~] modified ', filename);
+        inc(changed);
+      end;
+    end;
+  end;
+
+  for filename in headFiles do begin
+    if renamedFiles.contains(filename) then continue;
+    if not workingSpaceFiles.contains(filename) then begin
+      textattr := LIGHTRED;
+      writeln('[-] removed ', filename);
+      inc(removed);
+    end;
+  end;
+
+  textattr := WHITE;
+  if (added = 0) and (removed = 0) and (changed = 0) and (renamed = 0) then
+    writeln('No changes.');
+  writeln();
 end;
 
 {show all diff on all modified files}
@@ -667,6 +669,7 @@ begin
     outputX (' Renamed ',filename+' -> '+renamedFile, '', LIGHTBLUE);
     outputLn('----------------------------------------');
     stats := runDiff(filename, renamedFile);
+    totalStats += stats;
     inc(fileStats.added);
     renamedFiles += filename;
     renamedFiles += renamedFile;
@@ -680,6 +683,7 @@ begin
     outputX (' Removed ',filename, '', LIGHTRED);
     outputLn('----------------------------------------');
     stats := runDiff(filename);
+    totalStats += stats;
     inc(fileStats.removed);
   end;
 
@@ -691,6 +695,7 @@ begin
       outputX (' Added ',filename, '', LIGHTGREEN);
       outputLn('----------------------------------------');
       stats := runDiff(filename);
+      totalStats += stats;
       inc(fileStats.added);
     end else begin
       if not wasModified(filename, '$rep\head\'+filename) then continue;
@@ -708,15 +713,18 @@ begin
 
   textAttr := WHITE;
   outputLn('----------------------------------------');
+  status();
+  outputLn('----------------------------------------');
   outputln(' Total');
   outputLn('----------------------------------------');
   totalStats.print();
+
 end;
 
 {--------------------------------------------------}
 
 {generate per commit stats. Quite slow}
-procedure generateCheckpointStats();
+procedure stats();
 var
   cpm: tCheckpointManager;
   checkpoints: tStringList;
@@ -765,6 +773,8 @@ begin
     benchmark()
   else if command = 'status' then
     status()
+  else if command = 'stats' then
+    stats()
   else
     Error('Invalid command "'+command+'"');
 

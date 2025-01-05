@@ -58,7 +58,7 @@ type
     procedure clear();
     function head: string;
     function tail: tStringList;
-    function contains(item: string): boolean;
+    function contains(const item: string): boolean;
 
     procedure sort();
 
@@ -278,7 +278,7 @@ begin
     self.append(s);
 end;
 
-function tStringList.contains(item: string): boolean;
+function tStringList.contains(const item: string): boolean;
 var
   s: string;
 begin

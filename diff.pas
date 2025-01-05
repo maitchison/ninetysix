@@ -31,7 +31,6 @@ type
   private
     a, b: tLines;
 
-  {stub}
   public
     scores: tScores;
 

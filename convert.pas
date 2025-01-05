@@ -52,17 +52,6 @@ begin
   cpm.free;
 end;
 
-{go through each checkpoint and work out the change between each checkpoint}
-procedure generateCheckpointStats();
 begin
-end;
-
-begin
-  textattr := $07;
-  clrscr;
-  WRITE_TO_SCREEN := true;
-  test.runTestSuites();
-
   processOldRepo();
-
 end.

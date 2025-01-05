@@ -57,7 +57,7 @@ var
 begin
   assign(f, fileName);
   {$I-}
-  reset(f);
+  reset(f, 1);
   {$I+}
   if IOResult <> 0 then
     exit(0);
