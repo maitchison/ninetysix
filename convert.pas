@@ -326,21 +326,38 @@ procedure tCheckpointManager.save(checkpointName: string);
 var
   t: tINIFile;
   fileRef: tFileRef;
+  commitID: tDigest;
+  lines: tStringList;
+  i: integer;
 begin
+
   {save objects first, just in case anything goes wrong}
   {this way we won't have an ini file already}
   writeObjects();
+
+  {then write out the files, just so we can get the hash}
+  t := tIniFile.create(getCheckpointPath(checkpointName));
+  try
+    for fileRef in fileList do
+      t.writeObject('file', fileRef);
+  finally
+    t.free();
+  end;
+
+  {next hash the ini file for our commit id}
+  commitID := hash(loadString(getCheckpointPath(checkpointName)));
+
+  {then write out the complete file}
   t := tIniFile.create(getCheckpointPath(checkpointName));
   try
     t.writeSection('commit');
     t.writeString('message', messageText);
+    t.writeString('id', commitID.toHex);
     t.writeString('author', author);
     t.writeFloat('date', date);
     t.writeBlank();
-
-    for fileRef in fileList do begin
+    for fileRef in fileList do
       t.writeObject('file', fileRef);
-    end;
   finally
     t.free();
   end;

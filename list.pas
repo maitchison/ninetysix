@@ -55,6 +55,7 @@ type
     procedure append(x: string); overload;
     procedure append(x: tStringList); overload;
     function clone(): tStringList;
+    procedure clear();
     function head: string;
     function tail: tStringList;
     function contains(item: string): boolean;
@@ -65,6 +66,9 @@ type
 
     function getItem(index: int32): string;
     procedure setItem(index: int32; value: string);
+
+    procedure save(filename: string);
+    procedure load(filename: string);
 
     property items[index: int32]: string read getItem write setItem; default;
     class operator add(a: tStringList;b: string): tStringList;
@@ -242,8 +246,7 @@ constructor tStringList.create(const data: array of string);
 var
   s: string;
 begin
-  startPos := 0;
-  endPos := 0;
+  clear();
   for s in data do
     append(s);
 end;
@@ -340,6 +343,12 @@ begin
 
 end;
 
+procedure tStringList.clear();
+begin
+  startPos := 0;
+  endPos := 0;
+  data := nil;
+end;
 
 {create a copy of this slice without any slicing}
 function tStringList.clone(): tStringList;
@@ -371,6 +380,34 @@ begin
   result.fArray := data;
   result.fIndex := -1;
 end;
+
+procedure tStringList.save(filename: string);
+var
+  t: text;
+  line: string;
+begin
+  assign(t, filename);
+  rewrite(t);
+  for line in self do
+    writeln(t, line);
+  close(t);
+end;
+
+procedure tStringList.load(filename: string);
+var
+  t: text;
+  line: string;
+begin
+  self.clear();
+  assign(t, filename);
+  reset(t);
+  while not eof(t) do begin
+    readln(t, line);
+    self += line;
+  end;
+  close(t);
+end;
+
 
 {-----------------------------------------------------}
 
@@ -419,11 +456,12 @@ begin
 
   s1 := tStringList.create(['101','202','103']);
 
-
-
   s1.sort();
   assertEqual(s1.toString, '["101","103","202"]');
 
+  s1.save('test.txt');
+  s2.load('test.txt');
+  assertEqual(s2.toString, '["101","103","202"]');
 
 end;
 
