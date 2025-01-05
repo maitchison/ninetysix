@@ -39,20 +39,36 @@ type
   end;
 
   {a database of object files}
-  tObjectDatabase = class
+  tObjectStore = class
+    path: string;
     files: array of tFileRef;
+
     function lookupByHash(hash: string): tFileRef;
+    function addObject(hash: string;objectPath: string): boolean;
+    procedure reload();
+    procedure clear();
+
+    constructor create(aPath: string);
+    destructor destroy(); override;
   end;
 
-  tCheckpoint = class
+  tCheckpointManager = class
+
+    objectStore: tObjectStore;
+
     messageText: string;
     author: string;
     date: tDateTime;
     fileList: array of tFileRef;
+
     constructor create();
-    procedure reset();
+    destructor destroy();
+
+    procedure clear();
+
     procedure loadV1(path: string);
     procedure writeOut(path: string);
+    procedure writeObjects(path: string);
   end;
 
 const
@@ -73,7 +89,7 @@ begin
   fModified := 0;
   try
     assign(f, path);
-    system.reset(f,1);
+    reset(f,1);
     getFTime(f, fModified);
     fSize := fileSize(f);
   finally
@@ -88,7 +104,7 @@ var
   bytesRead: int32;
   buffer: array of byte;
 begin
-  assign(f, self.fPath + '\' + self.fName);
+  assign(f, concatPath(self.fPath, self.fName));
   try
     reset(f, 1);
     if (fSize > MAX_FILESIZE) then
@@ -115,7 +131,14 @@ end;
 
 {-------------------------------------------------------------}
 
-function tObjectDatabase.lookupByHash(hash: string): tFileRef;
+{adds object to storage, returns if it was added}
+function tObjectStore.addObject(hash: string;objectPath: string): boolean;
+begin
+  if assigned(lookupByHash(hash)) then exit(false);
+  //fs.copyFile(objectPath,
+end;
+
+function tObjectStore.lookupByHash(hash: string): tFileRef;
 var
   fRef: tFileRef;
 begin
@@ -124,14 +147,62 @@ begin
   exit(nil);
 end;
 
-{-------------------------------------------------------------}
-
-constructor tCheckpoint.create();
+constructor tObjectStore.create(aPath: string);
 begin
-  fileList := nil;
+  fs.mkdir(aPath);
+  files := nil;
+  self.path := aPath;
+  self.reload();
 end;
 
-procedure tCheckpoint.reset();
+destructor tObjectStore.destroy();
+begin
+  clear();
+  inherited destroy();
+end;
+
+procedure tObjectStore.clear();
+var
+  fileRef: tFileRef;
+begin
+  for fileRef in files do
+    fileRef.free;
+  files := nil;
+end;
+
+{reload file references from disk}
+procedure tObjectStore.reload();
+var
+  fileList: tStringList;
+  filename: string;
+  i: integer;
+begin
+  clear();
+  fileList := FS.listFiles(path+'*.*');
+  setLength(files, fileList.len);
+  for i := 0 to fileList.len-1 do begin
+    files[i] := tFileRef.create(concatPath(path, fileList[i]));
+    files[i].fHash := fileList[i]; //name is hash.
+  end;
+end;
+
+{-------------------------------------------------------------}
+
+constructor tCheckpointManager.create();
+begin
+  inherited create();
+  fileList := nil;
+  objectStore := tObjectStore.create('repo\store');
+end;
+
+destructor tCheckpointManager.destroy();
+begin
+  clear();
+  objectStore.free;
+  inherited destroy;
+end;
+
+procedure tCheckpointManager.clear();
 var
   fileRef: tFileRef;
 begin
@@ -142,7 +213,7 @@ begin
 end;
 
 {loads an old style 'files as they are' V1 checkpoint folder}
-procedure tCheckpoint.loadV1(path: string);
+procedure tCheckpointManager.loadV1(path: string);
 var
   filename: string;
   fileRef: tFileRef;
@@ -150,13 +221,13 @@ var
   i: integer;
 begin
 
-  reset();
+  clear();
 
   writeln('processing '+path);
   if not path.endsWith('\') then path += '\';
 
   // get all files in folder
-  files := fsListFiles(path+'*.*');
+  files := FS.listFiles(path+'*.*');
   setLength(fileList, files.len);
 
   if files.contains('message.txt') then begin
@@ -173,44 +244,52 @@ begin
     fileRef.calculateHash();
     fileList[i] := fileRef;
   end;
-  // create hash for every file
-  // write new files to object store
-  // link each object
-
 end;
 
-procedure tCheckpoint.writeOut(path: string);
+procedure tCheckpointManager.writeOut(path: string);
 var
   t: tINIFile;
   fileRef: tFileRef;
 begin
   t := tIniFile.create(path);
+  try
+    t.writeSection('commit');
+    t.writeString('message', messageText);
+    t.writeString('author', author);
+    t.writeFloat('date', date);
+    t.writeBlank();
 
-  t.writeSection('commit');
-  t.writeString('message', messageText);
-  t.writeString('author', author);
-  t.writeFloat('date', date);
-  t.writeBlank();
+    for fileRef in fileList do
+      t.writeObject('file', fileRef);
+  finally
+    t.free();
+  end;
+end;
 
-  for fileRef in fileList do
+procedure tCheckpointManager.writeObjects(path: string);
+begin
+{
+  for fileRef in fileList do begin
     t.writeObject('file', fileRef);
-  t.free();
+  end;
+  }
 end;
 
 procedure processRepo();
 var
-  checkpoint: tCheckpoint;
+  checkpoint: tCheckpointManager;
   folders: tStringList;
   folder: string;
   counter: integer;
 begin
-  checkpoint := tCheckpoint.create();
+  checkpoint := tCheckpointManager.create();
 
-  folders := fsListFolders('$REP');
+  folders := FS.listFolders('$REP');
   counter := 0;
   for folder in folders do begin
     checkpoint.loadV1('$REP\'+folder);
     checkpoint.writeOut('repo\'+folder+'.txt');
+    //checkpoint.writeObjects('repo\store');
     inc(counter);
     if counter > 10 then exit;
   end;

@@ -89,12 +89,14 @@ procedure delay(ms: double);
 {------------------------------------------------}
 { My custom routines }
 
+{path stuff}
 procedure logHeapStatus(msg: string='Heap status');
 function exists(filename: string): boolean;
 function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
 function extractFilename(const path: string): string;
 function extractPath(const path: string): string;
+function concatPath(const path, filename: string): string;
 function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
@@ -513,6 +515,14 @@ var
 begin
   filename := extractFilename(path);
   result := copy(path, 1, length(path) - length(filename));
+end;
+
+function concatPath(const path, filename: string): string;
+begin
+  if path.endswith('\') or path.endswith('/') then
+    result := path+filename
+  else
+    result := path+'\'+filename;
 end;
 
 function comma(value: int64; width: word; padding: char=' '): string;
@@ -1042,6 +1052,9 @@ begin
   assertEqual(comma(1200), '1,200');
   assertEqual(comma(987654321), '987,654,321');
 
+  assertEqual(concatPath('c:\dos', 'go.exe'), 'c:\dos\go.exe');
+  assertEqual(concatPath('c:\dos\', 'go.exe'), 'c:\dos\go.exe');
+  assertEqual(concatPath('c:\dos/', 'go.exe'), 'c:\dos/go.exe');
 
   {test string helpers}
   assert('fish'.endswith('sh'));

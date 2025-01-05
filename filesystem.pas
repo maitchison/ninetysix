@@ -10,14 +10,30 @@ uses
   list,
   dos;
 
-function fsListFiles(path: string): tStringList;
-function fsListFolders(path: string): tStringList;
+type
+  tFileSystem = class
+    function mkDir(path: string): boolean;
+    function listFiles(path: string): tStringList;
+    function listFolders(path: string): tStringList;
+  end;
+
+var
+  FS: tFilesystem;
 
 implementation
 
+{create folder. returns if it was created or not}
+function tFileSystem.mkDir(path: string): boolean;
+begin
+  {$I-}
+  system.mkDir(path);
+  {$I+}
+  result := (IoResult = 0);
+end;
+
 {returns a list of all files in filesystem matching path
 e.g. c:\src\*.pas}
-function fsListFiles(path: string): tStringList;
+function tFileSystem.ListFiles(path: string): tStringList;
 var
   sr: SearchRec;
 begin
@@ -33,7 +49,7 @@ begin
 end;
 
 {returns a list of all folders in path}
-function fsListFolders(path: string): tStringList;
+function tFileSystem.ListFolders(path: string): tStringList;
 var
   sr: SearchRec;
 begin
