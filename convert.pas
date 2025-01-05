@@ -328,8 +328,21 @@ end;
 
 {writes all files to folder so that others can read them}
 procedure tCheckpointManager.exportToFolder(path: string);
+var
+  fileRef: tFileRef;
+  dstFolder: string;
+  dstFile: string;
+  srcFile: string;
 begin
-  error('NIY');
+  dstFolder := concatPath(repoFolder, path);
+  fs.mkdir(dstFolder);
+  for fileRef in fileList do begin
+    dstFile := concatPath(dstFolder, fileRef.path);
+    srcFile := concatPath(objectStore.root, fileRef.hash);
+    {todo: support subfolders}
+    fs.copyFile(srcFile, dstFile);
+    fs.setModified(dstFile, fileRef.modified);
+  end;
 end;
 
 function tCheckpointManager.hasCheckpoint(checkpointName: string): boolean;
@@ -462,6 +475,7 @@ begin
   cpm := tCheckpointManager.create('repo');
 
   cpm.load('20241129_093958');
+  cpm.exportToFolder('tmp');
 
   cpm.free;
 end;
@@ -473,7 +487,7 @@ begin
   WRITE_TO_SCREEN := true;
   test.runTestSuites();
 
-  //processOldRepo();
+  processOldRepo();
   viewCheckpoint();
 
 end.
