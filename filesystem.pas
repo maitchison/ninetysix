@@ -13,6 +13,7 @@ uses
 type
   tFileSystem = class
 
+    function exists(filename: string): boolean;
     procedure copyFile(srcFile, dstFile: string);
     procedure setModified(fileName: string;time: dword);
     function  getModified(fileName: string): dword;
@@ -26,6 +27,21 @@ var
   FS: tFilesystem;
 
 implementation
+
+function tFileSystem.exists(filename: string): boolean;
+var
+  f: file;
+begin
+  assign(f, filename);
+  {$I-}
+  reset(f);
+  {$I+}
+  if IOResult = 0 then begin
+    close(f);
+    exit(True);
+  end else
+    exit(False);
+end;
 
 procedure tFileSystem.copyFile(srcFile, dstFile: string);
 begin

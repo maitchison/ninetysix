@@ -145,19 +145,19 @@ begin
       case i div 16 of
         0: begin
           F := (B and C) or ((not B) and D);
-          g := i;
+          g := i and $f;
         end;
         1: begin
           F := (D and B) or ((not D) and C);
-          g := (5*i + 1) mod 16;
+          g := (5*i + 1) and $f;
         end;
         2: begin
           F := B xor C xor D;
-          g := (3*i + 5) mod 16;
+          g := (3*i + 5) and $f;
         end;
         3: begin
           F := C xor (B or (not D));
-          g := (7*i) mod 16;
+          g := (7*i) and $f;
         end;
       end;
       F := F + A + K[i] + chunk.M[g];

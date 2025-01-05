@@ -91,7 +91,6 @@ procedure delay(ms: double);
 
 {path stuff}
 procedure logHeapStatus(msg: string='Heap status');
-function exists(filename: string): boolean;
 function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
 function extractFilename(const path: string): string;
@@ -446,21 +445,6 @@ begin
       comma(usedMem div 1024),
       comma(freeMem div 1024)
     ]), 60, '-'));
-end;
-
-function exists(filename: string): boolean;
-var
-  f: file;
-begin
-  assign(f, filename);
-  {$I-}
-  reset(f);
-  {$I+}
-  if IOResult = 0 then begin
-    close(f);
-    exit(True);
-  end else
-    exit(False);
 end;
 
 function toLowerCase(const s: string): string;

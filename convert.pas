@@ -23,7 +23,7 @@ type
   public
 
     procedure calculateHash();
-    function fqp: string;
+    function fqn: string;
 
   published
 
@@ -63,20 +63,25 @@ type
 
     {where our files came from}
     sourceFolder: string;
+    {where our repo is stored}
+    repoFolder: string;
 
   protected
     procedure writeObjects();
   public
 
-    constructor create();
+    constructor create(aRepoFolder: string);
     destructor destroy();
 
     procedure clear();
 
+    function  hasCheckpoint(checkpointName: string): boolean;
+    function  getCheckpointPath(checkpointName: string): string;
+
     procedure readFromFolder(path: string);
     procedure exportToFolder(path: string);
-    procedure load(path: string);
-    procedure save(path: string);
+    procedure load(checkpointName: string);
+    procedure save(checkpointName: string);
   end;
 
 const
@@ -97,11 +102,11 @@ begin
   fModified := 0;
 
   {$I-}
-  assign(f, self.fqp);
+  assign(f, self.fqn);
   reset(f,1);
   {$I+}
   if ioResult <> 0 then
-    error('Could not create file reference for file '+fqp);
+    error('Could not create file reference for file '+fqn);
 
   try
     getFTime(f, fModified);
@@ -112,7 +117,7 @@ begin
 end;
 
 {full path to file}
-function tFileRef.fqp: string;
+function tFileRef.fqn: string;
 begin
   result := concatPath(fRoot, fPath);
 end;
@@ -124,11 +129,11 @@ var
   bytesRead: int32;
   buffer: array of byte;
 begin
-  assign(f, fqp);
+  assign(f, fqn);
   try
     reset(f, 1);
     if (fSize > MAX_FILESIZE) then
-      error('Tried to process file that was too large');
+      error(format('Tried to process file that was too large. File size: %fkb File name: %s', [fSize/1024, fqn]));
     setLength(buffer, fSize);
     blockread(f, buffer[0], fSize, bytesRead);
     if bytesRead <> fSize then
@@ -222,12 +227,13 @@ end;
 
 {-------------------------------------------------------------}
 
-constructor tCheckpointManager.create();
+constructor tCheckpointManager.create(aRepoFolder: string);
 begin
   inherited create();
   fileList := nil;
   sourceFolder := '';
-  objectStore := tObjectStore.create('repo\store');
+  repoFolder := aRepoFolder;
+  objectStore := tObjectStore.create(concatPath(repoFolder, 'store'));
 end;
 
 destructor tCheckpointManager.destroy();
@@ -266,7 +272,6 @@ begin
 
   // get all files in folder
   files := FS.listFiles(path+'*.*');
-  setLength(fileList, files.len);
 
   if files.contains('message.txt') then begin
     messageText := loadString(path+'message.txt');
@@ -278,10 +283,18 @@ begin
 
   // create file reference for each one (including hash)
   for i := 0 to files.len-1 do begin
+    if files[i] = 'message.txt' then continue;
     {not: no subfolder support yet, but we'll add it here}
     fileRef := tFileRef.create(files[i], path);
+    if fileRef.size > MAX_FILESIZE then begin
+      warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.size/1024]));
+      fileRef.free;
+      continue;
+    end;
     fileRef.calculateHash();
-    fileList[i] := fileRef;
+    {add reference}
+    setLength(fileList, length(fileList)+1);
+    fileList[length(filelist)-1] := fileRef;
   end;
 end;
 
@@ -292,18 +305,32 @@ begin
 end;
 
 {read checkpoint metadata from file}
-procedure tCheckpointManager.load(path: string);
+procedure tCheckpointManager.load(checkpointName: string);
 begin
   error('NIY');
 end;
 
+function tCheckpointManager.hasCheckpoint(checkpointName: string): boolean;
+begin
+  result := fs.exists(getCheckpointPath(checkpointName));
+end;
+
+{returns path to checkpoint file}
+function tCheckpointManager.getCheckpointPath(checkpointName: string): string;
+begin
+  result := concatPath(repoFolder, checkpointName)+'.txt';
+end;
+
 {saves the checkpoint to repo}
-procedure tCheckpointManager.save(path: string);
+procedure tCheckpointManager.save(checkpointName: string);
 var
   t: tINIFile;
   fileRef: tFileRef;
 begin
-  t := tIniFile.create(path);
+  {save objects first, just in case anything goes wrong}
+  {this way we won't have an ini file already}
+  writeObjects();
+  t := tIniFile.create(getCheckpointPath(checkpointName));
   try
     t.writeSection('commit');
     t.writeString('message', messageText);
@@ -318,7 +345,6 @@ begin
     t.free();
   end;
 
-  writeObjects();
 end;
 
 {writes out objects to object database}
@@ -327,7 +353,7 @@ var
   fileRef: tFileRef;
 begin
   for fileRef in fileList do
-    objectStore.addObject(fileRef.hash, fileRef.fqp);
+    objectStore.addObject(fileRef.hash, fileRef.fqn);
 end;
 
 procedure processOldRepo();
@@ -335,18 +361,23 @@ var
   checkpoint: tCheckpointManager;
   folders: tStringList;
   folder: string;
-  counter: integer;
 begin
-  checkpoint := tCheckpointManager.create();
+  checkpoint := tCheckpointManager.create('repo');
 
   folders := FS.listFolders('$REP');
   folders.sort();
-  counter := 0;
   for folder in folders do begin
+
+    {exclude any folders not matching the expected format}
+    {expected format is yyyymmdd_hhmmss
+    {which I had regex here...}
+    if length(folder) <> 15 then continue;
+    if folder[9] <> '_' then continue;
+
+    if checkpoint.hasCheckpoint(folder) then continue;
+
     checkpoint.readFromFolder('$REP\'+folder);
-    checkpoint.save('repo\'+folder+'.txt');
-    inc(counter);
-    if counter > 10 then exit;
+    checkpoint.save(folder);
   end;
 
   checkpoint.free;
