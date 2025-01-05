@@ -57,10 +57,11 @@ type
 
     objectStore: tObjectStore;
 
-    messageText: string;
-    author: string;
-    date: tDateTime;
-    id: string;
+    fMessage: string;
+    fAuthor: string;
+    fDate: tDateTime;
+    fId: string;
+
     fileList: array of tFileRef;
 
     {where our files came from}
@@ -70,6 +71,14 @@ type
 
   protected
     procedure writeObjects();
+    function objectFactory(s: string): tObject;
+
+  published
+    property message: string read fMessage write fMessage;
+    property author: string read fAuthor write fAuthor;
+    property date: double read fDate write fDate;
+    property id: string read fID write fID;
+
   public
 
     constructor create(aRepoFolder: string);
@@ -107,6 +116,7 @@ constructor tFileRef.create(aPath: string;aRoot: string=''); overload;
 var
   f: file;
 begin
+
   create();
 
   fPath := aPath;
@@ -242,7 +252,7 @@ constructor tCheckpointManager.create(aRepoFolder: string);
 begin
   inherited create();
   fileList := nil;
-  sourceFolder := '';
+  clear();
   repoFolder := aRepoFolder;
   objectStore := tObjectStore.create(concatPath(repoFolder, 'store'));
 end;
@@ -258,11 +268,18 @@ procedure tCheckpointManager.clear();
 var
   fileRef: tFileRef;
 begin
+
   if assigned(fileList) then
     for fileRef in fileList do
       fileRef.free();
   fileList := nil;
+
   sourceFolder := '';
+  message := '';
+  author := '';
+  date := 0;
+  id:= '';
+
 end;
 
 {loads checkpoint from a standard folder (i.e. how V1 worked)}
@@ -285,11 +302,11 @@ begin
   files := FS.listFiles(path+'*.*');
 
   if files.contains('message.txt') then begin
-    messageText := loadString(path+'message.txt');
+    message := loadString(path+'message.txt');
     author := 'matthew';
     date := tMyDateTime.FromDosTC(FS.getModified(concatPath(path, 'message.txt')));
   end else begin
-    messageText := '- no message text - ';
+    message := '- no message text - ';
   end;
 
   // create file reference for each one (including hash)
@@ -326,6 +343,13 @@ begin
   result := concatPath(repoFolder, checkpointName)+'.txt';
 end;
 
+function tCheckpointManager.objectFactory(s: string): tObject;
+begin
+  if s = 'commit' then exit(self);
+  if s = 'file' then exit(tFileRef.create());
+  exit(nil);
+end;
+
 {read checkpoint metadata from file}
 procedure tCheckpointManager.load(checkpointName: string);
 var
@@ -333,28 +357,24 @@ var
   line: string;
   currentSection: string;
   currentFileRef: tFileRef;
+  reader: tINIReader;
+  obj: tObject;
+
 begin
   currentFileRef := nil;
-  {no good way to read ini files yet, so just do this by hand}
-  lines.load(getCheckpointPath(checkpointName));
-  for line in lines do begin
 
-    if line.startsWith('[') and line.endsWith(']') then begin
-      currentSection := copy(line, 2, length(line)-2);
-      if currentSection = 'file' then
-        currentFileRef := tFileRef.create();
-      continue;
-    end;
+  clear();
 
-    if currentSection = 'commit' then begin
-    end else if currentSection = 'file' then begin
-      {note: this could be done automatically... and I could amke commit
-       load the CMP stuff too}
-      if line.startsWith('path=') then
-    end else begin
-      warn(format('ignoring section [%s]', [currentSection]));
+  reader := tINIReader.create(getCheckpointPath(checkpointName), objectFactory);
+
+  while not reader.eof do begin
+    obj := reader.readObject();
+    if obj is tFileRef then begin
+      setLength(fileList, length(fileList)+1);
+      fileList[length(fileList)-1] := tFileRef(obj);
     end;
   end;
+
 end;
 
 {saves the checkpoint to repo}
@@ -386,7 +406,7 @@ begin
   t := tINIWriter.create(getCheckpointPath(checkpointName));
   try
     t.writeSection('commit');
-    t.writeString('message', messageText);
+    t.writeString('message', message);
     t.writeString('id', id);
     t.writeString('author', author);
     t.writeFloat('date', date);

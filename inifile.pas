@@ -28,7 +28,7 @@ type
     destructor Destroy(); override;
   end;
 
-  tObjectConstructorProc = function(s: string): tObject;
+  tObjectConstructorProc = function(s: string): tObject of object;
 
   tINIReader = class
   private
@@ -140,7 +140,7 @@ end;
 
 function tINIReader.eof(): boolean;
 begin
-  result := lineOn > lines.len;
+  result := lineOn >= lines.len;
 end;
 
 function tINIReader.readLine(): string;
@@ -180,8 +180,13 @@ begin
           setOrdProp(obj, propInfo, strToInt(value));
         tkFloat:
           setFloatProp(obj, propInfo, strToFlt(value));
-        tkString, tkLString, tkWString, tkUString, tkAString:
+        tkString, tkLString, tkWString, tkUString, tkAString: begin
+          // strings should be in quotes
+          value := value.trim();
+          if not value.startsWith('"') or not value.endsWith('"') then error(format('String property not quoted %s=%s', [key, value]));
+          value := copy(value, 2, length(value)-2);
           setStrProp(obj, propInfo, value);
+        end;
         tkBool:
           setOrdProp(obj, propInfo, ord(strToBool(value)));
         else
@@ -211,7 +216,7 @@ begin
 
   if not assigned(factory) then error('Must assign a factory to read objects.');
 
-  sectionName := copy(line, 1, length(line)-2);
+  sectionName := copy(line, 2, length(line)-2);
 
   obj := factory(sectionName);
   result := obj;
@@ -223,14 +228,17 @@ begin
     {check if we're at the start of a new section}
     if peekLine.startsWith('[') then exit;
 
+    line := readLine();
+
     {ignore comments and blank lines}
     if line = '' then continue;
     if line.startsWith('#') then continue;
 
     {read properties}
-    line := readLine();
     if not split(line, '=', key, value) then
       error(format('Could not process line "%s", expecting key=value', [line]));
+
+    writeProperty(obj, key, value);
   end;
 end;
 
