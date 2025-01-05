@@ -330,7 +330,7 @@ begin
     objectStore.addObject(fileRef.hash, fileRef.fqp);
 end;
 
-procedure processRepo();
+procedure processOldRepo();
 var
   checkpoint: tCheckpointManager;
   folders: tStringList;
@@ -340,6 +340,7 @@ begin
   checkpoint := tCheckpointManager.create();
 
   folders := FS.listFolders('$REP');
+  folders.sort();
   counter := 0;
   for folder in folders do begin
     checkpoint.readFromFolder('$REP\'+folder);
@@ -357,6 +358,6 @@ begin
   WRITE_TO_SCREEN := true;
   test.runTestSuites();
 
-  processRepo();
+  processOldRepo();
 
 end.

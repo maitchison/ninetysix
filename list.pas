@@ -10,6 +10,7 @@ uses
 type
 
   tIntList = record
+    {includes startPos, excludes endPos}
     startPos,endPos: int32;
     data: array of int32;
     constructor create(const data: array of int32);
@@ -57,6 +58,8 @@ type
     function head: string;
     function tail: tStringList;
     function contains(item: string): boolean;
+
+    procedure sort();
 
     function toString: string;
 
@@ -156,12 +159,13 @@ begin
 end;
 
 {create a sliced copy}
+{includes startPos, excludes endPos}
 function tIntList.slice(aStartPos, aEndPos: int32): tIntList;
 begin
   aStartPos := deref(aStartPos);
   aEndPos := deref(aEndPos);
   if (aStartPos < 0) or (aStartPos >= length(data)) then runError(201);
-  if (aEndPos < 0) or (aEndPos >= length(data)) then runError(201);
+  if (aEndPos < 0) or (aEndPos > length(data)) then runError(201);
   if aStartPos > aEndPos then runError(201);
   result.startPos := aStartPos;
   result.endPos := aEndPos;
@@ -192,7 +196,7 @@ begin
   if len = 0 then exit('[]');
   result := '[';
   for i := startPos to endPos-1 do
-    result += data[i] + ',';
+    result += '"'+data[i] + '",';
   result[length(result)] := ']';
 end;
 
@@ -286,12 +290,56 @@ begin
   aStartPos := deref(aStartPos);
   aEndPos := deref(aEndPos);
   if (aStartPos < 0) or (aStartPos >= length(data)) then runError(201);
-  if (aEndPos < 0) or (aEndPos >= length(data)) then runError(201);
+  if (aEndPos < 0) or (aEndPos > length(data)) then runError(201);
   if aStartPos > aEndPos then runError(201);
   result.startPos := aStartPos;
   result.endPos := aEndPos;
   result.data := self.data;
 end;
+
+{sorts elements within this slice}
+procedure tStringList.sort();
+var
+  mid: int32;
+  leftHalf,rightHalf: tStringList;
+  i,j,k: int32;
+  value: string;
+  goLeft: boolean;
+begin
+  {base case}
+  if len <= 1 then exit;
+  {merge sort, because quicksort is hard}
+  mid := len div 2;
+
+  leftHalf := slice(0, mid).clone();
+  rightHalf := slice(mid, len).clone();
+
+  leftHalf.sort();
+  rightHalf.sort();
+
+  {perform merge}
+  i := 0;
+  j := 0;
+  for k := 0 to len-1 do begin
+    if (i >= leftHalf.len) then
+      goLeft := false
+    else if (j >= rightHalf.len) then
+      goLeft := true
+    else
+      goLeft := (leftHalf[i] < rightHalf[j]);
+
+    if goLeft then begin
+      value := leftHalf[i];
+      i += 1;
+    end else begin
+      value := rightHalf[j];
+      j += 1;
+    end;
+    self[k] := value;
+  end;
+
+end;
+
 
 {create a copy of this slice without any slicing}
 function tStringList.clone(): tStringList;
@@ -334,7 +382,7 @@ type
 procedure tListTest.run();
 var
   list: tIntList;
-  s1,s2: tStringList;
+  s1,s2,s3: tStringList;
 begin
   list := tIntList.create([1,2,3,4,5,6]);
   assertEqual(list.len, 6);
@@ -362,7 +410,20 @@ begin
 
   s1 := tStringList.create(['a','b']);
   s2 := tStringList.create(['c','d']);
-  assertEqual((s1+s2).toString, '[a,b,c,d]');
+  s3 := (s1+s2);
+  assertEqual(s3.toString, '["a","b","c","d"]');
+  assertEqual(s3.slice(0,1).toString, '["a"]');
+  assertEqual(s3.slice(1,2).toString, '["b"]');
+  assertEqual(s3.slice(2,3).toString, '["c"]');
+  assertEqual(s3.slice(3,4).toString, '["d"]');
+
+  s1 := tStringList.create(['101','202','103']);
+
+
+
+  s1.sort();
+  assertEqual(s1.toString, '["101","103","202"]');
+
 
 end;
 
