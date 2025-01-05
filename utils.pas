@@ -125,7 +125,6 @@ function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double; inline;
-function  fileModifiedTime(fileName: string): dword;
 
 procedure dumpString(s: string; filename: string);
 function  loadString(filename: string): string;
@@ -738,24 +737,6 @@ begin
   result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
 end;
 
-{returns timestamp for file modified time, or 0 if file not found.}
-function fileModifiedTime(fileName: string): dword;
-var
-  f: file;
-  t: longint;
-begin
-  assign(f, fileName);
-  {$I-}
-  reset(f);
-  {$I+}
-  if IOResult <> 0 then
-    exit(0);
-  getFTime(f, t);
-  close(f);
-  exit(t);
-end;
-
-
 procedure dumpString(s: string; filename: string);
 var
   t: text;
@@ -908,6 +889,7 @@ var
   Hour, Minute, Second: Word;
 
 begin
+  {todo: switch to unpacktime}
   DosDate := dosTime shr 16;
   DosTimePart := dosTime and $ffff;
 

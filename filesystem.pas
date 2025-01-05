@@ -12,15 +12,58 @@ uses
 
 type
   tFileSystem = class
-    function mkDir(path: string): boolean;
-    function listFiles(path: string): tStringList;
-    function listFolders(path: string): tStringList;
+
+    procedure copyFile(srcFile, dstFile: string);
+    procedure setModified(fileName: string;time: dword);
+    function  getModified(fileName: string): dword;
+
+    function  mkDir(path: string): boolean;
+    function  listFiles(path: string): tStringList;
+    function  listFolders(path: string): tStringList;
   end;
 
 var
   FS: tFilesystem;
 
 implementation
+
+procedure tFileSystem.copyFile(srcFile, dstFile: string);
+begin
+  {not sure this is the best way to do this?}
+  dos.exec(getEnv('COMSPEC'), format('/C copy %s %s > nul', [srcFile, dstFile]));
+end;
+
+procedure tFileSystem.setModified(fileName: string;time: dword);
+var
+  f: file;
+begin
+  assign(f, fileName);
+  {$I-}
+  reset(f);
+  {$I+}
+  if IOResult <> 0 then
+    exit;
+  dos.setFTime(f, time);
+  close(f);
+end;
+
+{returns timestamp for file modified time, or 0 if file not found.}
+function tFileSystem.getModified(fileName: string): dword;
+var
+  f: file;
+  t: longint;
+begin
+  assign(f, fileName);
+  {$I-}
+  reset(f);
+  {$I+}
+  if IOResult <> 0 then
+    exit(0);
+  dos.getFTime(f, t);
+  close(f);
+  exit(t);
+end;
+
 
 {create folder. returns if it was created or not}
 function tFileSystem.mkDir(path: string): boolean;
