@@ -1,5 +1,7 @@
-{convert from go-v1 repo to go-v2}
-program convert;
+{handles git like repo}
+unit checkpoint;
+
+interface
 
 uses
   debug,
@@ -94,6 +96,8 @@ type
     procedure save(checkpointName: string);
   end;
 
+implementation
+
 const
   {fine for text files, but don't process large binary files}
   MAX_FILESIZE = 128*1024;
@@ -184,7 +188,7 @@ var
 begin
   if assigned(lookupByHash(hash)) then
     exit(false);
-  note(format(' -adding object %s <-- %s',[copy(hash, 1, 8), objectPath]));
+  note(format(' -adding object %s <- %s',[copy(hash, 1, 8), objectPath]));
   srcFile := objectPath;
   dstFile := concatPath(root, hash);
   fs.copyFile(srcFile, dstFile);
@@ -440,53 +444,7 @@ begin
     objectStore.addObject(fileRef.hash, fileRef.fqn);
 end;
 
-procedure processOldRepo();
-var
-  cpm: tCheckpointManager;
-  folders: tStringList;
-  folder: string;
-begin
-  cpm := tCheckpointManager.create('repo');
-
-  folders := FS.listFolders('$REP');
-  folders.sort();
-  for folder in folders do begin
-
-    {exclude any folders not matching the expected format}
-    {expected format is yyyymmdd_hhmmss
-    {which I had regex here...}
-    if length(folder) <> 15 then continue;
-    if folder[9] <> '_' then continue;
-
-    if cpm.hasCheckpoint(folder) then continue;
-
-    cpm.readFromFolder('$REP\'+folder);
-    cpm.save(folder);
-  end;
-
-  cpm.free;
-end;
-
-procedure viewCheckpoint();
-var
-  cpm: tCheckpointManager;
-begin
-  cpm := tCheckpointManager.create('repo');
-
-  cpm.load('20241129_093958');
-  cpm.exportToFolder('tmp');
-
-  cpm.free;
-end;
-
+{-------------------------------------------------------------}
 
 begin
-  textattr := $07;
-  clrscr;
-  WRITE_TO_SCREEN := true;
-  test.runTestSuites();
-
-  processOldRepo();
-  viewCheckpoint();
-
 end.

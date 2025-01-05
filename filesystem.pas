@@ -13,8 +13,9 @@ uses
 type
   tFileSystem = class
 
-    function exists(filename: string): boolean;
+    function  exists(filename: string): boolean;
     procedure copyFile(srcFile, dstFile: string);
+    function  fileSize(fileName: string): int64;
     procedure setModified(fileName: string;time: dword);
     function  getModified(fileName: string): dword;
 
@@ -47,6 +48,21 @@ procedure tFileSystem.copyFile(srcFile, dstFile: string);
 begin
   {not sure this is the best way to do this?}
   dos.exec(getEnv('COMSPEC'), format('/C copy %s %s > nul', [srcFile, dstFile]));
+end;
+
+{return filesize of file or 0 if not found.}
+function tFileSystem.fileSize(fileName: string): int64;
+var
+  f: file;
+begin
+  assign(f, fileName);
+  {$I-}
+  reset(f);
+  {$I+}
+  if IOResult <> 0 then
+    exit(0);
+  result := system.FileSize(f);
+  close(f);
 end;
 
 procedure tFileSystem.setModified(fileName: string;time: dword);

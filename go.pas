@@ -35,6 +35,7 @@ uses
   diff,
   utils,
   hashMap,
+  checkpoint,
   md5,
   list,
   filesystem,
@@ -46,7 +47,9 @@ type
     added: int64;
     removed: int64;
     changed: int64;
+    newLen: int64;
     function net: int64;
+    function unchanged: int64;
     procedure print();
     procedure clear();
 
@@ -126,13 +129,21 @@ begin
   result := added - removed;
 end;
 
+function tDiffStats.unchanged: int64;
+begin
+  result := newLen - added - changed;
+end;
+
 procedure tDiffStats.clear();
 begin
   files := 0;
   added := 0;
   removed := 0;
   changed := 0;
+  newLen := 0;
 end;
+
+
 
 procedure tDiffStats.print();
 var
@@ -140,12 +151,14 @@ var
 begin
   if net > 0 then plus := '+' else plus := '';
   if added > 0 then
-    outputX('Added   ', lpad(intToStr(added), 4),   ' lines.', LIGHTGREEN);
+    outputX('Added     ', lpad(intToStr(added), 4),     ' lines.', LIGHTGREEN);
   if removed > 0 then
-    outputX('Removed ', lpad(intToStr(removed), 4), ' lines.', LIGHTRED);
+    outputX('Removed   ', lpad(intToStr(removed), 4),   ' lines.', LIGHTRED);
   if changed > 0 then
-    outputX('Changed ', lpad(intToStr(changed), 4), ' lines.', CYAN);
-  outputX('Net     ',   lpad(plus+intToStr(net), 4),' lines.', YELLOW);
+    outputX('Changed   ', lpad(intToStr(changed), 4),   ' lines.', CYAN);
+  if unchanged > 0 then
+    outputX('Unchanged ', lpad(intToStr(unchanged), 4), ' lines.', DARKGRAY);
+  outputX  ('Net       ', lpad(plus+intToStr(net), 4),  ' lines.', YELLOW);
 end;
 
 class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
@@ -154,6 +167,7 @@ begin
   result.added := a.added + b.added;
   result.removed := a.removed + b.removed;
   result.changed := a.changed + b.changed;
+  result.newLen := a.newLen + b.newLen;
 end;
 
 {--------------------------------------------------------}
@@ -280,23 +294,6 @@ var
     end;
   end;
 
-  procedure processTail();
-  begin
-    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
-      textAttr := LIGHTRED;
-      outputLn(intToStr(j, 4, '0')+' [-] '+fix(oldLines[j]));
-      inc(j);
-      inc(result.removed);
-    end;
-
-    while (i < length(newLines)) and (newLines[i] <> cur) do begin
-      textAttr := LIGHTGREEN;
-      outputLn('     [+] '+fix(newLines[i]));
-      inc(i);
-      inc(result.added);
-    end;
-  end;
-
 begin
 
   result.clear();
@@ -313,10 +310,28 @@ begin
   for i := 1 to length(newLines) do
     newS.append(i);
 
+  result.newLen := newS.len;
+
   {detect identical files}
   if matching.len = max(oldS.len, newS.len) then begin
     textAttr := WHITE;
     outputLn('Files are identical.');
+    exit;
+  end;
+
+  {handle the added / deleted cases, which don't work for some reason}
+  {note: this might indicate a big with changes at the end being missing}
+  if matching.len = 0 then begin
+    for i := 0 to length(oldLines)-1 do begin
+      textAttr := LIGHTRED;
+      outputLn(intToStr(i+1, 4, '0')+' [-] '+fix(oldLines[i]));
+      inc(result.removed);
+    end;
+    for i := 0 to length(newLines)-1 do begin
+      textAttr := LIGHTGREEN;
+      outputLn(intToStr(i+1, 4, '0')+' [+] '+fix(newLines[i]));
+      inc(result.added);
+    end;
     exit;
   end;
 
@@ -348,7 +363,6 @@ begin
       markImportant(j);
       inc(j);
     end;
-
     while (i < length(newLines)) and (newLines[i] <> cur) do begin
       markImportant(j);
       inc(i);
@@ -390,7 +404,7 @@ begin
       end;
 
       if (j < length(importantLines)) and importantLines[j] then
-        outputLn(intToStr(j, 4, '0')+' [ ] '+fix(cur));
+        outputLn(intToStr(j+1, 4, '0')+' [ ] '+fix(cur));
 
       inc(i);
       inc(j);
@@ -403,10 +417,21 @@ begin
         break;
       end;
     end;
-    processTail();
-  end;
 
-  processTail();
+    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
+      textAttr := LIGHTRED;
+      outputLn(intToStr(j+1, 4, '0')+' [-] '+fix(oldLines[j]));
+      inc(j);
+      inc(result.removed);
+    end;
+
+    while (i < length(newLines)) and (newLines[i] <> cur) do begin
+      textAttr := LIGHTGREEN;
+      outputLn('     [+] '+fix(newLines[i]));
+      inc(i);
+      inc(result.added);
+    end;
+  end;
 
   outputLn('');
   textAttr := WHITE;
@@ -455,7 +480,7 @@ begin
   writeln('NM         ',length(new)*length(old));
 end;
 
-function runDiff(filename: string): tDiffStats;
+function runDiff(filename: string; otherFilename: string=''): tDiffStats;
 var
   merge: tIntList;
   sln: tLineRefs;
@@ -463,8 +488,11 @@ var
   diff: tDiff;
   i: integer;
 begin
+
+  if otherFilename = '' then otherFilename := filename;
+
   new := readFile(filename);
-  old := readFile('$rep/head/'+filename);
+  old := readFile('$rep/head/'+otherFilename);
 
   diff := tDiff.create();
 
@@ -569,6 +597,42 @@ begin
   writeln();
 end;
 
+{checks if originalFile is very similar to any of the other files in
+ filesToCheck, and if so returns the matching new filename}
+function checkForRename(originalFile: string; filesToCheck: tStringList): string;
+var
+  filename: string;
+  ourFileSize: int64;
+  filesizeRatio: double;
+  changedratio: double;
+  stats: tDiffStats;
+  oldSilent: boolean;
+begin
+  result := '';
+
+  ourFileSize := fs.fileSize(originalFile);
+
+  // we don't check very small files
+  if ourFileSize < 64 then exit;
+
+  for filename in filesToCheck do begin
+    // do not check ourselves
+    if filename = originalFile then continue;
+    fileSizeRatio := fs.fileSize(concatPath('$rep\head\', filename)) / ourFileSize;
+    //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
+    if (fileSizeRatio > 1.2) or (fileSizeRatio < 0.8) then continue;
+    oldSilent := SILENT;
+    SILENT := true;
+    stats := runDiff(originalFile, filename);
+    SILENT := oldSilent;
+    changedRatio := stats.unchanged / stats.newLen;
+    //outputln(format('changeratio %f %s %s ', [changedRatio, originalFile, filename]));
+    if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
+    result := filename;
+    exit;
+  end;
+end;
+
 {show all diff on all modified files}
 procedure diffOnWorkspace();
 var
@@ -577,6 +641,8 @@ var
   filename: string;
   fileStats: tDiffStats;
   stats: tDiffStats;
+  renamedFile: string;
+  renamedFiles: tStringList;
 begin
 
   totalStats.clear();
@@ -588,8 +654,27 @@ begin
 
   outputLn('');
 
+  renamedFiles.clear();
+
+  // look for files that were renamed
+  for filename in workingSpaceFiles do begin
+    if headFiles.contains(filename) then continue;
+    renamedFile := checkForRename(filename, headFiles);
+    if renamedFile = '' then continue;
+    // we found a renamed file
+    textAttr := WHITE;
+    outputLn('----------------------------------------');
+    outputX (' Renamed ',filename+' -> '+renamedFile, '', LIGHTBLUE);
+    outputLn('----------------------------------------');
+    stats := runDiff(filename, renamedFile);
+    inc(fileStats.added);
+    renamedFiles += filename;
+    renamedFiles += renamedFile;
+  end;
+
   for filename in headFiles do begin
     if workingSpaceFiles.contains(filename) then continue;
+    if renamedFiles.contains(filename) then continue;
     textAttr := WHITE;
     outputLn('----------------------------------------');
     outputX (' Removed ',filename, '', LIGHTRED);
@@ -599,6 +684,7 @@ begin
   end;
 
   for filename in workingSpaceFiles do begin
+    if renamedFiles.contains(filename) then continue;
     if not headFiles.contains(filename) then begin
       textAttr := WHITE;
       outputLn('----------------------------------------');
@@ -607,21 +693,18 @@ begin
       stats := runDiff(filename);
       inc(fileStats.added);
     end else begin
-      if wasModified(filename, '$rep\head\'+filename) then begin
-        textAttr := WHITE;
-        outputLn('----------------------------------------');
-        outputX (' Modified ', filename, '', YELLOW);
-        outputLn('----------------------------------------');
-        stats := runDiff(filename);
-        textAttr := WHITE;
-        //outputln(filename+':');
-        totalStats += stats;
-        inc(fileStats.changed);
-      end;
+      if not wasModified(filename, '$rep\head\'+filename) then continue;
+      textAttr := WHITE;
+      outputLn('----------------------------------------');
+      outputX (' Modified ', filename, '', YELLOW);
+      outputLn('----------------------------------------');
+      stats := runDiff(filename);
+      textAttr := WHITE;
+      //outputln(filename+':');
+      totalStats += stats;
+      inc(fileStats.changed);
     end;
   end;
-
-  {todo: put summary here}
 
   textAttr := WHITE;
   outputLn('----------------------------------------');
@@ -630,6 +713,30 @@ begin
   totalStats.print();
 end;
 
+{--------------------------------------------------}
+
+{generate per commit stats. Quite slow}
+procedure generateCheckpointStats();
+var
+  cpm: tCheckpointManager;
+  checkpoints: tStringList;
+  checkpoint: string;
+begin
+  cpm := tCheckpointManager.create('$repo');
+
+  checkpoints := fs.listFiles('$repo');
+  checkpoints.sort();
+  for checkpoint in checkpoints do begin
+
+    {exclude any folders not matching the expected format}
+    {expected format is yyyymmdd_hhmmss
+    {which I had regex here...}
+    if not checkpoint.endsWith('.txt', True) then continue;
+    cpm.load(removeExtension(checkpoint));
+    //cpm.exportToFolder('a');
+  end;
+  cpm.free;
+end;
 
 {--------------------------------------------------}
 
