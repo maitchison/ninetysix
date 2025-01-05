@@ -51,6 +51,7 @@ type
     function net: int64;
     function unchanged: int64;
     procedure print();
+    procedure printShort();
     procedure clear();
 
     class operator add(a,b: tDiffStats): tDiffStats;
@@ -143,8 +144,6 @@ begin
   newLen := 0;
 end;
 
-
-
 procedure tDiffStats.print();
 var
   plus: string;
@@ -159,6 +158,28 @@ begin
   if unchanged > 0 then
     outputX('Unchanged ', lpad(intToStr(unchanged), 4), ' lines.', DARKGRAY);
   outputX  ('Net       ', lpad(plus+intToStr(net), 4),  ' lines.', YELLOW);
+end;
+
+procedure tDiffStats.printShort();
+var
+  plus: string;
+  oldTextAttr: byte;
+begin
+  oldTextAttr := textAttr;
+  textAttr := LIGHTGRAY;
+  output('(');
+  if net > 0 then plus := '+' else plus := '';
+  textAttr := LIGHTGREEN;
+  if added > 0 then output(intToStr(added)+' ');
+  textAttr := LIGHTRED;
+  if removed > 0 then output(intToStr(removed)+' ');
+  textAttr := CYAN;
+  if changed > 0 then output(intToStr(changed)+' ');
+  textAttr := YELLOW;
+  output(plus+intToStr(net));
+  textAttr := LIGHTGRAY;
+  output(')');
+  textAttr := oldTextAttr;
 end;
 
 class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
@@ -582,6 +603,7 @@ var
   headFiles: tStringList;
   filename, renamedFile: string;
   added,removed,changed,renamed: int32;
+  stats: tDiffStats;
 begin
   writeln();
   renamedFiles.clear();
@@ -598,7 +620,10 @@ begin
     renamedFile := checkForRename(filename, headFiles);
     if renamedFile <> '' then begin
       textattr := LIGHTBLUE;
-      writeln('[>] renamed ', filename, ' to ', renamedFile);
+      stats := runDiff(filename, renamedFile);
+      output('[>] renamed '+filename+' to '+renamedFile+' ');
+      stats.printShort();
+      outputln('');
       inc(renamed);
     end;
     renamedFiles += filename;
@@ -609,12 +634,19 @@ begin
     if renamedFiles.contains(filename) then continue;
     if not headFiles.contains(filename) then begin
       textattr := LIGHTGREEN;
-      writeln('[+] added ', filename);
+      stats := runDiff(filename);
+      output('[+] added ' + filename + ' ');
+      stats.printShort();
+      outputln('');
+
       inc(added);
     end else begin
       if wasModified(filename, '$rep\head\'+filename) then begin
         textattr := WHITE;
-        writeln('[~] modified ', filename);
+        stats := runDiff(filename);
+        output('[~] modified ' + filename + ' ');
+        stats.printShort();
+        outputln('');
         inc(changed);
       end;
     end;
@@ -624,7 +656,10 @@ begin
     if renamedFiles.contains(filename) then continue;
     if not workingSpaceFiles.contains(filename) then begin
       textattr := LIGHTRED;
-      writeln('[-] removed ', filename);
+      stats := runDiff(filename);
+      writeln('[-] removed ' + filename + ' ');
+      stats.printShort();
+      outputln('');
       inc(removed);
     end;
   end;
