@@ -91,7 +91,7 @@ type
     function  getCheckpointPath(checkpointName: string): string;
 
     procedure readFromFolder(path: string);
-    procedure exportToFolder(path: string);
+    procedure exportToFolder(dstFolder: string);
     procedure load(checkpointName: string);
     procedure save(checkpointName: string);
   end;
@@ -330,14 +330,12 @@ begin
 end;
 
 {writes all files to folder so that others can read them}
-procedure tCheckpointManager.exportToFolder(path: string);
+procedure tCheckpointManager.exportToFolder(dstFolder: string);
 var
   fileRef: tFileRef;
-  dstFolder: string;
   dstFile: string;
   srcFile: string;
 begin
-  dstFolder := concatPath(repoFolder, path);
   fs.mkdir(dstFolder);
   for fileRef in fileList do begin
     dstFile := concatPath(dstFolder, fileRef.path);

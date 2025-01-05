@@ -19,6 +19,9 @@ type
     procedure setModified(fileName: string;time: dword);
     function  getModified(fileName: string): dword;
 
+    procedure rename(a,b: string);
+    procedure delFolder(path: string);
+
     function  mkDir(path: string): boolean;
     function  listFiles(path: string): tStringList;
     function  listFolders(path: string): tStringList;
@@ -28,6 +31,16 @@ var
   FS: tFilesystem;
 
 implementation
+
+procedure tFileSystem.rename(a,b: string);
+begin
+  dos.exec(getEnv('COMSPEC'), '/C ren '+a+' '+b);
+end;
+
+procedure tFileSystem.delFolder(path: string);
+begin
+  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+path);
+end;
 
 function tFileSystem.exists(filename: string): boolean;
 var

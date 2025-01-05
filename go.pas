@@ -155,8 +155,8 @@ begin
     outputX('Removed   ', lpad(intToStr(removed), 4),   ' lines.', LIGHTRED);
   if changed > 0 then
     outputX('Changed   ', lpad(intToStr(changed), 4),   ' lines.', CYAN);
-  if unchanged > 0 then
-    outputX('Unchanged ', lpad(intToStr(unchanged), 4), ' lines.', DARKGRAY);
+  //if unchanged > 0 then
+  //  outputX('Unchanged ', lpad(intToStr(unchanged), 4), ' lines.', DARKGRAY);
   outputX  ('Net       ', lpad(plus+intToStr(net), 4),  ' lines.', YELLOW);
 end;
 
@@ -168,15 +168,15 @@ begin
   oldTextAttr := textAttr;
   textAttr := LIGHTGRAY;
   output('(');
-  if net > 0 then plus := '+' else plus := '';
   textAttr := LIGHTGREEN;
-  if added > 0 then output(intToStr(added)+' ');
+  output(intToStr(added, 3, ' ')+' ');
   textAttr := LIGHTRED;
-  if removed > 0 then output(intToStr(removed)+' ');
-  textAttr := CYAN;
-  if changed > 0 then output(intToStr(changed)+' ');
+  output(intToStr(removed, 3, ' ')+' ');
+  {textAttr := CYAN;
+  if changed > 0 then output(intToStr(changed, 3, ' ')+' ');}
   textAttr := YELLOW;
-  output(plus+intToStr(net));
+  if net > 0 then plus := '+' else plus := '';
+  output(lpad(plus+intToStr(net), 3, ' '));
   textAttr := LIGHTGRAY;
   output(')');
   textAttr := oldTextAttr;
@@ -500,14 +500,18 @@ begin
   writeln('NM         ',length(new)*length(old));
 end;
 
-function runDiff(filename: string; otherFilename: string=''): tDiffStats;
+function runDiff(filename: string; otherFilename: string=''; printOutput: boolean=true): tDiffStats;
 var
   merge: tIntList;
   sln: tLineRefs;
   new,old: tLines;
   diff: tDiff;
   i: integer;
+  oldSilent: boolean;
 begin
+
+  oldSilent := SILENT;
+  SILENT := not printOutput;
 
   if otherFilename = '' then otherFilename := filename;
 
@@ -521,6 +525,8 @@ begin
   for i := 0 to length(sln)-1 do
     merge.append(sln[i]);
   result := processDiff(new, old, merge);
+
+  SILENT := oldSilent;
 end;
 
 procedure promptAndCommit();
@@ -567,7 +573,6 @@ var
   filesizeRatio: double;
   changedratio: double;
   stats: tDiffStats;
-  oldSilent: boolean;
 begin
   result := '';
 
@@ -582,10 +587,7 @@ begin
     fileSizeRatio := fs.fileSize(concatPath('$rep\head\', filename)) / ourFileSize;
     //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
     if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
-    oldSilent := SILENT;
-    SILENT := true;
-    stats := runDiff(originalFile, filename);
-    SILENT := oldSilent;
+    stats := runDiff(originalFile, filename, false);
     changedRatio := stats.unchanged / stats.newLen;
     //outputln(format('changeratio %f %s %s ', [changedRatio, originalFile, filename]));
     if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
@@ -605,6 +607,7 @@ var
   added,removed,changed,renamed: int32;
   stats: tDiffStats;
 begin
+
   writeln();
   renamedFiles.clear();
   workingSpaceFiles := getSourceFiles('');
@@ -620,8 +623,8 @@ begin
     renamedFile := checkForRename(filename, headFiles);
     if renamedFile <> '' then begin
       textattr := LIGHTBLUE;
-      stats := runDiff(filename, renamedFile);
-      output('[>] renamed '+filename+' to '+renamedFile+' ');
+      stats := runDiff(filename, renamedFile, false);
+      output(pad('[>] renamed '+filename+' to '+renamedFile, 40, ' '));
       stats.printShort();
       outputln('');
       inc(renamed);
@@ -634,8 +637,8 @@ begin
     if renamedFiles.contains(filename) then continue;
     if not headFiles.contains(filename) then begin
       textattr := LIGHTGREEN;
-      stats := runDiff(filename);
-      output('[+] added ' + filename + ' ');
+      stats := runDiff(filename, filename, false);
+      output(pad('[+] added ' + filename, 40, ' '));
       stats.printShort();
       outputln('');
 
@@ -643,8 +646,8 @@ begin
     end else begin
       if wasModified(filename, '$rep\head\'+filename) then begin
         textattr := WHITE;
-        stats := runDiff(filename);
-        output('[~] modified ' + filename + ' ');
+        stats := runDiff(filename, filename, false);
+        output(pad('[~] modified ' + filename, 40, ' '));
         stats.printShort();
         outputln('');
         inc(changed);
@@ -656,8 +659,8 @@ begin
     if renamedFiles.contains(filename) then continue;
     if not workingSpaceFiles.contains(filename) then begin
       textattr := LIGHTRED;
-      stats := runDiff(filename);
-      writeln('[-] removed ' + filename + ' ');
+      stats := runDiff(filename, filename, false);
+      output(pad('[-] removed ' + filename, 40, ' '));
       stats.printShort();
       outputln('');
       inc(removed);
@@ -668,6 +671,7 @@ begin
   if (added = 0) and (removed = 0) and (changed = 0) and (renamed = 0) then
     writeln('No changes.');
   writeln();
+
 end;
 
 {show all diff on all modified files}
@@ -764,19 +768,40 @@ var
   cpm: tCheckpointManager;
   checkpoints: tStringList;
   checkpoint: string;
+  previousCheckpoint: string;
+  folderA, folderB: string;
+
 begin
   cpm := tCheckpointManager.create('$repo');
 
   checkpoints := fs.listFiles('$repo');
   checkpoints.sort();
-  for checkpoint in checkpoints do begin
 
+  previousCheckpoint := '';
+  folderA := concatPath('$repo', 'a');
+  folderB := concatPath('$repo', 'b');
+  fs.delFolder(folderA);
+  fs.delFolder(folderB);
+  fs.mkdir(folderA);
+
+  for checkpoint in checkpoints do begin
     {exclude any folders not matching the expected format}
     {expected format is yyyymmdd_hhmmss
     {which I had regex here...}
     if not checkpoint.endsWith('.txt', True) then continue;
+
+    {del old folder}
+    fs.delFolder(folderB);
+
+    {swap new to old}
+    fs.rename(folderA, folderB);
+
+    {export new folder}
     cpm.load(removeExtension(checkpoint));
-    //cpm.exportToFolder('a');
+    cpm.exportToFolder(folderA);
+
+    // stub
+    break;
   end;
   cpm.free;
 end;
