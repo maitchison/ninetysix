@@ -97,7 +97,6 @@ begin
   if SILENT then exit;
   writeln(s);
 
-
   if not USE_PAGING then exit;
 
   inc(LINES_SINCE_PAGE);
@@ -512,7 +511,6 @@ var
   diff: tDiff;
   i: integer;
   oldSilent: boolean;
-
   cacheKey: string;
 begin
 
@@ -780,6 +778,13 @@ var
   folderA, folderB: string;
   counter: int32;
   stats: tDiffStats;
+
+  csvLines: tLines;
+  csvEntries: tStringToStringMap;
+  line: string;
+  key,value: string;
+  previousSkippedCheckpoint: string;
+
 var
   csvFile: text;
 begin
@@ -804,41 +809,77 @@ begin
   counter := 0;
 
   assign(csvFile, 'stats.csv');
-  rewrite(csvFile);
 
-  writeln(csvFile, '"Checkpoint","Date","Added","Removed","Changed"');
+  csvEntries := tStringToStringMap.create();
+
+  if fs.exists('stats.csv') then begin
+    csvLines := readFile('stats.csv');
+    for line in csvLines do begin
+      split(line, ',', key, value);
+      if length(key) < 2 then continue;
+      key := copy(key, 2, length(key)-2); {remove ""}
+      csvEntries.setValue(key, value);
+    end;
+    append(csvFile);
+  end else begin
+    rewrite(csvFile);
+    writeln(csvFile, '"Checkpoint","Date","Added","Removed","Changed"');
+  end;
+
+  previousSkippedCheckpoint := '';
 
   for checkpoint in checkpoints do begin
 
     write(pad(checkpoint, 40, ' '));
+
     {exclude any folders not matching the expected format}
     {expected format is yyyymmdd_hhmmss
     {which I had regex here...}
     if not checkpoint.endsWith('.txt', True) then continue;
 
+    if csvEntries.hasKey(checkpoint) then begin
+      writeln('[skip]');
+      previousSkippedCheckpoint := checkpoint;
+      continue;
+    end;
+
+    {ok we skiped some checkpoints, so copy the previous one in}
+    if previousSkippedCheckpoint <> '' then begin
+      cpm.load(removeExtension(previousSkippedCheckpoint));
+      fs.delFolder(folderA);
+      cpm.exportToFolder(folderA);
+      previousSkippedCheckpoint := '';
+    end;
+
+    {note: we can skip the exports and just check files from
+     the object database... but requires some changes}
+
     {folderA is the newer checkpoint}
-
-    {del old folder}
+    startTimer('swapFolder');
     fs.delFolder(folderB);
-
-    {swap new to old}
     fs.rename(folderA, folderB);
     fs.mkdir(folderA);
+    stopTimer('swapFolder');
 
     {export new folder}
+    startTimer('exportFolder');
     cpm.load(removeExtension(checkpoint));
     cpm.exportToFolder(folderA);
+    stopTimer('exportFolder');
 
+    startTimer('diff');
     SILENT := true;
     stats := diffOnWorkspace();
     SILENT := false;
     stats.printShort(6);
     writeln();
+    stopTimer('diff');
 
     // write stats to file
     writeln(csvFile,
       format('"%s", %.9f, %d, %d, %d', [checkpoint, cpm.date, stats.added, stats.removed, stats.changed])
     );
+    flush(csvFile);
 
     counter += 1;
 
