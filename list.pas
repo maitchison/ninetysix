@@ -121,14 +121,28 @@ begin
   self.clear();
   numberLength := 0;
   for i := 1 to length(s) do begin
-    if s[i] = '[' then continue;
-    if s[i] in ['0'..'9'] then inc(numberLength);
-    if s[i] in [',', ']'] then begin
-      value := strToInt(copy(s,i-numberLength,numberLength));
-      self += value;
-      numberLength := 0;
+    case s[i] of
+      '[': continue;
+      '0'..'9': inc(numberLength);
+      ',': begin
+        if numberLength = 0 then
+          error('Invalid tIntList string');
+        value := strToInt(copy(s,i-numberLength,numberLength));
+        self += value;
+        numberLength := 0;
+      end;
+      ']': begin
+        if i <> length(s) then error('Found characters after ]');
+        {process final number (if any)}
+        if numberLength = 0 then exit;
+        value := strToInt(copy(s,i-numberLength,numberLength));
+        self += value;
+        exit;
+      end;
+      else error('Invalid character "'+s[i]+'" in tIntList string.');
     end;
   end;
+  error('String missing ]');
 end;
 
 function tIntList.deref(index: int32): int32;
@@ -491,6 +505,9 @@ begin
   list2 := tIntList.create([5]);
   list2.loadS(list.dumpS);
   assertEqual(list2.toString, '[11,2,32,4,5,6]');
+
+  list.loads('[]');
+  assertEqual(list.len, 0);
 
   list := tIntList.create([]);
   assertEqual(list.toString, '[]');
