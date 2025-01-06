@@ -22,6 +22,8 @@ type
     function tail: tIntList;
 
     function toString: string;
+    function dumpS: string;
+    procedure loadS(s: string);
 
     function getItem(index: int32): int32;
     procedure setItem(index: int32; value: int32);
@@ -99,6 +101,13 @@ begin
   for i := startPos to endPos-1 do
     result += intToStr(int32(data[i])) + ',';
   result[length(result)] := ']';
+end;
+
+function tIntList.dumpS: string;
+begin
+end;
+procedure tIntList.loadS(s: string);
+begin
 end;
 
 function tIntList.deref(index: int32): int32;

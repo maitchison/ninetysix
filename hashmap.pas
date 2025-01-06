@@ -6,8 +6,10 @@ unit hashmap;
 interface
 
 uses
+  test,
+  debug,
   utils,
-  test;
+  list;
 
 type
 
@@ -36,15 +38,33 @@ type
     function usedBins: integer;
     function getValue(key: word): word;
     procedure setValue(key, value: word);
+  end;
 
+  tStringToStringMap = class
+    {maps from string to string}
+    {todo: dynamically resize hash table }
+    keys: array[0..255] of tStringList;
+    values: array[0..255] of tStringList;
+    constructor Create;
+    destructor Destroy; override;
+
+  private
+    function lookupKey(aKey: string; out i: int32; out j: int32): boolean;
+  public
+
+    procedure load(filename: string);
+    procedure save(filename: string);
+
+    procedure clear();
+    procedure setValue(aKey, aValue: string);
+    function  hasKey(aKey: string): boolean;
+    function  getValue(aKey: string): string;
   end;
 
 function hashW2B(x:word): byte; register; inline; assembler;
 function hashD2W(key: dword): word; register; inline; assembler;
 
 implementation
-
-uses debug;
 
 {----------------------------------------}
 
@@ -249,6 +269,110 @@ begin
 
 end;
 
+{-------------------------------------------------}
+{ tStringToStringMap }
+{-------------------------------------------------}
+
+constructor tStringToStringMap.Create();
+begin
+  inherited create;
+  clear();
+end;
+
+destructor tStringToStringMap.Destroy();
+begin
+  clear();
+  inherited Destroy;
+end;
+
+procedure tStringToStringMap.clear();
+var
+  i: integer;
+begin
+  for i := 0 to 255 do begin
+    keys[i].clear();
+    values[i].clear();
+  end;
+end;
+
+{finds key within hash table, returns if found or not.
+ If found i,j will be such that key=keys[i][j], otherwise
+ i will be the bucket where key should live and j is undefined}
+function tStringToStringMap.lookupKey(aKey: string; out i: int32; out j: int32): boolean;
+var
+  k: integer;
+begin
+  i := hashW2B(hashD2W(hashStr(aKey)));
+  for k := 0 to keys[i].len-1 do begin
+    j := k;
+    if keys[i][j] = aKey then
+      exit(true);
+    end;
+  exit(false);
+end;
+
+procedure tStringToStringMap.load(filename: string);
+var
+  t: text;
+  line: string;
+  key, value: string;
+begin
+  assign(t, filename);
+  reset(t);
+  while not eof(t) do begin
+    readln(t, line);
+    split(line, '=', key, value);
+    setValue(key, value);
+  end;
+  close(t);
+end;
+
+procedure tStringToStringMap.save(filename: string);
+var
+  t: text;
+  i,j: int32;
+  line: string;
+begin
+  assign(t, filename);
+  rewrite(t);
+  for i := 0 to 255 do
+    for j := 0 to keys[i].len-1 do begin
+      if keys[i][j].contains('=') then error('Serialized keys can not contain "="');
+      if values[i][j].contains('=') then error('Serialized values can not contain "="');
+      line := keys[i][j]+'='+values[i][j];
+      writeln(t, line);
+    end;
+  close(t);
+end;
+
+procedure tStringToStringMap.setValue(aKey: string; aValue: string);
+var
+  i,j: integer;
+begin
+  if not lookupKey(aKey, i, j) then begin
+    keys[i] += aKey;
+    values[i] += aValue;
+  end else begin
+    values[i][j] := aValue;
+  end;
+end;
+
+function tStringToStringMap.hasKey(aKey: string): boolean;
+var
+  i,j: integer;
+begin
+  result := lookupKey(aKey, i, j);
+end;
+
+function tStringToStringMap.getValue(aKey: string): string;
+var
+  i,j: integer;
+begin
+  if not lookupKey(aKey, i, j) then
+    error(format('No such key %s', [aKey]))
+  else
+    result := values[i][j];
+end;
 
 {-------------------------------------------------}
 
@@ -260,6 +384,7 @@ type
 procedure tHashMapTest.run();
 var
   map: tSparseMap;
+  stringMap: tStringToStringMap;
 begin
 
   map := tSparseMap.create();
@@ -274,6 +399,15 @@ begin
   hashStr('hello');
   hashStr('fish');
   hashStr('');
+
+  stringMap := tStringToStringMap.create();
+  assert(not stringMap.hasKey('fish'));
+  stringMap.setValue('fish', 'bad');
+  assert(stringMap.hasKey('fish'));
+  assertEqual(stringMap.getValue('fish'), 'bad');
+  stringMap.setValue('fish', 'good');
+  assertEqual(stringMap.getValue('fish'), 'good');
+  stringMap.free;
 
 end;
 

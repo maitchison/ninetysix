@@ -528,6 +528,8 @@ begin
     merge.append(sln[i]);
   result := processDiff(new, old, merge);
 
+  diff.free;
+
   SILENT := oldSilent;
 end;
 
@@ -783,7 +785,7 @@ begin
   assign(csvFile, 'stats.csv');
   rewrite(csvFile);
 
-  writeln(csvFile, 'Checkpoint, Date, Added, Removed, Changed');
+  writeln(csvFile, '"Checkpoint","Date","Added","Removed","Changed"');
 
   for checkpoint in checkpoints do begin
 

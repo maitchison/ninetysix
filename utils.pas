@@ -56,6 +56,7 @@ type
     function startsWith(const prefix: string; ignoreCase: boolean = false): boolean;
     function endsWith(const suffix: string; ignoreCase: boolean = false): boolean;
     function toLower(): string;
+    function contains(substring: string; ignoreCase: boolean=false): boolean;
     function trim(): string;
   end;
 
@@ -1014,6 +1015,16 @@ end;
 function tStringHelper.toLower(): string;
 begin
   result := utils.toLowerCase(self);
+end;
+
+function tStringHelper.contains(substring: string; ignoreCase: boolean=false): boolean;
+var
+  s: string;
+begin
+  if ignoreCase then
+    result := pos(self.toLower, substring.toLower) > 0
+  else
+    result := pos(self, substring) > 0;
 end;
 
 function tStringHelper.trim(): string;
