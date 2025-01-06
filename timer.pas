@@ -24,9 +24,19 @@ procedure startTimer(aTag: string);
 procedure stopTimer(aTag: string);
 function getTimer(aTag: string): tTimer;
 
+procedure printTimers();
+
 var TIMERS: array of tTimer;
 
 implementation
+
+procedure printTimers();
+var
+  timer: tTimer;
+begin
+  for timer in TIMERS do
+    writeln(timer.toString);
+end;
 
 function getTimer(aTag: string): tTimer;
 var

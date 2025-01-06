@@ -39,6 +39,7 @@ uses
   md5,
   list,
   filesystem,
+  timer,
   dos;
 
 type
@@ -59,7 +60,6 @@ type
 {--------------------------------------------------------}
 
 var
-  newLines, oldLines: tLines;
   totalStats: tDiffStats;
 
 var
@@ -71,6 +71,9 @@ var
 var
   WORKSPACE: string = '';
   HEAD: string = '$rep\HEAD\';
+
+var
+  CACHE: tStringToStringMap;
 
 {--------------------------------------------------------}
 { helpers }
@@ -227,7 +230,7 @@ end;
 
 procedure commit(msg: string);
 var
-  sourcePath, destinationPath, command, folderName: string;
+  sourcePath, destinationPath, folderName: string;
   t: text;
   time: tMyDateTime;
 begin
@@ -465,7 +468,7 @@ procedure benchmark();
 var
   startTime, elapsed: double;
   merge: tIntList;
-  sln: tLineRefs;
+  sln: tIntList;
   new,old: tLines;
   diff: tDiff;
   i: integer;
@@ -487,7 +490,7 @@ begin
   elapsed := getSec-startTime;
 
   merge := tIntList.create([]);
-  for i := 0 to length(sln)-1 do
+  for i := 0 to sln.len-1 do
     merge.append(sln[i]);
   writeln(merge.toString);
 
@@ -504,11 +507,13 @@ end;
 function runDiff(filename: string; otherFilename: string=''; printOutput: boolean=true): tDiffStats;
 var
   merge: tIntList;
-  sln: tLineRefs;
+  sln, sln2: tIntList;
   new,old: tLines;
   diff: tDiff;
   i: integer;
   oldSilent: boolean;
+
+  cacheKey: string;
 begin
 
   oldSilent := SILENT;
@@ -517,14 +522,30 @@ begin
 
   if otherFilename = '' then otherFilename := filename;
 
+  startTimer('readFiles');
   new := readFile(joinPath(WORKSPACE, filename));
   old := readFile(joinPath(HEAD, otherFilename));
+  stopTimer('readFiles');
 
   diff := tDiff.create();
 
-  sln := diff.run(new, old);
+  startTimer('cache_key');
+  cacheKey := 'new:'+MD5.hash(join(new)).toHex+' old:'+MD5.hash(join(old)).toHex;
+  stopTimer('cache_key');
+  if CACHE.hasKey(cacheKey) then begin
+    startTimer('cache_hit');
+    sln.loadS(cache.getValue(cacheKey));
+    stopTimer('cache_hit');
+  end else begin
+    startTimer('cache_miss');
+    sln := diff.run(new, old);
+    CACHE.setValue(cacheKey, sln.dumpS);
+    CACHE.save('go.cache');
+    stopTimer('cache_miss');
+  end;
+
   merge := tIntList.create([]);
-  for i := 0 to length(sln)-1 do
+  for i := 0 to sln.len-1 do
     merge.append(sln[i]);
   result := processDiff(new, old, merge);
 
@@ -832,6 +853,14 @@ var
   command: string;
 
 begin
+
+  //todo: remove
+  WRITE_TO_SCREEN := true;
+  runTestSuites();
+
+  CACHE := tStringToStringMap.create();
+  if fs.exists('go.cache') then
+    CACHE.load('go.cache');
 
   totalStats.clear();
 

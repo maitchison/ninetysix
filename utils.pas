@@ -115,6 +115,7 @@ function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
 function lpad(s: string;len: int32;padding: char=' '): string;
 function split(s: string; c: char; var left: string; var right: string): boolean;
+function join(lines: array of string;seperator: string='#13#10'): string;
 
 function negDecode(x: dword): int32; inline;
 function negEncode(x: int32): dword; inline;
@@ -792,6 +793,16 @@ begin
   if x > 0 then dec(result);
 end;
 
+function join(lines: array of string;seperator: string='#13#10'): string;
+var
+  i: integer;
+begin
+  if length(lines) = 0 then exit('');
+  result := '';
+  for i := 0 to length(lines)-2 do
+    result += lines[i] + seperator;
+  result += lines[length(lines)-1];
+end;
 
 {-------------------------------------------------------------------}
 
@@ -1103,6 +1114,8 @@ begin
   assert('fish'.startsWith('fish'));
   assert(not 'fish'.startsWith('fishy'));
   assert(not 'fish'.startsWith('fia'));
+
+  assertEqual(join(['a','b'],','), 'a,b');
 
 end;
 

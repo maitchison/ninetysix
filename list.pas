@@ -13,7 +13,8 @@ type
     {includes startPos, excludes endPos}
     startPos,endPos: int32;
     data: array of int32;
-    constructor create(const data: array of int32);
+    constructor create(len: integer);
+    constructor create(const aData: array of int32);
     function len: int32;
     function slice(aStartPos, aEndPos: int32): tIntList;
     procedure append(x: int32);
@@ -24,6 +25,8 @@ type
     function toString: string;
     function dumpS: string;
     procedure loadS(s: string);
+
+    procedure clear();
 
     function getItem(index: int32): int32;
     procedure setItem(index: int32; value: int32);
@@ -105,9 +108,27 @@ end;
 
 function tIntList.dumpS: string;
 begin
+  result := self.toString;
 end;
+
 procedure tIntList.loadS(s: string);
+var
+  i: integer;
+  start: integer;
+  value: integer;
+  numberLength: integer;
 begin
+  self.clear();
+  numberLength := 0;
+  for i := 1 to length(s) do begin
+    if s[i] = '[' then continue;
+    if s[i] in ['0'..'9'] then inc(numberLength);
+    if s[i] in [',', ']'] then begin
+      value := strToInt(copy(s,i-numberLength,numberLength));
+      self += value;
+      numberLength := 0;
+    end;
+  end;
 end;
 
 function tIntList.deref(index: int32): int32;
@@ -142,14 +163,29 @@ begin
   data[deref(index)] := value;
 end;
 
-constructor tIntList.create(const data: array of int32);
+constructor tIntList.create(const aData: array of int32);
 var
   i: int32;
 begin
+  clear();
+  endPos := length(aData);
+  setLength(data, length(aData));
+  for i := 0 to length(aData)-1 do
+    self.data[i] := aData[i];
+end;
+
+constructor tIntList.create(len: integer);
+begin
+  clear();
+  endPos := len;
+  setLength(data, len);
+end;
+
+procedure tIntList.clear();
+begin
   startPos := 0;
   endPos := 0;
-  for i := 0 to length(data)-1 do
-    append(data[i]);
+  setlength(data, 0);
 end;
 
 function tIntList.len: int32;
@@ -427,7 +463,7 @@ type
 
 procedure tListTest.run();
 var
-  list: tIntList;
+  list, list2: tIntList;
   s1,s2,s3: tStringList;
 begin
   list := tIntList.create([1,2,3,4,5,6]);
@@ -450,6 +486,11 @@ begin
   assertEqual(list[-1], 22);
   assertEqual(list[-2], 3);
   assertEqual(length(list.data), 2);
+
+  list := tIntList.create([11,2,32,4,5,6]);
+  list2 := tIntList.create([5]);
+  list2.loadS(list.dumpS);
+  assertEqual(list2.toString, '[11,2,32,4,5,6]');
 
   list := tIntList.create([]);
   assertEqual(list.toString, '[]');

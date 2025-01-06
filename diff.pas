@@ -17,13 +17,13 @@ uses
   debug,
   test,
   types,
-  utils;
+  utils,
+  list;
 
 type
 
   {todo: switch to tStringList}
   tLines = array of string;
-  tLineRefs = array of int32;
   tScores = array of int16;
 
   tDiff = class
@@ -39,11 +39,11 @@ type
 
     procedure init(newLines, oldLines: tLines);
     function solve(i,j: int32): int32;
-    function extractSolution(): tLineRefs;
+    function extractSolution(): tIntList;
 
   public
     constructor create();
-    function run(newLines, oldLines: tLines): tLineRefs;
+    function run(newLines, oldLines: tLines): tIntList;
     {debug stuff}
     procedure debugPrintPaths();
     procedure debugLogPaths();
@@ -87,16 +87,17 @@ begin
   scores[(i-1)+(j-1)*length(a)] := value;
 end;
 
-function tDiff.extractSolution(): tLineRefs;
+function tDiff.extractSolution(): tIntList;
 var
   i,j,k: word;
   matchCost: word;
   option1,option2,option3: int32;
-  current, best: int32;
-  sln: tLineRefs;
+  best: int32;
+  sln: tIntList;
   slnLen: int32;
   canMatch: boolean;
 begin
+
   {we start the end and go backwards}
   i := length(a);
   j := length(b);
@@ -106,14 +107,12 @@ begin
   if slnLen < 0 then
     Error('Call solve first');
 
-  sln := nil;
-  setLength(sln, slnLen);
+  sln := tIntList.create(slnLen);
 
   while (i>0) and (j>0) do begin
 
     canMatch := a[i-1] = b[j-1];
 
-    current := getScore(i,j);
     option1 := getScore(i-1,j-1);
     option2 := getScore(i,j-1);
     option3 := getScore(i-1,j);
@@ -131,8 +130,7 @@ begin
   end;
 
   {reverse order to get solution.}
-  result := nil;
-  setLength(result, k);
+  result := tIntList.create(k);
   for i := 1 to k do
     result[i-1] := sln[k-i];
 
@@ -153,7 +151,7 @@ end;
 {returns the lines that match between new and old
 lines numbers are from oldLines
 }
-function tDiff.run(newLines, oldLines: tLines): tLineRefs;
+function tDiff.run(newLines, oldLines: tLines): tIntList;
 var
   m,n: int32;
 begin
@@ -161,7 +159,7 @@ begin
   {special cases for empty files }
   if (length(oldLines) = 0) or (length(newLines) = 0) then begin
     {new file, no lines match}
-    setLength(result, 0);
+    result.clear();
     exit;
   end;
 
@@ -247,20 +245,21 @@ end;
 
 {--------------------------------------------------------------------}
 
-function toBytes(refs: tLineRefs): tBytes;
+function toBytes(refs: tIntList): tBytes;
 var
   i: int32;
 begin
   result := nil;
-  setLength(result, length(refs));
-  for i := 0 to length(refs)-1 do
+  setLength(result, refs.len);
+  for i := 0 to refs.len-1 do
     result[i] := refs[i];
 end;
 
+{todo: switch to new test system}
 procedure runTests();
 var
   new,old: tLines;
-  sln: tLineRefs;
+  sln: tIntList;
   diff: tDiff;
 begin
 
