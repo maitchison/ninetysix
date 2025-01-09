@@ -103,15 +103,15 @@ type
   public
 
     constructor create(); overload;
-    constructor create(path: string); overload;
-    destructor destroy();
+    constructor create(aPathOrCheckpoint: string); overload;
+    destructor destroy(); override;
 
     procedure clear();
 
     procedure readFromFolder(path: string);
     procedure exportToFolder(path: string);
-    procedure load(path: string);
-    procedure save(path: string);
+    procedure load(checkpoint: string);
+    procedure save(checkpoint: string);
   end;
 
   tCheckpointRepo = class
@@ -120,7 +120,7 @@ type
     repoRoot: string;
 
     constructor create(aRepoRoot: string);
-    destructor destroy();
+    destructor destroy(); override;
 
     function  generateDiff(checkpointOld, checkpointNew: string): tCheckpointDiff;
 
@@ -188,6 +188,8 @@ var
   bytesRead: int32;
   buffer: array of byte;
 begin
+  buffer := nil;
+  bytesRead := 0;
   assign(f, fqn);
   try
     reset(f, 1);
@@ -275,7 +277,6 @@ end;
 procedure tObjectStore.reload();
 var
   fileList: tStringList;
-  filename: string;
   i: integer;
 begin
   clear();
@@ -296,10 +297,13 @@ begin
   clear();
 end;
 
-constructor tCheckpoint.Create(path: string); overload;
+constructor tCheckpoint.Create(aPathOrCheckpoint: string); overload;
 begin
   Create();
-  load(path);
+  if aPathOrCheckpoint.endsWith('.txt', true) then
+    load(aPathOrCheckpoint)
+  else
+    readFromFolder(aPathOrCheckpoint);
 end;
 
 destructor tCheckpoint.Destroy();
@@ -329,7 +333,6 @@ end;
 {loads checkpoint from a standard folder (i.e. how V1 worked)}
 procedure tCheckpoint.readFromFolder(path: string);
 var
-  filename: string;
   fileRef: tFileRef;
   files: tStringList;
   i: integer;
@@ -343,7 +346,11 @@ begin
   if not path.endsWith('\') then path += '\';
 
   // get all files in folder
-  files := FS.listFiles(path+'*.*');
+  // note: for the moment just hard code which files to read
+  // eventually support a .git ignore file
+  files := fs.listFiles(path+'*.pas');
+  files += fs.listFiles(path+'*.inc');
+  files += fs.listFiles(path+'*.bat');
 
   if files.contains('message.txt') then begin
     message := loadString(path+'message.txt');
@@ -395,28 +402,20 @@ begin
 end;
 
 {read checkpoint metadata from file}
-procedure tCheckpoint.load(path: string);
+procedure tCheckpoint.load(checkpoint: string);
 var
-  lines: tStringList;
-  line: string;
-  currentSection: string;
-  currentFileRef: tFileRef;
   reader: tINIReader;
   obj: tObject;
-  checkpointPath: string;
-
 begin
 
-  if not path.endsWith('.txt', true) then error('Path must be a checkpoint .txt file');
+  if not checkpoint.endsWith('.txt', true) then error('Checkpoint must be a .txt file');
 
-  if not fs.exists(path) then
-    error(format('Checkpoint "%s" does not exist.', [path]));
-
-  currentFileRef := nil;
+  if not fs.exists(checkpoint) then
+    error(format('Checkpoint "%s" does not exist.', [checkpoint]));
 
   clear();
 
-  reader := tINIReader.create(checkpointPath, objectFactory);
+  reader := tINIReader.create(checkpoint, objectFactory);
 
   while not reader.eof do begin
     obj := reader.readObject();
@@ -429,7 +428,7 @@ begin
 end;
 
 {saves the checkpoint to repo}
-procedure tCheckpoint.save(path: string);
+procedure tCheckpoint.save(checkpoint: string);
 var
   t: tINIWriter;
   fileRef: tFileRef;
@@ -437,10 +436,10 @@ var
   i: integer;
 begin
 
-  if not path.endsWith('.txt', true) then error('Path must be a checkpoint .txt file');
+  if not checkpoint.endsWith('.txt', true) then error('Checkpoint must be a .txt file');
 
   {then write out the files, just so we can get the hash}
-  t := tINIWriter.create(path);
+  t := tINIWriter.create(checkpoint);
   try
     for fileRef in fileList do
       t.writeObject('file', fileRef);
@@ -449,10 +448,10 @@ begin
   end;
 
   {next hash the ini file for our commit id}
-  id := hash(loadString(path)).toHex;
+  id := hash(loadString(checkpoint)).toHex;
 
   {then write out the complete file}
-  t := tINIWriter.create(path);
+  t := tINIWriter.create(checkpoint);
   try
     t.writeSection('commit');
     t.writeString('message', message);

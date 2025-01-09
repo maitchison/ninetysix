@@ -66,6 +66,10 @@ type
     procedure printShort(padding: integer=3);
   end;
 
+  tCheckpointHelper = class helper for tCheckpoint
+    procedure print();
+  end;
+
 {--------------------------------------------------------}
 { helpers }
 {--------------------------------------------------------}
@@ -157,6 +161,16 @@ begin
   textAttr := LIGHTGRAY;
   output(')');
   textAttr := oldTextAttr;
+end;
+
+{--------------------------------------------------------}
+
+procedure tCheckpointHelper.print();
+var
+  fileRef: tFileRef;
+begin
+  for fileRef in fileList do
+    outputLn(fileRef.toString);
 end;
 
 {--------------------------------------------------------}
@@ -646,7 +660,19 @@ end;
 
 {present to user the diff between current workspace and head}
 procedure showDiffOnWorkspace();
+var
+  old,new: tCheckpoint;
+const
+  ROOT = '$repo';
 begin
+  old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
+  new := tCheckpoint.create('.');
+  outputln('--------------------');
+  outputln('OLD');
+  old.print();
+  outputln('--------------------');
+  outputln('NEW');
+  new.print();
   //showDiff('', 'HEAD');
 end;
 
@@ -899,7 +925,7 @@ begin
     command := paramSTR(1);
 
   if command = 'diff' then
-    oldDiffOnWorkspace()
+    showDiffOnWorkspace()
   else if command = 'commit' then
     promptAndCommit()
   else if command = 'benchmark' then
