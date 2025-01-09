@@ -91,8 +91,7 @@ type
     sourceFolder: string;
 
   protected
-    repo: tCheckpointRepo;
-    procedure writeObjects();
+    procedure writeObjects(objectStore: tObjectStore);
     function objectFactory(s: string): tObject;
 
   published
@@ -103,8 +102,8 @@ type
 
   public
 
-    constructor create(aRepo: tCheckpointRepo); overload;
-    constructor create(aRepo: tCheckpointRepo; path: string); overload;
+    constructor create(); overload;
+    constructor create(path: string); overload;
     destructor destroy();
 
     procedure clear();
@@ -290,23 +289,16 @@ end;
 
 {-------------------------------------------------------------}
 
-constructor tCheckpoint.Create(aRepo: tCheckpointRepo); overload;
+constructor tCheckpoint.Create(); overload;
 begin
-
-  if not assigned(aRepo) then error('repo was nil');
-
   inherited Create();
-  repo := aRepo;
   fileList := nil;
   clear();
 end;
 
-constructor tCheckpoint.Create(aRepo: tCheckpointRepo;path: string); overload;
+constructor tCheckpoint.Create(path: string); overload;
 begin
-
-  if not assigned(aRepo) then error('repo was nil');
-
-  Create(aRepo);
+  Create();
   load(path);
 end;
 
@@ -388,7 +380,7 @@ begin
   fs.mkdir(path);
   for fileRef in fileList do begin
     dstFile := joinPath(path, fileRef.path);
-    srcFile := joinPath(repo.objectStore.root, fileRef.hash);
+    srcFile := joinPath(fileRef.fRoot, fileRef.hash);
     {todo: support subfolders}
     fs.copyFile(srcFile, dstFile);
     fs.setModified(dstFile, fileRef.modified);
@@ -447,10 +439,6 @@ begin
 
   if not path.endsWith('.txt', true) then error('Path must be a checkpoint .txt file');
 
-  {save objects first, just in case anything goes wrong}
-  {this way we won't have an ini file already}
-  writeObjects();
-
   {then write out the files, just so we can get the hash}
   t := tINIWriter.create(path);
   try
@@ -481,12 +469,12 @@ begin
 end;
 
 {writes out objects to object database}
-procedure tCheckpoint.writeObjects();
+procedure tCheckpoint.writeObjects(objectStore: tObjectStore);
 var
   fileRef: tFileRef;
 begin
   for fileRef in fileList do
-    repo.objectStore.addObject(fileRef.hash, fileRef.fqn);
+    objectStore.addObject(fileRef.hash, fileRef.fqn);
 end;
 
 {-------------------------------------------------------------}
@@ -523,7 +511,7 @@ end;
 
 function tCheckpointRepo.load(checkpointName: string): tCheckpoint;
 begin
-  result := tCheckpoint.create(self, getCheckpointPath(checkpointName));
+  result := tCheckpoint.create(getCheckpointPath(checkpointName));
 end;
 
 {-------------------------------------------------------------}

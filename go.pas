@@ -644,8 +644,21 @@ begin
 
 end;
 
-{show all diff on all modified files}
-function diffOnWorkspace(): tDiffStats;
+{present to user the diff between current workspace and head}
+procedure showDiffOnWorkspace();
+begin
+  //showDiff('', 'HEAD');
+end;
+
+{show all diff on all modified files
+This is the old version that has many issues,
+ - printing of diff and generating of diff stats are combined for some reason.
+ - uses the old 'folder' system instead of the new objectstore
+ - caching is done in go rather than in checkpoint
+ - it does work though.
+}
+
+function oldDiffOnWorkspace(): tDiffStats;
 var
   workingSpaceFiles: tStringList;
   headFiles: tStringList;
@@ -838,7 +851,7 @@ begin
 
     startTimer('diff');
     SILENT := true;
-    stats := diffOnWorkspace();
+    stats := oldDiffOnWorkspace();
     SILENT := false;
     stats.printShort(6);
     writeln();
@@ -886,7 +899,7 @@ begin
     command := paramSTR(1);
 
   if command = 'diff' then
-    diffOnWorkspace()
+    oldDiffOnWorkspace()
   else if command = 'commit' then
     promptAndCommit()
   else if command = 'benchmark' then
