@@ -42,21 +42,6 @@ uses
   timer,
   dos;
 
-type
-  tDiffStats = record
-    added: int64;
-    removed: int64;
-    changed: int64;
-    newLen: int64;
-    function net: int64;
-    function unchanged: int64;
-    procedure print();
-    procedure printShort(padding: integer=3);
-    procedure clear();
-
-    class operator add(a,b: tDiffStats): tDiffStats;
-  end;
-
 {--------------------------------------------------------}
 
 var
@@ -74,6 +59,12 @@ var
 
 var
   CACHE: tStringToStringMap;
+
+type
+  tDiffStatsHelper = record helper for tDiffStats
+    procedure print();
+    procedure printShort(padding: integer=3);
+  end;
 
 {--------------------------------------------------------}
 { helpers }
@@ -130,25 +121,7 @@ end;
 
 {--------------------------------------------------------}
 
-function tDiffStats.net: int64;
-begin
-  result := added - removed;
-end;
-
-function tDiffStats.unchanged: int64;
-begin
-  result := newLen - added - changed;
-end;
-
-procedure tDiffStats.clear();
-begin
-  added := 0;
-  removed := 0;
-  changed := 0;
-  newLen := 0;
-end;
-
-procedure tDiffStats.print();
+procedure tDiffStatsHelper.print();
 var
   plus: string;
 begin
@@ -164,7 +137,7 @@ begin
   outputX  ('Net       ', lpad(plus+intToStr(net), 4),  ' lines.', YELLOW);
 end;
 
-procedure tDiffStats.printShort(padding: integer=3);
+procedure tDiffStatsHelper.printShort(padding: integer=3);
 var
   plus: string;
   oldTextAttr: byte;
@@ -184,14 +157,6 @@ begin
   textAttr := LIGHTGRAY;
   output(')');
   textAttr := oldTextAttr;
-end;
-
-class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
-begin
-  result.added := a.added + b.added;
-  result.removed := a.removed + b.removed;
-  result.changed := a.changed + b.changed;
-  result.newLen := a.newLen + b.newLen;
 end;
 
 {--------------------------------------------------------}
@@ -503,6 +468,7 @@ begin
 end;
 
 {todo: make paths fully qualified, and drop HEAD, WORKSPACE here}
+{perform a diff on two paths (absoulte)}
 function runDiff(filename: string; otherFilename: string=''; printOutput: boolean=true): tDiffStats;
 var
   merge: tIntList;
@@ -771,7 +737,7 @@ end;
 {generate per commit stats. Quite slow}
 procedure stats();
 var
-  cpm: tCheckpointManager;
+  repo: tCheckpointRepo;
   checkpoints: tStringList;
   checkpoint: string;
   previousCheckpoint: string;
@@ -789,9 +755,12 @@ var
   csvFile: text;
 begin
 
+  error('Stats has not been tested with the new system yet, as so is disabled.');
+  (*
+
   textAttr := WHITE;
 
-  cpm := tCheckpointManager.create('$repo');
+  repo := tCheckpointRepo.create('$repo');
 
   checkpoints := fs.listFiles('$repo\*.txt');
   checkpoints.sort();
@@ -886,6 +855,7 @@ begin
   end;
   close(csvFile);
   cpm.free;
+  *)
 end;
 
 {--------------------------------------------------}

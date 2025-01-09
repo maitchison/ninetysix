@@ -54,9 +54,31 @@ type
     destructor destroy(); override;
   end;
 
-  tCheckpointManager = class
+  tDiffStats = record
+    added: int64;
+    removed: int64;
+    changed: int64;
+    newLen: int64;
+    function net: int64;
+    function unchanged: int64;
+    procedure clear();
+    class operator add(a,b: tDiffStats): tDiffStats;
+  end;
 
-    objectStore: tObjectStore;
+  tFileDiff = record
+    old, new: tStringList;
+    match: tIntList;
+    stats: tDiffStats;
+  end;
+
+  tCheckpointDiff = record
+    files: array of tFileDiff;
+    stats: tDiffStats;
+  end;
+
+  tCheckpointRepo = class;
+
+  tCheckpoint = class
 
     fMessage: string;
     fAuthor: string;
@@ -67,10 +89,9 @@ type
 
     {where our files came from}
     sourceFolder: string;
-    {where our repo is stored}
-    repoFolder: string;
 
   protected
+    repo: tCheckpointRepo;
     procedure writeObjects();
     function objectFactory(s: string): tObject;
 
@@ -82,19 +103,35 @@ type
 
   public
 
-    constructor create(aRepoFolder: string);
+    constructor create(aRepo: tCheckpointRepo); overload;
+    constructor create(aRepo: tCheckpointRepo; path: string); overload;
     destructor destroy();
 
     procedure clear();
 
+    procedure readFromFolder(path: string);
+    procedure exportToFolder(path: string);
+    procedure load(path: string);
+    procedure save(path: string);
+  end;
+
+  tCheckpointRepo = class
+
+    objectStore: tObjectStore;
+    repoRoot: string;
+
+    constructor create(aRepoRoot: string);
+    destructor destroy();
+
+    function  generateDiff(checkpointOld, checkpointNew: string): tCheckpointDiff;
+
     function  hasCheckpoint(checkpointName: string): boolean;
     function  getCheckpointPath(checkpointName: string): string;
 
-    procedure readFromFolder(path: string);
-    procedure exportToFolder(dstFolder: string);
-    procedure load(checkpointName: string);
-    procedure save(checkpointName: string);
+    function  load(checkpointName: string): tCheckpoint;
+
   end;
+
 
 implementation
 
@@ -103,7 +140,6 @@ const
   MAX_FILESIZE = 128*1024;
 
 {-------------------------------------------------------------}
-
 
 constructor tFileRef.create(); overload;
 begin
@@ -213,7 +249,10 @@ end;
 constructor tObjectStore.create(aPath: string);
 begin
   root := aPath;
-  fs.mkdir(aPath);
+  if not fs.exists(aPath) then begin
+    note(format('Object store folder "%s" was not found, so creating it.', [aPath]));
+    fs.mkdir(aPath);
+  end;
   files := nil;
   self.reload();
 end;
@@ -251,23 +290,33 @@ end;
 
 {-------------------------------------------------------------}
 
-constructor tCheckpointManager.create(aRepoFolder: string);
+constructor tCheckpoint.Create(aRepo: tCheckpointRepo); overload;
 begin
-  inherited create();
+
+  if not assigned(aRepo) then error('repo was nil');
+
+  inherited Create();
+  repo := aRepo;
   fileList := nil;
   clear();
-  repoFolder := aRepoFolder;
-  objectStore := tObjectStore.create(joinPath(repoFolder, 'store'));
 end;
 
-destructor tCheckpointManager.destroy();
+constructor tCheckpoint.Create(aRepo: tCheckpointRepo;path: string); overload;
+begin
+
+  if not assigned(aRepo) then error('repo was nil');
+
+  Create(aRepo);
+  load(path);
+end;
+
+destructor tCheckpoint.Destroy();
 begin
   clear();
-  objectStore.free;
-  inherited destroy;
+  inherited Destroy;
 end;
 
-procedure tCheckpointManager.clear();
+procedure tCheckpoint.clear();
 var
   fileRef: tFileRef;
 begin
@@ -286,7 +335,7 @@ begin
 end;
 
 {loads checkpoint from a standard folder (i.e. how V1 worked)}
-procedure tCheckpointManager.readFromFolder(path: string);
+procedure tCheckpoint.readFromFolder(path: string);
 var
   filename: string;
   fileRef: tFileRef;
@@ -330,34 +379,23 @@ begin
 end;
 
 {writes all files to folder so that others can read them}
-procedure tCheckpointManager.exportToFolder(dstFolder: string);
+procedure tCheckpoint.exportToFolder(path: string);
 var
   fileRef: tFileRef;
   dstFile: string;
   srcFile: string;
 begin
-  fs.mkdir(dstFolder);
+  fs.mkdir(path);
   for fileRef in fileList do begin
-    dstFile := joinPath(dstFolder, fileRef.path);
-    srcFile := joinPath(objectStore.root, fileRef.hash);
+    dstFile := joinPath(path, fileRef.path);
+    srcFile := joinPath(repo.objectStore.root, fileRef.hash);
     {todo: support subfolders}
     fs.copyFile(srcFile, dstFile);
     fs.setModified(dstFile, fileRef.modified);
   end;
 end;
 
-function tCheckpointManager.hasCheckpoint(checkpointName: string): boolean;
-begin
-  result := fs.exists(getCheckpointPath(checkpointName));
-end;
-
-{returns path to checkpoint file}
-function tCheckpointManager.getCheckpointPath(checkpointName: string): string;
-begin
-  result := joinPath(repoFolder, checkpointName)+'.txt';
-end;
-
-function tCheckpointManager.objectFactory(s: string): tObject;
+function tCheckpoint.objectFactory(s: string): tObject;
 begin
   if s = 'commit' then exit(self);
   if s = 'file' then exit(tFileRef.create());
@@ -365,7 +403,7 @@ begin
 end;
 
 {read checkpoint metadata from file}
-procedure tCheckpointManager.load(checkpointName: string);
+procedure tCheckpoint.load(path: string);
 var
   lines: tStringList;
   line: string;
@@ -377,9 +415,10 @@ var
 
 begin
 
-  checkpointPath := getCheckpointPath(checkpointName);
-  if not fs.exists(checkpointPath) then
-    error(format('Checkpoint "%s" does not exist.', [checkpointPath]));
+  if not path.endsWith('.txt', true) then error('Path must be a checkpoint .txt file');
+
+  if not fs.exists(path) then
+    error(format('Checkpoint "%s" does not exist.', [path]));
 
   currentFileRef := nil;
 
@@ -398,7 +437,7 @@ begin
 end;
 
 {saves the checkpoint to repo}
-procedure tCheckpointManager.save(checkpointName: string);
+procedure tCheckpoint.save(path: string);
 var
   t: tINIWriter;
   fileRef: tFileRef;
@@ -406,12 +445,14 @@ var
   i: integer;
 begin
 
+  if not path.endsWith('.txt', true) then error('Path must be a checkpoint .txt file');
+
   {save objects first, just in case anything goes wrong}
   {this way we won't have an ini file already}
   writeObjects();
 
   {then write out the files, just so we can get the hash}
-  t := tINIWriter.create(getCheckpointPath(checkpointName));
+  t := tINIWriter.create(path);
   try
     for fileRef in fileList do
       t.writeObject('file', fileRef);
@@ -420,10 +461,10 @@ begin
   end;
 
   {next hash the ini file for our commit id}
-  id := hash(loadString(getCheckpointPath(checkpointName))).toHex;
+  id := hash(loadString(path)).toHex;
 
   {then write out the complete file}
-  t := tINIWriter.create(getCheckpointPath(checkpointName));
+  t := tINIWriter.create(path);
   try
     t.writeSection('commit');
     t.writeString('message', message);
@@ -440,12 +481,77 @@ begin
 end;
 
 {writes out objects to object database}
-procedure tCheckpointManager.writeObjects();
+procedure tCheckpoint.writeObjects();
 var
   fileRef: tFileRef;
 begin
   for fileRef in fileList do
-    objectStore.addObject(fileRef.hash, fileRef.fqn);
+    repo.objectStore.addObject(fileRef.hash, fileRef.fqn);
+end;
+
+{-------------------------------------------------------------}
+
+constructor tCheckpointRepo.create(aRepoRoot: string);
+begin
+  inherited create;
+  if not fs.exists(aRepoRoot) then error(format('No repo found at "%s"', [aRepoRoot]));
+  repoRoot := aRepoRoot;
+  objectStore := tObjectStore.create(joinPath(aRepoRoot, 'store'));
+end;
+
+destructor tCheckpointRepo.destroy();
+begin
+  objectStore.free;
+  repoRoot := '';
+  inherited Destroy;
+end;
+
+function tCheckpointRepo.generateDiff(checkpointOld, checkpointNew: string): tCheckpointDiff;
+begin
+  error('NIY');
+end;
+
+function tCheckpointRepo.hasCheckpoint(checkpointName: string): boolean;
+begin
+  result := fs.exists(getCheckpointPath(checkpointName));
+end;
+
+function tCheckpointRepo.getCheckpointPath(checkpointName: string): string;
+begin
+  result := joinPath(repoRoot, checkpointName)+'.txt';
+end;
+
+function tCheckpointRepo.load(checkpointName: string): tCheckpoint;
+begin
+  result := tCheckpoint.create(self, getCheckpointPath(checkpointName));
+end;
+
+{-------------------------------------------------------------}
+
+function tDiffStats.net: int64;
+begin
+  result := added - removed;
+end;
+
+function tDiffStats.unchanged: int64;
+begin
+  result := newLen - added - changed;
+end;
+
+procedure tDiffStats.clear();
+begin
+  added := 0;
+  removed := 0;
+  changed := 0;
+  newLen := 0;
+end;
+
+class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
+begin
+  result.added := a.added + b.added;
+  result.removed := a.removed + b.removed;
+  result.changed := a.changed + b.changed;
+  result.newLen := a.newLen + b.newLen;
 end;
 
 {-------------------------------------------------------------}
