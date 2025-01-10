@@ -46,7 +46,6 @@ uses
 
 var
   LINES_SINCE_PAGE: byte = 0;
-  SILENT: boolean = false;
   USE_PAGING: boolean = true;
   PAUSE_AT_END: boolean = false;
 
@@ -66,6 +65,7 @@ type
 
   tCheckpointDiffHelper = record helper for tCheckpointDiff
     procedure showStatus(withStats: boolean=true);
+    procedure showChanges();
   end;
 
 {--------------------------------------------------------}
@@ -80,14 +80,12 @@ end;
 procedure output(s: string);
 begin
   {todo: detect line wrap}
-  if SILENT then exit;
   write(s);
 end;
 
 {outputs a line of text, with support for paging}
 procedure outputLn(s: string='');
 begin
-  if SILENT then exit;
   writeln(s);
 
   if not USE_PAGING then exit;
@@ -229,7 +227,7 @@ end;
 {-----------------------------------------------------}
 
 {output the longest common subsequence. Returns stats}
-procedure processDiff(newLines,oldLines: tStringList;matching: tIntList);
+procedure showDiff(oldLines, newLines: tStringList;matching: tIntList);
 
 var
   i,j,k,z: int32;
@@ -481,7 +479,7 @@ begin
   old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
   new := tCheckpoint.create('.');
   checkpointDiff := repo.generateCheckpointDiff(old, new);
-  checkpointDiff.showStatus();
+  checkpointDiff.showChanges();
 
   new.free;
   old.free;
@@ -711,9 +709,7 @@ begin
     stopTimer('exportFolder');
 
     startTimer('diff');
-    SILENT := true;
     stats := oldDiffOnWorkspace();
-    SILENT := false;
     stats.printShort(6);
     writeln();
     stopTimer('diff');
@@ -733,6 +729,7 @@ begin
 end;
 
 {--------------------------------------------------}
+
 
 procedure tCheckpointDiffHelper.showStatus(withStats: boolean=true);
 var
@@ -794,6 +791,48 @@ begin
     outputLn('No changes.');
 
   outputLn();
+
+  textattr := oldTextAttr;
+end;
+
+procedure tCheckpointDiffHelper.showChanges();
+var
+  fileDiff: tFileDiff;
+  oldTextAttr: byte;
+  stats: tDiffStats;
+  wasChanges: boolean;
+  matches: tIntList;
+  old, new: tStringList;
+begin
+
+  stats.clear();
+
+  oldTextattr := textAttr;
+
+  for fileDiff in fileDiffs do begin
+
+    outputLn('----------------------------------------');
+    case fileDiff.diffType of
+      FD_MODIFIED: outputX (' Modified ', fileDiff.old.path, '', YELLOW);
+    end;
+    outputLn('----------------------------------------');
+
+    old := fs.readText(fileDiff.old.fqn);
+    new := fs.readText(fileDiff.new.fqn);
+    matches := fileDiff.getMatch();
+    stats := fileDiff.getStats();
+
+    showDiff(old, new, matches);
+
+  end;
+
+  outputLn('----------------------------------------');
+  outputLn(' SUMMARY');
+  outputLn('----------------------------------------');
+  outputLn();
+
+  {show footer}
+  self.showStatus();
 
   textattr := oldTextAttr;
 end;
