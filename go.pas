@@ -57,9 +57,6 @@ var
   WORKSPACE: string = '';
   HEAD: string = '$rep\HEAD\';
 
-var
-  CACHE: tStringToStringMap;
-
 type
   tDiffStatsHelper = record helper for tDiffStats
     procedure print();
@@ -145,7 +142,7 @@ begin
   outputX  ('Net       ', lpad(plus+intToStr(net), 4),  ' lines.', YELLOW);
 end;
 
-procedure tDiffStatsHelper.printShort(padding: integer=3);
+procedure tDiffStatsHelper.printShort(padding: integer=4);
 var
   plus: string;
   oldTextAttr: byte;
@@ -475,7 +472,7 @@ var
   oldSilent: boolean;
   cacheKey: string;
 begin
-
+     (*
   oldSilent := SILENT;
   if not printOutput then
     SILENT := true;
@@ -512,6 +509,7 @@ begin
   diff.free;
 
   SILENT := oldSilent;
+   *)
 end;
 
 procedure promptAndCommit();
@@ -900,11 +898,6 @@ begin
   clrscr;
   WRITE_TO_SCREEN := true;
   runTestSuites();
-
-  {todo: also remove}
-  CACHE := tStringToStringMap.create();
-  if fs.exists('go.cache') then
-    CACHE.load('go.cache');
 
   totalStats.clear();
 

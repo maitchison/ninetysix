@@ -43,8 +43,8 @@ type
   tStringToStringMap = class
     {maps from string to string}
     {todo: dynamically resize hash table }
-    keys: array[0..255] of tStringList;
-    values: array[0..255] of tStringList;
+    keys, values: tStringList;
+    bins: array[0..255] of tIntList;
     constructor Create;
     destructor Destroy; override;
 
@@ -53,12 +53,13 @@ type
   public
 
     procedure load(filename: string);
-    procedure save(filename: string);
+    procedure save(filename: string; maxEntries: integer=-1);
 
     procedure clear();
     procedure setValue(aKey, aValue: string);
     function  hasKey(aKey: string): boolean;
     function  getValue(aKey: string): string;
+    function  len: int32;
   end;
 
 function hashW2B(x:word): byte; register; inline; assembler;
@@ -289,10 +290,8 @@ procedure tStringToStringMap.clear();
 var
   i: integer;
 begin
-  for i := 0 to 255 do begin
-    keys[i].clear();
-    values[i].clear();
-  end;
+  for i := 0 to 255 do
+    bins[i].clear();
 end;
 
 {finds key within hash table, returns if found or not.
@@ -300,14 +299,15 @@ end;
  i will be the bucket where key should live and j is undefined}
 function tStringToStringMap.lookupKey(aKey: string; out i: int32; out j: int32): boolean;
 var
-  k: integer;
+  jj, k: integer;
 begin
   i := hashW2B(hashD2W(hashStr(aKey)));
-  for k := 0 to keys[i].len-1 do begin
-    j := k;
-    if keys[i][j] = aKey then
+  for jj := 0 to bins[i].len-1 do begin
+    j := jj; // can't use j as a loop varaible.
+    k := bins[i][j];
+    if keys[k] = aKey then
       exit(true);
-    end;
+  end;
   exit(false);
 end;
 
@@ -327,33 +327,40 @@ begin
   close(t);
 end;
 
-procedure tStringToStringMap.save(filename: string);
+procedure tStringToStringMap.save(filename: string; maxEntries: integer=-1);
 var
   t: text;
-  i,j: int32;
+  i, j, k: int32;
   line: string;
+  startK: integer;
 begin
   assign(t, filename);
   rewrite(t);
-  for i := 0 to 255 do
-    for j := 0 to keys[i].len-1 do begin
-      if keys[i][j].contains('=') then error('Serialized keys can not contain "="');
-      if values[i][j].contains('=') then error('Serialized values can not contain "="');
-      line := keys[i][j]+'='+values[i][j];
-      writeln(t, line);
-    end;
+  if maxEntries >= 0 then
+    startK := max(self.len - maxEntries, 0)
+  else
+    startK := 0;
+  for k := startK to self.len-1 do begin
+    if keys[k].contains('=') then error('Serialized keys can not contain "="');
+    if values[k].contains('=') then error('Serialized values can not contain "="');
+    line := keys[k]+'='+values[k];
+    writeln(t, line);
+  end;
   close(t);
 end;
 
 procedure tStringToStringMap.setValue(aKey: string; aValue: string);
 var
-  i,j: integer;
+  i,j,k: integer;
 begin
   if not lookupKey(aKey, i, j) then begin
-    keys[i] += aKey;
-    values[i] += aValue;
+    keys.append(aKey);
+    values.append(aValue);
+    k := self.len-1;
+    bins[i].append(k);
   end else begin
-    values[i][j] := aValue;
+    k := bins[i][j];
+    values[k] := aValue;
   end;
 end;
 
@@ -366,12 +373,19 @@ end;
 
 function tStringToStringMap.getValue(aKey: string): string;
 var
-  i,j: integer;
+  i,j,k: integer;
 begin
   if not lookupKey(aKey, i, j) then
     error(format('No such key %s', [aKey]))
-  else
-    result := values[i][j];
+  else begin
+    k := bins[i][j];
+    result := values[k];
+  end;
+end;
+
+function tStringToStringMap.len: int32;
+begin
+  result := values.len;
 end;
 
 {-------------------------------------------------}

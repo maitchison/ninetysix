@@ -19,7 +19,8 @@ uses
   types,
   utils,
   fileSystem,
-  list;
+  list,
+  hashMap;
 
 type
 
@@ -68,10 +69,15 @@ type
   end;
 
 function testLines(s: string): tStringList;
+
+{these implement caching}
 function run(oldLines, newLines: tStringList): tIntList; overload;
 function run(oldFile, newFile: string): tMergeInfo; overload;
 
 implementation
+
+var
+  CACHE: tStringToStringMap;
 
 {-----------------------------------------------}
 
@@ -357,6 +363,23 @@ begin
 
 end;
 
+{--------------------------------------------------------------------}
+
+procedure initCache();
 begin
+  CACHE := tStringToStringMap.create();
+  if fs.exists('go.cache') then
+    CACHE.load('go.cache');
+end;
+
+procedure saveCache();
+begin
+  CACHE.save('go.cache', 100);
+end;
+
+initialization
+  initCache();
   tDiffTest.create('Diff');
+finalization
+  saveCache();
 end.
