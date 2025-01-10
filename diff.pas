@@ -34,12 +34,13 @@ type
   protected
     scores: tScores;
 
-    function getScore(i,j: int32): int16; inline;
+    function  getScore(i,j: int32): int16; inline;
     procedure setScore(i,j: int32;value: int16); inline;
 
     procedure init(newLines, oldLines: tStringList);
-    function solve(i,j: int32): int32;
-    function extractSolution(): tIntList;
+    function  solve(i,j: int32): int32;
+    procedure blockSolve(maxEdits: int32=-1);
+    function  extractSolution(): tIntList;
 
   public
 
@@ -117,7 +118,6 @@ end;
 function tDiffSolver.extractSolution(): tIntList;
 var
   i,j,k: word;
-  matchCost: word;
   option1,option2,option3: int32;
   best: int32;
   sln: tIntList;
@@ -185,7 +185,8 @@ lines numbers are from oldLines
 }
 function tDiffSolver.run(oldLines, newLines: tStringList): tIntList;
 var
-  m,n: int32;
+  minChanges, maxChanges: int32;
+  editLimit: int32;
 begin
 
   {special cases for empty files }
@@ -196,11 +197,17 @@ begin
   end;
 
   init(newLines, oldLines);
-  solve(a.len, b.len);
+  maxChanges := oldLines.len + newLines.len;
+  minChanges := max(abs(oldLines.len - newLines.len), 1);
+  editLimit := minChanges + 10;
+  repeat
+    blockSolve(editLimit);
+    editLimit *= 2;
+  until solutionLength > 0;
   result := extractSolution();
 end;
 
-{returns the length of the longest common subsequence between a[:i], and b[:i]}
+{returns the length of the longest common subsequence between a[:i], and b[:j]}
 function tDiffSolver.solve(i,j: int32): int32;
 var
   u,v: int32;
@@ -229,6 +236,37 @@ begin
 
   {...and store the result}
   setScore(i, j, result);
+end;
+
+procedure tDiffSolver.blockSolve(maxEdits: int32=-1);
+var
+  i,j: int32;
+  u,v: int32;
+  score: int32;
+  edits: int32;
+  iMin,iMax: int32;
+begin
+  for j := 1 to b.len do begin
+
+    if maxEdits < 0 then begin
+      iMin := 1;
+      iMax := a.len;
+    end else begin
+      iMin := clamp(j - maxEdits, 1, a.len);
+      iMax := clamp(j + maxEdits, 1, a.len);
+    end;
+
+    for i := iMin to iMax do begin
+      if a[i-1] = b[j-1] then begin
+        score := getScore(i-1,j-1)+1;
+      end else begin
+        u := getScore(i, j-1);
+        v := getScore(i-1, j);
+        if u > v then score := u else score := v;
+      end;
+      setScore(i,j,score);
+    end;
+  end;
 end;
 
 procedure tDiffSolver.debugPrintPaths();
@@ -317,7 +355,6 @@ type
 
 procedure tDiffTest.run();
 var
-  new,old: tStringList;
   sln: tIntList;
   diff: tDiffSolver;
 begin

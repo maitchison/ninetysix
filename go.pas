@@ -438,7 +438,6 @@ begin
   merge := tIntList.create([]);
   for i := 0 to sln.len-1 do
     merge.append(sln[i]);
-  writeln(merge.toString);
 
   writeln('final score -> ', diff.solutionLength);
 
@@ -446,6 +445,7 @@ begin
   writeln(merge.len);
   writeln('new        ',new.len);
   writeln('old        ',old.len);
+  writeln('delta      ',(new.len-sln.len)+(old.len-sln.len));
   writeln('NM         ',new.len*old.len);
 end;
 
