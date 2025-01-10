@@ -45,9 +45,6 @@ uses
 {--------------------------------------------------------}
 
 var
-  totalStats: tDiffStats;
-
-var
   LINES_SINCE_PAGE: byte = 0;
   SILENT: boolean = false;
   USE_PAGING: boolean = true;
@@ -232,7 +229,7 @@ end;
 {-----------------------------------------------------}
 
 {output the longest common subsequence. Returns stats}
-function processDiff(newLines,oldLines: tStringList;matching: tIntList): tDiffStats;
+procedure processDiff(newLines,oldLines: tStringList;matching: tIntList);
 
 var
   i,j,k,z: int32;
@@ -279,8 +276,6 @@ var
 
 begin
 
-  result.clear();
-
   {which lines in old file should be shown for context}
   fillchar(importantLines, sizeof(importantLines), false);
 
@@ -305,12 +300,10 @@ begin
     for i := 0 to oldLines.len-1 do begin
       textAttr := LIGHTRED;
       outputLn(intToStr(i+1, 4, '0')+' [-] '+fix(oldLines[i]));
-      inc(result.removed);
     end;
     for i := 0 to newLines.len-1 do begin
       textAttr := LIGHTGREEN;
       outputLn(intToStr(i+1, 4, '0')+' [+] '+fix(newLines[i]));
-      inc(result.added);
     end;
     exit;
   end;
@@ -402,14 +395,12 @@ begin
       textAttr := LIGHTRED;
       outputLn(intToStr(j+1, 4, '0')+' [-] '+fix(oldLines[j]));
       inc(j);
-      inc(result.removed);
     end;
 
     while (i < newLines.len) and (newLines[i] <> cur) do begin
       textAttr := LIGHTGREEN;
       outputLn('     [+] '+fix(newLines[i]));
       inc(i);
-      inc(result.added);
     end;
   end;
 
@@ -460,58 +451,6 @@ begin
   writeln('NM         ',new.len*old.len);
 end;
 
-{todo: make paths fully qualified, and drop HEAD, WORKSPACE here}
-{perform a diff on two paths (absoulte)}
-function runDiff(filename: string; otherFilename: string=''; printOutput: boolean=true): tDiffStats;
-var
-  merge: tIntList;
-  sln, sln2: tIntList;
-  new,old: tStringList;
-  diff: tDiffSolver;
-  i: integer;
-  oldSilent: boolean;
-  cacheKey: string;
-begin
-     (*
-  oldSilent := SILENT;
-  if not printOutput then
-    SILENT := true;
-
-  if otherFilename = '' then otherFilename := filename;
-
-  startTimer('readFiles');
-  new := fs.readText(joinPath(WORKSPACE, filename));
-  old := fs.readText(joinPath(HEAD, otherFilename));
-  stopTimer('readFiles');
-
-  diff := tDiffSolver.create();
-
-  startTimer('cache_key');
-  cacheKey := 'new:'+MD5.hash(join(new.data)).toHex+' old:'+MD5.hash(join(old.data)).toHex;
-  stopTimer('cache_key');
-  if CACHE.hasKey(cacheKey) then begin
-    startTimer('cache_hit');
-    sln.loadS(cache.getValue(cacheKey));
-    stopTimer('cache_hit');
-  end else begin
-    startTimer('cache_miss');
-    sln := diff.run(old, new);
-    CACHE.setValue(cacheKey, sln.dumpS);
-    CACHE.save('go.cache');
-    stopTimer('cache_miss');
-  end;
-
-  merge := tIntList.create([]);
-  for i := 0 to sln.len-1 do
-    merge.append(sln[i]);
-  result := processDiff(new, old, merge);
-
-  diff.free;
-
-  SILENT := oldSilent;
-   *)
-end;
-
 procedure promptAndCommit();
 begin
   write('Message:');
@@ -529,87 +468,27 @@ begin
   result += fs.listFiles(path+'*.inc');
 end;
 
-{show all changed / added / deleted files}
-procedure status();
-var
-  workingSpaceFiles: tStringList;
-  renamedFiles: tStringList;
-  headFiles: tStringList;
-  filename, renamedFile: string;
-  added,removed,changed,renamed: int32;
-  stats: tDiffStats;
-begin
-
-  error('Old status is no longer supported');
-(*
-
-  outputln();
-  renamedFiles.clear();
-  workingSpaceFiles := getSourceFiles(WORKSPACE);
-  headFiles := getSourceFiles(HEAD);
-  added := 0;
-  removed := 0;
-  changed := 0;
-  renamed := 0;
-
-  // look for files that were renamed
-  for filename in workingSpaceFiles do begin
-    if headFiles.contains(filename) then continue;
-    renamedFile := checkForRename(filename, headFiles);
-    if renamedFile <> '' then begin
-      textattr := LIGHTBLUE;
-      stats := runDiff(filename, renamedFile, false);
-      output(pad('[>] renamed '+filename+' to '+renamedFile, 40, ' '));
-      stats.printShort();
-      outputln();
-      inc(renamed);
-    end;
-    renamedFiles += filename;
-    renamedFiles += renamedFile;
-  end;
-
-  for filename in workingSpaceFiles do begin
-    if renamedFiles.contains(filename) then continue;
-    if not headFiles.contains(filename) then begin
-      textattr := LIGHTGREEN;
-      stats := runDiff(filename, filename, false);
-      output(pad('[+] added ' + filename, 40, ' '));
-      stats.printShort();
-      outputln();
-      inc(added);
-    end else begin
-      if fs.wasModified(joinPath(WORKSPACE, filename), joinPath(HEAD, filename)) then begin
-        textattr := WHITE;
-        stats := runDiff(filename, filename, false);
-        output(pad('[~] modified ' + filename, 40, ' '));
-        stats.printShort();
-        outputln();
-        inc(changed);
-      end;
-    end;
-  end;
-
-  for filename in headFiles do begin
-    if renamedFiles.contains(filename) then continue;
-    if not workingSpaceFiles.contains(filename) then begin
-      textattr := LIGHTRED;
-      stats := runDiff(filename, filename, false);
-      output(pad('[-] removed ' + filename, 40, ' '));
-      stats.printShort();
-      outputln();
-      inc(removed);
-    end;
-  end;
-
-  textattr := WHITE;
-  if (added = 0) and (removed = 0) and (changed = 0) and (renamed = 0) then
-    outputLn('No changes.');
-  outputLn();
-  *)
-end;
-
 {present to user the diff between current workspace and head}
 procedure showDiffOnWorkspace();
+var
+  repo: tCheckpointRepo;
+  old,new: tCheckpoint;
+  checkpointDiff: tCheckpointDiff;
+const
+  ROOT = '$repo';
+begin
+  repo := tCheckpointRepo.create(ROOT);
+  old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
+  new := tCheckpoint.create('.');
+  checkpointDiff := repo.generateCheckpointDiff(old, new);
+  checkpointDiff.showStatus();
+
+  new.free;
+  old.free;
+  repo.free;
+end;
+
+procedure showStatus();
 var
   repo: tCheckpointRepo;
   old,new: tCheckpoint;
@@ -859,31 +738,63 @@ procedure tCheckpointDiffHelper.showStatus(withStats: boolean=true);
 var
   fileDiff: tFileDiff;
   oldTextAttr: byte;
+  filesStats, totalStats, stats: tDiffStats;
+  wasChanges: boolean;
 begin
+
+  stats.clear();
+  totalStats.clear();
+  filesStats.clear();
+
   oldTextattr := textAttr;
+
   for fileDiff in fileDiffs do begin
     case fileDiff.diffType of
       FD_ADDED: begin
         textattr := LIGHTGREEN;
         output(pad('[+] added ' + fileDiff.new.path, 50));
+        inc(filesStats.added);
       end;
       FD_REMOVED: begin
         textattr := LIGHTRED;
         output(pad('[-] removed ' + fileDiff.old.path, 50));
+        inc(filesStats.removed);
       end;
       FD_MODIFIED: begin
         textattr := WHITE;
         output(pad('[~] modified ' + fileDiff.new.path, 50));
+        inc(filesStats.changed);
       end;
       FD_RENAMED: begin
         textattr := LIGHTBLUE;
         output(pad('[>] renamed '+fileDiff.old.path+' to '+fileDiff.new.path, 50));
+        inc(filesStats.changed);
       end;
     end;
-    if withStats then
-      fileDiff.getStats().printShort();
+    if withStats then begin
+      stats := fileDiff.getStats();
+      stats.printShort();
+      totalStats += stats;
+    end;
     outputln();
   end;
+
+  {show footer}
+
+  textattr := WHITE;
+  wasChanges := (stats.added > 0) or (stats.removed > 0) or (stats.changed > 0);
+
+  if wasChanges and withStats then begin
+    outputln();
+    outputln('Total:');
+    totalStats.print();
+  end;
+
+  if not wasChanges then
+    outputLn('No changes.');
+
+  outputLn();
+
   textattr := oldTextAttr;
 end;
 
@@ -898,8 +809,6 @@ begin
   clrscr;
   WRITE_TO_SCREEN := true;
   runTestSuites();
-
-  totalStats.clear();
 
   // screen is hard to read due to a dosbox-x bug, so we clear it
   // for visibility.
@@ -918,7 +827,7 @@ begin
   else if command = 'benchmark' then
     benchmark()
   else if command = 'status' then
-    status()
+    showStatus()
   else if command = 'stats' then
     stats()
   else
