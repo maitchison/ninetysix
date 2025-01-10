@@ -63,11 +63,15 @@ var
 type
   tDiffStatsHelper = record helper for tDiffStats
     procedure print();
-    procedure printShort(padding: integer=3);
+    procedure printShort(padding: integer=4);
   end;
 
   tCheckpointHelper = class helper for tCheckpoint
     procedure print();
+  end;
+
+  tCheckpointDiffHelper = record helper for tCheckpointDiff
+    procedure showStatus(withStats: boolean=true);
   end;
 
 {--------------------------------------------------------}
@@ -87,7 +91,7 @@ begin
 end;
 
 {outputs a line of text, with support for paging}
-procedure outputLn(s: string);
+procedure outputLn(s: string='');
 begin
   if SILENT then exit;
   writeln(s);
@@ -148,7 +152,7 @@ var
 begin
   oldTextAttr := textAttr;
   textAttr := LIGHTGRAY;
-  output('(');
+  //output('(');
   textAttr := LIGHTGREEN;
   output(intToStr(added, padding, ' ')+' ');
   textAttr := LIGHTRED;
@@ -159,7 +163,7 @@ begin
   if net > 0 then plus := '+' else plus := '';
   output(lpad(plus+intToStr(net), padding, ' '));
   textAttr := LIGHTGRAY;
-  output(')');
+  //output(')');
   textAttr := oldTextAttr;
 end;
 
@@ -230,29 +234,8 @@ end;
 
 {-----------------------------------------------------}
 
-function readFile(filename: string): tLines;
-var
-  t: text;
-  line: string;
-  lines: tLines;
-begin
-
-  if not fs.exists(filename) then exit(nil);
-
-  assign(t, filename);
-  reset(t);
-  lines := nil;
-  while not EOF(t) do begin
-    readln(t, line);
-    setLength(lines, length(lines)+1);
-    lines[length(lines)-1] := line;
-  end;
-  close(t);
-  result := lines;
-end;
-
 {output the longest common subsequence. Returns stats}
-function processDiff(newLines,oldLines: tLines;matching: tIntList): tDiffStats;
+function processDiff(newLines,oldLines: tStringList;matching: tIntList): tDiffStats;
 
 var
   i,j,k,z: int32;
@@ -300,17 +283,16 @@ var
 begin
 
   result.clear();
-  result.newLen := length(newLines);
 
   {which lines in old file should be shown for context}
   fillchar(importantLines, sizeof(importantLines), false);
 
   oldS := tIntList.create([]);
-  for i := 1 to length(oldLines) do
+  for i := 1 to oldLines.len do
     oldS.append(i);
 
   newS := tIntList.create([]);
-  for i := 1 to length(newLines) do
+  for i := 1 to newLines.len do
     newS.append(i);
 
   {detect identical files}
@@ -323,12 +305,12 @@ begin
   {handle the added / deleted cases, which don't work for some reason}
   {note: this might indicate a big with changes at the end being missing}
   if matching.len = 0 then begin
-    for i := 0 to length(oldLines)-1 do begin
+    for i := 0 to oldLines.len-1 do begin
       textAttr := LIGHTRED;
       outputLn(intToStr(i+1, 4, '0')+' [-] '+fix(oldLines[i]));
       inc(result.removed);
     end;
-    for i := 0 to length(newLines)-1 do begin
+    for i := 0 to newLines.len-1 do begin
       textAttr := LIGHTGREEN;
       outputLn(intToStr(i+1, 4, '0')+' [+] '+fix(newLines[i]));
       inc(result.added);
@@ -360,11 +342,11 @@ begin
       end;
     end;
 
-    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
+    while (j < oldLines.len) and (oldLines[j] <> cur) do begin
       markImportant(j);
       inc(j);
     end;
-    while (i < length(newLines)) and (newLines[i] <> cur) do begin
+    while (i < newLines.len) and (newLines[i] <> cur) do begin
       markImportant(j);
       inc(i);
     end;
@@ -377,7 +359,7 @@ begin
   k := 0;
   clock := 0;
 
-  outputLn('');
+  outputLn();
 
   while k < matching.len do begin
     inc(clock);
@@ -400,7 +382,7 @@ begin
           output(' ');
         for z := 1 to 55 do
           output(chr(196));
-        outputLn('');
+        outputLn();
         textAttr := LIGHTGRAY;
       end;
 
@@ -419,14 +401,14 @@ begin
       end;
     end;
 
-    while (j < length(oldLines)) and (oldLines[j] <> cur) do begin
+    while (j < oldLines.len) and (oldLines[j] <> cur) do begin
       textAttr := LIGHTRED;
       outputLn(intToStr(j+1, 4, '0')+' [-] '+fix(oldLines[j]));
       inc(j);
       inc(result.removed);
     end;
 
-    while (i < length(newLines)) and (newLines[i] <> cur) do begin
+    while (i < newLines.len) and (newLines[i] <> cur) do begin
       textAttr := LIGHTGREEN;
       outputLn('     [+] '+fix(newLines[i]));
       inc(i);
@@ -434,7 +416,7 @@ begin
     end;
   end;
 
-  outputLn('');
+  outputLn();
   textAttr := WHITE;
 
 end;
@@ -447,8 +429,8 @@ var
   startTime, elapsed: double;
   merge: tIntList;
   sln: tIntList;
-  new,old: tLines;
-  diff: tDiff;
+  new,old: tStringList;
+  diff: tDiffSolver;
   i: integer;
 begin
   {
@@ -458,13 +440,13 @@ begin
     no writeln: 12.4
     sln from backtrace: 1.6
   }
-  new := readFile('sample_new.txt');
-  old := readFile('sample_old.txt');
+  new := fs.readText('sample_new.txt');
+  old := fs.readText('sample_old.txt');
 
-  diff := tDiff.create();
+  diff := tDiffSolver.create();
 
   startTime := getSec;
-  sln := diff.run(new, old);
+  sln := diff.run(old, new);
   elapsed := getSec-startTime;
 
   merge := tIntList.create([]);
@@ -472,13 +454,13 @@ begin
     merge.append(sln[i]);
   writeln(merge.toString);
 
-  writeln('final score -> ',diff.scores[(length(new)*length(old))-1]);
+  writeln('final score -> ', diff.solutionLength);
 
   writeln(format('Took %f seconds', [elapsed]));
   writeln(merge.len);
-  writeln('new        ',length(new));
-  writeln('old        ',length(old));
-  writeln('NM         ',length(new)*length(old));
+  writeln('new        ',new.len);
+  writeln('old        ',old.len);
+  writeln('NM         ',new.len*old.len);
 end;
 
 {todo: make paths fully qualified, and drop HEAD, WORKSPACE here}
@@ -487,8 +469,8 @@ function runDiff(filename: string; otherFilename: string=''; printOutput: boolea
 var
   merge: tIntList;
   sln, sln2: tIntList;
-  new,old: tLines;
-  diff: tDiff;
+  new,old: tStringList;
+  diff: tDiffSolver;
   i: integer;
   oldSilent: boolean;
   cacheKey: string;
@@ -501,14 +483,14 @@ begin
   if otherFilename = '' then otherFilename := filename;
 
   startTimer('readFiles');
-  new := readFile(joinPath(WORKSPACE, filename));
-  old := readFile(joinPath(HEAD, otherFilename));
+  new := fs.readText(joinPath(WORKSPACE, filename));
+  old := fs.readText(joinPath(HEAD, otherFilename));
   stopTimer('readFiles');
 
-  diff := tDiff.create();
+  diff := tDiffSolver.create();
 
   startTimer('cache_key');
-  cacheKey := 'new:'+MD5.hash(join(new)).toHex+' old:'+MD5.hash(join(old)).toHex;
+  cacheKey := 'new:'+MD5.hash(join(new.data)).toHex+' old:'+MD5.hash(join(old.data)).toHex;
   stopTimer('cache_key');
   if CACHE.hasKey(cacheKey) then begin
     startTimer('cache_hit');
@@ -516,7 +498,7 @@ begin
     stopTimer('cache_hit');
   end else begin
     startTimer('cache_miss');
-    sln := diff.run(new, old);
+    sln := diff.run(old, new);
     CACHE.setValue(cacheKey, sln.dumpS);
     CACHE.save('go.cache');
     stopTimer('cache_miss');
@@ -549,39 +531,6 @@ begin
   result += fs.listFiles(path+'*.inc');
 end;
 
-{checks if originalFile is very similar to any of the other files in
- filesToCheck, and if so returns the matching new filename}
-function checkForRename(originalFile: string; filesToCheck: tStringList): string;
-var
-  filename: string;
-  ourFileSize: int64;
-  filesizeRatio: double;
-  changedratio: double;
-  stats: tDiffStats;
-begin
-  result := '';
-
-  ourFileSize := fs.fileSize(joinPath(WORKSPACE, originalFile));
-
-  // we don't check very small files
-  if ourFileSize < 64 then exit;
-
-  for filename in filesToCheck do begin
-    // do not check ourselves
-    if filename = originalFile then continue;
-    fileSizeRatio := fs.fileSize(joinPath(HEAD, filename)) / ourFileSize;
-    //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
-    if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
-    stats := runDiff(originalFile, filename, false);
-    changedRatio := stats.unchanged / stats.newLen;
-    //outputln(format('changeratio %f %s %s ', [changedRatio, originalFile, filename]));
-    if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
-    result := filename;
-    exit;
-  end;
-end;
-
-
 {show all changed / added / deleted files}
 procedure status();
 var
@@ -593,7 +542,10 @@ var
   stats: tDiffStats;
 begin
 
-  outputln('');
+  error('Old status is no longer supported');
+(*
+
+  outputln();
   renamedFiles.clear();
   workingSpaceFiles := getSourceFiles(WORKSPACE);
   headFiles := getSourceFiles(HEAD);
@@ -611,7 +563,7 @@ begin
       stats := runDiff(filename, renamedFile, false);
       output(pad('[>] renamed '+filename+' to '+renamedFile, 40, ' '));
       stats.printShort();
-      outputln('');
+      outputln();
       inc(renamed);
     end;
     renamedFiles += filename;
@@ -625,7 +577,7 @@ begin
       stats := runDiff(filename, filename, false);
       output(pad('[+] added ' + filename, 40, ' '));
       stats.printShort();
-      outputln('');
+      outputln();
       inc(added);
     end else begin
       if fs.wasModified(joinPath(WORKSPACE, filename), joinPath(HEAD, filename)) then begin
@@ -633,7 +585,7 @@ begin
         stats := runDiff(filename, filename, false);
         output(pad('[~] modified ' + filename, 40, ' '));
         stats.printShort();
-        outputln('');
+        outputln();
         inc(changed);
       end;
     end;
@@ -646,7 +598,7 @@ begin
       stats := runDiff(filename, filename, false);
       output(pad('[-] removed ' + filename, 40, ' '));
       stats.printShort();
-      outputln('');
+      outputln();
       inc(removed);
     end;
   end;
@@ -654,26 +606,28 @@ begin
   textattr := WHITE;
   if (added = 0) and (removed = 0) and (changed = 0) and (renamed = 0) then
     outputLn('No changes.');
-  outputLn('');
-
+  outputLn();
+  *)
 end;
 
 {present to user the diff between current workspace and head}
 procedure showDiffOnWorkspace();
 var
+  repo: tCheckpointRepo;
   old,new: tCheckpoint;
+  checkpointDiff: tCheckpointDiff;
 const
   ROOT = '$repo';
 begin
+  repo := tCheckpointRepo.create(ROOT);
   old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
   new := tCheckpoint.create('.');
-  outputln('--------------------');
-  outputln('OLD');
-  old.print();
-  outputln('--------------------');
-  outputln('NEW');
-  new.print();
-  //showDiff('', 'HEAD');
+  checkpointDiff := repo.generateCheckpointDiff(old, new);
+  checkpointDiff.showStatus();
+
+  new.free;
+  old.free;
+  repo.free;
 end;
 
 {show all diff on all modified files
@@ -695,6 +649,10 @@ var
   renamedFiles: tStringList;
 begin
 
+  error('Old diff has been deprecated.');
+
+(*
+
   totalStats.clear();
 
   workingSpaceFiles := getSourceFiles(WORKSPACE);
@@ -702,7 +660,7 @@ begin
 
   fileStats.clear();
 
-  outputLn('');
+  outputLn();
 
   renamedFiles.clear();
 
@@ -768,7 +726,7 @@ begin
   totalStats.print();
 
   result := totalStats;
-
+  *)
 end;
 
 {--------------------------------------------------}
@@ -784,7 +742,7 @@ var
   counter: int32;
   stats: tDiffStats;
 
-  csvLines: tLines;
+  csvLines: tStringList;
   csvEntries: tStringToStringMap;
   line: string;
   key,value: string;
@@ -899,15 +857,51 @@ end;
 
 {--------------------------------------------------}
 
+procedure tCheckpointDiffHelper.showStatus(withStats: boolean=true);
+var
+  fileDiff: tFileDiff;
+  oldTextAttr: byte;
+begin
+  oldTextattr := textAttr;
+  for fileDiff in fileDiffs do begin
+    case fileDiff.diffType of
+      FD_ADDED: begin
+        textattr := LIGHTGREEN;
+        output(pad('[+] added ' + fileDiff.new.path, 50));
+      end;
+      FD_REMOVED: begin
+        textattr := LIGHTRED;
+        output(pad('[-] removed ' + fileDiff.old.path, 50));
+      end;
+      FD_MODIFIED: begin
+        textattr := WHITE;
+        output(pad('[~] modified ' + fileDiff.new.path, 50));
+      end;
+      FD_RENAMED: begin
+        textattr := LIGHTBLUE;
+        output(pad('[>] renamed '+fileDiff.old.path+' to '+fileDiff.new.path, 50));
+      end;
+    end;
+    if withStats then
+      fileDiff.getStats().printShort();
+    outputln();
+  end;
+  textattr := oldTextAttr;
+end;
+
+{--------------------------------------------------}
+
 var
   command: string;
 
 begin
 
-  //todo: remove
+  {todo: remove}
+  clrscr;
   WRITE_TO_SCREEN := true;
   runTestSuites();
 
+  {todo: also remove}
   CACHE := tStringToStringMap.create();
   if fs.exists('go.cache') then
     CACHE.load('go.cache');

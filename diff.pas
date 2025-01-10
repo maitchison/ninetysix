@@ -18,76 +18,117 @@ uses
   test,
   types,
   utils,
+  fileSystem,
   list;
 
 type
 
-  {todo: switch to tStringList}
-  tLines = array of string;
   tScores = array of int16;
+  tMergeInfo = record
+    oldLen, newLen: int32;
+    merge: tIntList;
+  end;
 
-  tDiff = class
+  tDiffSolver = class
 
   private
-    a, b: tLines;
+    a, b: tStringList;
 
-  public
+  protected
     scores: tScores;
 
     function getScore(i,j: int32): int16; inline;
     procedure setScore(i,j: int32;value: int16); inline;
 
-    procedure init(newLines, oldLines: tLines);
+    procedure init(newLines, oldLines: tStringList);
     function solve(i,j: int32): int32;
     function extractSolution(): tIntList;
 
   public
+
     constructor create();
-    function run(newLines, oldLines: tLines): tIntList;
+    function run(oldLines, newLines: tStringList): tIntList;
+    function solutionLength(): int16;
     {debug stuff}
     procedure debugPrintPaths();
     procedure debugLogPaths();
     function debugCacheUsed(): int32;
   end;
 
-function testLines(s: string): tLines;
+  tDiffStats = record
+    added: int64;
+    removed: int64;
+    changed: int64;
+    unchanged: int64;
+    function net: int64;
+    function newLen: int64;
+    function oldLen: int64;
+    procedure clear();
+    class operator add(a,b: tDiffStats): tDiffStats;
+  end;
+
+function testLines(s: string): tStringList;
+function run(oldLines, newLines: tStringList): tIntList; overload;
+function run(oldFile, newFile: string): tMergeInfo; overload;
 
 implementation
 
-function testLines(s: string): tLines;
+{-----------------------------------------------}
+
+function testLines(s: string): tStringList;
 var
   i: int32;
 begin
-  result := nil;
-  setLength(result, length(s));
+  result := tStringList.create(length(s));
   for i := 0 to length(s)-1 do
     result[i] := s[i+1];
 end;
 
-
-constructor tDiff.create();
+function run(oldLines, newLines: tStringList): tIntList; overload;
+var
+  diff: tDiffSolver;
 begin
-  scores := nil;
-  a := nil;
-  b := nil;
+  diff := tDiffSolver.create();
+  result := diff.run(oldLines, newLines);
+  diff.free;
 end;
 
-function tDiff.getScore(i,j: int32): int16; inline;
+function run(oldFile, newFile: string): tMergeInfo; overload;
+var
+  new, old: tStringList;
+begin
+  old := fs.readText(oldFile);
+  new := fs.readText(newFile);
+  result.merge := run(old, new);
+  result.oldLen := old.len;
+  result.newLen := new.len;
+end;
+
+{-----------------------------------------------}
+
+constructor tDiffSolver.create();
+begin
+  scores := nil;
+  a.clear();
+  b.clear();
+end;
+
+function tDiffSolver.getScore(i,j: int32): int16; inline;
 begin
   if (i = 0) or (j = 0) then exit(0);
   if (i < 0) or (j < 0) then exit(-1);
-  if (i > length(a)) or (j > length(b)) then exit(-1);
-  result := scores[(i-1)+(j-1)*length(a)];
+  if (i > a.len) or (j > b.len) then exit(-1);
+  result := scores[(i-1)+(j-1)*a.len];
 end;
 
-procedure tDiff.setScore(i,j: int32;value: int16); inline;
+procedure tDiffSolver.setScore(i,j: int32;value: int16); inline;
 begin
   if (i <= 0) or (j <= 0) then runError(201);
-  if (i > length(a)) or (j > length(b)) then runError(201);
-  scores[(i-1)+(j-1)*length(a)] := value;
+  if (i > a.len) or (j > b.len) then runError(201);
+  scores[(i-1)+(j-1)*a.len] := value;
 end;
 
-function tDiff.extractSolution(): tIntList;
+function tDiffSolver.extractSolution(): tIntList;
 var
   i,j,k: word;
   matchCost: word;
@@ -99,8 +140,8 @@ var
 begin
 
   {we start the end and go backwards}
-  i := length(a);
-  j := length(b);
+  i := a.len;
+  j := b.len;
   k := 0;
 
   slnLen := getScore(i,j);
@@ -136,40 +177,45 @@ begin
 
 end;
 
-procedure tDiff.init(newLines, oldLines: tLines);
+procedure tDiffSolver.init(newLines, oldLines: tStringList);
 begin
   a := newLines;
   b := oldLines;
-  if (length(b) > 4*1024) or (length(b) > 4*1024) then
+  if (b.len > 4*1024) or (b.len > 4*1024) then
     Error('Max length for diff is 4k');
   scores := nil;
-  setLength(scores, length(a)*length(b));
-  if length(a)*length(b) > 0 then
-    fillword(scores[0], length(a)*length(b), word(-1));
+  setLength(scores, a.len*b.len);
+  if a.len*b.len > 0 then
+    fillword(scores[0], a.len*b.len, word(-1));
+end;
+
+function tDiffSolver.solutionLength(): int16;
+begin
+  result := getScore(a.len, b.len);
 end;
 
 {returns the lines that match between new and old
 lines numbers are from oldLines
 }
-function tDiff.run(newLines, oldLines: tLines): tIntList;
+function tDiffSolver.run(oldLines, newLines: tStringList): tIntList;
 var
   m,n: int32;
 begin
 
   {special cases for empty files }
-  if (length(oldLines) = 0) or (length(newLines) = 0) then begin
+  if (oldLines.len = 0) or (newLines.len = 0) then begin
     {new file, no lines match}
     result.clear();
     exit;
   end;
 
   init(newLines, oldLines);
-  solve(length(a), length(b));
+  solve(a.len, b.len);
   result := extractSolution();
 end;
 
 {returns the length of the longest common subsequence between a[:i], and b[:i]}
-function tDiff.solve(i,j: int32): int32;
+function tDiffSolver.solve(i,j: int32): int32;
 var
   u,v: int32;
 begin
@@ -199,12 +245,12 @@ begin
   setScore(i, j, result);
 end;
 
-procedure tDiff.debugPrintPaths();
+procedure tDiffSolver.debugPrintPaths();
 var
   i,j: int32;
 begin
-  for j := 1 to length(b) do begin
-    for i := 1 to length(a) do begin
+  for j := 1 to b.len do begin
+    for i := 1 to a.len do begin
       if getScore(i,j) < 0 then
         write('[ . ]')
       else
@@ -215,14 +261,14 @@ begin
 end;
 
 
-procedure tDiff.debugLogPaths();
+procedure tDiffSolver.debugLogPaths();
 var
   i,j: int32;
   s: string;
 begin
-  for j := 1 to length(b) do begin
+  for j := 1 to b.len do begin
     s := '';
-    for i := 1 to length(a) do begin
+    for i := 1 to a.len do begin
       if getScore(i,j) = -1 then
         s += ('[ . ]')
       else
@@ -232,58 +278,85 @@ begin
   end;
 end;
 
-function tDiff.debugCacheUsed(): int32;
+function tDiffSolver.debugCacheUsed(): int32;
 var
   i,j: int32;
 begin
   result := 0;
-  for j := 1 to length(b) do
-    for i := 1 to length(a) do
+  for j := 1 to b.len do
+    for i := 1 to a.len do
       if getScore(i,j) >= 0 then
         inc(result);
 end;
 
-{--------------------------------------------------------------------}
+{-------------------------------------------------------------}
 
-function toBytes(refs: tIntList): tBytes;
-var
-  i: int32;
+function tDiffStats.net: int64;
 begin
-  result := nil;
-  setLength(result, refs.len);
-  for i := 0 to refs.len-1 do
-    result[i] := refs[i];
+  result := added - removed;
 end;
 
-{todo: switch to new test system}
-procedure runTests();
+function tDiffStats.newLen: int64;
+begin
+  result := added + unchanged;
+end;
+
+function tDiffStats.oldLen: int64;
+begin
+  result := removed + unchanged;
+end;
+
+procedure tDiffStats.clear();
+begin
+  added := 0;
+  removed := 0;
+  changed := 0;
+  unchanged := 0;
+end;
+
+class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
+begin
+  result.added := a.added + b.added;
+  result.removed := a.removed + b.removed;
+  result.changed := a.changed + b.changed;
+  result.unchanged := a.unchanged + b.unchanged;
+end;
+
+{--------------------------------------------------------------------}
+
+type
+  tDiffTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tDiffTest.run();
 var
-  new,old: tLines;
+  new,old: tStringList;
   sln: tIntList;
-  diff: tDiff;
+  diff: tDiffSolver;
 begin
 
-  diff := tDiff.create();
+  diff := tDiffSolver.create();
 
   sln := diff.run(testLines(''), testLines(''));
-  assertEqual(toBytes(sln),[]);
+  assertEqual(sln.toString,'[]');
 
   sln := diff.run(testLines('ABC'), testLines(''));
-  assertEqual(toBytes(sln),[]);
+  assertEqual(sln.toString,'[]');
 
   sln := diff.run(testLines(''), testLines('ABC'));
-  assertEqual(toBytes(sln),[]);
+  assertEqual(sln.toString,'[]');
 
   sln := diff.run(testLines('ABC'), testLines('ABC'));
-  assertEqual(toBytes(sln),[1,2,3]);
+  assertEqual(sln.toString,'[1,2,3]');
 
-  sln := diff.run(testLines('ABCD'), testLines('ABXXEDA'));
-  assertEqual(toBytes(sln),[1,2,6]);
+  sln := diff.run(testLines('ABXXEDA'), testLines('ABCD'));
+  assertEqual(sln.toString,'[1,2,6]');
 
   diff.free;
 
 end;
 
 begin
-  runTests();
+  tDiffTest.create('Diff');
 end.

@@ -8,16 +8,20 @@ uses
   test,
   utils,
   list,
+  types,
   dos;
 
 type
   tFileSystem = class
 
+    function  folderExists(path: string): boolean;
     function  exists(filename: string): boolean;
     procedure copyFile(srcFile, dstFile: string);
     function  fileSize(fileName: string): int64;
     procedure setModified(fileName: string;time: dword);
     function  getModified(fileName: string): dword;
+
+    function  readText(filename: string): tStringList;
 
     function  wasModified(fileA, fileB: string): boolean;
 
@@ -57,6 +61,15 @@ begin
     exit(True);
   end else
     exit(False);
+end;
+
+function tFileSystem.folderExists(path: string): boolean;
+var
+  sr: SearchRec;
+begin
+  findFirst(path, dos.DIRECTORY, sr);
+  result := (dosError = 0) and ((sr.attr and dos.DIRECTORY) <> 0);
+  findClose(sr);
 end;
 
 procedure tFileSystem.copyFile(srcFile, dstFile: string);
@@ -160,6 +173,26 @@ begin
   end;
   findClose(sr);
 end;
+
+function tFileSystem.readText(filename: string): tStringList;
+var
+  t: text;
+  line: string;
+begin
+
+  result.clear();
+
+  if not self.exists(filename) then error(format('File "%s" not found.', [filename]));
+
+  assign(t, filename);
+  reset(t);
+  while not EOF(t) do begin
+    readln(t, line);
+    result.append(line);
+  end;
+  close(t);
+end;
+
 
 begin
 end.

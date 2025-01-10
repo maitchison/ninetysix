@@ -12,13 +12,45 @@ uses
   filesystem,
   md5,
   iniFile,
+  types,
+  diff,
   dos;
 
 type
   tFileRef = class
   protected
-    fRoot: string; //root folder, not saved.
-    fPath: string;
+
+    {ok some documentation... I might need to rename some of these
+
+
+    path is the 'source' of the file, i.e the handle of the file in the repo.
+    fqn is what to load to get the file contents
+    root is where the repo folder is...
+
+    e.g..
+
+    root = 'dev\src'
+    path = 'airtime.pas'
+    fqn -> 'dev\src\airtime.pas'
+
+    However a head reference would look like
+
+    root = '\dev\$repo\HEAD
+    path = 'airtime.pas'
+    fqn -> 'dev\$repo\HEAD\airtime.pas'
+
+    and a checkpoint reference would look like
+
+    root = 'OBJECTSTORE'
+    path = 'airtime.pas'
+    fqn -> 'dev\$repo\objectstore\e1f1ae8cac8dda7f5c52a3dbe135'
+
+    also.. please make a record and have another way to seralize
+    }
+
+
+    fRoot: string; // repo root folder, not saved.
+    fPath: string; // relative path from repo root folder
     fHash: string;
     fSize: int64;
     fModified: int32;
@@ -54,26 +86,32 @@ type
     destructor destroy(); override;
   end;
 
-  tDiffStats = record
-    added: int64;
-    removed: int64;
-    changed: int64;
-    newLen: int64;
-    function net: int64;
-    function unchanged: int64;
-    procedure clear();
-    class operator add(a,b: tDiffStats): tDiffStats;
-  end;
+  tFileDiffType = (
+    FD_ADDED,
+    FD_REMOVED,
+    FD_MODIFIED,
+    FD_RENAMED
+  );
 
   tFileDiff = record
-    old, new: tStringList;
-    match: tIntList;
-    stats: tDiffStats;
+    old, new: tFileRef;
+    procedure init(aOld, aNew: tFileRef);
+    function  diffType: tFileDiffType;
+    function  getMatch(): tIntList;
+    function  getStats(): tDiffStats;
+    class function MakeRenamed(aOld, aNew: tFileRef): tFileDiff; static;
+    class function MakeAdded(aNew: tFileRef): tFileDiff; static;
+    class function MakeRemoved(aOld: tFileRef): tFileDiff; static;
+    class function MakeModified(aOld, aNew: tFileRef): tFileDiff; static;
   end;
 
   tCheckpointDiff = record
-    files: array of tFileDiff;
-    stats: tDiffStats;
+    fileDiffs: array of tFileDiff;
+    procedure clear();
+    procedure append(fileDiff: tFileDiff);
+    function  getFileStats(): tDiffStats;
+    function  getLineStats(): tDiffStats;
+
   end;
 
   tCheckpointRepo = class;
@@ -88,6 +126,7 @@ type
     fileList: array of tFileRef;
 
     {where our files came from}
+    {todo: I think we can remove this and just trust the fileRefs to be correct}
     sourceFolder: string;
 
   protected
@@ -122,7 +161,7 @@ type
     constructor create(aRepoRoot: string);
     destructor destroy(); override;
 
-    function  generateDiff(checkpointOld, checkpointNew: string): tCheckpointDiff;
+    function  generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
 
     function  hasCheckpoint(checkpointName: string): boolean;
     function  getCheckpointPath(checkpointName: string): string;
@@ -250,7 +289,7 @@ end;
 constructor tObjectStore.create(aPath: string);
 begin
   root := aPath;
-  if not fs.exists(aPath) then begin
+  if not fs.folderExists(aPath) then begin
     note(format('Object store folder "%s" was not found, so creating it.', [aPath]));
     fs.mkdir(aPath);
   end;
@@ -342,7 +381,6 @@ begin
 
   self.sourceFolder := path;
 
-  writeln('processing '+path);
   if not path.endsWith('\') then path += '\';
 
   // get all files in folder
@@ -481,7 +519,7 @@ end;
 constructor tCheckpointRepo.create(aRepoRoot: string);
 begin
   inherited create;
-  if not fs.exists(aRepoRoot) then error(format('No repo found at "%s"', [aRepoRoot]));
+  if not fs.folderExists(aRepoRoot) then error(format('No repo found at "%s"', [aRepoRoot]));
   repoRoot := aRepoRoot;
   objectStore := tObjectStore.create(joinPath(aRepoRoot, 'store'));
 end;
@@ -493,9 +531,120 @@ begin
   inherited Destroy;
 end;
 
-function tCheckpointRepo.generateDiff(checkpointOld, checkpointNew: string): tCheckpointDiff;
+{checks if originalFile is very similar to any of the other files in
+ filesToCheck, and if so returns the matching new filename}
+function checkForRename(originalFile: tFileRef; filesToCheck: array of tFileRef): string;
+var
+  fileRef: tFileRef;
+  filesizeRatio: double;
+  changedratio: double;
+  stats: tDiffStats;
+  diff: tFileDiff;
 begin
-  error('NIY');
+  result := '';
+
+  // we don't check very small files
+  if originalFile.fSize < 64 then exit;
+
+  for fileRef in filesToCheck do begin
+    // do not check ourselves
+    if fileRef.path = originalFile.path then continue;
+    fileSizeRatio := fileRef.fSize / originalFile.fSize;
+    //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
+    if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
+
+    diff.init(originalFile, fileRef);
+    stats := diff.getStats();
+
+    changedRatio := stats.unchanged / stats.newLen;
+    //outputln(format('changeratio %f %s %s ', [changedRatio, originalFile, filename]));
+    if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
+    result := fileRef.path;
+    exit;
+  end;
+end;
+
+
+function tCheckpointRepo.generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
+var
+  filename, originalFile: string;
+  fileRef: tFileRef;
+  fileDiff: tFileDiff;
+
+  {todo: replace thiese all with lists of tFileRefs
+   ... shame we don't have a generic list, would be handy
+   here}
+  oldFiles, newFiles: tStringList;
+  addedFiles, removedFiles: tStringList;
+  renamedFiles: tStringList;
+
+  removedFilesAsRefs: array of tFileRef;
+
+  oldRoot, newRoot: string;
+
+  i: integer;
+
+begin
+  result.clear();
+
+  {todo: remove these and use fileRefs properly}
+  oldRoot := old.sourceFolder;
+  newRoot := new.sourceFolder;
+
+  oldFiles.clear();
+  for fileRef in old.fileList do
+    oldFiles.append(fileRef.path);
+
+  newFiles.clear();
+  for fileRef in new.fileList do
+    newFiles.append(fileRef.path);
+
+  addedFiles.clear();
+  for filename in newFiles do
+    if not oldFiles.contains(filename) then
+      addedFiles.append(filename);
+
+  removedFiles.clear();
+  for filename in oldFiles do
+    if not newFiles.contains(filename) then
+      removedFiles.append(filename);
+
+  removedFilesAsRefs := nil;
+  setLength(removedFilesAsRefs, removedFiles.len);
+  for i := 0 to removedFiles.len-1 do
+    removedFilesAsRefs[i] := tFileRef.create(removedFiles[i], oldRoot);
+
+  // process the lists...
+
+  {first, look for files that were renamed.}
+  renamedFiles.clear();
+  for filename in newFiles do begin
+    originalFile := checkForRename(tFileRef.create(filename, newRoot), removedFilesAsRefs);
+    if originalFile <> '' then begin
+      result.append(tFileDiff.MakeRenamed(tFileRef.create(originalFile, oldRoot), tFileRef.create(filename, newRoot)));
+      renamedFiles.append(filename);
+      renamedFiles.append(originalFile);
+    end;
+  end;
+
+  {next files that were added and removed}
+  for filename in addedFiles do begin
+    if renamedFiles.contains(filename) then continue;
+    result.append(tFileDiff.MakeAdded(tFileRef.create(filename, newRoot)));
+  end;
+  for filename in removedFiles do begin
+    if renamedFiles.contains(filename) then continue;
+    result.append(tFileDiff.MakeRemoved(tFileRef.create(filename, oldRoot)));
+  end;
+
+  {finally check for modified}
+  for filename in newFiles do begin
+    if renamedFiles.contains(filename) then continue;
+    if not oldFiles.contains(filename) then continue;
+    {todo: do this using filerefs, with support for being in repo}
+    if not fs.wasModified(joinPath(oldRoot, filename), joinPath(newRoot, filename)) then continue;
+    result.append(tFileDiff.MakeModified(tFileRef.create(filename, oldRoot), tFileRef.create(filename, newRoot)));
+  end;
 end;
 
 function tCheckpointRepo.hasCheckpoint(checkpointName: string): boolean;
@@ -515,33 +664,89 @@ end;
 
 {-------------------------------------------------------------}
 
-function tDiffStats.net: int64;
+function tFileDiff.getMatch(): tIntList;
 begin
-  result := added - removed;
+  result := diff.run(old.fqn, new.fqn).merge;
 end;
 
-function tDiffStats.unchanged: int64;
+function tFileDiff.getStats(): tDiffStats;
+var
+  mi: tMergeInfo;
 begin
-  result := newLen - added - changed;
+  mi := diff.run(old.fqn, new.fqn);
+  result.clear();
+  result.removed := mi.oldLen - mi.merge.len;
+  result.added := mi.newLen - mi.merge.len;
+  result.changed := 0;
+  result.unchanged := mi.merge.len;
 end;
 
-procedure tDiffStats.clear();
+procedure tFileDiff.init(aOld, aNew: tFileRef);
 begin
-  added := 0;
-  removed := 0;
-  changed := 0;
-  newLen := 0;
+  self.old := aOld;
+  self.new := aNew;
 end;
 
-class operator tDiffStats.add(a,b: tDiffStats): tDiffStats;
+function tFileDiff.diffType: tFileDiffType;
 begin
-  result.added := a.added + b.added;
-  result.removed := a.removed + b.removed;
-  result.changed := a.changed + b.changed;
-  result.newLen := a.newLen + b.newLen;
+  if assigned(self.old) and assigned(self.new) then
+    if (old.path = new.path) then
+      exit(FD_MODIFIED)
+    else
+      exit(FD_RENAMED);
+  if assigned(self.old) then exit(FD_REMOVED);
+  if assigned(self.new) then exit(FD_ADDED);
+  error('Neither old nor new was assigned, file as no diff type.');
+end;
+
+class function tFileDiff.MakeRenamed(aOld, aNew: tFileRef): tFileDiff;
+begin
+  result.old := aOld;
+  result.new := aNew;
+end;
+
+class function tFileDiff.MakeAdded(aNew: tFileRef): tFileDiff;
+begin
+  result.old := nil;
+  result.new := aNew;
+end;
+
+class function tFileDiff.MakeRemoved(aOld: tFileRef): tFileDiff;
+begin
+  result.old := aOld;
+  result.new := nil;
+end;
+
+class function tFileDiff.MakeModified(aOld, aNew: tFileRef): tFileDiff;
+begin
+  if aOld.path <> aNew.path then error('Modified diff should have paths match.');
+  if aOld.fqn = aNew.fqn then error('Modified diff have two different files.');
+  result.old := aOld;
+  result.new := aNew;
 end;
 
 {-------------------------------------------------------------}
+
+procedure tCheckpointDiff.clear();
+begin
+  setLength(self.fileDiffs, 0);
+end;
+
+procedure tCheckpointDiff.append(fileDiff: tFileDiff);
+begin
+  setLength(fileDiffs, length(fileDiffs)+1);
+  fileDiffs[length(fileDiffs)-1] := fileDiff;
+end;
+
+function tCheckpointDiff.getFileStats(): tDiffStats;
+begin
+  error('NIY');
+end;
+
+function tCheckpointDiff.getLineStats(): tDiffStats;
+begin
+  error('NIY');
+end;
 
 begin
 end.

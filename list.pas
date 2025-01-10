@@ -54,11 +54,12 @@ type
 
     startPos,endPos: int32;
     data: array of string;
-    constructor create(const data: array of string);
+    constructor create(len: integer); overload;
+    constructor create(const data: array of string); overload;
     function len: int32;
     function slice(aStartPos, aEndPos: int32): tStringList;
-    procedure append(x: string); overload;
-    procedure append(x: tStringList); overload;
+    procedure append(const x: string); overload;
+    procedure append(const x: tStringList); overload;
     function clone(): tStringList;
     procedure clear();
     function head: string;
@@ -301,7 +302,14 @@ begin
   data[deref(index)] := value;
 end;
 
-constructor tStringList.create(const data: array of string);
+constructor tStringList.create(len: int32); overload;
+begin
+  clear();
+  endPos := len;
+  setLength(data, len);
+end;
+
+constructor tStringList.create(const data: array of string); overload;
 var
   s: string;
 begin
@@ -315,7 +323,7 @@ begin
   result := endPos-startPos;
 end;
 
-procedure tStringList.append(x: string); overload;
+procedure tStringList.append(const x: string); overload;
 begin
   {note: this is not a good way to handle append, maybe a different
     'stringbuilder' like class}
@@ -329,7 +337,7 @@ begin
   end;
 end;
 
-procedure tStringList.append(x: tStringList); overload;
+procedure tStringList.append(const x: tStringList); overload;
 var
   s: string;
 begin
