@@ -319,6 +319,7 @@ var
 begin
   assign(t, filename);
   reset(t);
+  clear();
   while not eof(t) do begin
     readln(t, line);
     split(line, '=', key, value);

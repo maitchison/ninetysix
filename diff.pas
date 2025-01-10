@@ -25,10 +25,6 @@ uses
 type
 
   tScores = array of int16;
-  tMergeInfo = record
-    oldLen, newLen: int32;
-    merge: tIntList;
-  end;
 
   tDiffSolver = class
 
@@ -70,14 +66,9 @@ type
 
 function testLines(s: string): tStringList;
 
-{these implement caching}
-function run(oldLines, newLines: tStringList): tIntList; overload;
-function run(oldFile, newFile: string): tMergeInfo; overload;
+function run(oldLines, newLines: tStringList): tIntList;
 
 implementation
-
-var
-  CACHE: tStringToStringMap;
 
 {-----------------------------------------------}
 
@@ -90,24 +81,13 @@ begin
     result[i] := s[i+1];
 end;
 
-function run(oldLines, newLines: tStringList): tIntList; overload;
+function run(oldLines, newLines: tStringList): tIntList;
 var
   diff: tDiffSolver;
 begin
   diff := tDiffSolver.create();
   result := diff.run(oldLines, newLines);
   diff.free;
-end;
-
-function run(oldFile, newFile: string): tMergeInfo; overload;
-var
-  new, old: tStringList;
-begin
-  old := fs.readText(oldFile);
-  new := fs.readText(newFile);
-  result.merge := run(old, new);
-  result.oldLen := old.len;
-  result.newLen := new.len;
 end;
 
 {-----------------------------------------------}
@@ -365,21 +345,6 @@ end;
 
 {--------------------------------------------------------------------}
 
-procedure initCache();
-begin
-  CACHE := tStringToStringMap.create();
-  if fs.exists('go.cache') then
-    CACHE.load('go.cache');
-end;
-
-procedure saveCache();
-begin
-  CACHE.save('go.cache', 100);
-end;
-
 initialization
-  initCache();
   tDiffTest.create('Diff');
-finalization
-  saveCache();
 end.

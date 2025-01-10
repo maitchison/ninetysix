@@ -14,6 +14,8 @@ uses
   iniFile,
   types,
   diff,
+  hashMap,
+  timer,
   dos;
 
 type
@@ -167,15 +169,26 @@ type
     function  getCheckpointPath(checkpointName: string): string;
 
     function  load(checkpointName: string): tCheckpoint;
-
   end;
 
 
 implementation
 
+type
+  tMergeInfo = record
+    oldLen, newLen: int32;
+    merge: tIntList;
+  end;
+
 const
   {fine for text files, but don't process large binary files}
   MAX_FILESIZE = 128*1024;
+
+var
+  CACHE: tStringToStringMap;
+
+{cached diff}
+function diff(oldFile, newFile: string): tMergeInfo; forward;
 
 {-------------------------------------------------------------}
 
@@ -666,14 +679,14 @@ end;
 
 function tFileDiff.getMatch(): tIntList;
 begin
-  result := diff.run(old.fqn, new.fqn).merge;
+  result := diff(old.fqn, new.fqn).merge;
 end;
 
 function tFileDiff.getStats(): tDiffStats;
 var
   mi: tMergeInfo;
 begin
-  mi := diff.run(old.fqn, new.fqn);
+  mi := diff(old.fqn, new.fqn);
   result.clear();
   result.removed := mi.oldLen - mi.merge.len;
   result.added := mi.newLen - mi.merge.len;
@@ -748,5 +761,60 @@ begin
   error('NIY');
 end;
 
+{-------------------------------------------------------------}
+
+const
+  {for the moment just hard code this to the repo folder}
+  CACHE_PATH = '$repo\.cache';
+
+{cached diff}
+function diff(oldFile, newFile: string): tMergeInfo;
+var
+  new, old: tStringList;
+  sln: tIntList;
+  cacheKey: string;
 begin
+  startTimer('diff_read_file');
+  old := fs.readText(oldFile);
+  new := fs.readText(newFile);
+  stopTimer('diff_read_file');
+
+  startTimer('diff_cache_key');
+  cacheKey := 'new:'+MD5.hash(join(new.data)).toHex+' old:'+MD5.hash(join(old.data)).toHex;
+  stopTimer('diff_cache_key');
+
+  if CACHE.hasKey(cacheKey) then begin
+    startTimer('diff_cache_hit');
+    sln.loadS(cache.getValue(cacheKey));
+    stopTimer('diff_cache_hit');
+  end else begin
+    startTimer('diff_cache_miss');
+    sln := run(old, new);
+    CACHE.setValue(cacheKey, sln.dumpS);
+    stopTimer('diff_cache_miss');
+  end;
+
+  result.merge := sln;
+  result.oldLen := old.len;
+  result.newLen := new.len;
+end;
+
+procedure loadCache();
+begin
+  if fs.exists(CACHE_PATH) then
+    CACHE.load(CACHE_PATH);
+end;
+
+procedure saveCache();
+begin
+  if assigned(CACHE) then
+    CACHE.save(CACHE_PATH, 100);
+end;
+
+initialization
+  CACHE := tStringToStringMap.create();
+  loadCache();
+finalization
+  saveCache();
+  CACHE.free;
 end.
