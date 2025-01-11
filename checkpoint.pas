@@ -43,7 +43,7 @@ type
 
     and a checkpoint reference would look like
 
-    root = 'OBJECTSTORE'
+    root = '*dev\$repo\objectstore\'
     path = 'airtime.pas'
     fqn -> 'dev\$repo\objectstore\e1f1ae8cac8dda7f5c52a3dbe135'
 
@@ -204,6 +204,7 @@ const
 
 var
   CACHE: tStringToStringMap;
+  NULL_FILE: tFileRef;
 
 {cached diff}
 function diff(oldFile, newFile: string): tMergeInfo; forward;
@@ -232,7 +233,10 @@ end;
 {full path to file}
 function tFileRef.fqn: string;
 begin
-  result := joinPath(fRoot, fPath);
+  if fRoot.startsWith('*') then
+    result := joinPath(copy(fRoot, 2, length(fRoot)-1), fHash)
+  else
+    result := joinPath(fRoot, fPath);
 end;
 
 {returns the hash, calculates it if needed.}
@@ -494,9 +498,10 @@ procedure tCheckpoint.load(checkpoint: string);
 var
   reader: tINIReader;
   obj: tObject;
+  fr: tFileRef;
 begin
 
-  if not checkpoint.endsWith('.txt', true) then error('Checkpoint must be a .txt file');
+  if not checkpoint.endsWith('.txt', true) then error(format('Checkpoint must be a .txt file but was "%s"', [checkpoint]));
 
   if not fs.exists(checkpoint) then
     error(format('Checkpoint "%s" does not exist.', [checkpoint]));
@@ -509,7 +514,9 @@ begin
     obj := reader.readObject();
     if obj is tFileRef then begin
       setLength(fileList, length(fileList)+1);
-      fileList[length(fileList)-1] := tFileRef(obj);
+      fr := tFileRef(obj);
+      fr.fRoot := '*'+repo.objectStore.root;
+      fileList[length(fileList)-1] := fr;
     end;
   end;
 
@@ -721,8 +728,12 @@ begin
 end;
 
 function tCheckpointRepo.getCheckpoints(): tStringList;
+var
+  i: integer;
 begin
   result := fs.listFiles(repoRoot+'\*.txt');
+  for i := 0 to result.len-1 do
+    result[i] := removeExtension(result[i]);
   result.sort();
   result.reverse();
 end;
@@ -782,14 +793,14 @@ end;
 
 class function tFileDiff.MakeAdded(aNew: tFileRef): tFileDiff;
 begin
-  result.old := nil;
+  result.old := NULL_FILE;
   result.new := aNew;
 end;
 
 class function tFileDiff.MakeRemoved(aOld: tFileRef): tFileDiff;
 begin
   result.old := aOld;
-  result.new := nil;
+  result.new := NULL_FILE;
 end;
 
 class function tFileDiff.MakeModified(aOld, aNew: tFileRef): tFileDiff;
@@ -819,8 +830,12 @@ begin
 end;
 
 function tCheckpointDiff.getLineStats(): tDiffStats;
+var
+  fd: tFileDiff;
 begin
-  error('NIY');
+  result.clear();
+  for fd in fileDiffs do
+    result += fd.getStats();
 end;
 
 {-------------------------------------------------------------}
@@ -844,6 +859,7 @@ var
   sln: tIntList;
   cacheKey: string;
 begin
+
   startTimer('diff_read_file');
   old := fs.readText(oldFile);
   new := fs.readText(newFile);
@@ -882,6 +898,7 @@ begin
 end;
 
 initialization
+  NULL_FILE := tFileRef.create();
   CACHE := tStringToStringMap.create();
   loadCache();
 finalization

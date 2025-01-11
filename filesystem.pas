@@ -182,6 +182,8 @@ begin
 
   result.clear();
 
+  if filename = '' then exit;
+
   if not self.exists(filename) then error(format('File "%s" not found.', [filename]));
 
   assign(t, filename);

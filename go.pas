@@ -214,6 +214,7 @@ var
   old,new: tCheckpoint;
   checkpointName: string;
   checkpointTime: tMyDateTime;
+
 begin
 
   time := now;
@@ -249,10 +250,8 @@ procedure showDiff(oldLines, newLines: tStringList;matching: tIntList);
 
 var
   i,j,k,z: int32;
-  map: tHashMap;
-  hash: word;
   oldS,newS: tIntList;
-  new,old,cur: string;
+  cur: string;
   isFirst: boolean;
   plus: string;
   clock: int32;
@@ -538,39 +537,26 @@ var
   checkpoints: tStringList;
   checkpoint: string;
   previousCheckpoint: string;
-  folderA, folderB: string;
   counter: int32;
   stats: tDiffStats;
+  old, new: tCheckpoint;
 
   csvLines: tStringList;
   csvEntries: tStringToStringMap;
   line: string;
   key,value: string;
-  previousSkippedCheckpoint: string;
+  didSkip: boolean;
 
 var
   csvFile: text;
 begin
 
-  error('Stats has not been tested with the new system yet, as so is disabled.');
-  (*
-
   textAttr := WHITE;
 
   repo := tCheckpointRepo.create('$repo');
 
-  checkpoints := fs.listFiles('$repo\*.txt');
-  checkpoints.sort();
-
-  previousCheckpoint := '';
-  folderA := joinPath('$repo', 'a');
-  folderB := joinPath('$repo', 'b');
-  fs.delFolder(folderA);
-  fs.delFolder(folderB);
-  fs.mkdir(folderA);
-
-  WORKSPACE := folderA;
-  HEAD := folderB;
+  checkpoints := repo.getCheckpoints();
+  checkpoints.reverse(); // we want these old to new
 
   counter := 0;
 
@@ -579,11 +565,11 @@ begin
   csvEntries := tStringToStringMap.create();
 
   if fs.exists('stats.csv') then begin
-    csvLines := readFile('stats.csv');
+    csvLines := fs.readText('stats.csv');
     for line in csvLines do begin
       split(line, ',', key, value);
       if length(key) < 2 then continue;
-      key := copy(key, 2, length(key)-2); {remove ""}
+      key := copy(key, 2, length(key)-6); {remove ".txt"}
       csvEntries.setValue(key, value);
     end;
     append(csvFile);
@@ -592,65 +578,58 @@ begin
     writeln(csvFile, '"Checkpoint","Date","Added","Removed","Changed"');
   end;
 
-  previousSkippedCheckpoint := '';
+  previousCheckpoint := '';
+  didSkip := false;
+
+  old := nil;
+  new := nil;
 
   for checkpoint in checkpoints do begin
 
     write(pad(checkpoint, 40, ' '));
 
-    {exclude any folders not matching the expected format}
-    {expected format is yyyymmdd_hhmmss
-    {which I had regex here...}
-    if not checkpoint.endsWith('.txt', True) then continue;
-
     if csvEntries.hasKey(checkpoint) then begin
       writeln('[skip]');
-      previousSkippedCheckpoint := checkpoint;
+      didSkip := true;
+      previousCheckpoint := checkpoint;
       continue;
     end;
 
-    {ok we skiped some checkpoints, so copy the previous one in}
-    if previousSkippedCheckpoint <> '' then begin
-      cpm.load(removeExtension(previousSkippedCheckpoint));
-      fs.delFolder(folderA);
-      cpm.exportToFolder(folderA);
-      previousSkippedCheckpoint := '';
+    if previousCheckpoint = '' then begin
+      new := repo.load(checkpoint);
+      old := tCheckpoint.create(repo); // an empty one
+    end else begin
+      if assigned(old) then old.free;
+      if didSkip then
+        // if we skipped we must reload both
+        old := repo.load(previousCheckpoint)
+      else
+        old := new;
+      new := repo.load(checkpoint);
+      didSkip := false;
     end;
 
-    {note: we can skip the exports and just check files from
-     the object database... but requires some changes}
-
-    {folderA is the newer checkpoint}
-    startTimer('swapFolder');
-    fs.delFolder(folderB);
-    fs.rename(folderA, folderB);
-    fs.mkdir(folderA);
-    stopTimer('swapFolder');
-
-    {export new folder}
-    startTimer('exportFolder');
-    cpm.load(removeExtension(checkpoint));
-    cpm.exportToFolder(folderA);
-    stopTimer('exportFolder');
-
-    startTimer('diff');
-    stats := oldDiffOnWorkspace();
+    stats := repo.generateCheckpointDiff(old, new).getLineStats();
     stats.printShort(6);
     writeln();
-    stopTimer('diff');
 
     // write stats to file
     writeln(csvFile,
-      format('"%s", %.9f, %d, %d, %d', [checkpoint, cpm.date, stats.added, stats.removed, stats.changed])
+      format('"%s", %.9f, %d, %d, %d', [checkpoint, new.date, stats.added, stats.removed, stats.changed])
     );
     flush(csvFile);
 
+    if keypressed then case readkey of
+      #3: break;
+    end;
+
     counter += 1;
+
+    previousCheckpoint := checkpoint;
 
   end;
   close(csvFile);
-  cpm.free;
-  *)
+  repo.free;
 end;
 
 {make sure our checkpoints look ok}
@@ -663,7 +642,7 @@ begin
   repo := tCheckpointRepo.create(ROOT);
   checkpoint := tCheckpoint.create();
   for checkpointName in repo.getCheckpoints() do begin
-    checkpoint.load(joinPath(ROOT, checkpointName));
+    checkpoint.load(joinPath(ROOT, checkpointName)+'.txt');
     textAttr := LIGHTGRAY;
     output(pad(checkpointName, 40));
     if repo.verify(checkpoint, false) then begin
@@ -755,7 +734,6 @@ var
   fileDiff: tFileDiff;
   oldTextAttr: byte;
   stats: tDiffStats;
-  wasChanges: boolean;
   matches: tIntList;
   old, new: tStringList;
 begin
