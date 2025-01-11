@@ -219,8 +219,8 @@ begin
   time := now;
 
   repo := tCheckpointRepo.create(ROOT);
-  old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
-  new := tCheckpoint.create('.');
+  old := tCheckpoint.create(repo, joinPath(ROOT, 'HEAD'));
+  new := tCheckpoint.create(repo, '.');
 
   outputln();
   outputDiv();
@@ -237,7 +237,6 @@ begin
   new.message := msg;
 
   new.save(joinPath(ROOT, new.defaultCheckpointPath));
-  new.writeObjects(repo.objectStore);
 
   safeCopy(joinPath(ROOT, 'HEAD'));
 
@@ -493,8 +492,8 @@ var
   checkpointDiff: tCheckpointDiff;
 begin
   repo := tCheckpointRepo.create(ROOT);
-  old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
-  new := tCheckpoint.create('.');
+  old := tCheckpoint.create(repo, joinPath(ROOT, 'HEAD'));
+  new := tCheckpoint.create(repo, '.');
   checkpointDiff := repo.generateCheckpointDiff(old, new);
   checkpointDiff.showChanges();
 
@@ -512,8 +511,8 @@ const
   ROOT = '$repo';
 begin
   repo := tCheckpointRepo.create(ROOT);
-  old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
-  new := tCheckpoint.create('.');
+  old := tCheckpoint.create(repo, joinPath(ROOT, 'HEAD'));
+  new := tCheckpoint.create(repo, '.');
   checkpointDiff := repo.generateCheckpointDiff(old, new);
   checkpointDiff.showStatus();
 
