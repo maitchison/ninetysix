@@ -46,10 +46,11 @@ uses
 var
   LINES_SINCE_PAGE: byte = 0;
   USE_PAGING: boolean = true;
-  PAUSE_AT_END: boolean = false;
+  PAUSE_AT_END: boolean = false ;
 
 const
-  ROOT = '$repo';
+  WORKSPACE = 'c:\dev\';
+  REPO_PATH = 'c:\dev\$repo';
 
 type
   tDiffStatsHelper = record helper for tDiffStats
@@ -182,9 +183,9 @@ var
 
 begin
 
-  repo := tCheckpointRepo.create(ROOT);
+  repo := tCheckpointRepo.create(REPO_PATH);
   old := repo.loadHead();
-  new := tCheckpoint.create(repo, '.');
+  new := tCheckpoint.create(repo, WORKSPACE);
 
   outputln();
   outputDiv();
@@ -198,7 +199,7 @@ begin
   new.date := now();
   new.message := msg;
 
-  new.save(joinPath(ROOT, new.defaultCheckpointPath));
+  new.save(joinPath(REPO_PATH, new.defaultCheckpointPath));
 
 end;
 
@@ -438,9 +439,9 @@ var
   old,new: tCheckpoint;
   checkpointDiff: tCheckpointDiff;
 begin
-  repo := tCheckpointRepo.create(ROOT);
+  repo := tCheckpointRepo.create(REPO_PATH);
   old := repo.loadHead();
-  new := tCheckpoint.create(repo, '.');
+  new := tCheckpoint.create(repo, WORKSPACE);
   checkpointDiff := repo.generateCheckpointDiff(old, new);
   checkpointDiff.showChanges();
 
@@ -454,12 +455,10 @@ var
   repo: tCheckpointRepo;
   old,new: tCheckpoint;
   checkpointDiff: tCheckpointDiff;
-const
-  ROOT = '$repo';
 begin
-  repo := tCheckpointRepo.create(ROOT);
-  old := tCheckpoint.create(repo, joinPath(ROOT, 'HEAD'));
-  new := tCheckpoint.create(repo, '.');
+  repo := tCheckpointRepo.create(REPO_PATH);
+  old := repo.loadHead();
+  new := tCheckpoint.create(repo, WORKSPACE);
   checkpointDiff := repo.generateCheckpointDiff(old, new);
   checkpointDiff.showStatus();
 
@@ -501,7 +500,7 @@ begin
 
   textAttr := WHITE;
 
-  repo := tCheckpointRepo.create('$repo');
+  repo := tCheckpointRepo.create(REPO_PATH);
 
   checkpoints := repo.getCheckpointNames();
   checkpoints.reverse(); // we want these old to new
@@ -590,10 +589,10 @@ var
   checkpoint: tCheckpoint;
   repo: tCheckpointRepo;
 begin
-  repo := tCheckpointRepo.create(ROOT);
+  repo := tCheckpointRepo.create(REPO_PATH);
   checkpoint := tCheckpoint.create(repo);
   for checkpointName in repo.getCheckpointNames() do begin
-    checkpoint.load(joinPath(ROOT, checkpointName)+'.txt');
+    checkpoint.load(joinPath(REPO_PATH, checkpointName)+'.txt');
     textAttr := LIGHTGRAY;
     output(pad(checkpointName, 40));
     if repo.verify(checkpoint, false) then begin
@@ -709,8 +708,8 @@ begin
     matches := fileDiff.getMatch();
     stats := fileDiff.getStats();
 
-    showDiff(old, new, matches);
-
+    if fileDiff.diffType <> FD_REMOVED then
+      showDiff(old, new, matches);
   end;
 
   outputDiv();

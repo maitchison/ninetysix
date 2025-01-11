@@ -437,8 +437,13 @@ begin
   clear();
   if not path.endsWith('\') then path += '\';
   addFromFolder('', path);
-  {for the moment, just hard code one folder}
+  {for the moment, just hard code the folder structure}
+  {todo: implement .ignore and scan the folders}
   addFromFolder('shared', path);
+  addFromFolder('tools', path);
+  addFromFolder('go', path);
+  addFromFolder('old', path);
+  addFromFolder('airtime', path);
 end;
 
 {adds files to current checkpoint, but does not clear}
@@ -451,6 +456,9 @@ var
 begin
 
   fullPath := joinPath(root, path);
+
+  // stub:
+  writeln('Scanning: ', fullPath);
 
   // get all files in folder
   // note: for the moment just hard code which files to read
