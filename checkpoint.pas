@@ -182,9 +182,10 @@ type
 
     function  hasCheckpoint(checkpointName: string): boolean;
     function  getCheckpointPath(checkpointName: string): string;
-    function  getCheckpoints(): tStringList;
+    function  getCheckpointNames(): tStringList;
 
     function  load(checkpointName: string): tCheckpoint;
+    function  loadHead(): tCheckpoint;
     function  verify(checkpoint: tCheckpoint; verbose: boolean=false): boolean;
 
   end;
@@ -690,6 +691,9 @@ begin
     oldFr := oldFiles.lookup(fr.path);
     if not oldFr.assigned then continue;
     if not fs.wasModified(fr.fqn, oldFr.fqn) then continue;
+    {unfortunately we need to do a full comparision here as sometimes
+     modified is changed but file is not}
+    if fs.compareText(fr.fqn, oldFr.fqn) then continue;
     result.append(tFileDiff.MakeModified(oldFr, fr));
   end;
 end;
@@ -699,7 +703,8 @@ begin
   result := fs.exists(getCheckpointPath(checkpointName));
 end;
 
-function tCheckpointRepo.getCheckpoints(): tStringList;
+{returns list of checkpoint names from most recent to least recent}
+function tCheckpointRepo.getCheckpointNames(): tStringList;
 var
   i: integer;
 begin
@@ -713,6 +718,15 @@ end;
 function tCheckpointRepo.getCheckpointPath(checkpointName: string): string;
 begin
   result := joinPath(repoRoot, checkpointName)+'.txt';
+end;
+
+function tCheckpointRepo.loadHead(): tCheckpoint;
+var
+  checkpointNames: tStringList;
+begin
+  checkpointNames := getCheckpointNames();
+  if checkpointNames.len = 0 then error('Repo has no head, as it is empty.');
+  result := load(checkpointNames[0]);
 end;
 
 function tCheckpointRepo.load(checkpointName: string): tCheckpoint;

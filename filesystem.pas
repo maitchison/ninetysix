@@ -22,6 +22,7 @@ type
     function  getModified(fileName: string): dword;
 
     function  readText(filename: string): tStringList;
+    function  compareText(fileA, fileB: string): boolean;
 
     function  wasModified(fileA, fileB: string): boolean;
 
@@ -172,6 +173,39 @@ begin
     findNext(sr);
   end;
   findClose(sr);
+end;
+
+{returns if two text files are identical}
+function tFileSystem.compareText(fileA, fileB: string): boolean;
+var
+  t1, t2: text;
+  line1, line2: string;
+begin
+
+  result := true;
+
+  if getFileSize(fileA) <> getFileSize(fileB) then exit(false);
+
+  assign(t1, fileA);
+  assign(t2, fileA);
+
+  reset(t1);
+  reset(t2);
+
+  while not eof(t1) and not eof(t2) do begin
+    readln(t1, line1);
+    readln(t2, line2);
+    if line1 <> line2 then begin
+      result := false;
+      break;
+    end;
+  end;
+
+  if (not eof(t1)) or (not eof(t2)) then result := false;
+
+  close(t1);
+  close(t2);
+
 end;
 
 function tFileSystem.readText(filename: string): tStringList;

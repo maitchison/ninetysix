@@ -220,7 +220,7 @@ begin
   time := now;
 
   repo := tCheckpointRepo.create(ROOT);
-  old := tCheckpoint.create(repo, joinPath(ROOT, 'HEAD'));
+  old := repo.loadHead();
   new := tCheckpoint.create(repo, '.');
 
   outputln();
@@ -238,8 +238,6 @@ begin
   new.message := msg;
 
   new.save(joinPath(ROOT, new.defaultCheckpointPath));
-
-  safeCopy(joinPath(ROOT, 'HEAD'));
 
 end;
 
@@ -491,7 +489,7 @@ var
   checkpointDiff: tCheckpointDiff;
 begin
   repo := tCheckpointRepo.create(ROOT);
-  old := tCheckpoint.create(repo, joinPath(ROOT, 'HEAD'));
+  old := repo.loadHead();
   new := tCheckpoint.create(repo, '.');
   checkpointDiff := repo.generateCheckpointDiff(old, new);
   checkpointDiff.showChanges();
@@ -555,7 +553,7 @@ begin
 
   repo := tCheckpointRepo.create('$repo');
 
-  checkpoints := repo.getCheckpoints();
+  checkpoints := repo.getCheckpointNames();
   checkpoints.reverse(); // we want these old to new
 
   counter := 0;
@@ -641,7 +639,7 @@ var
 begin
   repo := tCheckpointRepo.create(ROOT);
   checkpoint := tCheckpoint.create(repo);
-  for checkpointName in repo.getCheckpoints() do begin
+  for checkpointName in repo.getCheckpointNames() do begin
     checkpoint.load(joinPath(ROOT, checkpointName)+'.txt');
     textAttr := LIGHTGRAY;
     output(pad(checkpointName, 40));
