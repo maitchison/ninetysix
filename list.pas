@@ -67,6 +67,7 @@ type
     function contains(const item: string): boolean;
 
     procedure sort();
+    procedure reverse();
 
     function toString: string;
 
@@ -367,6 +368,16 @@ begin
   result.data := self.data;
 end;
 
+procedure tStringList.reverse();
+var
+  i: integer;
+  tmp: tStringList;
+begin
+  tmp := self.clone();
+  for i := 0 to len-1 do
+    self[i] := tmp[len-i-1]
+end;
+
 {sorts elements within this slice}
 procedure tStringList.sort();
 var
@@ -533,6 +544,9 @@ begin
 
   s1.sort();
   assertEqual(s1.toString, '["101","103","202"]');
+
+  s1.reverse();
+  assertEqual(s1.toString, '["202","103","101"]');
 
   s1.save('test.txt');
   s2.load('test.txt');

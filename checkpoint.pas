@@ -724,6 +724,7 @@ function tCheckpointRepo.getCheckpoints(): tStringList;
 begin
   result := fs.listFiles(repoRoot+'\*.txt');
   result.sort();
+  result.reverse();
 end;
 
 function tCheckpointRepo.getCheckpointPath(checkpointName: string): string;
