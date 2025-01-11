@@ -131,7 +131,7 @@ function  Quantize(value, levels: byte): byte;
 function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
-function  GetSec(): double; inline;
+function  GetSec(): double;
 
 procedure dumpString(s: string; filename: string);
 function  loadString(filename: string): string;
@@ -748,7 +748,7 @@ end;
 
 {Get seconds since program start.
 Can be used for very accurate timing measurement}
-function GetSec(): double; inline;
+function GetSec(): double;
 begin
   result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
 end;

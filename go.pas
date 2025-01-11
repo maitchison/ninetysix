@@ -39,8 +39,7 @@ uses
   md5,
   list,
   filesystem,
-  timer,
-  dos;
+  timer;
 
 {--------------------------------------------------------}
 
@@ -176,48 +175,12 @@ end;
 
 {--------------------------------------------------------}
 
-// not sure if needed, but wait for external filesystem to catch up.
-procedure fsWait();
-begin
-  delay(200);
-end;
-
-{copies all '.pas' files from current path to destination folder.
-if destination folder exists it is renamed, and then a new folder is
-created. If back exists, it is removed.}
-procedure safeCopy(destinationPath: string);
-begin
-  destinationPath := trim(destinationPath);
-  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp > nul');
-  fsWait;
-  dos.exec(getEnv('COMSPEC'), '/C ren '+destinationPath+' '+destinationPath+'_tmp');
-  fsWait;
-  try
-    mkDIR(destinationPath);
-  except
-    // ignore
-  end;
-  fsWait;
-  dos.exec(getEnv('COMSPEC'), '/C copy *.inc '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C copy *.pas '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C copy *.bat '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C copy message.txt '+destinationPath+' > nul');
-  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
-end;
-
-
 procedure commit(msg: string);
 var
-  t: text;
-  time: tMyDateTime;
   repo: tCheckpointRepo;
   old,new: tCheckpoint;
-  checkpointName: string;
-  checkpointTime: tMyDateTime;
 
 begin
-
-  time := now;
 
   repo := tCheckpointRepo.create(ROOT);
   old := repo.loadHead();
@@ -230,8 +193,6 @@ begin
   outputLn();
 
   repo.generateCheckpointDiff(old, new).showStatus;
-
-  checkpointTime := now;
 
   new.author := 'Matthew';
   new.date := now();
@@ -251,7 +212,6 @@ var
   oldS,newS: tIntList;
   cur: string;
   isFirst: boolean;
-  plus: string;
   clock: int32;
 var
   importantLines: array[0..1024-1] of boolean;
@@ -471,16 +431,6 @@ begin
   commit(msg);
 end;
 
-function getSourceFiles(path: string): tStringList;
-begin
-  {todo: proper .gitignore style decision on what to include}
-  if (length(path) > 0) and (path[length(path)] <> '\') then
-    path += '\';
-  result := fs.listFiles(path+'*.pas');
-  result += fs.listFiles(path+'*.bat');
-  result += fs.listFiles(path+'*.inc');
-end;
-
 {present to user the diff between current workspace and head}
 procedure showDiffOnWorkspace();
 var
@@ -561,6 +511,9 @@ begin
   assign(csvFile, 'stats.csv');
 
   csvEntries := tStringToStringMap.create();
+
+  key := '';
+  value := '';
 
   if fs.exists('stats.csv') then begin
     csvLines := fs.readText('stats.csv');
