@@ -640,7 +640,7 @@ var
   repo: tCheckpointRepo;
 begin
   repo := tCheckpointRepo.create(ROOT);
-  checkpoint := tCheckpoint.create();
+  checkpoint := tCheckpoint.create(repo);
   for checkpointName in repo.getCheckpoints() do begin
     checkpoint.load(joinPath(ROOT, checkpointName)+'.txt');
     textAttr := LIGHTGRAY;

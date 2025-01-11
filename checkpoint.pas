@@ -689,7 +689,6 @@ begin
     if renamedFiles.contains(fr) then continue;
     oldFr := oldFiles.lookup(fr.path);
     if not oldFr.assigned then continue;
-    writeln(fr.fqn, ',',oldfr.fqn, '->',fr.path);
     if not fs.wasModified(fr.fqn, oldFr.fqn) then continue;
     result.append(tFileDiff.MakeModified(oldFr, fr));
   end;
