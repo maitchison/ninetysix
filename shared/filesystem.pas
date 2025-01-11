@@ -166,7 +166,8 @@ var
   sr: SearchRec;
 begin
   result := tStringList.create([]);
-  findFirst(path+'\*', AnyFile, sr);
+  if not path.endsWith('\') then path += '\';
+  findFirst(path+'*', AnyFile, sr);
   while DosError = 0 do begin
     if ((sr.attr and Directory) = Directory) and (sr.name <> '.') and (sr.name <> '..') then
       result += toLowerCase(sr.name);

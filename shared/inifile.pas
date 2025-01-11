@@ -34,6 +34,7 @@ type
   private
     lines: tStringList;
     lineOn: int32;
+    fCurrentSection: string;
   public
 
     factory: tObjectConstructorProc;
@@ -41,6 +42,9 @@ type
     function  eof(): boolean;
     function  readLine(): string;
     function  peekLine(): string;
+    function  nextLine(): string;
+
+    property currentSection: string read fCurrentSection;
 
     function  readObject(): tObject;
 
@@ -143,10 +147,30 @@ begin
   result := lineOn >= lines.len;
 end;
 
+{raw read line}
 function tINIReader.readLine(): string;
 begin
   result := trim(lines[lineOn]);
   lineOn += 1;
+end;
+
+{read next content line}
+function tINIReader.nextLine(): string;
+var
+  line: string;
+begin
+  while not eof do begin
+    line := readLine();
+    if line = '' then continue;
+    if line.startsWith('#') then continue;
+    if line.startsWith('[') then begin
+      fCurrentSection := copy(line, 2, length(line)-2);
+      continue;
+    end;
+    exit(line);
+  end;
+  {eof}
+  result := '';
 end;
 
 function tINIReader.peekLine(): string;

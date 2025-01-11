@@ -44,11 +44,11 @@ uses
 var
   LINES_SINCE_PAGE: byte = 0;
   USE_PAGING: boolean = true;
-  PAUSE_AT_END: boolean = false ;
+  PAUSE_AT_END: boolean = false;
 
 const
   WORKSPACE = 'c:\dev\';
-  REPO_PATH = 'c:\dev\$repo';
+  REPO_PATH = 'c:\dev\';
 
 type
   tDiffStatsHelper = record helper for tDiffStats

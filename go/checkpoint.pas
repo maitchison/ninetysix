@@ -6,6 +6,7 @@ interface
 uses
   {$I baseunits.inc},
   crt, {remove}
+  glob,
   md5,
   iniFile,
   diff,
@@ -62,7 +63,6 @@ type
   protected
     function  objectFactory(s: string): tObject;
     procedure writeObjects();
-    procedure addFromFolder(path, root: string;recursive: boolean=True);
 
   published
     property message: string read fMessage write fMessage;
@@ -89,9 +89,12 @@ type
 
     objectStore: tObjectStore;
     repoRoot: string;
+    glob: tGlob;
 
     constructor create(aRepoRoot: string);
     destructor destroy(); override;
+
+    function  repoDataPath: string;
 
     function  generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
 
@@ -171,50 +174,24 @@ end;
 
 {loads checkpoint from a standard folder.}
 procedure tCheckpoint.readFromFolder(path: string);
+var
+  filePath: string;
+  filePaths: tStringList;
+  fr: tFileRef;
 begin
   clear();
   if not path.endsWith('\') then path += '\';
-  addFromFolder('', path, true);
-  {for the moment, just hard code the folder structure}
-  {todo: implement .ignore and scan the folders}
-  addFromFolder('shared', path);
-  addFromFolder('tools', path);
-  addFromFolder('go', path);
-  addFromFolder('old', path);
-  addFromFolder('airtime', path);
-end;
+  filePaths := repo.glob.getFiles(path);
 
-{adds files to current checkpoint, but does not clear}
-procedure tCheckpoint.addFromFolder(path, root: string; recursive: boolean=true);
-var
-  fileRef: tFileRef;
-  files: tStringList;
-  i: integer;
-  fullPath: string;
-begin
-
-  fullPath := joinPath(root, path);
-
-  // stub:
-  writeln('Scanning: ', fullPath);
-
-  // get all files in folder
-  // note: for the moment just hard code which files to read
-  // eventually support a .git ignore file
-  files := fs.listFiles(joinPath(fullPath, '*.pas'));
-  files += fs.listFiles(joinPath(fullPath, '*.inc'));
-  files += fs.listFiles(joinPath(fullPath, '*.bat'));
-
-  // create file reference for each one (including hash)
-  for i := 0 to files.len-1 do begin
-    fileRef := tFileRef.create(joinPath(path, files[i]), root);
-    if fileRef.fileSize > MAX_FILESIZE then begin
-      warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.fileSize/1024]));
-      fileRef.free;
+  // create file reference for file found (including hash)
+  for filePath in filePaths do begin
+    fr := tFileRef.create(filePath, path);
+    if fr.fileSize > MAX_FILESIZE then begin
+      warn(format('Skipping %s as it is too large (%fkb)',[fr.fqn, fr.fileSize/1024]));
+      fr.free;
       continue;
     end;
-    {add reference}
-    fileList.append(fileRef);
+    fileList.append(fr);
   end;
 end;
 
@@ -324,11 +301,19 @@ end;
 {-------------------------------------------------------------}
 
 constructor tCheckpointRepo.create(aRepoRoot: string);
+var
+  ignoreFilename: string;
 begin
-  inherited create;
-  if not fs.folderExists(aRepoRoot) then error(format('No repo found at "%s"', [aRepoRoot]));
-  repoRoot := aRepoRoot;
-  objectStore := tObjectStore.create(joinPath(aRepoRoot, 'store'));
+  inherited create();
+
+  self.repoRoot := aRepoRoot;
+  if not fs.folderExists(self.repoDataPath) then error(format('No repo found at "%s"', [self.repoDataPath]));
+
+  objectStore := tObjectStore.create(joinPath(self.repoDataPath, 'store'));
+  glob := tGlob.create();
+  ignoreFilename := joinPath(repoRoot, 'ignore.ini');
+  if fs.exists(ignoreFilename) then
+    glob.loadIgnoreFile(ignoreFilename);
 end;
 
 destructor tCheckpointRepo.destroy();
@@ -387,6 +372,11 @@ begin
       result := false;
     end;
   end;
+end;
+
+function tCheckpointRepo.repoDataPath: string;
+begin
+  result := joinPath(repoRoot, '$repo');
 end;
 
 function tCheckpointRepo.generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
@@ -454,7 +444,7 @@ function tCheckpointRepo.getCheckpointNames(): tStringList;
 var
   i: integer;
 begin
-  result := fs.listFiles(repoRoot+'\*.txt');
+  result := fs.listFiles(self.repoDataPath+'\*.txt');
   for i := 0 to result.len-1 do
     result[i] := removeExtension(result[i]);
   result.sort();
@@ -463,7 +453,7 @@ end;
 
 function tCheckpointRepo.getCheckpointPath(checkpointName: string): string;
 begin
-  result := joinPath(repoRoot, checkpointName)+'.txt';
+  result := joinPath(self.repoDataPath, checkpointName)+'.txt';
 end;
 
 function tCheckpointRepo.loadHead(): tCheckpoint;
