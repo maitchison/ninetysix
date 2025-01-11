@@ -29,16 +29,14 @@ Block header
 }
 
 uses
-  debug,
-  test,
+  {$I baseunits.inc},
   crt, {remove this?}
   diff,
-  utils,
   hashMap,
   checkpoint,
+  fileRef,
+  objectStore,
   md5,
-  list,
-  filesystem,
   timer;
 
 {--------------------------------------------------------}

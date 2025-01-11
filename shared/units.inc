@@ -4,7 +4,6 @@
   test,
   utils,
   types,
-  configFile,
 {some base units}
   mymath,
   mydos,
@@ -25,7 +24,3 @@
   sound,
   mix,
   sbDriver
-
-
-
-

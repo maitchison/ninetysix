@@ -4,95 +4,18 @@ unit checkpoint;
 interface
 
 uses
-  debug,
+  {$I baseunits.inc},
   crt, {remove}
-  test,
-  utils,
-  list,
-  filesystem,
   md5,
   iniFile,
-  types,
   diff,
   hashMap,
   timer,
+  objectStore,
+  fileRef,
   dos;
 
 type
-  tFileRef = class
-  protected
-
-    {ok some documentation... I might need to rename some of these
-
-
-    path is the 'source' of the file, i.e the handle of the file in the repo.
-    fqn is what to load to get the file contents
-    root is where the repo folder is...
-
-    e.g..
-
-    root = 'dev\src'
-    path = 'airtime.pas'
-    fqn -> 'dev\src\airtime.pas'
-
-    However a head reference would look like
-
-    root = '\dev\$repo\HEAD
-    path = 'airtime.pas'
-    fqn -> 'dev\$repo\HEAD\airtime.pas'
-
-    and a checkpoint reference would look like
-
-    root = '*dev\$repo\objectstore\'
-    path = 'airtime.pas'
-    fqn -> 'dev\$repo\objectstore\e1f1ae8cac8dda7f5c52a3dbe135'
-
-    also.. please make a record and have another way to seralize
-    }
-
-
-    fRoot: string; // repo root folder, not saved.
-    fPath: string; // relative path from repo root folder
-    fHash: string;
-    fSize: int64;
-    fModified: int32;
-
-    procedure updateHash();
-    function getHash(): string;
-    function getFileSize(): int64;
-    function getModified(): int32;
-
-  public
-    function fqn: string;
-    function assigned: boolean;
-    property fileSize: int64 read getFileSize write fSize;
-
-  published
-
-    property path: string read fPath write fPath;
-    property hash: string read getHash write fHash;
-    property modified: int32 read getModified write fModified;
-
-  public
-
-    constructor create(); overload;
-    constructor create(aPath: string;aRoot: string = ''); overload;
-    function toString(): string; override;
-  end;
-
-  {a database of object files}
-  tObjectStore = class
-    root: string;
-    files: array of tFileRef;
-
-    function lookupByHash(hash: string): tFileRef;
-    function addObject(hash: string;objectPath: string): boolean;
-    procedure reload();
-    procedure clear();
-
-    constructor create(aPath: string);
-    destructor destroy(); override;
-  end;
 
   tFileDiffType = (
     FD_ADDED,
@@ -125,14 +48,6 @@ type
 
   tCheckpointRepo = class;
 
-  tFileRefList = array of tFileRef;
-
-  tFileRefListHelper = record helper for tFileRefList
-    procedure append(x: tFileRef);
-    function contains(x: tFileRef): boolean;
-    function lookup(path: string): tFileRef;
-  end;
-
   tCheckpoint = class
 
     fMessage: string;
@@ -147,7 +62,7 @@ type
   protected
     function  objectFactory(s: string): tObject;
     procedure writeObjects();
-    procedure addFromFolder(path, root: string);
+    procedure addFromFolder(path, root: string;recursive: boolean=True);
 
   published
     property message: string read fMessage write fMessage;
@@ -199,188 +114,11 @@ type
     merge: tIntList;
   end;
 
-const
-  {fine for text files, but don't process large binary files}
-  MAX_FILESIZE = 128*1024;
-
 var
   CACHE: tStringToStringMap;
-  NULL_FILE: tFileRef;
 
 {cached diff}
 function diff(oldFile, newFile: string): tMergeInfo; forward;
-
-{-------------------------------------------------------------}
-
-constructor tFileRef.create(); overload;
-begin
-  inherited create();
-  fPath := '';
-  fRoot := '';
-  fHash := '';
-  fSize := -1; // these are defered
-  fModified := -1; // these are deffered
-end;
-
-constructor tFileRef.create(aPath: string;aRoot: string=''); overload;
-var
-  f: file;
-begin
-  create();
-  fPath := aPath;
-  fRoot := aRoot;
-end;
-
-{full path to file}
-function tFileRef.fqn: string;
-begin
-  if fRoot.startsWith('*') then
-    result := joinPath(copy(fRoot, 2, length(fRoot)-1), fHash)
-  else
-    result := joinPath(fRoot, fPath);
-end;
-
-function tFileRef.assigned: boolean;
-begin
-  result := path <> '';
-end;
-
-
-{returns the hash, calculates it if needed.}
-function tFileRef.getHash(): string;
-begin
-  if fHash = '' then updateHash();
-  result := fHash;
-end;
-
-{returns the hash, calculates it if needed.}
-function tFileRef.getFilesize(): int64;
-begin
-  if fSize < 0 then
-    fSize := fs.getFileSize(self.fqn);
-  result := fSize;
-end;
-
-{returns the hash, calculates it if needed.}
-function tFileRef.getModified(): int32;
-begin
-  if fModified < 0 then
-    fModified := fs.getModified(self.fqn);
-  result := fModified;
-end;
-
-{calculates the hash for this file (not done by default)}
-procedure tFileRef.updateHash();
-var
-  f: file;
-  bytesRead: int32;
-  buffer: array of byte;
-begin
-
-  if self.fileSize = 0 then begin
-    fHash := MD5.NULL_HASH.toHex;
-    exit;
-  end;
-
-  buffer := nil;
-  bytesRead := 0;
-  assign(f, self.fqn);
-  try
-    reset(f, 1);
-    if (fileSize > MAX_FILESIZE) then
-      error(format('Tried to process file that was too large. File size: %fkb File name: %s', [fileSize/1024, fqn]));
-    setLength(buffer, fileSize);
-    blockread(f, buffer[0], fileSize, bytesRead);
-    if bytesRead <> fileSize then
-      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fileSize, bytesRead]));
-    fHash := MD5.hash(buffer).toHex;
-  finally
-    close(f);
-  end;
-end;
-
-function tFileRef.toString(): string;
-begin
-  if hash <> '' then
-    result := copy(hash, 1, 8)+ ' '
-  else
-    result := '';
-  result := result + fPath;
-end;
-
-{-------------------------------------------------------------}
-
-{adds object to storage, returns if it was added}
-function tObjectStore.addObject(hash: string;objectPath: string): boolean;
-var
-  srcFile: string;
-  dstFile: string;
-  fileRef: tFileRef;
-begin
-  if assigned(lookupByHash(hash)) then
-    exit(false);
-  note(format(' -adding object %s <- %s',[copy(hash, 1, 8), objectPath]));
-  srcFile := objectPath;
-  dstFile := joinPath(root, hash);
-  fs.copyFile(srcFile, dstFile);
-  fs.setModified(dstFile, fs.getModified(srcFile));
-
-  {add to our list of files}
-  fileRef := tFileRef.create(hash, root);
-  fileRef.fHash := hash;
-  setLength(files, length(files)+1);
-  files[length(files)-1] := fileRef;
-end;
-
-function tObjectStore.lookupByHash(hash: string): tFileRef;
-var
-  fRef: tFileRef;
-begin
-  for fRef in files do
-    if fRef.hash = hash then exit(fref);
-  exit(nil);
-end;
-
-constructor tObjectStore.create(aPath: string);
-begin
-  root := aPath;
-  if not fs.folderExists(aPath) then begin
-    note(format('Object store folder "%s" was not found, so creating it.', [aPath]));
-    fs.mkdir(aPath);
-  end;
-  files := nil;
-  self.reload();
-end;
-
-destructor tObjectStore.destroy();
-begin
-  clear();
-  inherited destroy();
-end;
-
-procedure tObjectStore.clear();
-var
-  fileRef: tFileRef;
-begin
-  for fileRef in files do
-    fileRef.free;
-  files := nil;
-end;
-
-{reload file references from disk}
-procedure tObjectStore.reload();
-var
-  fileList: tStringList;
-  i: integer;
-begin
-  clear();
-  fileList := fs.listFiles(joinPath(root, '*.*'));
-  setLength(files, fileList.len);
-  for i := 0 to fileList.len-1 do begin
-    files[i] := tFileRef.create(fileList[i], root);
-    files[i].fHash := fileList[i]; //hash is stored in name.
-  end;
-end;
 
 {-------------------------------------------------------------}
 
@@ -436,7 +174,7 @@ procedure tCheckpoint.readFromFolder(path: string);
 begin
   clear();
   if not path.endsWith('\') then path += '\';
-  addFromFolder('', path);
+  addFromFolder('', path, true);
   {for the moment, just hard code the folder structure}
   {todo: implement .ignore and scan the folders}
   addFromFolder('shared', path);
@@ -447,7 +185,7 @@ begin
 end;
 
 {adds files to current checkpoint, but does not clear}
-procedure tCheckpoint.addFromFolder(path, root: string);
+procedure tCheckpoint.addFromFolder(path, root: string; recursive: boolean=true);
 var
   fileRef: tFileRef;
   files: tStringList;
@@ -490,7 +228,7 @@ begin
   fs.mkdir(path);
   for fileRef in fileList do begin
     dstFile := joinPath(path, fileRef.path);
-    srcFile := joinPath(fileRef.fRoot, fileRef.hash);
+    srcFile := joinPath(fileRef.root, fileRef.hash);
     {todo: support subfolders}
     fs.copyFile(srcFile, dstFile);
     fs.setModified(dstFile, fileRef.modified);
@@ -526,7 +264,7 @@ begin
     if obj is tFileRef then begin
       setLength(fileList, length(fileList)+1);
       fr := tFileRef(obj);
-      fr.fRoot := '*'+repo.objectStore.root;
+      fr.root := '*'+repo.objectStore.root;
       fileList[length(fileList)-1] := fr;
     end;
   end;
@@ -834,34 +572,9 @@ end;
 
 {-------------------------------------------------------------}
 
-procedure tFileRefListHelper.append(x: tFileRef);
-begin
-  setLength(self, length(self)+1);
-  self[length(self)-1] := x;
-end;
-
-function tFileRefListHelper.contains(x: tFileRef): boolean;
-var
-  fr: tFileRef;
-begin
-  for fr in self do
-    if fr.path = x.path then exit(true);
-  exit(false);
-end;
-
-function tFileRefListHelper.lookup(path: string): tFileRef;
-var
-  fr: tFileRef;
-begin
-  for fr in self do
-    if path = fr.path then exit(fr);
-  exit(NULL_FILE);
-end;
-{-------------------------------------------------------------}
-
 const
   {for the moment just hard code this to the repo folder}
-  CACHE_PATH = '$repo\.cache';
+  CACHE_PATH = 'c:\dev\$repo\.cache';
 
 {cached diff}
 function diff(oldFile, newFile: string): tMergeInfo;
@@ -909,7 +622,6 @@ begin
 end;
 
 initialization
-  NULL_FILE := tFileRef.create();
   CACHE := tStringToStringMap.create();
   loadCache();
 finalization
