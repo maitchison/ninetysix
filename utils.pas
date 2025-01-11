@@ -1034,9 +1034,9 @@ var
   s: string;
 begin
   if ignoreCase then
-    result := pos(self.toLower, substring.toLower) > 0
+    result := pos(substring.toLower, self.toLower) > 0
   else
-    result := pos(self, substring) > 0;
+    result := pos(substring, self) > 0;
 end;
 
 function tStringHelper.trim(): string;
@@ -1114,6 +1114,14 @@ begin
   assert('fish'.startsWith('fi'));
   assert('fish'.startsWith('fish'));
   assert(not 'fish'.startsWith('fishy'));
+  assert(not 'fish'.startsWith('fia'));
+
+  assert('fish'.contains('fish'));
+  assert('fish'.contains('fi'));
+  assert('fish'.contains('sh'));
+  assert('fish'.contains('is'));
+  assert(not 'fish'.contains('fash'));
+
   assert(not 'fish'.startsWith('fia'));
 
   assertEqual(join(['a','b'],','), 'a,b');
