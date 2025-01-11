@@ -129,6 +129,8 @@ type
 
   tFileRefListHelper = record helper for tFileRefList
     procedure append(x: tFileRef);
+    function contains(x: tFileRef): boolean;
+    function lookup(path: string): tFileRef;
   end;
 
   tCheckpoint = class
@@ -142,13 +144,10 @@ type
 
     repo: tCheckpointRepo;
 
-    {where our files came from}
-    {todo: I think we can remove this and just trust the fileRefs to be correct}
-    sourceFolder: string;
-
   protected
     function  objectFactory(s: string): tObject;
     procedure writeObjects();
+    procedure addFromFolder(path, root: string);
 
   published
     property message: string read fMessage write fMessage;
@@ -418,7 +417,6 @@ begin
       fileRef.free();
   fileList := nil;
 
-  sourceFolder := '';
   message := '';
   author := '';
   date := 0;
@@ -432,40 +430,37 @@ begin
   result := tMyDateTime(date).YYMMDD('')+'_'+tMyDateTime(date).HHMMSS('')+'.txt'
 end;
 
-{loads checkpoint from a standard folder (i.e. how V1 worked)}
+{loads checkpoint from a standard folder.}
 procedure tCheckpoint.readFromFolder(path: string);
+begin
+  clear();
+  if not path.endsWith('\') then path += '\';
+  addFromFolder('', path);
+  {for the moment, just hard code one folder}
+  addFromFolder('shared', path);
+end;
+
+{adds files to current checkpoint, but does not clear}
+procedure tCheckpoint.addFromFolder(path, root: string);
 var
   fileRef: tFileRef;
   files: tStringList;
   i: integer;
+  fullPath: string;
 begin
 
-  clear();
-
-  self.sourceFolder := path;
-
-  if not path.endsWith('\') then path += '\';
+  fullPath := joinPath(root, path);
 
   // get all files in folder
   // note: for the moment just hard code which files to read
   // eventually support a .git ignore file
-  files := fs.listFiles(path+'*.pas');
-  files += fs.listFiles(path+'*.inc');
-  files += fs.listFiles(path+'*.bat');
-
-  if files.contains('message.txt') then begin
-    message := loadString(path+'message.txt');
-    author := 'matthew';
-    date := tMyDateTime.FromDosTC(FS.getModified(joinPath(path, 'message.txt')));
-  end else begin
-    message := '- no message text - ';
-  end;
+  files := fs.listFiles(joinPath(fullPath, '*.pas'));
+  files += fs.listFiles(joinPath(fullPath, '*.inc'));
+  files += fs.listFiles(joinPath(fullPath, '*.bat'));
 
   // create file reference for each one (including hash)
   for i := 0 to files.len-1 do begin
-    if files[i] = 'message.txt' then continue;
-    {not: no subfolder support yet, but we'll add it here}
-    fileRef := tFileRef.create(files[i], path);
+    fileRef := tFileRef.create(joinPath(path, files[i]), root);
     if fileRef.fileSize > MAX_FILESIZE then begin
       warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.fileSize/1024]));
       fileRef.free;
@@ -598,7 +593,7 @@ end;
 
 {checks if originalFile is very similar to any of the other files in
  filesToCheck, and if so returns the matching new filename}
-function checkForRename(originalFile: tFileRef; filesToCheck: array of tFileRef): string;
+function checkForRename(originalFile: tFileRef; filesToCheck: array of tFileRef): tFileRef;
 var
   fileRef: tFileRef;
   filesizeRatio: double;
@@ -606,7 +601,7 @@ var
   stats: tDiffStats;
   diff: tFileDiff;
 begin
-  result := '';
+  result := NULL_FILE;
 
   // we don't check very small files
   if originalFile.fileSize < 64 then exit;
@@ -624,7 +619,7 @@ begin
     changedRatio := stats.unchanged / stats.newLen;
     //writeln(format('changeratio %f %s %s ', [changedRatio, originalFile.path, fileRef.path]));
     if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
-    result := fileRef.path;
+    result := fileRef;
     exit;
   end;
 end;
@@ -649,83 +644,54 @@ end;
 
 function tCheckpointRepo.generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
 var
-  filename, originalFile: string;
-  fileRef: tFileRef;
-  fileDiff: tFileDiff;
-
-  {todo: replace thiese all with lists of tFileRefs
-   ... shame we don't have a generic list, would be handy
-   here}
-  oldFiles, newFiles: tStringList;
-  addedFiles, removedFiles: tStringList;
-  renamedFiles: tStringList;
-
-  removedFilesAsRefs: array of tFileRef;
-
-  oldRoot, newRoot: string;
-
+  fr, oldFr: tFileRef;
+  fd: tFileDiff;
+  oldFiles, newFiles,
+  addedFiles, removedFiles,
+  renamedFiles: tFileRefList;
   i: integer;
 
 begin
   result.clear();
 
-  {todo: remove these and use fileRefs properly}
-  oldRoot := old.sourceFolder;
-  newRoot := new.sourceFolder;
+  oldFiles := old.fileList;
+  newFiles := new.fileList;
 
-  oldFiles.clear();
-  for fileRef in old.fileList do
-    oldFiles.append(fileRef.path);
+  for fr in newFiles do
+    if not oldFiles.contains(fr) then
+      addedFiles.append(fr);
 
-  newFiles.clear();
-  for fileRef in new.fileList do
-    newFiles.append(fileRef.path);
+  for fr in oldFiles do
+    if not newFiles.contains(fr) then
+      removedFiles.append(fr);
 
-  addedFiles.clear();
-  for filename in newFiles do
-    if not oldFiles.contains(filename) then
-      addedFiles.append(filename);
-
-  removedFiles.clear();
-  for filename in oldFiles do
-    if not newFiles.contains(filename) then
-      removedFiles.append(filename);
-
-  removedFilesAsRefs := nil;
-  setLength(removedFilesAsRefs, removedFiles.len);
-  for i := 0 to removedFiles.len-1 do
-    removedFilesAsRefs[i] := tFileRef.create(removedFiles[i], oldRoot);
-
-  // process the lists...
-
-  {first, look for files that were renamed.}
-  renamedFiles.clear();
-  for filename in newFiles do begin
-    originalFile := checkForRename(tFileRef.create(filename, newRoot), removedFilesAsRefs);
-    if originalFile <> '' then begin
-      result.append(tFileDiff.MakeRenamed(tFileRef.create(originalFile, oldRoot), tFileRef.create(filename, newRoot)));
-      renamedFiles.append(filename);
-      renamedFiles.append(originalFile);
-    end;
+  {look for renamed files}
+  for fr in newFiles do begin
+    oldFr := checkForRename(fr, removedFiles);
+    if not oldFr.assigned then continue;
+    result.append(tFileDiff.MakeRenamed(oldFr, fr));
+    renamedFiles.append(oldFr);
+    renamedFiles.append(fr);
   end;
 
-  {next files that were added and removed}
-  for filename in addedFiles do begin
-    if renamedFiles.contains(filename) then continue;
-    result.append(tFileDiff.MakeAdded(tFileRef.create(filename, newRoot)));
+  {process files that were added and removed}
+  for fr in addedFiles do begin
+    if renamedFiles.contains(fr) then continue;
+    result.append(tFileDiff.MakeAdded(fr));
   end;
-  for filename in removedFiles do begin
-    if renamedFiles.contains(filename) then continue;
-    result.append(tFileDiff.MakeRemoved(tFileRef.create(filename, oldRoot)));
+  for fr in removedFiles do begin
+    if renamedFiles.contains(fr) then continue;
+    result.append(tFileDiff.MakeRemoved(fr));
   end;
 
   {finally check for modified}
-  for filename in newFiles do begin
-    if renamedFiles.contains(filename) then continue;
-    if not oldFiles.contains(filename) then continue;
-    {todo: do this using filerefs, with support for being in repo}
-    if not fs.wasModified(joinPath(oldRoot, filename), joinPath(newRoot, filename)) then continue;
-    result.append(tFileDiff.MakeModified(tFileRef.create(filename, oldRoot), tFileRef.create(filename, newRoot)));
+  for fr in newFiles do begin
+    if renamedFiles.contains(fr) then continue;
+    oldFr := oldFiles.lookup(fr.path);
+    if not oldFr.assigned then continue;
+    writeln(fr.fqn, ',',oldfr.fqn, '->',fr.path);
+    if not fs.wasModified(fr.fqn, oldFr.fqn) then continue;
+    result.append(tFileDiff.MakeModified(oldFr, fr));
   end;
 end;
 
@@ -853,6 +819,23 @@ begin
   self[length(self)-1] := x;
 end;
 
+function tFileRefListHelper.contains(x: tFileRef): boolean;
+var
+  fr: tFileRef;
+begin
+  for fr in self do
+    if fr.path = x.path then exit(true);
+  exit(false);
+end;
+
+function tFileRefListHelper.lookup(path: string): tFileRef;
+var
+  fr: tFileRef;
+begin
+  for fr in self do
+    if path = fr.path then exit(fr);
+  exit(NULL_FILE);
+end;
 {-------------------------------------------------------------}
 
 const
