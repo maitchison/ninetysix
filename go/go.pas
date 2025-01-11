@@ -197,7 +197,7 @@ begin
   new.date := now();
   new.message := msg;
 
-  new.save(joinPath(REPO_PATH, new.defaultCheckpointPath));
+  new.save(joinPath(repo.repoDataPath, new.defaultCheckpointPath));
 
 end;
 
