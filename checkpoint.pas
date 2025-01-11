@@ -56,16 +56,21 @@ type
     fHash: string;
     fSize: int64;
     fModified: int32;
-  public
 
-    procedure calculateHash();
+    procedure updateHash();
+    function getHash(): string;
+    function getFileSize(): int64;
+    function getModified(): int32;
+
+  public
     function fqn: string;
+    property fileSize: int64 read getFileSize write fSize;
 
   published
 
     property path: string read fPath write fPath;
-    property hash: string read fHash write fHash;
-    property modified: int32 read fModified write fModified;
+    property hash: string read getHash write fHash;
+    property modified: int32 read getModified write fModified;
 
   public
 
@@ -116,7 +121,14 @@ type
 
   end;
 
+
   tCheckpointRepo = class;
+
+  tFileRefList = array of tFileRef;
+
+  tFileRefListHelper = record helper for tFileRefList
+    procedure append(x: tFileRef);
+  end;
 
   tCheckpoint = class
 
@@ -125,15 +137,14 @@ type
     fDate: tDateTime;
     fId: string;
 
-    fileList: array of tFileRef;
+    fileList: tFileRefList;
 
     {where our files came from}
     {todo: I think we can remove this and just trust the fileRefs to be correct}
     sourceFolder: string;
 
   protected
-    procedure writeObjects(objectStore: tObjectStore);
-    function objectFactory(s: string): tObject;
+    function  objectFactory(s: string): tObject;
 
   published
     property message: string read fMessage write fMessage;
@@ -142,6 +153,7 @@ type
     property id: string read fID write fID;
 
   public
+    procedure writeObjects(objectStore: tObjectStore);
 
     constructor create(); overload;
     constructor create(aPathOrCheckpoint: string); overload;
@@ -149,6 +161,7 @@ type
 
     procedure clear();
 
+    function  defaultCheckpointPath: string;
     procedure readFromFolder(path: string);
     procedure exportToFolder(path: string);
     procedure load(checkpoint: string);
@@ -167,8 +180,11 @@ type
 
     function  hasCheckpoint(checkpointName: string): boolean;
     function  getCheckpointPath(checkpointName: string): string;
+    function  getCheckpoints(): tStringList;
 
     function  load(checkpointName: string): tCheckpoint;
+    function  verify(checkpoint: tCheckpoint; verbose: boolean=false): boolean;
+
   end;
 
 
@@ -198,33 +214,17 @@ begin
   fPath := '';
   fRoot := '';
   fHash := '';
-  fSize := 0;
-  fModified := 0;
+  fSize := -1; // these are defered
+  fModified := -1; // these are deffered
 end;
 
 constructor tFileRef.create(aPath: string;aRoot: string=''); overload;
 var
   f: file;
 begin
-
   create();
-
   fPath := aPath;
   fRoot := aRoot;
-
-  {$I-}
-  assign(f, self.fqn);
-  reset(f,1);
-  {$I+}
-  if ioResult <> 0 then
-    error('Could not create file reference for file '+fqn);
-
-  try
-    getFTime(f, fModified);
-    fSize := fileSize(f);
-  finally
-    close(f);
-  end;
 end;
 
 {full path to file}
@@ -233,24 +233,53 @@ begin
   result := joinPath(fRoot, fPath);
 end;
 
+{returns the hash, calculates it if needed.}
+function tFileRef.getHash(): string;
+begin
+  if fHash = '' then updateHash();
+  result := fHash;
+end;
+
+{returns the hash, calculates it if needed.}
+function tFileRef.getFilesize(): int64;
+begin
+  if fSize < 0 then
+    fSize := fs.getFileSize(self.fqn);
+  result := fSize;
+end;
+
+{returns the hash, calculates it if needed.}
+function tFileRef.getModified(): int32;
+begin
+  if fModified < 0 then
+    fModified := fs.getModified(self.fqn);
+  result := fModified;
+end;
+
 {calculates the hash for this file (not done by default)}
-procedure tFileRef.calculateHash();
+procedure tFileRef.updateHash();
 var
   f: file;
   bytesRead: int32;
   buffer: array of byte;
 begin
+
+  if self.fileSize = 0 then begin
+    fHash := MD5.NULL_HASH.toHex;
+    exit;
+  end;
+
   buffer := nil;
   bytesRead := 0;
-  assign(f, fqn);
+  assign(f, self.fqn);
   try
     reset(f, 1);
-    if (fSize > MAX_FILESIZE) then
-      error(format('Tried to process file that was too large. File size: %fkb File name: %s', [fSize/1024, fqn]));
-    setLength(buffer, fSize);
-    blockread(f, buffer[0], fSize, bytesRead);
-    if bytesRead <> fSize then
-      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fSize, bytesRead]));
+    if (fileSize > MAX_FILESIZE) then
+      error(format('Tried to process file that was too large. File size: %fkb File name: %s', [fileSize/1024, fqn]));
+    setLength(buffer, fileSize);
+    blockread(f, buffer[0], fileSize, bytesRead);
+    if bytesRead <> fileSize then
+      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fileSize, bytesRead]));
     fHash := MD5.hash(buffer).toHex;
   finally
     close(f);
@@ -260,7 +289,7 @@ end;
 function tFileRef.toString(): string;
 begin
   if hash <> '' then
-    result := copy(fHash, 1, 8)+ ' '
+    result := copy(hash, 1, 8)+ ' '
   else
     result := '';
   result := result + fPath;
@@ -332,7 +361,7 @@ var
   i: integer;
 begin
   clear();
-  fileList := FS.listFiles(joinPath(root, '*.*'));
+  fileList := fs.listFiles(joinPath(root, '*.*'));
   setLength(files, fileList.len);
   for i := 0 to fileList.len-1 do begin
     files[i] := tFileRef.create(fileList[i], root);
@@ -382,6 +411,12 @@ begin
 
 end;
 
+{returns the default checkpoint path}
+function tCheckpoint.defaultCheckpointPath: string;
+begin
+  result := tMyDateTime(date).YYMMDD('')+'_'+tMyDateTime(date).HHMMSS('')+'.txt'
+end;
+
 {loads checkpoint from a standard folder (i.e. how V1 worked)}
 procedure tCheckpoint.readFromFolder(path: string);
 var
@@ -416,15 +451,13 @@ begin
     if files[i] = 'message.txt' then continue;
     {not: no subfolder support yet, but we'll add it here}
     fileRef := tFileRef.create(files[i], path);
-    if fileRef.fSize > MAX_FILESIZE then begin
-      warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.fSize/1024]));
+    if fileRef.fileSize > MAX_FILESIZE then begin
+      warn(format('Skipping %s as it is too large (%fkb)',[fileRef.fqn, fileRef.fileSize/1024]));
       fileRef.free;
       continue;
     end;
-    fileRef.calculateHash();
     {add reference}
-    setLength(fileList, length(fileList)+1);
-    fileList[length(filelist)-1] := fileRef;
+    fileList.append(fileRef);
   end;
 end;
 
@@ -489,7 +522,7 @@ begin
 
   if not checkpoint.endsWith('.txt', true) then error('Checkpoint must be a .txt file');
 
-  {then write out the files, just so we can get the hash}
+  {first write out just the files (so we can get the checkpoint hash)}
   t := tINIWriter.create(checkpoint);
   try
     for fileRef in fileList do
@@ -515,7 +548,6 @@ begin
   finally
     t.free();
   end;
-
 end;
 
 {writes out objects to object database}
@@ -557,12 +589,12 @@ begin
   result := '';
 
   // we don't check very small files
-  if originalFile.fSize < 64 then exit;
+  if originalFile.fileSize < 64 then exit;
 
   for fileRef in filesToCheck do begin
     // do not check ourselves
     if fileRef.path = originalFile.path then continue;
-    fileSizeRatio := fileRef.fSize / originalFile.fSize;
+    fileSizeRatio := fileRef.fileSize / originalFile.fileSize;
     //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
     if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
 
@@ -577,6 +609,23 @@ begin
   end;
 end;
 
+{perform a basic check to make sure objects reference in this checkpoint exist.}
+function tCheckpointRepo.verify(checkpoint: tCheckpoint; verbose: boolean=false): boolean;
+var
+  fileRef: tFileRef;
+  missingFileMsg: string;
+begin
+  result := true;
+  for fileRef in checkpoint.fileList do begin
+    if not assigned(objectStore.lookupByHash(fileRef.hash)) then begin
+      missingFileMsg := format(' - missing object %s referenced by %s', [copy(fileRef.hash, 1, 8), fileRef.path]);
+      warn(missingFileMsg);
+      if verbose then
+        writeln(missingFileMsg);
+      result := false;
+    end;
+  end;
+end;
 
 function tCheckpointRepo.generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
 var
@@ -663,6 +712,12 @@ end;
 function tCheckpointRepo.hasCheckpoint(checkpointName: string): boolean;
 begin
   result := fs.exists(getCheckpointPath(checkpointName));
+end;
+
+function tCheckpointRepo.getCheckpoints(): tStringList;
+begin
+  result := fs.listFiles(repoRoot+'\*.txt');
+  result.sort();
 end;
 
 function tCheckpointRepo.getCheckpointPath(checkpointName: string): string;
@@ -759,6 +814,14 @@ end;
 function tCheckpointDiff.getLineStats(): tDiffStats;
 begin
   error('NIY');
+end;
+
+{-------------------------------------------------------------}
+
+procedure tFileRefListHelper.append(x: tFileRef);
+begin
+  setLength(self, length(self)+1);
+  self[length(self)-1] := x;
 end;
 
 {-------------------------------------------------------------}

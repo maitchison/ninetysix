@@ -17,7 +17,7 @@ type
     function  folderExists(path: string): boolean;
     function  exists(filename: string): boolean;
     procedure copyFile(srcFile, dstFile: string);
-    function  fileSize(fileName: string): int64;
+    function  getFileSize(fileName: string): int64;
     procedure setModified(fileName: string;time: dword);
     function  getModified(fileName: string): dword;
 
@@ -79,7 +79,7 @@ begin
 end;
 
 {return filesize of file or 0 if not found.}
-function tFileSystem.fileSize(fileName: string): int64;
+function tFileSystem.getFileSize(fileName: string): int64;
 var
   f: file;
 begin
@@ -152,7 +152,7 @@ begin
   findFirst(path, AnyFile, sr);
   while DosError = 0 do begin
     if sr.size > 0 then begin
-      result += toLowerCase(sr.name);
+      result.append(toLowerCase(sr.name));
     end;
     findNext(sr);
   end;

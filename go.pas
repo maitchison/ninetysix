@@ -49,9 +49,8 @@ var
   USE_PAGING: boolean = true;
   PAUSE_AT_END: boolean = false;
 
-var
-  WORKSPACE: string = '';
-  HEAD: string = '$rep\HEAD\';
+const
+  ROOT = '$repo';
 
 type
   tDiffStatsHelper = record helper for tDiffStats
@@ -99,10 +98,16 @@ begin
       // done, or down... i.e. go to bottom and wait.
       'd': begin USE_PAGING := false; PAUSE_AT_END := true; end;
       #27: halt;
+      #3: halt;
     end;
     LINES_SINCE_PAGE := 0;
     writeln();
   end;
+end;
+
+procedure outputDiv();
+begin
+  outputLn('----------------------------------------');
 end;
 
 procedure outputX(a: string; b: string; c: string; col: byte);
@@ -182,9 +187,8 @@ if destination folder exists it is renamed, and then a new folder is
 created. If back exists, it is removed.}
 procedure safeCopy(destinationPath: string);
 begin
-  //stub
   destinationPath := trim(destinationPath);
-  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp');
+  dos.exec(getEnv('COMSPEC'), '/C deltree /y '+destinationPath+'_tmp > nul');
   fsWait;
   dos.exec(getEnv('COMSPEC'), '/C ren '+destinationPath+' '+destinationPath+'_tmp');
   fsWait;
@@ -204,23 +208,38 @@ end;
 
 procedure commit(msg: string);
 var
-  sourcePath, destinationPath, folderName: string;
   t: text;
   time: tMyDateTime;
+  repo: tCheckpointRepo;
+  old,new: tCheckpoint;
+  checkpointName: string;
+  checkpointTime: tMyDateTime;
 begin
-  sourcePath := getENV('CWD');
-  if sourcePath = '' then
-    sourcePath := '.';
 
   time := now;
 
-  assign(t,'message.txt');
-  rewrite(t);
-  writeln(t, msg);
-  close(t);
+  repo := tCheckpointRepo.create(ROOT);
+  old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
+  new := tCheckpoint.create('.');
 
-  safeCopy('$rep\'+time.YYMMDD('')+'_'+time.HHMMSS(''));
-  safeCopy('$rep\HEAD');
+  outputln();
+  outputDiv();
+  outputln(' SUMMARY');
+  outputDiv();
+  outputLn();
+
+  repo.generateCheckpointDiff(old, new).showStatus;
+
+  checkpointTime := now;
+
+  new.author := 'Matthew';
+  new.date := now();
+  new.message := msg;
+
+  new.save(joinPath(ROOT, new.defaultCheckpointPath));
+  new.writeObjects(repo.objectStore);
+
+  safeCopy(joinPath(ROOT, 'HEAD'));
 
 end;
 
@@ -472,8 +491,6 @@ var
   repo: tCheckpointRepo;
   old,new: tCheckpoint;
   checkpointDiff: tCheckpointDiff;
-const
-  ROOT = '$repo';
 begin
   repo := tCheckpointRepo.create(ROOT);
   old := tCheckpoint.create(joinPath(ROOT, 'HEAD'));
@@ -513,101 +530,10 @@ This is the old version that has many issues,
  - it does work though.
 }
 
-function oldDiffOnWorkspace(): tDiffStats;
-var
-  workingSpaceFiles: tStringList;
-  headFiles: tStringList;
-  filename: string;
-  fileStats: tDiffStats;
-  stats: tDiffStats;
-  renamedFile: string;
-  renamedFiles: tStringList;
-begin
-
-  error('Old diff has been deprecated.');
-
-(*
-
-  totalStats.clear();
-
-  workingSpaceFiles := getSourceFiles(WORKSPACE);
-  headFiles := getSourceFiles(HEAD);
-
-  fileStats.clear();
-
-  outputLn();
-
-  renamedFiles.clear();
-
-  // look for files that were renamed
-  for filename in workingSpaceFiles do begin
-    if headFiles.contains(filename) then continue;
-    renamedFile := checkForRename(filename, headFiles);
-    if renamedFile = '' then continue;
-    // we found a renamed file
-    textAttr := WHITE;
-    outputLn('----------------------------------------');
-    outputX (' Renamed ',filename+' -> '+renamedFile, '', LIGHTBLUE);
-    outputLn('----------------------------------------');
-    stats := runDiff(filename, renamedFile);
-    totalStats += stats;
-    inc(fileStats.added);
-    renamedFiles += filename;
-    renamedFiles += renamedFile;
-  end;
-
-  for filename in headFiles do begin
-    if workingSpaceFiles.contains(filename) then continue;
-    if renamedFiles.contains(filename) then continue;
-    textAttr := WHITE;
-    outputLn('----------------------------------------');
-    outputX (' Removed ',filename, '', LIGHTRED);
-    outputLn('----------------------------------------');
-    stats := runDiff(filename);
-    totalStats += stats;
-    inc(fileStats.removed);
-  end;
-
-  for filename in workingSpaceFiles do begin
-    if renamedFiles.contains(filename) then continue;
-    if not headFiles.contains(filename) then begin
-      textAttr := WHITE;
-      outputLn('----------------------------------------');
-      outputX (' Added ',filename, '', LIGHTGREEN);
-      outputLn('----------------------------------------');
-      stats := runDiff(filename);
-      totalStats += stats;
-      inc(fileStats.added);
-    end else begin
-      if not fs.wasModified(joinPath(WORKSPACE, filename), joinPath(HEAD, filename)) then continue;
-      textAttr := WHITE;
-      outputLn('----------------------------------------');
-      outputX (' Modified ', filename, '', YELLOW);
-      outputLn('----------------------------------------');
-      stats := runDiff(filename);
-      textAttr := WHITE;
-      //outputln(filename+':');
-      totalStats += stats;
-      inc(fileStats.changed);
-    end;
-  end;
-
-  textAttr := WHITE;
-  outputLn('----------------------------------------');
-  status();
-  outputLn('----------------------------------------');
-  outputln(' Total');
-  outputLn('----------------------------------------');
-  totalStats.print();
-
-  result := totalStats;
-  *)
-end;
-
 {--------------------------------------------------}
 
 {generate per commit stats. Quite slow}
-procedure stats();
+procedure showStats();
 var
   repo: tCheckpointRepo;
   checkpoints: tStringList;
@@ -728,6 +654,36 @@ begin
   *)
 end;
 
+{make sure our checkpoints look ok}
+procedure doVerify();
+var
+  checkpointName: string;
+  checkpoint: tCheckpoint;
+  repo: tCheckpointRepo;
+begin
+  repo := tCheckpointRepo.create(ROOT);
+  checkpoint := tCheckpoint.create();
+  for checkpointName in repo.getCheckpoints() do begin
+    checkpoint.load(joinPath(ROOT, checkpointName));
+    textAttr := LIGHTGRAY;
+    output(pad(checkpointName, 40));
+    if repo.verify(checkpoint, false) then begin
+      textAttr := LIGHTGREEN;
+      outputLn('[OK]');
+    end else begin
+      textAttr := LIGHTRED;
+      outputLn('[BAD]');
+      repo.verify(checkpoint, true);
+    end;
+    textAttr := WHITE;
+
+    if keypressed then case readkey of
+      #3: break;
+    end;
+  end;
+  checkpoint.free;
+end;
+
 {--------------------------------------------------}
 
 
@@ -811,11 +767,14 @@ begin
 
   for fileDiff in fileDiffs do begin
 
-    outputLn('----------------------------------------');
+    outputDiv();
     case fileDiff.diffType of
       FD_MODIFIED: outputX (' Modified ', fileDiff.old.path, '', YELLOW);
+      FD_ADDED:    outputX (' Added ',   fileDiff.new.path, '', LIGHTGREEN);
+      FD_REMOVED:  outputX (' Removed ', fileDiff.old.path, '', LIGHTRED);
+      FD_RENAMED:  outputX (' Renamed ', fileDiff.old.path+' -> '+fileDiff.new.path, '', LIGHTBLUE);
     end;
-    outputLn('----------------------------------------');
+    outputDiv();
 
     old := fs.readText(fileDiff.old.fqn);
     new := fs.readText(fileDiff.new.fqn);
@@ -826,10 +785,12 @@ begin
 
   end;
 
-  outputLn('----------------------------------------');
+
+  outputDiv();
   outputLn(' SUMMARY');
-  outputLn('----------------------------------------');
+  outputDiv();
   outputLn();
+
 
   {show footer}
   self.showStatus();
@@ -844,13 +805,9 @@ var
 
 begin
 
-  {todo: remove}
-  clrscr;
-  WRITE_TO_SCREEN := true;
-  runTestSuites();
-
   // screen is hard to read due to a dosbox-x bug, so we clear it
   // for visibility.
+  crt.CheckBreak := true;
   textAttr := WHITE;
   clrscr;
 
@@ -868,7 +825,9 @@ begin
   else if command = 'status' then
     showStatus()
   else if command = 'stats' then
-    stats()
+    showStats()
+  else if command = 'verify' then
+    doVerify()
   else
     Error('Invalid command "'+command+'"');
 

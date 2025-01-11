@@ -29,6 +29,9 @@ type
 function hash(bytes: tBytes): tDigest; overload;
 function hash(s: ansistring): tDigest; overload;
 
+var
+  NULL_HASH: tDigest;
+
 implementation
 
 {------------------------------------------------------}
@@ -221,5 +224,6 @@ begin
 end;
 
 initialization
+  NULL_HASH := hash('');
   tMD5Test.create('MD5');
 end.

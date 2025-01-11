@@ -23,6 +23,7 @@ uses
 
 type
 
+  {todo: make this a record helper}
   tMyDateTime = record
 
     asDouble: double;
