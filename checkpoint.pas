@@ -64,6 +64,7 @@ type
 
   public
     function fqn: string;
+    function assigned: boolean;
     property fileSize: int64 read getFileSize write fSize;
 
   published
@@ -238,6 +239,12 @@ begin
   else
     result := joinPath(fRoot, fPath);
 end;
+
+function tFileRef.assigned: boolean;
+begin
+  result := path <> '';
+end;
+
 
 {returns the hash, calculates it if needed.}
 function tFileRef.getHash(): string;
@@ -608,14 +615,14 @@ begin
     // do not check ourselves
     if fileRef.path = originalFile.path then continue;
     fileSizeRatio := fileRef.fileSize / originalFile.fileSize;
-    //outputln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile, filename]));
+    //writeln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile.path, fileRef.path]));
     if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
 
     diff.init(originalFile, fileRef);
     stats := diff.getStats();
 
     changedRatio := stats.unchanged / stats.newLen;
-    //outputln(format('changeratio %f %s %s ', [changedRatio, originalFile, filename]));
+    //writeln(format('changeratio %f %s %s ', [changedRatio, originalFile.path, fileRef.path]));
     if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
     result := fileRef.path;
     exit;
@@ -775,13 +782,13 @@ end;
 
 function tFileDiff.diffType: tFileDiffType;
 begin
-  if assigned(self.old) and assigned(self.new) then
+  if self.old.assigned and self.new.assigned then
     if (old.path = new.path) then
       exit(FD_MODIFIED)
     else
       exit(FD_RENAMED);
-  if assigned(self.old) then exit(FD_REMOVED);
-  if assigned(self.new) then exit(FD_ADDED);
+  if self.old.assigned then exit(FD_REMOVED);
+  if self.new.assigned then exit(FD_ADDED);
   error('Neither old nor new was assigned, file as no diff type.');
 end;
 

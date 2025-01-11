@@ -739,11 +739,11 @@ var
 begin
 
   stats.clear();
-
   oldTextattr := textAttr;
 
   for fileDiff in fileDiffs do begin
 
+    textAttr := WHITE;
     outputDiv();
     case fileDiff.diffType of
       FD_MODIFIED: outputX (' Modified ', fileDiff.old.path, '', YELLOW);
@@ -761,7 +761,6 @@ begin
     showDiff(old, new, matches);
 
   end;
-
 
   outputDiv();
   outputLn(' SUMMARY');
@@ -784,7 +783,6 @@ begin
 
   // screen is hard to read due to a dosbox-x bug, so we clear it
   // for visibility.
-  crt.CheckBreak := true;
   textAttr := WHITE;
   clrscr;
 
