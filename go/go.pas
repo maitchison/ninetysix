@@ -501,7 +501,6 @@ begin
   repo := tCheckpointRepo.create(REPO_PATH);
 
   checkpoints := repo.getCheckpointNames();
-  checkpoints.reverse(); // we want these old to new
 
   counter := 0;
 
@@ -544,16 +543,18 @@ begin
     end;
 
     if previousCheckpoint = '' then begin
-      new := repo.load(checkpoint);
-      old := tCheckpoint.create(repo); // an empty one
+      {this is the first checkpoint}
+      {do diff against current workspace}
+      old := repo.load(checkpoint);
+      new := tCheckpoint.create(repo, WORKSPACE);
     end else begin
-      if assigned(old) then old.free;
+      if assigned(new) then new.free;
       if didSkip then
         // if we skipped we must reload both
-        old := repo.load(previousCheckpoint)
+        new := repo.load(previousCheckpoint)
       else
-        old := new;
-      new := repo.load(checkpoint);
+        new := old;
+      old := repo.load(checkpoint);
       didSkip := false;
     end;
 
