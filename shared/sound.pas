@@ -69,6 +69,8 @@ type
   tAudioSampleF32 = packed record
   {32 bit stereo sample, used for mixing}
     left,right: single;
+    class operator implicit(a: tAudioSample16S): tAudioSampleF32;
+    class operator implicit(a: tAudioSampleF32): tAudioSample16S;
   end;
   tAudioSampleI32 = packed record
   {32 bit stereo sample, used for mixing}
@@ -154,6 +156,18 @@ class operator tAudioSample16S.subtract(a,b: tAudioSample16S): tAudioSample16S;
 begin
   result.left := a.left - b.left;
   result.right := a.right - b.right;
+end;
+
+class operator tAudioSampleF32.implicit(a: tAudioSample16S): tAudioSampleF32;
+begin
+  result.left := a.left;
+  result.right := a.right;
+end;
+
+class operator tAudioSampleF32.implicit(a: tAudioSampleF32): tAudioSample16S;
+begin
+  result.left := clamp(round(a.left), -32768, +32767);
+  result.right := clamp(round(a.right), -32768, +32767);
 end;
 
 {--------------------------------------------------------}

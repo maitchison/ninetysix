@@ -38,6 +38,26 @@ begin
     result.setSample(i, sample);
   end;
 end;
+
+{compulate a low pass filter via IIR filter
+fc: Frequency cutoff}
+function IIR(s1: tSoundEffect;fc: single): tSoundEffect;
+var
+  i: int32;
+  y, sample: tAudioSampleF32;
+  alpha: single;
+begin
+  alpha := exp(-2.0 * pi * fc / 44100);
+  writeln(format('%.2f %.2ff', [alpha, pi]));
+  result := tSoundEffect.create(AF_16_STEREO, s1.length);
+  y := s1.getSample(i);
+  for i := 0 to result.length-1 do begin
+    sample := s1.getSample(i);
+    y.left := alpha * y.left + (1-alpha) * sample.left;
+    y.right := alpha * y.right + (1-alpha) * sample.right;
+    result.setSample(i, y);
+  end;
+end;
 {$R+,Q+}
 
 procedure go();
@@ -49,9 +69,9 @@ begin
   SAMPLE_LENGTH := 44100 * 45;
 
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('..\airtime\res\music1.wav', SAMPLE_LENGTH);
+  music16 := tSoundEffect.loadFromWave('..\airtime\res\music2.wav', SAMPLE_LENGTH);
   mixer.play(music16, SCS_FIXED1);
-  musicL := soundQuant(music16, 7);
+  musicL := IIR(music16, 10000);
   writeln('Processing.');
   musicD := soundDelta(music16, musicL);
   writeln('Done.');
