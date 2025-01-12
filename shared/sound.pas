@@ -95,7 +95,7 @@ type
     function getSample(pos: int32): tAudioSample;
     procedure setSample(pos: int32;sample: tAudioSample);
 
-    class function loadFromWave(filename: string): tSoundEffect;
+    class function loadFromWave(filename: string;maxSamples: int32=-1): tSoundEffect;
     class function createNoise(duration: single): tSoundEffect;
 
     (*
@@ -245,7 +245,7 @@ begin
   result.tag := 'noise';
 end;
 
-class function tSoundEffect.loadFromWave(filename: string): tSoundEffect;
+class function tSoundEffect.loadFromWave(filename: string;maxSamples: int32=-1): tSoundEffect;
 const
   BLOCK_SIZE = 16*1024;
 var
@@ -259,6 +259,7 @@ var
   blockSize: int32;
   dataPtr: pointer;
   af: tAudioFormat;
+  samplesToRead: dword;
 
 function wordAlign(x: int32): int32;
   begin
@@ -308,9 +309,12 @@ begin
           continue;
         end;
 
-        result := tSoundEffect.create(af, chunkSize div AF_SIZE[af], filename);
+        samplesToRead := chunkSize div AF_SIZE[af];
+        if maxSamples > 0 then samplesToRead := min(samplesToRead, maxSamples);
 
-        bytesRemaining := chunkSize;
+        result := tSoundEffect.create(af, samplesToRead, filename);
+
+        bytesRemaining := samplesToRead * AF_SIZE[af];
         dataPtr := result.data;
 
         {reading in blocks stop interrupts from being blocked for too
