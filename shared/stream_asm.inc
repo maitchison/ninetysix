@@ -3,7 +3,7 @@ var
   inPtr, outPtr: pointer;
   nibblesRead: dword;
 begin
-  inPtr := @stream.bytes[stream.pos];
+  inPtr := @stream.bytes[stream.fpos];
   outPtr := @outBuffer[0];
   nibblesRead := 0;
 
@@ -75,6 +75,6 @@ begin
 
   end;
 
-  stream.pos += (nibblesRead + 1) div 2;
+  stream.fpos += (nibblesRead + 1) div 2;
 
 end;

@@ -25,15 +25,30 @@ unit la96;
 interface
 
 uses
+  debug,
+  test,
   utils,
   types,
   lz4,
   dos,
   sound,
+  audioFilter,
   stream;
 
+type
+  tAudioCompressionProfile = record
+    quantBits: word;
+    freqLow: word;
+    freqHigh: word;
+  end;
+
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect;s: tStream=nil): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile; s: tStream=nil): tStream;
+
+const
+  ACP_LOW: tAudioCompressionProfile = (quantBits:8; freqLow: 10; freqHigh:16000);
+  ACP_MEDIUM: tAudioCompressionProfile = (quantBits:10; freqLow: 10; freqHigh:18000);
+  ACP_HIGH: tAudioCompressionProfile = (quantBits:12; freqLow: 10; freqHigh:20000);
 
 implementation
 
@@ -43,7 +58,7 @@ begin
   {todo: implement decode}
 end;
 
-function encodeLA96(sfx: tSoundEffect;s: tStream=nil): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile; s: tStream=nil): tStream;
 var
   i,j: int32;
 
@@ -63,7 +78,7 @@ var
 begin
 
   {guess that we'll need 1 byte per sample, i.e 4:1 compression vs 16bit stereo}
-  if not assigned(s) then s := tStream.create(sfx.length);
+  if not assigned(s) then s := tStream.create(sfx.length*2);
   result := s;
 
   if sfx.length = 0 then exit;
@@ -72,9 +87,9 @@ begin
   samplesRemaining := sfx.length;
 
   lastMidValue := (samplePtr^.left+samplePtr^.right) div 2;
-  lastDifValue := (samplePtr^.left-samplePtr^.right);
-  lastMidValue := lastMidValue div 256;
-  lastDifValue := lastDifValue div 256;
+  lastDifValue := (samplePtr^.left-samplePtr^.right) div 2;
+  lastMidValue := lastMidValue;
+  lastDifValue := lastDifValue;
 
   ds := tStream.create();
   counter := 0;
@@ -87,13 +102,15 @@ begin
     firstDifValue := lastDifValue;
 
     for j := 0 to 1024-1 do begin
-      {dividing by 2 looses quality, but only when stereo}
+      {dividing by 2 is needed so as to not overflow.
+       This method looses 1-bit of quality, but only when stereo.}
+
       thisMidValue := (samplePtr^.left+samplePtr^.right) div 2;
-      thisDifValue := (samplePtr^.left-samplePtr^.right);
+      thisDifValue := (samplePtr^.left-samplePtr^.right) div 2;
 
       {convert to 8-bit}
-      thisMidValue := thisMidValue div 256;
-      thisDifValue := thisDifValue div 256;
+      {thisMidValue := thisMidValue div 256;
+      thisDifValue := thisDifValue div 256;}
 
       midCodes[j] := negEncode(thisMidValue-lastMidValue);
       difCodes[j] := negEncode(thisDifValue-lastDifValue);
@@ -121,14 +138,25 @@ begin
 
     write('.');
 
+    //stub:
+    if counter and $ff = 0 then
+      logHeapStatus(intToStr(counter));
+
     dec(samplesRemaining, 1024);
     inc(counter);
 
   end;
 
   ds.free;
-  writeln();
-  writeln(format('Encoded used %fKB',[s.len/1024]));
+  {note: we write out s.len bytes}
+  writeln(s.capacity);
+  writeln(s.len);
+  writeln(s.pos);
+  writeln(ds.capacity);
+  writeln(ds.len);
+  writeln(ds.pos);
+
+  note(format('Encoded size %fKB',[s.len/1024]));
 end;
 
 

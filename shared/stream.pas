@@ -25,17 +25,17 @@ type
 
     {
     note on position
-    pos is our current position within the buffer.
-    valid bytes are considred to be [0..pos-1]
+    fPos is our current position within the buffer.
+    valid bytes are considered to be [0..bytesLen-1]
 
-    capacity length(bytes) is always >= pos
-    using seek(pos) is a 'soft clear', as in does not change the capacitiy.
+    capacity length(bytes) is always >= fPos
+    using seek(fPos) is a 'soft clear', as in does not change the capacitiy.
     }
 
   protected
     bytes: tBytes;   {length(bytes) is the capacity}
     bytesLen: dword; {bytesLen is the number of actual bytes used}
-    pos: int32;      {current position in stream}
+    fPos: int32;     {current position in stream}
     midByte: boolean;
 
   private
@@ -85,11 +85,12 @@ type
     procedure readFromDisk(fileName: string);
 
     function  capacity: int32; inline;
-    function  len: int32; inline;
-    function  getPos: int32; inline;
 
     procedure reset();
     procedure softReset();
+
+    property  len: dword read bytesLen;
+    property  pos: int32 read fPos;
 
     function  asBytes: tBytes;
     function  getBuffer: tBytes;
@@ -200,7 +201,7 @@ procedure tStream.setCapacity(n: dword); inline;
 begin
   system.setLength(bytes, n);
   if bytesLen > length(bytes) then
-    bytesLen := length(bytes); {byteslen can not be more than actaul buffer size}
+    bytesLen := length(bytes); {byteslen can not be more than actual buffer size}
 end;
 
 procedure tStream.makeCapacity(n: dword); inline;
@@ -228,12 +229,12 @@ begin
   {$ENDIF}
 
   if midByte then begin
-    bytes[pos] := bytes[pos] or (b shl 4);
+    bytes[fPos] := bytes[fPos] or (b shl 4);
     midByte := false;
-    inc(pos);
+    inc(fPos);
   end else begin
-    setLength(pos+1);
-    bytes[pos] := b;
+    setLength(fPos+1);
+    bytes[fPos] := b;
     midByte := true;
   end;
 end;
@@ -245,9 +246,9 @@ begin
     writeNibble((b shr 4) and $f);
     exit;
   end;
-  setLength(pos+1);
-  bytes[pos] := b;
-  inc(pos);
+  setLength(fPos+1);
+  bytes[fPos] := b;
+  inc(fPos);
 end;
 
 procedure tStream.writeWord(w: word); inline;
@@ -258,11 +259,11 @@ begin
     writeNibble((w shr 12) and $f);
     exit;
   end;
-  setLength(pos+2);
+  setLength(fPos+2);
   {little edian}
-  bytes[pos] := w and $FF;
-  bytes[pos+1] := w shr 8;
-  inc(pos,2);
+  bytes[fPos] := w and $FF;
+  bytes[fPos+1] := w shr 8;
+  inc(fPos,2);
 end;
 
 procedure tStream.writeDWord(d: dword); inline;
@@ -275,13 +276,13 @@ begin
     writeNibble((d shr 28) and $f);
     exit;
   end;
-  setLength(pos+4);
+  setLength(fPos+4);
   {little edian}
-  bytes[pos] := d and $ff;
-  bytes[pos+1] := (d shr 8) and $ff;
-  bytes[pos+2] := (d shr 16) and $ff;
-  bytes[pos+3] := (d shr 24) and $ff;
-  inc(pos,4);
+  bytes[fPos] := d and $ff;
+  bytes[fPos+1] := (d shr 8) and $ff;
+  bytes[fPos+2] := (d shr 16) and $ff;
+  bytes[fPos+3] := (d shr 24) and $ff;
+  inc(fPos,4);
 end;
 
 procedure tStream.writeChars(s: string);
@@ -297,19 +298,19 @@ begin
   if aLen < 0 then aLen := length(aBytes);
   if aLen = 0 then exit;
   if midByte then error('unaligned write bytes');
-  setLength(pos + aLen);
-  move(aBytes[0], self.bytes[pos], aLen);
-  inc(pos, aLen);
+  setLength(fPos + aLen);
+  move(aBytes[0], self.bytes[fPos], aLen);
+  inc(fPos, aLen);
 end;
 
 function tStream.readNibble: byte; inline;
 begin
   if midByte then begin
-    result := bytes[pos] shr 4;
+    result := bytes[fPos] shr 4;
     midByte := false;
-    inc(pos);
+    inc(fPos);
   end else begin
-    result := bytes[pos] and $f;
+    result := bytes[fPos] and $f;
     midByte := true;
   end;
 end;
@@ -319,24 +320,24 @@ begin
   {todo: support halfbyte}
   if midByte then
     Error('Reading missaligned bytes not yet supported');
-  result := bytes[pos];
-  inc(pos);
+  result := bytes[fPos];
+  inc(fPos);
 end;
 
 function tStream.readWord: word; inline;
 begin
   if midByte then
     Error('Reading missaligned words not yet supported');
-  result := bytes[pos] + (bytes[pos+1] shl 8);
-  inc(pos,2);
+  result := bytes[fPos] + (bytes[fPos+1] shl 8);
+  inc(fPos,2);
 end;
 
 function tStream.readDWord: dword; inline;
 begin
   if midByte then
     Error('Reading missaligned dwords not yet supported');
-  result := bytes[pos] + (bytes[pos+1] shl 8) + (bytes[pos+2] shl 16) + (bytes[pos+3] shl 24);
-  inc(pos,4);
+  result := bytes[fPos] + (bytes[fPos+1] shl 8) + (bytes[fPos+2] shl 16) + (bytes[fPos+3] shl 24);
+  inc(fPos,4);
 end;
 
 function tStream.peekByte: byte; inline;
@@ -344,21 +345,21 @@ begin
   {todo: support halfbyte}
   if midByte then
     Error('Reading missaligned bytes not yet supported');
-  result := bytes[pos];
+  result := bytes[fPos];
 end;
 
 function tStream.peekWord: word; inline;
 begin
   if midByte then
     Error('Reading missaligned bytes not yet supported');
-  result := bytes[pos] + (bytes[pos+1] shl 8);
+  result := bytes[fPos] + (bytes[fPos+1] shl 8);
 end;
 
 function tStream.peekDWord: dword; inline;
 begin
   if midByte then
     Error('Reading missaligned dwords not yet supported');
-  result := bytes[pos] + (bytes[pos+1] shl 8) + (bytes[pos+2] shl 16) + (bytes[pos+3] shl 24);
+  result := bytes[fPos] + (bytes[fPos+1] shl 8) + (bytes[fPos+2] shl 16) + (bytes[fPos+3] shl 24);
 end;
 
 function tStream.readVLC: dword; inline;
@@ -386,14 +387,14 @@ var
 begin
   if midByte then
     error('Unaligned readBytes');
-  if n > (len-pos) then
-    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (pos + n)]));
+  if n > (len-fPos) then
+    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (fPos + n)]));
   result := nil;
   if n = 0 then
     exit;
   system.setLength(result, n);
-  move(bytes[pos], result[0], n);
-  pos += n;
+  move(bytes[fPos], result[0], n);
+  fPos += n;
 end;
 
 {writes memory stream to disk}
@@ -434,16 +435,6 @@ begin
   midByte := False;
 end;
 
-function tStream.getPos(): int32; inline;
-begin
-  result := pos;
-end;
-
-function tStream.len(): int32; inline;
-begin
-  result := bytesLen;
-end;
-
 function tStream.capacity(): int32; inline;
 begin
   result := length(bytes);
@@ -457,7 +448,7 @@ end;
 
 procedure tStream.seek(aPos: dword; aMidByte: boolean=False);
 begin
-  pos := aPos;
+  fPos := aPos;
   midByte := aMidByte;
 end;
 
