@@ -69,8 +69,13 @@ type
   tAudioSampleF32 = packed record
   {32 bit stereo sample, used for mixing}
     left,right: single;
-    class operator implicit(a: tAudioSample16S): tAudioSampleF32;
     class operator implicit(a: tAudioSampleF32): tAudioSample16S;
+    class operator implicit(a: tAudioSample16S): tAudioSampleF32;
+    class operator add(a,b: tAudioSampleF32): tAudioSampleF32;
+    class operator subtract(a,b: tAudioSampleF32): tAudioSampleF32;
+    class operator multiply(a: tAudioSampleF32;b: single): tAudioSampleF32;
+    class operator multiply(b: single; a: tAudioSampleF32): tAudioSampleF32;
+    class operator multiply(b: single; a: tAudioSample16S): tAudioSampleF32;
   end;
   tAudioSampleI32 = packed record
   {32 bit stereo sample, used for mixing}
@@ -100,6 +105,8 @@ type
 
     class function loadFromWave(filename: string;maxSamples: int32=-1): tSoundEffect;
     class function createNoise(duration: single): tSoundEffect;
+
+    property items[index: int32]: tAudioSample read getSample write setSample; default;
 
     (*
     class function loadFromFile(filename: string): tSoundEffect;
@@ -154,20 +161,50 @@ end;
 
 class operator tAudioSample16S.subtract(a,b: tAudioSample16S): tAudioSample16S;
 begin
-  result.left := a.left - b.left;
-  result.right := a.right - b.right;
+  result.left  := clamp16(a.left - b.left);
+  result.right := clamp16(a.right - b.right);
 end;
 
 class operator tAudioSampleF32.implicit(a: tAudioSample16S): tAudioSampleF32;
 begin
-  result.left := a.left;
+  result.left  := a.left;
   result.right := a.right;
 end;
 
 class operator tAudioSampleF32.implicit(a: tAudioSampleF32): tAudioSample16S;
 begin
-  result.left := clamp(round(a.left), -32768, +32767);
-  result.right := clamp(round(a.right), -32768, +32767);
+  result.left  := clamp16(a.left);
+  result.right := clamp16(a.right);
+end;
+
+class operator tAudioSampleF32.add(a,b: tAudioSampleF32): tAudioSampleF32;
+begin
+  result.left  := a.left + b.left;
+  result.right := a.right + b.right;
+end;
+
+class operator tAudioSampleF32.subtract(a,b: tAudioSampleF32): tAudioSampleF32;
+begin
+  result.left  := a.left - b.left;
+  result.right := a.right - b.right;
+end;
+
+class operator tAudioSampleF32.multiply(a: tAudioSampleF32;b: single): tAudioSampleF32;
+begin
+  result.left  := a.left * b;
+  result.right := a.right * b;
+end;
+
+class operator tAudioSampleF32.multiply(b: single; a: tAudioSampleF32): tAudioSampleF32;
+begin
+  result.left  := a.left * b;
+  result.right := a.right * b;
+end;
+
+class operator tAudioSampleF32.multiply(b: single; a: tAudioSample16S): tAudioSampleF32;
+begin
+  result.left  := a.left * b;
+  result.right := a.right * b;
 end;
 
 {--------------------------------------------------------}
