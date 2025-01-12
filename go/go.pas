@@ -610,8 +610,69 @@ begin
   checkpoint.free;
 end;
 
-{--------------------------------------------------}
+procedure runTests();
+var
+  t: textFile;
+  testFiles: tStringList;
+  unitName, filename: string;
+  code: word;
+begin
 
+  testFiles := fs.listFiles('.\*_test.pas');
+
+  fs.delFile('_runtest.pas');
+  fs.delFile('_runtest.exe');
+
+  outputLn(format('Found %d unit tests.', [testFiles.len]));
+
+  if testFiles.len = 0 then exit;
+
+  {generate our file}
+  assign(t,'_runtest.pas');
+  rewrite(t);
+  writeln(t, '{auto generated file}');
+  writeln(t, 'program runtests;');
+  writeln(t, '');
+  writeln(t, 'uses');
+  writeln(t, '  test,');
+  for filename in testFiles do begin
+    unitName := copy(filename, 1, length(filename)-4);
+    writeln(t, '  '+unitName+',');
+  end;
+  writeln(t, '  debug;');
+  writeln(t, '');
+  writeln(t, 'begin');
+  writeln(t, '  debug.WRITE_TO_SCREEN := true;');
+  writeln(t, '  test.runTestSuites();');
+  writeln(t, 'end.');
+  close(t);
+
+  {compile it}
+  textAttr := YELLOW;
+  outputln();
+  outputDiv();
+  outputln('Building');
+  outputDiv();
+  textAttr := LIGHTGRAY;
+  code := dosExecute('fpc @fp.cfg -dDEBUG -v1 _runtest.pas', true);
+  if code <> 0 then error('Failed to build test cases.');
+
+  {run it}
+  textAttr := LIGHTGREEN;
+  outputln();
+  outputDiv();
+  outputln('Running Tests');
+  outputDiv();
+  textAttr := LIGHTGRAY;
+  code := dosExecute('_runtest.exe', true);
+  if code <> 0 then error('Failed to run unit tests.');
+
+  fs.delFile('_runtest.pas');
+  fs.delFile('_runtest.exe');
+
+end;
+
+{--------------------------------------------------}
 
 procedure tCheckpointDiffHelper.showStatus(withStats: boolean=true);
 var
@@ -749,6 +810,8 @@ begin
     showStatus()
   else if command = 'stats' then
     showStats()
+  else if command = 'test' then
+    runTests()
   else if command = 'verify' then
     doVerify()
   else

@@ -16,8 +16,10 @@ type
     procedure run(); virtual;
   end;
 
+
 procedure assertError(msg: string); overload;
 
+{todo: move these to testSuite}
 procedure assert(condition: boolean;msg: string); overload;
 procedure assertClose(value, expected: extended;epsilon: extended=1e-6);
 procedure assertEqual(value, expected: string); overload;

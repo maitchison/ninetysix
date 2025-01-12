@@ -133,6 +133,8 @@ function  clamp(x, a, b: single): single; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
 
+function dosExecute(s: string; showOutput: boolean=false): word;
+
 procedure dumpString(s: string; filename: string);
 function  loadString(filename: string): string;
 
@@ -803,6 +805,19 @@ begin
   for i := 0 to length(lines)-2 do
     result += lines[i] + seperator;
   result += lines[length(lines)-1];
+end;
+
+{execute a command in dos with blocking. Returns dos error code.}
+function dosExecute(s: string; showOutput: boolean=false): word;
+var
+  postfix: string;
+begin
+  if showOutput then
+    postfix := ''
+  else
+    postfix := ' > nul';
+  dos.exec(getEnv('COMSPEC'), '/C '+s+postfix);
+  result := dosExitCode;
 end;
 
 {-------------------------------------------------------------------}

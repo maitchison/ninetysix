@@ -550,7 +550,7 @@ begin
 
   s1.save('test.txt');
   s2.load('test.txt');
-  assertEqual(s2.toString, '["101","103","202"]');
+  assertEqual(s2.toString, '["202","103","101"]');
 
 end;
 

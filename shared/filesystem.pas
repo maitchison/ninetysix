@@ -28,6 +28,7 @@ type
 
     procedure rename(a,b: string);
     procedure delFolder(path: string);
+    procedure delFile(path: string);
 
     function  mkDir(path: string): boolean;
     function  listFiles(path: string): tStringList;
@@ -47,6 +48,11 @@ end;
 procedure tFileSystem.delFolder(path: string);
 begin
   dos.exec(getEnv('COMSPEC'), format('/C deltree /y %s > nul', [path]));
+end;
+
+procedure tFileSystem.delFile(path: string);
+begin
+  dos.exec(getEnv('COMSPEC'), format('/C del %s > nul', [path]));
 end;
 
 function tFileSystem.exists(filename: string): boolean;
@@ -145,7 +151,7 @@ end;
 
 {returns a list of all files in filesystem matching path
 e.g. c:\src\*.pas}
-function tFileSystem.ListFiles(path: string): tStringList;
+function tFileSystem.listFiles(path: string): tStringList;
 var
   sr: SearchRec;
 begin
@@ -161,7 +167,7 @@ begin
 end;
 
 {returns a list of all folders in path}
-function tFileSystem.ListFolders(path: string): tStringList;
+function tFileSystem.listFolders(path: string): tStringList;
 var
   sr: SearchRec;
 begin

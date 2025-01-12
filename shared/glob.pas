@@ -13,7 +13,6 @@ type
 
   {scans a folder and returns list of files matching constraints}
   tGlob = class
-
   protected
     ignoreFolders: tStringList;
     ignoreExtensions: tStringList;
@@ -22,7 +21,7 @@ type
     function isFolderIgnored(folderName: string): boolean;
   public
     procedure loadIgnoreFile(filename: string);
-    function getFiles(path: string; recursive: boolean=true): tStringList;
+    function getFiles(path: string; pattern: string='*.*'; recursive: boolean=true): tStringList;
   end;
 
 implementation
@@ -62,7 +61,7 @@ begin
 end;
 
 {get files. out paths will be relative to path}
-function tGlob.getFiles(path: string; recursive: boolean=true): tStringList;
+function tGlob.getFiles(path: string; pattern: string = '*.*'; recursive: boolean=true): tStringList;
 var
   filename, subfolder: string;
   subfolderFiles: tStringList;
@@ -70,7 +69,7 @@ begin
 
   result.clear();
 
-  for filename in fs.listFiles(joinPath(path, '*.*')) do begin
+  for filename in fs.listFiles(joinPath(path, pattern)) do begin
     if isFileIgnored(filename) then continue;
     result.append(filename);
   end;
@@ -79,7 +78,7 @@ begin
 
   for subfolder in fs.listFolders(path) do begin
     if isFolderIgnored(subfolder) then continue;
-    subfolderFiles := getFiles(joinPath(path, subfolder), true);
+    subfolderFiles := getFiles(joinPath(path, subfolder), pattern, true);
     for filename in subfolderFiles do
       result.append(joinPath(subfolder, filename));
   end;
