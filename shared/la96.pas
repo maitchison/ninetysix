@@ -26,6 +26,7 @@ interface
 
 uses
   utils,
+  types,
   lz4,
   dos,
   sound,
@@ -67,7 +68,7 @@ begin
 
   if sfx.length = 0 then exit;
 
-  samplePtr := sfx.sample;
+  samplePtr := sfx.data;
   samplesRemaining := sfx.length;
 
   lastMidValue := (samplePtr^.left+samplePtr^.right) div 2;
@@ -103,7 +104,7 @@ begin
       inc(samplePtr);
     end;
 
-    {prepair playload}
+    {prepare playload}
     ds.softReset();
     ds.writeVLC(negEncode(firstMidValue));
     ds.writeVLCSegment(midCodes);
@@ -112,7 +113,7 @@ begin
 
     {write block header}
     s.byteAlign();
-    s.writeByte($00);           {type = 16-bit joint stereo.}
+    s.writeByte($00);            {type = 16-bit joint stereo.}
     s.writeWord(1024);           {number of samples}
     s.writeWord(ds.len);         {compressed size}
 

@@ -4,6 +4,7 @@ program aconv;
 uses
   {$I baseunits.inc},
   sound,
+  la96,
   keyboard,
   mix,
   crt;
@@ -123,15 +124,16 @@ var
   SAMPLE_LENGTH: int32;
 begin
 
-  SAMPLE_LENGTH := 44100 * 30;
+  SAMPLE_LENGTH := 44100 * 60;
 
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('..\airtime\res\music1.wav', SAMPLE_LENGTH);
+  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing 320kbps.wav', SAMPLE_LENGTH);
   mixer.play(music16, SCS_FIXED1);
   writeln('Processing.');
   //musicL := butterworth(music16, 16000);
   //musicL := lowPass(music16, 16000);
-  musicL := highPass(music16, 10);
+  musicL := tSoundEffect.loadFromWave('c:\dev\masters\bearing 128kbps.wav', SAMPLE_LENGTH);
+  {musicL := highPass(music16, 10);     }
   musicD := soundDelta(music16, musicL);
   writeln('Done.');
   while true do begin
@@ -144,8 +146,26 @@ begin
   writeln('Exiting.');
 end;
 
+procedure testCompression();
+var
+  music16, musicL, musicD: tSoundEffect;
+  SAMPLE_LENGTH: int32;
+begin
+
+  SAMPLE_LENGTH := 44100 * 30;
+
+  writeln('Loading music.');
+  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing 320kbps.wav', SAMPLE_LENGTH);
+  mixer.play(music16, SCS_FIXED1);
+  writeln('Compressing.');
+
+  encodeLA96(music16).writeToDisk('c:\dev\tools\sample_1.a96');
+
+  writeln('Done.');
+end;
+
 begin
   initKeyboard();
   runTestSuites();
-  go();
+  testCompression();
 end.

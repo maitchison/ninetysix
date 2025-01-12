@@ -92,7 +92,7 @@ type
     length: int32;        // number of samples
     format: tAudioFormat;
 
-    constructor create(aFormat: tAudioFormat; aLength: int32; aTag: string='');
+    constructor create(aFormat: tAudioFormat=AF_16_STEREO; aLength: int32=0; aTag: string='');
     destructor destroy();
 
     function toString(): string;

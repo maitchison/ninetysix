@@ -12,6 +12,7 @@ interface
 
 uses
   test,
+  types,
   debug,
   hashmap,
   stream,

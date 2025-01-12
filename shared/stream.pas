@@ -10,6 +10,7 @@ interface
 uses
   utils,
   debug,
+  types,
   test;
 
 type
