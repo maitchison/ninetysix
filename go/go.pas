@@ -492,6 +492,9 @@ var
   key,value: string;
   didSkip: boolean;
 
+  dayTotal: tDiffStats;
+  dateCode, prevDateCode: string;
+
 var
   csvFile: text;
 begin
@@ -516,7 +519,7 @@ begin
     for line in csvLines do begin
       split(line, ',', key, value);
       if length(key) < 2 then continue;
-      key := copy(key, 2, length(key)-6); {remove ".txt"}
+      key := copy(key, 2, length(key)-2); {remove "}
       csvEntries.setValue(key, value);
     end;
     append(csvFile);
@@ -531,7 +534,19 @@ begin
   old := nil;
   new := nil;
 
+  dayTotal.clear();
+  dateCode := '';
+  prevDateCode := '';
+
   for checkpoint in checkpoints do begin
+
+    dateCode := copy(checkpoint, 1, 8);
+    if (dateCode <> prevDateCode) and (dayTotal.net <> 0) then begin
+      writeln();
+      dayTotal.printShort(8);
+      writeln;
+      dayTotal.clear();
+    end;
 
     write(pad(checkpoint, 40, ' '));
 
@@ -547,6 +562,7 @@ begin
       {do diff against current workspace}
       old := repo.load(checkpoint);
       new := tCheckpoint.create(repo, WORKSPACE);
+      new.date := now();
     end else begin
       if assigned(new) then new.free;
       if didSkip then
@@ -560,6 +576,7 @@ begin
 
     stats := repo.generateCheckpointDiff(old, new).getLineStats();
     stats.printShort(6);
+    dayTotal += stats;
     writeln();
 
     // write stats to file
@@ -574,6 +591,7 @@ begin
 
     counter += 1;
 
+    prevDateCode := dateCode;
     previousCheckpoint := checkpoint;
 
   end;
