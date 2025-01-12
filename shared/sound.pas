@@ -43,6 +43,7 @@ const
 type
   tAudioSample16S = packed record
     left, right: int16;
+    class operator subtract(a,b: tAudioSample16S): tAudioSample16S;
   end;
   tAudioSample8S = packed record
     left, right: uint8;
@@ -145,6 +146,14 @@ begin
     end;
   end;
   exit(AF_INVALID);
+end;
+
+{--------------------------------------------------------}
+
+class operator tAudioSample16S.subtract(a,b: tAudioSample16S): tAudioSample16S;
+begin
+  result.left := a.left - b.left;
+  result.right := a.right - b.right;
 end;
 
 {--------------------------------------------------------}
