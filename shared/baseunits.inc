@@ -1,3 +1,4 @@
+  sysinfo,
   debug,
   watches,
   test,

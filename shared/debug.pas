@@ -68,6 +68,7 @@ implementation
 
 uses
   utils,
+  sysInfo,
   vga;
 
 function tLogEntry.toString(): String;
@@ -339,8 +340,5 @@ begin
   end;
 
   info('[init] Logging');
-
-  cpuInfo.printToLog();
-  logDPMIInfo();
 
 end.

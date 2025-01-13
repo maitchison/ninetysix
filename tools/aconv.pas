@@ -202,23 +202,44 @@ procedure testMemoryLeak4();
 var
   p: pointer;
   i: integer;
-
+  error: boolean;
 begin
   returnNilIfGrowHeapFails := true;
-  writeln(comma(getUsedMemory), ' ', comma(getFreeMemory));
-  writeln('try to allocate: ',hexStr(p));
-  for i := 1 to 25 do begin
+
+  error := false;
+
+  //getMem(p, 64*1024*1024);
+  //freemem(p);
+
+  logFullHeapStatus();
+
+
+  writeln('Used memory:', comma(getUsedMemory div 1024)+'kb');
+  writeln('Free memory:', comma(getFreeMemory div 1024)+'kb');
+
+  for i := 1 to 32 do begin
     p := nil;
     getMem(p, i*1024*1024);
     if p = nil then begin
-      writeln('failed to allocate at '+intToStr(i)+'mb');
+      writeln('!failed to allocate at '+intToStr(i)+'mb');
+      error := true;
       break;
     end else
       freeMem(p);
   end;
+  if not error then begin
+    textAttr := GREEN;
+    writeln('Looks all good');
+  end;
+
+  logFullHeapStatus();
+
+  textAttr := WHITE;
   //writeln('did allocate:    ',hexStr(p));
   //writeln('size:            ',comma(memSize(p)));
-  writeln(comma(getUsedMemory), ' ', comma(getFreeMemory));
+  writeln('Used memory:', comma(getUsedMemory div 1024)+'kb');
+  writeln('Free memory:', comma(getFreeMemory div 1024)+'kb');
+
 end;
 
 begin
@@ -232,4 +253,5 @@ begin
   //testCompression();
   testMemoryLeak4();
   //testMemoryLeak2();
+  textAttr := LIGHTGRAY;
 end.

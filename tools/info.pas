@@ -5,6 +5,8 @@ program info;
 
 uses
   crt,
+  types,
+  sysInfo,
   cpu,
   utils;
 
@@ -476,7 +478,7 @@ begin
   timer.stop(); timer.print();
 
   {this should be just a few cycles}
-  if cpu.getMMXSupport then begin
+  if sysInfo.getMMXSupport then begin
     timer.mode := TM_CYCLES;
     timer.start('EMMS');
     asm
@@ -511,9 +513,9 @@ var
   cpuBrand: string;
 begin
   testInfo('CPUINFO','');
-  showFlag('CPUID' ,cpu.getCPUIDSupport);
+  showFlag('CPUID' ,sysInfo.getCPUIDSupport);
   showFlag('CPU Name' ,getCPUName());
-  showFlag('MMX', cpu.getMMXSupport);
+  showFlag('MMX', sysInfo.getMMXSupport);
 end;
 
 begin
@@ -527,4 +529,3 @@ begin
   testCompilerCorruption();
   testTiming();
 end.
-

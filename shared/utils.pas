@@ -8,6 +8,7 @@ unit utils;
 interface
 
 uses
+  sysinfo,
   dos,
   types,
   go32;
@@ -45,13 +46,6 @@ type
     function HHMMSS(sep: string=':'): string;
   end;
 
-  tCPUInfo = record
-    mhz: single;
-    ram: dword;
-    hasMMX: boolean;
-    procedure printToLog();
-  end;
-
 type
   tStringHelper = record helper for string
     function startsWith(const prefix: string; ignoreCase: boolean = false): boolean;
@@ -60,9 +54,6 @@ type
     function contains(substring: string; ignoreCase: boolean=false): boolean;
     function trim(): string;
   end;
-
-var
-  CPUInfo: tCPUInfo;
 
 {------------------------------------------------}
 { Math replacements}
@@ -94,12 +85,6 @@ procedure delay(ms: double);
 {------------------------------------------------}
 { My custom routines }
 
-{memory stuff}
-function getFreeMemory: int64;
-function getTotalMemory: int64;
-function getUsedMemory: int64;
-procedure logHeapStatus(msg: string='Heap status');
-
 {path stuff}
 function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
@@ -123,8 +108,8 @@ function lpad(s: string;len: int32;padding: char=' '): string;
 function split(s: string; c: char; var left: string; var right: string): boolean;
 function join(lines: array of string;seperator: string='#13#10'): string;
 
-function negDecode(x: dword): int32; inline;
-function negEncode(x: int32): dword; inline;
+function  negDecode(x: dword): int32; inline;
+function  negEncode(x: int32): dword; inline;
 
 function  bytesForBits(x: int32): int32;
 function  toBytes(x: array of dword): tBytes; overload;
@@ -140,15 +125,13 @@ function  clamp16(x: single): int32; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
 
-function dosExecute(s: string; showOutput: boolean=false): word;
+function  dosExecute(s: string; showOutput: boolean=false): word;
 
 procedure dumpString(s: string; filename: string);
 function  loadString(filename: string): string;
 
 function  getTickCount(): int64;
 function  getMSCount(): int64;
-
-procedure logDPMIInfo();
 
 implementation
 
@@ -160,11 +143,6 @@ uses
 var
   SEED: byte;
   programStartTSC: uint64 = 0;
-
-var
-  {updated on initialization, but fall back to 166MHZ on error}
-  INV_CLOCK_FREQ: double = 1.0/(166*1000*1000);
-
 
 {----------------------------------------------------------}
 
@@ -445,45 +423,6 @@ begin
     else
       result += '#('+intToStr(b)+')';
   end;
-end;
-
-{Free memory is avalaible physical memory, which could be less than
- total-used, if, for example, we run from an IDE which retains
- it's allocations.}
-function getFreeMemory: int64;
-var
-  memInfo: tMemInfo;
-begin
-  get_memInfo(memInfo);
-  result := memInfo.available_physical_pages * get_page_size;
-end;
-
-{Total memory is the amount of system memory on the machine.}
-function getTotalMemory: int64;
-var
-  memInfo: tMemInfo;
-begin
-  get_memInfo(memInfo);
-  result := memInfo.total_physical_pages * get_page_size;
-end;
-
-{Used memory is memory used by our heap.}
-function getUsedMemory: int64;
-var
-  hs: tFPCHeapStatus;
-begin
-  result := getFPCHeapStatus().currHeapSize;
-end;
-
-procedure logHeapStatus(msg: string='Heap status');
-begin
-  note(pad(format('--- %s used:%skb free:%skb ',
-    [
-      msg,
-      // total_physical_pages
-      comma(getUsedMemory div 1024),
-      comma(getFreeMemory div 1024)
-    ]), 60, '-'));
 end;
 
 function toLowerCase(const s: string): string;
@@ -792,7 +731,7 @@ end;
 Can be used for very accurate timing measurement}
 function GetSec(): double;
 begin
-  result := (getTSC()-programStartTSC) * INV_CLOCK_FREQ;
+  result := (getTSC()-programStartTSC) * CPUInfo.INV_CLOCK_FREQ;
 end;
 
 procedure dumpString(s: string; filename: string);
@@ -1003,58 +942,6 @@ begin
   result := IntToStr(h, 2, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(s, 2, '0');
 end;
 
-{-------------------------------------------------------------}
-
-procedure updateCPUInfo();
-var
-  memInfo: tMemInfo;
-  totalMem: int64;
-begin
-  cpuInfo.mhz := (1.0 / INV_CLOCK_FREQ) / 1000 / 1000;
-  cpuInfo.hasMMX := cpu.getMMXSupport();
-  get_memInfo(memInfo);
-  cpuInfo.ram := memInfo.total_physical_pages * get_page_size;
-end;
-
-procedure tCPUInfo.printToLog();
-var
-  mmxString: string;
-begin
-  if hasMMX then mmxString := '(MMX)' else mmxString := '';
-  info(format('System is %fMHZ with %fMB ram %s',[mhz, ram/1024/1024, mmxString]));
-end;
-
-{-------------------------------------------------------------}
-
-procedure logDPMIInfo();
-var
-  ver: tDPMIVersionInfo;
-begin
-  go32.get_dpmi_version(ver);
-  log(format('DPMI Version: %d.%d', [ver.major, ver.minor]));
-  note(' - Page size '+comma(get_page_size)+' bytes');
-  if ver.flags and $1 <> $1 then warn(' - 16-bit');
-  if ver.flags and $2 = $2 then warn(' - Real Mode');
-  if ver.flags and $4 = $4 then note(' - Virtual Memory Support');
-end;
-
-{-------------------------------------------------------------}
-
-procedure updateRDTSCRate();
-var
-  tick: int64;
-  startTSC, endTSC: uint64;
-begin
-  tick := getTickCount();
-  while getTickCount() = tick do;
-  startTSC := getTSC;
-  while getTickCount() = tick+1 do;
-  endTSC := getTSC;
-  if (endTSC = startTSC) then
-    warn(format('RDTSC seems to not be working, assuming default of %fMHZ', [(1/INV_CLOCK_FREQ)/1000/1000]))
-  else
-    INV_CLOCK_FREQ := (1/18.2065) / (endTSC - startTSC);
-end;
 
 {--------------------------------------------------------}
 { String helpers}
@@ -1201,10 +1088,8 @@ end;
 {--------------------------------------------------------}
 
 initialization
-  updateRDTSCRate();
   programStartTSC := getTSC();
   SEED := 97;
-  updateCPUInfo();
   tUtilsTest.create('Utils');
 finalization
 
