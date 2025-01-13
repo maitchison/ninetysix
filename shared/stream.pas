@@ -28,13 +28,13 @@ type
     fPos is our current position within the buffer.
     valid bytes are considered to be [0..bytesUsed-1]
 
-    capacity (bytesSize) is always >= fPos
+    capacity (bytesAllocated) is always >= fPos
     using seek(fPos) is a 'soft clear', as in does not change the capacitiy.
     }
 
   protected
     bytes: pByte;
-    bytesSize: int32;   {capacity is how much memory we allocated}
+    bytesAllocated: int32;   {capacity is how much memory we allocated}
     bytesUsed: int32;   {bytesUsed is the number of actual bytes used}
     fPos: int32;        {current position in stream}
     midByte: boolean;
@@ -64,6 +64,8 @@ type
     procedure writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST);
     function  VLCbits(value: dword): word; inline;
 
+    procedure setSize(newSize: int32);
+
     procedure writeChars(s: string);
     procedure writeBytes(aBytes: tBytes;aLen:int32=-1);
 
@@ -88,7 +90,7 @@ type
     procedure reset();
     procedure softReset();
 
-    property  capacity: int32 read bytesSize;
+    property  capacity: int32 read bytesAllocated;
     property  len: int32 read bytesUsed;
     property  pos: int32 read fPos;
 
@@ -167,8 +169,8 @@ end;
 constructor tStream.Create(aInitialCapacity: dword=0);
 begin
   inherited Create();
-  bytesSize := 0;
   bytes := nil;
+  bytesAllocated := 0;
   midByte := False;
   if aInitialCapacity > 0 then
     makeCapacity(aInitialCapacity)
@@ -211,10 +213,10 @@ var
   bytesToCopy: int32;
   blocks: int32;
 begin
-  //stub:
-  //log(format('Update capacity: %d to %d', [bytesSize, newSize]));
 
   blocks := (newSize+1023) div 1024;
+
+  {todo: switch to realloc, (might be faster)}
   getMem(newBytes, blocks*1024);
   bytesToCopy := min(newSize, bytesUsed);
   if bytesToCopy > 0 then
@@ -222,7 +224,7 @@ begin
   if assigned(bytes) then
     freeMem(bytes);
   bytes := newBytes;
-  bytesSize := blocks*1024;
+  bytesAllocated := blocks*1024;
 
   {bytesUsed can not be more than actual buffer size}
   if bytesUsed > newSize then
@@ -232,9 +234,11 @@ end;
 {makes sure the stream has capacity for *atleast* n bytes}
 procedure tStream.makeCapacity(n: dword);
 begin
-  if bytesSize < n then
+  if bytesAllocated < n then
     {resize requires a copy, so always increase size by atleast 5%}
-    setCapacity(max(n, int64(bytesSize)*105 div 100));
+    //stub:
+    //setCapacity(max(n, int64(bytesAllocated)*105 div 100));
+    setCapacity(n);
 end;
 
 {expand (or contract) the length this many bytes}
@@ -273,8 +277,6 @@ begin
     exit;
   end;
   setLength(fPos+1);
-  //stub:
-  log(format('%d %d %d', [dword(bytes), bytesSize, fPos]));
   bytes[fPos] := b;
   inc(fPos);
 end;
@@ -321,6 +323,13 @@ begin
     writeByte(ord(s[i]));
 end;
 
+{expands stream to given new size (or truncates if needed)}
+procedure tStream.setSize(newSize: int32);
+begin
+  setLength(newSize);
+  bytesUsed := newSize
+end;
+
 procedure tStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
 begin
   if aLen < 0 then aLen := length(aBytes);
@@ -328,7 +337,6 @@ begin
   if midByte then error('unaligned write bytes');
   if aLen > length(aBytes) then error('tried writing too many bytes');
   setLength(fPos + aLen);
-
   move(aBytes[0], self.bytes[fPos], aLen);
   inc(fPos, aLen);
 end;
@@ -926,7 +934,6 @@ begin
     for i := 0 to length(testData2)-1 do
       AssertEqual(data[i], testData2[i]);
   end;
-
   testUnpack();
 
   {check vlcsegment standard}
@@ -943,7 +950,6 @@ begin
   s.writeVLCSegment(testData3);
   s.seek(0);
   data := s.readVLCSegment(length(testData3));
-
   s.free;
   for i := 0 to length(testData3)-1 do
     AssertEqual(data[i], testData3[i]);
@@ -1017,7 +1023,6 @@ begin
   for i := 0 to length(testData1)-1 do
     assertEqual(s.readVLC, testData1[i]);
   s.free;
-
 end;
 
 {--------------------------------------------------}
@@ -1025,6 +1030,4 @@ end;
 initialization
   buildUnpackingTables();
   tStreamTest.create('Stream');
-finalization
-
 end.

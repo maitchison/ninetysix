@@ -136,5 +136,12 @@ begin
   error('Empty test suite!');
 end;
 
-begin
+var i: integer;
+
+initialization
+
+finalization
+  for i := 0 to length(testSuites)-1 do begin
+    testSuites[i].free();
+  end;
 end.

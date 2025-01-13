@@ -3,14 +3,15 @@ program aconv;
 
 uses
   {$I baseunits.inc},
-  sound,
-  audioFilter,
-  la96,
-  keyboard,
+  //sound,
+ // audioFilter,
+ // la96,
+ // keyboard,
+  go32,
   stream,
-  mix,
   crt;
 
+  (*
 procedure go();
 var
   music16, musicL, musicD: tSoundEffect;
@@ -55,16 +56,20 @@ begin
   writeln('Done.');
 end;
 
+
+    *)
+
 function mem: int64;
 begin
-  result := getUsedMemory;
+  //result := getUsedMemory;
+  result := getFreeMemory;
 end;
 
 procedure testMemoryLeak1();
 var
   s: tStream;
   initialMem, startMem, endMem, prevMem: int64;
-  i: integer;
+  i: int32;
   data: tBytes;
 begin
 
@@ -85,26 +90,55 @@ begin
   }
 
   data := nil;
-  setLength(data, 4*1024);
+  setLength(data, 8*1024);
 
   {look for memory leak}
   initialMem := mem;
   s := tStream.Create(0);
   startMem := mem;
   prevMem := startMem;
-  for i := 0 to 512-1 do begin
-    if i mod 16 = 0 then begin
-      writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, s.pos]));
+  {try to allocate 16megs (incremental)}
+  {set crashes at about 2000, which is 2megs}
+  {set, free, create crashes at about 4000, which is 4megs}
+  for i := 0 to 16*1024-1 do begin
+    if (prevMem-mem) <> 0 then begin
+      writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, length(data)*i]));
       prevMem := mem;
-    end;
-    s.writeBytes(data);
+    end else
+      writeln(i);
+    //s.writeBytes(data);
+    //s.setSize(length(data)*i);
+    s.free();
+    s := tStream.Create(length(data)*i);
   end;
   s.free;
   endMem := mem;
   writeln(format('Memory still allocated %,', [initialMem-endMem]));
   writeln(format('Initial commit %,', [initialMem-startMem]));
-  repeat until keyDown(key_esc);
+  //repeat until keyDown(key_esc);
 end;
+
+(*
+  log(format('Update capacity: %d to %d %s', [bytesAllocated, newSize, hexStr(myESP)]));
+
+  blocks := (newSize+1023) div 1024;
+
+  getMem(newBytes, blocks*1024);
+  writeln(memSize(newBytes));
+
+  bytesToCopy := min(newSize, bytesUsed);
+  if bytesToCopy > 0 then
+    move(bytes^, newBytes^, bytesToCopy);
+  if assigned(bytes) then
+    freeMem(bytes);
+  bytes := newBytes;
+  bytesAllocated := blocks*1024;
+
+  {bytesUsed can not be more than actual buffer size}
+  if bytesUsed > newSize then
+    bytesUsed := newSize;
+*)
+
 
 procedure testMemoryLeak2();
 var
@@ -127,13 +161,88 @@ begin
     writeln(comma(mem-initialMem));
   end;
 
-  repeat until keyDown(key_esc);
+  //repeat until keyDown(key_esc);
+end;
+
+procedure testMemoryLeak3();
+var
+  s: tStream;
+  initialMem, startMem, endMem, prevMem: int64;
+  i: int32;
+  data: tBytes;
+begin
+
+  data := nil;
+  setLength(data, 8*1024);
+
+  {look for memory leak}
+  initialMem := mem;
+  s := tStream.Create(0);
+  startMem := mem;
+  prevMem := startMem;
+  for i := 0 to 16*1024-1 do begin
+    if (prevMem-mem) <> 0 then begin
+      writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, length(data)*i]));
+      prevMem := mem;
+    end else
+      writeln(i);
+    //s.writeBytes(data);
+    //s.setSize(length(data)*i);
+    s.free();
+    s := tStream.Create(length(data)*i);
+  end;
+  s.free;
+  endMem := mem;
+  writeln(format('Memory still allocated %,', [initialMem-endMem]));
+  writeln(format('Initial commit %,', [initialMem-startMem]));
+  //repeat until keyDown(key_esc);
+end;
+
+procedure testMemoryLeak4();
+var
+  p: pointer;
+  i: integer;
+
+begin
+  returnNilIfGrowHeapFails := true;
+  writeln(comma(getUsedMemory), ' ', comma(getFreeMemory));
+  writeln('try to allocate: ',hexStr(p));
+  for i := 1 to 25 do begin
+    p := nil;
+    getMem(p, i*1024*1024);
+    if p = nil then begin
+      writeln('failed to allocate at '+intToStr(i)+'mb');
+      break;
+    end else
+      freeMem(p);
+  end;
+  //writeln('did allocate:    ',hexStr(p));
+  //writeln('size:            ',comma(memSize(p)));
+  writeln(comma(getUsedMemory), ' ', comma(getFreeMemory));
+end;
+
+procedure printDPMIInfo();
+var
+  ver: tDPMIVersionInfo;
+begin
+  go32.get_dpmi_version(ver);
+  writeln(ver.major,'.',ver.minor);
+  if ver.flags and $1 = 0 then write('[16-bit] ') else write('[32-bit] ');
+  if ver.flags and $2 = 0 then write('[Virtual Mode] ') else write('[Real Mode] ');
+  if ver.flags and $4 = 0 then write('') else write('[Virtual Memory Support] ');
+  writeln();
 end;
 
 begin
-  runTestSuites();
-  initKeyboard();
+  clrscr;
+  textAttr := WHITE;
+
+  printDPMIInfo();
+
+  debug.WRITE_TO_SCREEN := true;
+  //runTestSuites();
+  //initKeyboard();
   //testCompression();
-  testMemoryLeak1();
+  testMemoryLeak4();
   //testMemoryLeak2();
 end.

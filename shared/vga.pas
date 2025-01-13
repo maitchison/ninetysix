@@ -63,10 +63,14 @@ type
     procedure setText(); override;
   end;
 
-var
-  videoDriver: tVideoDriver = nil;
+function videoDriver(): tVideoDriver;
+procedure enableVideoDriver(newVideoDriver: tVideoDriver);
+
 
 implementation
+
+var
+  fVideoDriver: tVideoDriver = nil;
 
 CONST
   USE_80x50: boolean = True;
@@ -194,7 +198,23 @@ end;
 
 {--------------------------------------------------------------}
 
+procedure enableVideoDriver(newVideoDriver: tVideoDriver);
 begin
-  if not assigned(videoDriver) then
-    videoDriver := tVGADriver.create();
+  if assigned(fVideoDriver) then
+    fVideoDriver.free;
+  fVideoDriver := newVideoDriver;
+end;
+
+function videoDriver(): tVideoDriver;
+begin
+  result := fVideoDriver;
+end;
+
+{--------------------------------------------------------------}
+
+initialization
+  if not assigned(fVideoDriver) then
+    enableVideoDriver(tVGADriver.create());
+finalization
+  enableVideoDriver(nil);
 end.
