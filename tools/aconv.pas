@@ -7,6 +7,7 @@ uses
   audioFilter,
   la96,
   keyboard,
+  stream,
   mix,
   crt;
 
@@ -54,8 +55,85 @@ begin
   writeln('Done.');
 end;
 
+function mem: int64;
 begin
-  initKeyboard();
+  result := getUsedMemory;
+end;
+
+procedure testMemoryLeak1();
+var
+  s: tStream;
+  initialMem, startMem, endMem, prevMem: int64;
+  i: integer;
+  data: tBytes;
+begin
+
+  {notes:
+   no change in free memory until 256k allocated
+   no change in used memory until 512k allocated
+
+   }
+
+  {
+   I've allocated 1000*4k blocks, so 4 megs, but this has
+   taken up all 128MB of ram
+
+  For 16 allocations I'm expecting 64k deltas.
+
+  Ok, delta increases... so yeah we have a resizing problem.
+
+  }
+
+  data := nil;
+  setLength(data, 4*1024);
+
+  {look for memory leak}
+  initialMem := mem;
+  s := tStream.Create(0);
+  startMem := mem;
+  prevMem := startMem;
+  for i := 0 to 512-1 do begin
+    if i mod 16 = 0 then begin
+      writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, s.pos]));
+      prevMem := mem;
+    end;
+    s.writeBytes(data);
+  end;
+  s.free;
+  endMem := mem;
+  writeln(format('Memory still allocated %,', [initialMem-endMem]));
+  writeln(format('Initial commit %,', [initialMem-startMem]));
+  repeat until keyDown(key_esc);
+end;
+
+procedure testMemoryLeak2();
+var
+  x: tStream;
+  initialMem: int64;
+  i: integer;
+  data: array of byte;
+begin
+  x := tStream.create();
+  initialMem := mem;
+  writeln(comma(mem-initialMem));
+
+  data := nil;
+  setLength(data, 1024*1024);
+
+  for i := 0 to 15 do begin
+    x := tStream.create();
+    x.writeBytes(data);
+    x.free;
+    writeln(comma(mem-initialMem));
+  end;
+
+  repeat until keyDown(key_esc);
+end;
+
+begin
   runTestSuites();
-  testCompression();
+  initKeyboard();
+  //testCompression();
+  testMemoryLeak1();
+  //testMemoryLeak2();
 end.

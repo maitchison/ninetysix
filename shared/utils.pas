@@ -94,8 +94,13 @@ procedure delay(ms: double);
 {------------------------------------------------}
 { My custom routines }
 
-{path stuff}
+{memory stuff}
+function getFreeMemory: int64;
+function getTotalMemory: int64;
+function getUsedMemory: int64;
 procedure logHeapStatus(msg: string='Heap status');
+
+{path stuff}
 function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
 function extractFilename(const path: string): string;
@@ -261,6 +266,15 @@ begin
             vtInt64: result += IntToStr(a.VInt64^);
             vtExtended: result += IntToStr(trunc(a.VExtended^));
             else Error('Invalid type for %d:'+IntToStr(a.VType));
+          end;
+        end;
+        ',': begin
+          // integer
+          case a.VType of
+            vtInteger: result += comma(a.VInteger);
+            vtInt64: result += comma(a.VInt64^);
+            vtExtended: result += comma(trunc(a.VExtended^));
+            else Error('Invalid type for %,:'+IntToStr(a.VType));
           end;
         end;
         'f': begin
@@ -431,31 +445,42 @@ begin
   end;
 end;
 
-procedure logHeapStatus(msg: string='Heap status');
+{Free memory is avalaible physical memory, which could be less than
+ total-used, if, for example, we run from an IDE which retains
+ it's allocations.}
+function getFreeMemory: int64;
+var
+  memInfo: tMemInfo;
+begin
+  get_memInfo(memInfo);
+  result := memInfo.available_physical_pages * get_page_size;
+end;
+
+{Total memory is the amount of system memory on the machine.}
+function getTotalMemory: int64;
+var
+  memInfo: tMemInfo;
+begin
+  get_memInfo(memInfo);
+  result := memInfo.total_physical_pages * get_page_size;
+end;
+
+{Used memory is memory used by our heap.}
+function getUsedMemory: int64;
 var
   hs: tFPCHeapStatus;
-  memInfo: tMemInfo;
-  usedMem, totalMem, freeMem: int32;
 begin
-  hs:= getFPCHeapStatus();
-  get_memInfo(memInfo);
+  result := getFPCHeapStatus().currHeapSize;
+end;
 
-  {
-  Total memory is the amount of system memory on the machine.
-  Used memory is memory used by our heap.
-  Free memory is avalaible physical memory, which could be less than
-    total-used, if, for example, we run from an IDE which retains
-    it's allocations.
-  }
-  totalMem := memInfo.total_physical_pages * get_page_size;
-  usedMem := hs.currHeapSize;
-  freeMem := memInfo.available_physical_pages * get_page_size;
+procedure logHeapStatus(msg: string='Heap status');
+begin
   note(pad(format('--- %s used:%skb free:%skb ',
     [
       msg,
       // total_physical_pages
-      comma(usedMem div 1024),
-      comma(freeMem div 1024)
+      comma(getUsedMemory div 1024),
+      comma(getFreeMemory div 1024)
     ]), 60, '-'));
 end;
 
@@ -527,7 +552,7 @@ var
   s: string;
   i, j: int32;
 begin
-  s := intToStr(value, width, padding);
+  s := intToStr(abs(value), width, padding);
   result := '';
   for i := length(s) downto 1 do begin
     j := length(s) - i;
@@ -535,6 +560,7 @@ begin
     if (j mod 3 = 2) and (i <> 1) then
       result := ',' + result;
   end;
+  if value < 0 then result := '-'+result;
 end;
 
 function fltToStr(value: extended): string;
@@ -1127,6 +1153,7 @@ begin
   assertEqual(comma(100), '100');
   assertEqual(comma(1200), '1,200');
   assertEqual(comma(987654321), '987,654,321');
+  assertEqual(comma(-987654321), '-987,654,321');
 
   assertEqual(joinPath('c:\dos', 'go.exe'), 'c:\dos\go.exe');
   assertEqual(joinPath('c:\dos\', 'go.exe'), 'c:\dos\go.exe');

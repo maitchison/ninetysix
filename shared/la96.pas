@@ -31,6 +31,7 @@ uses
   types,
   lz4,
   dos,
+  go32,
   sound,
   audioFilter,
   stream;
@@ -75,10 +76,13 @@ var
   counter: int32;
   bytes: tBytes;
 
+  //stub: remove
+  memInfo: tMemInfo;
+
 begin
 
   {guess that we'll need 1 byte per sample, i.e 4:1 compression vs 16bit stereo}
-  if not assigned(s) then s := tStream.create(sfx.length*2);
+  if not assigned(s) then s := tStream.create(sfx.length);
   result := s;
 
   if sfx.length = 0 then exit;
@@ -134,12 +138,19 @@ begin
     s.writeWord(1024);           {number of samples}
     s.writeWord(ds.len);         {compressed size}
 
-    s.writeBytes(ds.getBuffer, ds.len);
+    get_memInfo(memInfo);
+    write(memInfo.available_physical_pages*get_page_size, ' -> ');
+    s.writeBytes(ds.asBytes, ds.len); //todo: remove copy here
+    get_memInfo(memInfo);
+    write(memInfo.available_physical_pages*get_page_size);
+    writeln;
 
-    write('.');
+
+    // stub:
+    //write('.');
 
     //stub:
-    if counter and $ff = 0 then
+    if counter and $f = 0 then
       logHeapStatus(intToStr(counter));
 
     dec(samplesRemaining, 1024);

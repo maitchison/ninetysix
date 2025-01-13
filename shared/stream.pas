@@ -26,22 +26,23 @@ type
     {
     note on position
     fPos is our current position within the buffer.
-    valid bytes are considered to be [0..bytesLen-1]
+    valid bytes are considered to be [0..bytesUsed-1]
 
-    capacity length(bytes) is always >= fPos
+    capacity (bytesSize) is always >= fPos
     using seek(fPos) is a 'soft clear', as in does not change the capacitiy.
     }
 
   protected
-    bytes: tBytes;   {length(bytes) is the capacity}
-    bytesLen: dword; {bytesLen is the number of actual bytes used}
-    fPos: int32;     {current position in stream}
+    bytes: pByte;
+    bytesSize: int32;   {capacity is how much memory we allocated}
+    bytesUsed: int32;   {bytesUsed is the number of actual bytes used}
+    fPos: int32;        {current position in stream}
     midByte: boolean;
 
   private
-    procedure makeCapacity(n: dword); inline;
-    procedure setCapacity(n: dword); inline;
-    procedure setLength(n: dword); inline;
+    procedure makeCapacity(n: dword);
+    procedure setCapacity(newSize: dword);
+    procedure setLength(n: dword);
 
     function getByte(index: dword): byte; inline;
     procedure setByte(index: dword; value: byte); inline;
@@ -84,16 +85,16 @@ type
     procedure writeToDisk(fileName: string);
     procedure readFromDisk(fileName: string);
 
-    function  capacity: int32; inline;
-
     procedure reset();
     procedure softReset();
 
-    property  len: dword read bytesLen;
+    property  capacity: int32 read bytesSize;
+    property  len: int32 read bytesUsed;
     property  pos: int32 read fPos;
 
     function  asBytes: tBytes;
-    function  getBuffer: tBytes;
+    {todo: support weak pointers on locked streams}
+    //function  getBuffer: tBytes;
 
   end;
 
@@ -166,17 +167,17 @@ end;
 constructor tStream.Create(aInitialCapacity: dword=0);
 begin
   inherited Create();
+  bytesSize := 0;
+  bytes := nil;
   midByte := False;
   if aInitialCapacity > 0 then
     makeCapacity(aInitialCapacity)
-  else
-    system.setLength(bytes, 0);
 end;
 
 destructor tStream.Destroy();
 begin
-  system.setLength(bytes, 0);
-  inherited Destroy;
+  freeMem(bytes); bytes := nil;
+  inherited destroy;
 end;
 
 class function tStream.FromFile(filename: string): tStream; static;
@@ -197,27 +198,52 @@ begin
   bytes[index] := value;
 end;
 
-procedure tStream.setCapacity(n: dword); inline;
+{updates stream so that it has this much capacity.
+Will truncate down if needed.
+What get's modified
+ - Pos: no change
+ - ByteSize: >= newSize
+ - ByteUsed: truncated down to newSize
+}
+procedure tStream.setCapacity(newSize: dword);
+var
+  newBytes: pointer;
+  bytesToCopy: int32;
+  blocks: int32;
 begin
-  system.setLength(bytes, n);
-  if bytesLen > length(bytes) then
-    bytesLen := length(bytes); {byteslen can not be more than actual buffer size}
+  //stub:
+  //log(format('Update capacity: %d to %d', [bytesSize, newSize]));
+
+  blocks := (newSize+1023) div 1024;
+  getMem(newBytes, blocks*1024);
+  bytesToCopy := min(newSize, bytesUsed);
+  if bytesToCopy > 0 then
+    move(bytes^, newBytes^, bytesToCopy);
+  if assigned(bytes) then
+    freeMem(bytes);
+  bytes := newBytes;
+  bytesSize := blocks*1024;
+
+  {bytesUsed can not be more than actual buffer size}
+  if bytesUsed > newSize then
+    bytesUsed := newSize;
 end;
 
-procedure tStream.makeCapacity(n: dword); inline;
+{makes sure the stream has capacity for *atleast* n bytes}
+procedure tStream.makeCapacity(n: dword);
 begin
-  if length(bytes) < n then
-    setCapacity(n);
+  if bytesSize < n then
+    {resize requires a copy, so always increase size by atleast 5%}
+    setCapacity(max(n, int64(bytesSize)*105 div 100));
 end;
 
 {expand (or contract) the length this many bytes}
 {note: we never shrink the capacity here.}
-procedure tStream.setLength(n: dword); inline;
+procedure tStream.setLength(n: dword);
 begin
   makeCapacity(n);
-  bytesLen := n;
+  bytesUsed := n;
 end;
-
 
 {------------------------------------------------------}
 
@@ -247,6 +273,8 @@ begin
     exit;
   end;
   setLength(fPos+1);
+  //stub:
+  log(format('%d %d %d', [dword(bytes), bytesSize, fPos]));
   bytes[fPos] := b;
   inc(fPos);
 end;
@@ -298,7 +326,9 @@ begin
   if aLen < 0 then aLen := length(aBytes);
   if aLen = 0 then exit;
   if midByte then error('unaligned write bytes');
+  if aLen > length(aBytes) then error('tried writing too many bytes');
   setLength(fPos + aLen);
+
   move(aBytes[0], self.bytes[fPos], aLen);
   inc(fPos, aLen);
 end;
@@ -405,7 +435,7 @@ var
 begin
   assignFile(f, fileName);
   rewrite(f,1);
-  blockwrite(f, bytes[0], bytesLen, bytesWritten);
+  blockwrite(f, bytes[0], bytesUsed, bytesWritten);
   close(f);
 end;
 
@@ -426,18 +456,12 @@ begin
   if IOError <> 0 then
     Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
 
-  bytes := nil; {todo, is this needed?}
-  system.setLength(bytes, fileSize(f));
-  bytesLen := length(bytes);
-  blockread(f, bytes[0], length(bytes), bytesRead);
+  setCapacity(fileSize(f));
+  bytesUsed := fileSize(f);
+  blockread(f, bytes^, bytesUsed, bytesRead);
   close(f);
   seek(0);
   midByte := False;
-end;
-
-function tStream.capacity(): int32; inline;
-begin
-  result := length(bytes);
 end;
 
 procedure tStream.byteAlign(); inline;
@@ -804,48 +828,24 @@ end;
 
 procedure tStream.reset();
 begin
-  system.setLength(bytes, 0);
-  bytesLen := 0;
+  freeMem(bytes); bytes := nil;
+  bytesUsed := 0;
   seek(0);
 end;
 
 {Reset stream, but keep previous capcity}
 procedure tStream.softReset();
 begin
-  bytesLen := 0;
+  bytesUsed := 0;
   seek(0);
 end;
 
-{gets the bytes buffer}
-function tStream.getBuffer(): tBytes;
-begin
-  exit(bytes);
-end;
-
-
 function tStream.asBytes(): tBytes;
 begin
-  if bytesLen = 0 then
-    exit(nil);
-
-  if bytesLen = length(self.bytes) then
-    {just output a reference}
-    exit(self.bytes);
-
-  {
-  ok, so we have a size missmatch, passing bytes would have the wrong
-  length.
-  We have two options
-    1. Create a fake tBytes with the correct length
-    2. Create a new tBytes and copy accross the data.
-  Option 2 is safest, as I don't know if the runtime will change how
-  dynamic arrays work. Also, option 1 might not work if the object tries
-  to free it's memory.
-  }
-
   result := nil;
-  system.setLength(result, bytesLen);
-  move(bytes[0], result[0], bytesLen);
+  if bytesUsed = 0 then exit;
+  system.setLength(result, bytesUsed);
+  move(bytes^, result[0], bytesUsed);
 end;
 
 {---------------------------------------------------------------}
@@ -1017,6 +1017,7 @@ begin
   for i := 0 to length(testData1)-1 do
     assertEqual(s.readVLC, testData1[i]);
   s.free;
+
 end;
 
 {--------------------------------------------------}
