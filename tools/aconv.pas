@@ -208,11 +208,7 @@ begin
 
   error := false;
 
-  //getMem(p, 64*1024*1024);
-  //freemem(p);
-
   logFullHeapStatus();
-
 
   writeln('Used memory:', comma(getUsedMemory div 1024)+'kb');
   writeln('Free memory:', comma(getFreeMemory div 1024)+'kb');
@@ -228,7 +224,7 @@ begin
       freeMem(p);
   end;
   if not error then begin
-    textAttr := GREEN;
+     textAttr := GREEN;
     writeln('Looks all good');
   end;
 

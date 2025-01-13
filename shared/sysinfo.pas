@@ -48,7 +48,7 @@ var
   mmxString: string;
 begin
   if hasMMX then mmxString := '(MMX)' else mmxString := '';
-  info(format('System is %fMHZ with %fMB ram %s',[mhz, ram/1024/1024, mmxString]));
+  info(format('System is %.0fMHZ with %.0fMB ram %s',[mhz, ram/1024/1024, mmxString]));
 end;
 
 function getRDTSCRate(): double;
@@ -183,10 +183,16 @@ end;
 {-------------------------------------------------------------}
 
 
-{Free memory is avalaible physical memory, which could be less than
- total-used, if, for example, we run from an IDE which retains
- it's allocations.}
+{current free heap memory (assuming heap does not grow anymore)}
 function getFreeMemory: int64;
+var
+  memInfo: tMemInfo;
+begin
+  result := getFPCHeapStatus().currHeapFree;
+end;
+
+{this is basically avalaible memory - current heap size}
+function getFreeSystemMemory: int64;
 var
   memInfo: tMemInfo;
 begin
@@ -208,7 +214,7 @@ function getUsedMemory: int64;
 var
   hs: tFPCHeapStatus;
 begin
-  result := getFPCHeapStatus().currHeapSize;
+  result := getFPCHeapStatus().currHeapUsed;
 end;
 
 procedure logHeapStatus(msg: string='Heap status');
@@ -261,7 +267,29 @@ end;
 
 {-------------------------------------------------------------}
 
+{Attempts to set a fixed size for the heap}
+procedure setFixedHeapSize(size: int64);
+var
+  p: pointer;
+begin
+  getMem(p, size);
+  freemem(p);
+end;
+
+procedure autoSetHeapSize();
+var
+  freeMemMB: int64;
+begin
+  freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
+  freeMemMB := clamp(freeMemMB, 1, 64);
+  log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
+  setFixedHeapSize(freeMemMB*1024*1024);
+end;
+
 initialization
+
+  autoSetHeapSize();
+
   CPUInfo := getCPUInfo();
   cpuInfo.printToLog();
   logDPMIInfo();
