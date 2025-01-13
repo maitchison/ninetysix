@@ -221,25 +221,12 @@ begin
   writeln(comma(getUsedMemory), ' ', comma(getFreeMemory));
 end;
 
-procedure printDPMIInfo();
-var
-  ver: tDPMIVersionInfo;
-begin
-  go32.get_dpmi_version(ver);
-  writeln(ver.major,'.',ver.minor);
-  if ver.flags and $1 = 0 then write('[16-bit] ') else write('[32-bit] ');
-  if ver.flags and $2 = 0 then write('[Virtual Mode] ') else write('[Real Mode] ');
-  if ver.flags and $4 = 0 then write('') else write('[Virtual Memory Support] ');
-  writeln();
-end;
-
 begin
   clrscr;
   textAttr := WHITE;
-
-  printDPMIInfo();
-
   debug.WRITE_TO_SCREEN := true;
+  logDPMIInfo();
+
   //runTestSuites();
   //initKeyboard();
   //testCompression();

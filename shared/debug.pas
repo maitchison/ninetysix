@@ -341,5 +341,6 @@ begin
   info('[init] Logging');
 
   cpuInfo.printToLog();
+  logDPMIInfo();
 
 end.

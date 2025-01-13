@@ -148,6 +148,8 @@ function  loadString(filename: string): string;
 function  getTickCount(): int64;
 function  getMSCount(): int64;
 
+procedure logDPMIInfo();
+
 implementation
 
 uses
@@ -1020,6 +1022,20 @@ var
 begin
   if hasMMX then mmxString := '(MMX)' else mmxString := '';
   info(format('System is %fMHZ with %fMB ram %s',[mhz, ram/1024/1024, mmxString]));
+end;
+
+{-------------------------------------------------------------}
+
+procedure logDPMIInfo();
+var
+  ver: tDPMIVersionInfo;
+begin
+  go32.get_dpmi_version(ver);
+  log(format('DPMI Version: %d.%d', [ver.major, ver.minor]));
+  note(' - Page size '+comma(get_page_size)+' bytes');
+  if ver.flags and $1 <> $1 then warn(' - 16-bit');
+  if ver.flags and $2 = $2 then warn(' - Real Mode');
+  if ver.flags and $4 = $4 then note(' - Virtual Memory Support');
 end;
 
 {-------------------------------------------------------------}
