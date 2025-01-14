@@ -1037,6 +1037,33 @@ end;
 
 {--------------------------------------------------------}
 
+{Attempts to set a fixed size for the heap
+I've found dynamic FPC heap growth does not work well under go32 so
+it's best to just set the heapsize to something large upfront, and
+then never go over this.
+}
+
+procedure setFixedHeapSize(size: int64);
+var
+  p: pointer;
+begin
+  getMem(p, size);
+  freemem(p);
+end;
+
+{set heap size to max memory, minus a little, with a reasonable upper limit}
+procedure autoHeapSize();
+var
+  freeMemMB: int64;
+begin
+  freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
+  freeMemMB := clamp(freeMemMB, 1, 64);
+  log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
+  setFixedHeapSize(freeMemMB*1024*1024);
+end;
+
+{--------------------------------------------------------}
+
 type
   tUtilsTest = class(tTestSuite)
     procedure run; override;
@@ -1126,33 +1153,6 @@ begin
   assertEqual(roundUpToPowerOfTwo(4), 4);
   assertEqual(roundUpToPowerOfTwo(5), 8);
 
-end;
-
-{--------------------------------------------------------}
-
-{Attempts to set a fixed size for the heap
-I've found dynamic FPC heap growth does not work well under go32 so
-it's best to just set the heapsize to something large upfront, and
-then never go over this.
-}
-
-procedure setFixedHeapSize(size: int64);
-var
-  p: pointer;
-begin
-  getMem(p, size);
-  freemem(p);
-end;
-
-{set heap size to max memory, minus a little, with a reasonable upper limit}
-procedure autoHeapSize();
-var
-  freeMemMB: int64;
-begin
-  freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
-  freeMemMB := clamp(freeMemMB, 1, 64);
-  log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
-  setFixedHeapSize(freeMemMB*1024*1024);
 end;
 
 {--------------------------------------------------------}

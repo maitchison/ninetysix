@@ -227,7 +227,7 @@ begin
 
   writeln('--------------------------');
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav');
+  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
 
   mixer.play(music16, SCS_FIXED1);
   mixer.channels[1].looping := true;

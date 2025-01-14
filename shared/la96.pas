@@ -40,12 +40,12 @@ uses
   stream;
 
 type
+
   tAudioCompressionProfile = record
     quantBits: byte; // number of bits to remove 0..16 (0=off)
     ulawBits: byte;  // number of ulaw bits, (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
     filter: byte;    // frequency of low pass filter (in khz) = (0 off).
-    quantType: byte; // 0 = pre divide, 1 = divide and renormalize
   end;
 
   tAudioStreamProcessor = class
@@ -95,16 +95,112 @@ const
   VER_SMALL = 1;
   VER_BIG = 0;
 
+type
+  {fast uLaw calculations via a lookup table}
+  tULawLookup = class
+    encodeTable: tIntList;
+    decodeTable: tIntList;
+    constructor create(bits: byte; log2Mu: byte);
+    function encode(x: int32): int32;
+    function decode(x: int32): int32;
+  end;
+
+
 {-------------------------------------------------------}
 
-function uLaw(x: int16; mu: int32): single;
+{input is -32k..32k, output is -1..1}
+function uLaw(x: int32; mu: int32): single;
 begin
   result := sign(x)*(ln(1.0+abs(mu*x/(32*1024)))/ln(1+mu));
 end;
 
-function uLawInv(y: single; mu: int32): int16;
+{input is -1..1, output is -32k..32k}
+function uLawInv(y: single; mu: int32): int32;
 begin
-  result := clamp16(sign(y)*32*1024/mu*(power(1+mu, abs(y))-1));
+  result := round(sign(y)*32*1024/mu*(power(1+mu, abs(y))-1));
+end;
+
+{--------------}
+
+constructor tULawLookup.create(bits: byte; log2Mu: byte);
+var
+  i: int32;
+  codeSize: int32;
+  mu: int32;
+begin
+  mu := 1 shl log2Mu;
+  codeSize := (1 shl bits);
+  decodeTable := tIntList.create(codeSize+1); {0..codesize (inclusive)}
+  encodeTable := tIntList.create(32*1024+1);
+  for i := 0 to 32*1024 do
+    encodeTable[i] := round(uLaw(i, mu) * codeSize);
+  for i := 0 to codeSize do
+    decodeTable[i] := uLawInv(i / codeSize, mu);
+
+end;
+
+{input is -32k to 32k, output is -2^bits..2^bits}
+{this was often off by 1 due to rounding, so I gave up}
+(*
+function tULawLookup.encode(x: int32): int32;
+var
+  ax, value: int32;
+  left, right, mid: int32;
+begin
+  ax := abs(x);
+  {binary search it}
+  {if value exists is it between [i,j] (inclusive)}
+  left := 0; right := table.len-1;
+  while left <= right do begin
+    mid := (left + right) div 2;
+    value := table[mid];
+    if value = ax then
+      exit(sign(x)*(mid+1) div 2);
+
+    if value < ax then
+      left := mid + 1
+    else
+      right := mid -1;
+  end;
+
+  writeln(left, ' ' , right, ' ' , table.len, ' ', ax, ' ', table[left], ' ' , table[right]);
+
+  if left >= table.len then
+    // too high, return largest value
+    exit(sign(x) * (table.len) div 2);
+
+  if right < 0 then
+    //this can't happen
+    exit(sign(x) * 0);
+
+  // check which side is closer
+  // always go smallest
+  if table[right] < table[left] then
+    exit(sign(x) * (right+1) div 2)
+  else
+    exit(sign(x) * (left+1) div 2)
+  {
+  if (ax - table[right]) < (table[left] - ax) then
+    exit(sign(x) * (right+1) div 2)
+  else
+    exit(sign(x) * (left+1) div 2);
+  }
+
+end;
+*)
+
+{ input is -2^bits..2^bits, output is -32k...32k }
+function tULawLookup.decode(x: int32): int32;
+begin
+  result := decodeTable[abs(x)];
+  if x < 0 then result := -result;
+end;
+
+{input is -32k to 32k, output is -2^bits..2^bits}
+function tULawLookup.encode(x: int32): int32;
+begin
+  result := encodeTable[abs(x)];
+  if x < 0 then result := -result;
 end;
 
 {-------------------------------------------------------}
@@ -221,6 +317,7 @@ var
   maxSamplePtr: pointer;
   aspMid, aspDif: tAudioStreamProcessor;
   midSignCounter, difSignCounter: integer;
+  currentMidSign, currentDifSign: integer;
 
 
   function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
@@ -316,6 +413,9 @@ begin
 
     fillchar(midSignBits, sizeof(midSignBits), 0);
     fillchar(difSignBits, sizeof(difSignBits), 0);
+    currentMidSign := 1;
+    currentDifSign := 1;
+
 
     startTimer('LA96_process');
     for j := 0 to 1023-1 do begin
@@ -326,22 +426,17 @@ begin
       midCodes[j] := abs(aspMid.y);
       difCodes[j] := abs(aspDif.y);
 
-      {note: this is wrong..
-       consider
-        neg zero zero pos,... this will not trigger a change
-        }
-
-      if (aspMid.y * aspMid.prevY) < 0 then begin
-        //stub:
-        write(midSignCounter, ' ');
+      if (sign(aspMid.y) * currentMidSign) < 0 then begin
         midSigns.writeVLC(midSignCounter);
         midSignCounter := 0;
+        currentMidSign *= -1;
       end else
         inc(midSignCounter);
 
-      if (aspDif.y * aspDif.prevY) < 0 then begin
+      if (sign(aspDif.y) * currentDifSign) < 0 then begin
         difSigns.writeVLC(difSignCounter);
         difSignCounter := 0;
+        currentDifSign *= -1;
       end else
         inc(difSignCounter);
 
@@ -353,11 +448,13 @@ begin
     stopTimer('LA96_process');
 
     {stub:}
+    {
     if i mod 4 = 0 then begin
       for k := 0 to 20 do
         write(midCodes[k], ' ');
-      writeln();
+      writeln('!!');
     end;
+    }
 
     {write frame header}
     {todo:}
@@ -414,6 +511,39 @@ begin
   note(format('Encoded size %fKB Original %fKB',[fs.len/1024, 4*sfx.length/1024]));
 end;
 
+{--------------------------------------------------------}
 
+type
+  tLA96Test = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tLA96Test.run();
+var
+  lut: tULawLookup;
+  i: int32;
+const
+  mu = 256;
+  bits = 6;
+  codeSize = 1 shl bits;
 begin
+  {test lookups}
+  lut := tULawLookup.create(bits, round(log2(mu)));
+  for i := -codeSize to codeSize do
+    assertEqual(lut.decode(i), uLawInv(i/codeSize, mu));
+  for i := -1024 to 1024 do begin
+    {check all values -1k..-1k, and also samples from whole range}
+    assertEqual(lut.encode(32*i), round(uLaw(32*i, mu) * codeSize));
+    assertEqual(lut.encode(i), round(uLaw(i, mu) * codeSize));
+  end;
+end;
+
+{--------------------------------------------------------}
+
+initialization
+  tLA96Test.create('LA96');
+finalization
+
 end.
+
+
