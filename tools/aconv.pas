@@ -3,11 +3,10 @@ program aconv;
 
 uses
   {$I baseunits.inc},
-  //sound,
- // audioFilter,
- // la96,
- // keyboard,
-  go32,
+  sound,
+  audioFilter,
+  la96,
+  keyboard,
   stream,
   crt;
 
@@ -64,10 +63,9 @@ begin
   debug.WRITE_TO_SCREEN := true;
   logDPMIInfo();
 
-  //runTestSuites();
-  //initKeyboard();
-  //testCompression();
-  //testMemoryLeak4();
+  runTestSuites();
+  initKeyboard();
+  testCompression();
 
   textAttr := LIGHTGRAY;
 end.

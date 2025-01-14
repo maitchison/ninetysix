@@ -10,6 +10,7 @@ uses
   debug,
   utils,
   sound,
+  sysInfo,
   go32;
 
 CONST

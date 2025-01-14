@@ -32,6 +32,7 @@ uses
   lz4,
   dos,
   go32,
+  sysInfo,
   sound,
   audioFilter,
   stream;

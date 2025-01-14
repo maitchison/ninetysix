@@ -227,10 +227,8 @@ end;
 procedure tStream.makeCapacity(n: dword);
 begin
   if bytesAllocated < n then
-    {resize requires a copy, so always increase size by atleast 5%}
-    //stub:
-    //setCapacity(max(n, int64(bytesAllocated)*105 div 100));
-    setCapacity(n);
+    {resize might require a copy, so always increase size by atleast 5%}
+    setCapacity(max(n, int64(bytesAllocated)*105 div 100));
 end;
 
 {expand (or contract) the length this many bytes}

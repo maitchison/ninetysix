@@ -30,9 +30,10 @@ begin
   prevMem := startMem;
   {allocate up to 16megs}
   for i := 0 to 16*1024-1 do begin
-    if i mod 64 = 0 then
+    if i mod 64 = 0 then begin
       writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, length(data)*i]));
-    prevMem := mem;
+      prevMem := mem;
+    end;
     s.writeBytes(data);
     s.setSize(length(data)*i);
   end;
