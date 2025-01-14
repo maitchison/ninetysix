@@ -33,6 +33,7 @@ uses
   dos,
   go32,
   sysInfo,
+  list,
   sound,
   audioFilter,
   stream;
@@ -45,15 +46,20 @@ type
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile; s: tStream=nil): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=true): tStream;
 
 const
   ACP_LOW: tAudioCompressionProfile = (quantBits:8);
   ACP_MEDIUM: tAudioCompressionProfile = (quantBits:10);
   ACP_HIGH: tAudioCompressionProfile = (quantBits:12);
-  ACP_EXTREME: tAudioCompressionProfile = (quantBits:16); //very nearly lossless.
+  ACP_EXTREME: tAudioCompressionProfile = (quantBits:16); // very nearly lossless.
+  ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:17);
 
 implementation
+
+const
+  VER_SMALL = 1;
+  VER_BIG = 0;
 
 function decodeLA96(s: tStream): tSoundEffect;
 begin
@@ -61,76 +67,110 @@ begin
   {todo: implement decode}
 end;
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile; s: tStream=nil): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=true): tStream;
 var
   i,j: int32;
 
   samplePtr: pAudioSample;
-  samplesRemaining: dword;
 
-  thisMidValue, lastMidValue, firstMidValue: int32;
-  thisDifValue, lastDifValue, firstDifValue: int32;
+  thisMidValue, lastMidValue: int32;
+  thisDifValue, lastDifValue: int32;
 
-  midCodes: array[0..1024-1] of dword;
-  difCodes: array[0..1024-1] of dword;
+  {note: we write 1023 deltas, which is 1024 samples when including
+   the initial value}
+  midCodes: array[0..1023-1] of dword;
+  difCodes: array[0..1023-1] of dword;
 
-  ds: tStream;
+  fs: tStream;  // our file stream
+  ds: tStream;  // our data stream.
+
   counter: int32;
-  bytes: tBytes;
-
-  maxCode, sumCode: int64;
-  meanValue, meanAbsValue: double;
-
-  packBitsMid, packBitsDif: integer;
+  numFrames: int32;
+  startPos: int32;
   shiftAmount: byte;
 
-function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
-asm
-  push cx
-  mov cl, [shiftAmount]
-  mov eax, [x]
-  sar eax, cl
-  pop cx
+  framePtr, frameMid, frameDif: tDwords;
+
+  maxSamplePtr: pointer;
+
+  function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
+  asm
+    push cx
+    mov cl, [shiftAmount]
+    mov eax, [x]
+    sar eax, cl
+    pop cx
+    end;
+
+  procedure incPtr(); inline;
+  begin
+    {once we reach end just write out the last value repeatedly}
+    if samplePtr < maxSamplePtr then
+      inc(samplePtr);
   end;
 
 begin
 
-  {guess that we'll need 2 bytes per sample, i.e 4:1 compression vs 16bit stereo}
-  if not assigned(s) then s := tStream.create(2*sfx.length);
-  result := s;
-
-  if sfx.length = 0 then exit;
-
-  samplePtr := sfx.data;
-  samplesRemaining := sfx.length;
-
-  lastMidValue := (samplePtr^.left+samplePtr^.right) div 2;
-  lastDifValue := (samplePtr^.left-samplePtr^.right) div 2;
-  lastMidValue := lastMidValue;
-  lastDifValue := lastDifValue;
-
-  ds := tStream.create();
-  counter := 0;
-
   assert(profile.quantBits >= 1);
   assert(profile.quantBits <= 17);
+
+  if sfx.length = 0 then exit(nil);
+
+  // Setup out output stream
+  {guess that we'll need 2 bytes per sample, i.e 4:1 compression vs 16bit stereo}
+  fs := tStream.create(2*sfx.length);
+  result := fs;
+
+  // Initialize variables
+  if useLZ4 then
+    {must defer writes and LZ4 doesn't work with streaming yet}
+    ds := tStream.create()
+  else
+    {no compression means we can write directly to the file stream}
+    ds := fs;
+  counter := 0;
+  samplePtr := sfx.data;
+  maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
+  numFrames := (sfx.length + 1023) div 1024;
   {note: 17bits is full precision as we are adding two 16bit values together}
   shiftAmount := (17-profile.quantBits);
-  maxCode := 0;
-  sumCode := 0;
-  meanValue := 0;
-  meanAbsValue := 0;
 
-  while samplesRemaining >= 1024 do begin
+  framePtr := nil;
+  frameMid := nil;
+  frameDif := nil;
+
+  // -------------------------
+  // Write Header
+
+  {write header}
+  startPos := fs.pos;
+  fs.writeChars('AC96');
+  fs.writebyte(VER_SMALL);
+  fs.writebyte(VER_BIG);
+  fs.writeByte($00);    {joint 16bit-stereo}
+  fs.writeByte(byte(useLZ4)); {LZ4 compression}
+  fs.writeDWord(numFrames);
+  fs.writeDWord(sfx.length); // samples might be different if length is not multiple of 1024
+
+  {write reserved header space}
+  while fs.pos < startPos+128 do
+    fs.writeByte(0);
+
+  // -------------------------
+  // Write Frames
+
+  for i := 0 to numFrames-1 do begin
 
     {unfortunately we can not encode any final partial block}
+    lastMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
+    lastDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
+    incPtr();
 
-    firstMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
-    firstDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
-    lastMidValue := firstMidValue;
-    lastDifValue := firstDifValue;
+    framePtr.append(fs.pos);
+    frameMid.append(negEncode(lastMidValue));
+    frameDif.append(negEncode(lastDifValue));
 
-    for j := 0 to 1024-1 do begin
+    for j := 0 to 1023-1 do begin
 
       thisMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
       thisDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
@@ -141,32 +181,30 @@ begin
       lastMidValue := thisMidValue;
       lastDifValue := thisDifValue;
 
-      inc(samplePtr);
+      incPtr();
     end;
 
-    {prepare playload}
-    ds.softReset();
-    ds.writeVLC(negEncode(firstMidValue));
-    packBitsMid := ds.writeVLCSegment(midCodes, PACK_FAST);
-    ds.writeVLC(negEncode(firstDifValue));
-    packBitsDif := ds.writeVLCSegment(difCodes, PACK_FAST);
-
-    {write block header}
-    s.byteAlign();
-    s.writeByte($00);            {type = 16-bit joint stereo.}
-    s.writeWord(1024);           {number of samples}
-    s.writeWord(ds.len);         {compressed size}
-
-    s.writeBytes(ds.asBytes, ds.len); //todo: remove copy here
-
-    dec(samplesRemaining, 1024);
-    inc(counter);
+    {write out frame}
+    ds.writeVLCSegment(midCodes, PACK_BEST);
+    ds.writeVLCSegment(difCodes, PACK_BEST);
 
   end;
 
+  if useLZ4 then
+    //fs.writeBytes(LZ4Compress(ds.asBytes));
+    //stub:
+    fs.writeBytes(ds.asBytes);
+
+  // -------------------------
+  // Write Footer
+  fs.writeVLCSegment(frameMid, PACK_BEST);
+  fs.writeVLCSegment(frameDif, PACK_BEST);
+  fs.writeVLCSegment(framePtr, PACK_BEST);
+
+  {clean up}
   ds.free;
 
-  note(format('Encoded size %fKB Original %fKB',[s.len/1024, 4*sfx.length/1024]));
+  note(format('Encoded size %fKB Original %fKB',[fs.len/1024, 4*sfx.length/1024]));
 end;
 
 
