@@ -11,7 +11,7 @@ type
   tTimer = class
     tag: string;
     startTime: double;
-    elapsed, maxElapsed, avElapsed: double;
+    elapsed, maxElapsed, avElapsed, totalElapsed: double;
     cycles: int32;
     constructor Create(aTag: string);
     procedure reset(aTag: string);
@@ -91,6 +91,7 @@ begin
   maxElapsed := 0;
   avElapsed := 0;
   cycles := 0;
+  totalElapsed := 0;
 end;
 
 procedure tTimer.start();
@@ -114,12 +115,13 @@ begin
     maxElapsed := elapsed
   else
     maxElapsed *= 0.995;
+  totalElapsed += elapsed;
   inc(cycles);
 end;
 
 function tTimer.toString(): string;
 begin
-  result := format('%s: %f (%f)', [tag, elapsed, maxElapsed]);
+  result := format('%s: %f (%f) [total:%f]', [tag, elapsed, maxElapsed, totalElapsed]);
 end;
 
 begin

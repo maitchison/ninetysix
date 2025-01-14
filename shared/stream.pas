@@ -834,14 +834,17 @@ procedure tStream.reset();
 begin
   freeMem(bytes); bytes := nil;
   bytesUsed := 0;
-  seek(0);
+  bytesAllocated := 0;
+  fPos := 0;
+  midByte := false;
 end;
 
 {Reset stream, but keep previous capcity}
 procedure tStream.softReset();
 begin
   bytesUsed := 0;
-  seek(0);
+  fPos := 0;
+  midByte := false;
 end;
 
 function tStream.asBytes(): tBytes;

@@ -8,6 +8,7 @@ uses
   mixLib,
   la96,
   keyboard,
+  timer,
   stream,
   crt;
 
@@ -68,29 +69,24 @@ end;
 
 procedure testCompression();
 var
-  music16, musicX, musicL, musicD: tSoundEffect;
+  music16, musicL, musicD: tSoundEffect;
   SAMPLE_LENGTH: int32;
   profile: tAudioCompressionProfile;
   quantBits: integer;
 begin
 
   writeln('Loading music.');
+  writeln('--------------------------');
   music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav');
 
-  musicX := music16.clone();
-  writeln(format('%f', [getStd(musicX)]));
-
-  mixer.play(musicX, SCS_FIXED1);
+  mixer.play(music16, SCS_FIXED1);
   mixer.channels[1].looping := true;
 
-  // problem: highpass changed music 16?}
-
   writeln('Compressing.');
-  for profile in [ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_EXTREME] do begin
-    write(profile.quantBits,':');
-    encodeLA96(musicX, profile).writeToDisk('c:\dev\tools\sample_'+intToStr(profile.quantBits)+'.a96');
-  end;
+  writeln('--------------------------');
+  encodeLA96(music16, ACP_LOW, true).writeToDisk('c:\dev\tools\out_low_std.a96');
 
+  printTimers();
   writeln('Done.');
 
   delay(3000);

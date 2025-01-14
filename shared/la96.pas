@@ -33,6 +33,7 @@ uses
   dos,
   go32,
   sysInfo,
+  timer,
   list,
   sound,
   audioFilter,
@@ -46,7 +47,7 @@ type
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=true): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
 const
   ACP_LOW: tAudioCompressionProfile = (quantBits:8);
@@ -67,7 +68,7 @@ begin
   {todo: implement decode}
 end;
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=true): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 var
   i,j: int32;
 
@@ -121,9 +122,11 @@ begin
   fs := tStream.create(2*sfx.length);
   result := fs;
 
+  startTimer('LA96');
+
   // Initialize variables
   if useLZ4 then
-    {must defer writes and LZ4 doesn't work with streaming yet}
+    {must defer writes as LZ4 doesn't work with streaming yet}
     ds := tStream.create()
   else
     {no compression means we can write directly to the file stream}
@@ -144,7 +147,7 @@ begin
 
   {write header}
   startPos := fs.pos;
-  fs.writeChars('AC96');
+  fs.writeChars('LA96');
   fs.writebyte(VER_SMALL);
   fs.writebyte(VER_BIG);
   fs.writeByte($00);    {joint 16bit-stereo}
@@ -170,6 +173,7 @@ begin
     frameMid.append(negEncode(lastMidValue));
     frameDif.append(negEncode(lastDifValue));
 
+    startTimer('LA96_process');
     for j := 0 to 1023-1 do begin
 
       thisMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
@@ -183,17 +187,32 @@ begin
 
       incPtr();
     end;
+    stopTimer('LA96_process');
 
     {write out frame}
+    startTimer('LA96_segments');
     ds.writeVLCSegment(midCodes, PACK_BEST);
     ds.writeVLCSegment(difCodes, PACK_BEST);
+    stopTimer('LA96_segments');
 
+    {when using compression every 128k or so write out the compressed data}
+
+    if useLZ4 and (ds.len > 128*1024) then begin
+      writeln('Compressing ',ds.len,' bytes');
+      startTimer('LA96_compress');
+      fs.writeBytes(LZ4Compress(ds.asBytes));
+      ds.reset();
+      stopTimer('LA96_compress');
+      printTimers();
+    end;
   end;
 
-  if useLZ4 then
-    //fs.writeBytes(LZ4Compress(ds.asBytes));
-    //stub:
-    fs.writeBytes(ds.asBytes);
+  if useLZ4 then begin
+    startTimer('LA96_compress');
+    fs.writeBytes(LZ4Compress(ds.asBytes));
+    ds.free;
+    stopTimer('LA96_compress');
+  end;
 
   // -------------------------
   // Write Footer
@@ -201,8 +220,7 @@ begin
   fs.writeVLCSegment(frameDif, PACK_BEST);
   fs.writeVLCSegment(framePtr, PACK_BEST);
 
-  {clean up}
-  ds.free;
+  stopTimer('LA96');
 
   note(format('Encoded size %fKB Original %fKB',[fs.len/1024, 4*sfx.length/1024]));
 end;

@@ -9,15 +9,46 @@ uses
   test,
   debug,
   utils,
+  types,
   list;
 
 type
 
+  tValueOrPointer = record
+    case byte of
+      0: (value: dword);
+      1: (ptr: pDword);
+    end;
+
+  {a simple int list. needed as freepascal dynamic arrays crash if
+   resized too many times...
+
+   A short list will take 8 bytes of memory for 0 or 1 items, with
+   fast local reading. For lists longer it allocates a buffer
+   which has some overhead
+
+   }
+  tShortList = record
+  private
+    fLen: dword;
+    fData: tValueOrPointer;
+  public
+    function  len: int32;
+    procedure init();
+    procedure done();
+    procedure append(x: dword);
+    procedure makeSpace(n: integer);
+    function  getItem(index: int32): dword;
+    procedure setItem(index: int32; x: dword);
+    property  items[index: int32]: dword read getItem write setItem; default;
+  end;
+
   {records multiple instantances of keys.}
   tHashMap = class
     maxBinSize: integer;
-    matches: array[0..65535] of array of dword;
+    matches: array[0..65535] of tShortList;
     constructor create(aMaxBinSize: integer=32);
+    destructor destroy();
     procedure addReference(key: word; pos: dword);
     procedure trim(minPos: dword);
   end;
@@ -67,9 +98,12 @@ function hashD2W(key: dword): word; register; inline; assembler;
 
 implementation
 
+uses
+  sysInfo;
+
 {----------------------------------------}
 
-function hashW2B(x:word): byte; register; inline; assembler;
+function hashW2B(x:word): byte; register; assembler;
 asm
   {ax=x}
   rol al, 4
@@ -77,7 +111,7 @@ asm
   {output = al}
   end;
 
-function hashD2W(key: dword): word; register; inline; assembler;
+function hashD2W(key: dword): word; register; assembler;
 asm
   push bx
   {eax is key}
@@ -131,35 +165,40 @@ end;
 
 {----------------------------------------}
 
-
 constructor tHashMap.create(aMaxBinSize: integer=32);
 begin
   fillchar(matches, sizeof(matches), 0);
   maxBinSize := aMaxBinSize;
 end;
 
+destructor tHashMap.destroy();
+var
+  i: integer;
+begin
+  for i := 0 to 65536-1 do
+    matches[i].done;
+  fillchar(matches, sizeof(matches), 0);
+end;
+
 procedure tHashMap.addReference(key: word; pos: dword);
 begin
-  if (maxBinSize > 0) and (length(matches[key]) >= maxBinSize) then
+  if (maxBinSize > 0) and (matches[key].len >= maxBinSize) then
     exit;
-  SetLength(Matches[key], Length(Matches[Key])+1);
-  Matches[key][Length(Matches[Key])-1] := pos;
+  matches[key].append(pos);
 end;
 
 {Remove old references}
 procedure tHashMap.trim(minPos: dword);
 var
   i,j: int32;
-  newMatches: array of dword;
+  newMatches: tShortList;
 begin
   for i := 0 to 65536-1 do begin
-    newMatches := nil;
-    for j := 0 to length(matches[i])-1 do begin
-      if matches[i][j] >= minPos then begin
-        setLength(newMatches, length(newMatches)+1);
-        newMatches[length(newMatches)-1] := matches[i][j];
-      end;
-    end;
+    newMatches.init();
+    for j := 0 to matches[i].len-1 do
+      if matches[i][j] >= minPos then
+        newMatches.append(matches[i][j]);
+    matches[i].done;
     matches[i] := newMatches;
   end;
 end;
@@ -400,6 +439,8 @@ procedure tHashMapTest.run();
 var
   map: tSparseMap;
   stringMap: tStringToStringMap;
+  hm: tHashMap;
+  i: int32;
 begin
 
   map := tSparseMap.create();
@@ -424,8 +465,83 @@ begin
   assertEqual(stringMap.getValue('fish'), 'good');
   stringMap.free;
 
+  {make sure hashmap is robust}
+  hm := tHashMap.create();
+  for i := 0 to 64*1024 do begin
+    hm.addReference(random(65536), random(256*65536));
+  end;
+  hm.free;
+
 end;
 
+{-------------------------------------------------}
+
+procedure tShortList.init();
+begin
+  self.fLen := 0;
+  self.fData.value := 0;
+end;
+
+function tShortList.len: int32; inline;
+begin
+  result := fLen;
+end;
+
+procedure tShortList.done();
+begin
+  if len > 1 then begin
+    freemem(self.fData.ptr);
+    self.fData.ptr := nil;
+  end;
+  self.fLen := 0;
+  self.fData.value := 0;
+end;
+
+{make room for atleast n elements}
+procedure tShortList.makeSpace(n: integer);
+var
+  newLen: int32;
+  requestedSpace: int32;
+  allocatedSpace: int32;
+begin
+  requestedSpace := roundUpToPowerOfTwo(n);
+  allocatedSpace := roundUpToPowerOfTwo(len);
+  if requestedSpace < allocatedSpace then
+    reallocMem(self.fData.ptr, requestedSpace*4);
+end;
+
+procedure tShortList.append(x: dword);
+begin
+  if fLen = 0 then begin
+    fLen := 1;
+    self.fData.value := x;
+  end else begin
+    makeSpace(fLen+1);
+    self[fLen-1] := x;
+  end;
+end;
+
+function tShortList.getItem(index: int32): dword; inline;
+begin
+  //if index >= len then error('Bounds error on small list');
+  //if index < 0 then error('Bounds error on small list');
+  if fLen = 1 then
+    result := self.fData.value
+  else
+    result := self.fData.ptr[index];
+end;
+
+procedure tShortList.setItem(index: int32; x: dword); inline;
+begin
+  //if index >= fLen then error('Bounds error on small list');
+  //if index < 0 then error('Bounds error on small list');
+  if fLen = 1 then
+    self.fData.value := x
+  else
+    self.fData.ptr[index] := x;
+end;
+
+{-------------------------------------------------}
 
 initialization
   tHashMapTest.create('HashMap');

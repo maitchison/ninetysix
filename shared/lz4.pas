@@ -144,7 +144,7 @@ var
   startSize: int32;
 begin
 
-  startSize := pos;
+  startSize := fPos;
 
   {note: literals may be empty, but match and offset may not}
   {
@@ -182,7 +182,7 @@ begin
 
   {make sure this worked}
   {$IFDEF debug}
-  if (pos - startSize) <> getSequenceSize(matchLength, length(literals)) then
+  if (fPos - startSize) <> getSequenceSize(matchLength, length(literals)) then
     writeln('Invalid block length!');
   {$ENDIF}
 end;
@@ -599,7 +599,7 @@ var
   code: dword;
   bytesMatched: dword;
   srcLen: int32;
-  matches: array of dword;
+  matches: tShortList;
   i,j,k: dword;
 
   bestMatch: array[0..31] of TMatchRecord;
@@ -614,20 +614,19 @@ var
   block: tLZ4Stream;
   map: tHashMap;
 
+  function getCode(pos: int32): word; inline;
+  begin
+    // hash on first 4 bytes, starting from position
+    result := hashD2W(pDWord(@data[pos])^);
+  end;
 
-function getCode(pos: int32): word; inline;
-begin
-  // hash on first 4 bytes, starting from position
-  result := hashD2W(pDWord(@data[pos])^);
-end;
-
-procedure addRef(pos: int32); inline;
-var
-  code: word;
-begin
-  if pos < 0 then exit;
-  map.AddReference(getCode(pos), pos);
-end;
+  procedure addRef(pos: int32); inline;
+  var
+    code: word;
+  begin
+    if pos < 0 then exit;
+    map.AddReference(getCode(pos), pos);
+  end;
 
 begin
 
@@ -635,8 +634,12 @@ begin
 
   {todo: special case for short TBytes (i.e length <= 5)}
 
+  if not assigned(data) then exit; {null input}
+
   map := tHashMap.create(level.maxBinSize);
   srcLen := length(data);
+
+  if srcLen > MAX_BLOCK_SIZE then error('LZ4 max block size is '+intToStr(MAX_BLOCK_SIZE)+'.');
 
   {greedy approach}
 
@@ -676,7 +679,6 @@ begin
       exit(block.asBytes);
     end;
 
-
     fillchar(thisMatch, sizeof(thisMatch), 0);
     fillchar(bestMatch, sizeof(bestMatch), 0);
 
@@ -707,21 +709,11 @@ begin
 
         code := getCode(pos+i);
 
-        {fast path}
-        (*
-        if map.match[code] > 0 then begin
-          thisMatch.pos := map.match[code];
-          thisMatch.length := matchLength(data, pos+i, thisMatch.pos);
-          thisMatch.gain := int32(thisMatch.length) - 3;
-          if thisMatch.gain > 0 then
-            bestMatch[i] := thisMatch;
-        end;*)
-
         fillchar(thisMatch, sizeof(thisMatch), 0);
 
         matches := map.matches[code];
-        if assigned(matches) then begin
-          for j := 0 to length(matches)-1 do begin
+        if matches.len > 0 then begin
+          for j := 0 to matches.len-1 do begin
 
             if (pos - matches[j]) > 65535 then
               {outside of window}

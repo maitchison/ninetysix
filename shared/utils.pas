@@ -64,9 +64,10 @@ function min(a,b,c: single): single; overload;
 function max(a,b: int32): int32; inline; overload;
 function max(a,b,c: int32): int32; overload;
 function max(a,b,c: single): single; overload;
-function Power(Base, Exponent: double): double; inline;
-function Log10(x: double): double;
-function Log2(x: double): double;
+function power(Base, Exponent: double): double; inline;
+function log10(x: double): double;
+function log2(x: double): double;
+function roundUpToPowerOfTwo(x: dword): dword;
 
 {------------------------------------------------}
 { SysUtils replacements}
@@ -202,6 +203,19 @@ end;
 function Log2(x: double): double; inline;
 begin
   result := ln(x) / ln(2);
+end;
+
+function roundUpToPowerOfTwo(x: dword): dword;
+begin
+  if x = 0 then exit(0);
+  dec(x);
+  x := x or (x shr 1);
+  x := x or (x shr 2);
+  x := x or (x shr 4);
+  x := x or (x shr 8);
+  x := x or (x shr 16);
+  inc(x);
+  result := x;
 end;
 
 {----------------------------------------------------------}
@@ -1087,6 +1101,14 @@ begin
   assert(not 'fish'.startsWith('fia'));
 
   assertEqual(join(['a','b'],','), 'a,b');
+
+  {power of two}
+  assertEqual(roundUpToPowerOfTwo(0), 0);
+  assertEqual(roundUpToPowerOfTwo(1), 1);
+  assertEqual(roundUpToPowerOfTwo(2), 2);
+  assertEqual(roundUpToPowerOfTwo(3), 4);
+  assertEqual(roundUpToPowerOfTwo(4), 4);
+  assertEqual(roundUpToPowerOfTwo(5), 8);
 
 end;
 
