@@ -41,9 +41,11 @@ uses
 
 type
   tAudioCompressionProfile = record
-    {we used to have lo and high freq cut, but
-     these did nothing, so I've removed them}
-    quantBits: word;
+    quantBits: byte; // number of bits to remove 0..16 (0=off)
+    ulawBits: byte;  // number of ulaw bits, (0 = off).
+    log2mu: byte;    // log2 of mu parameter (if ulaw is active)
+    filter: byte;    // frequency of low pass filter (in khz) = (0 off).
+    quantType: byte; // 0 = pre divide, 1 = divide and renormalize
   end;
 
   tAudioStreamProcessor = class
@@ -52,16 +54,25 @@ type
     procedure reset(initialValue: int32=0); virtual;
   end;
 
+  {encode the difference between samples}
   tASPDelta = class(tAudioStreamProcessor)
     procedure encode(newX: int32); override;
   end;
 
-  tASPNonLinear = class(tAudioStreamProcessor)
-    currentError: int32;
+  {uLaw on deltas}
+  tASPDeltaULaw = class(tAudioStreamProcessor)
+    log2Mu: byte;
+    uLawBits: byte;
+    currentError: int32;  // to track drift
+    constructor create(uLawBits: byte=8;log2Mu: byte=8);
     procedure encode(newX: int32); override;
   end;
 
-  tASPULaw = class(tAudioStreamProcessor)
+  {delta on uLaw}
+  tASPULawDelta = class(tAudioStreamProcessor)
+    log2Mu: byte;
+    uLawBits: byte;
+    constructor create(uLawBits: byte=8;log2Mu: byte=8);
     procedure encode(newX: int32); override;
   end;
 
@@ -69,11 +80,14 @@ function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
 const
-  ACP_LOW: tAudioCompressionProfile = (quantBits:8);
-  ACP_MEDIUM: tAudioCompressionProfile = (quantBits:10);
-  ACP_HIGH: tAudioCompressionProfile = (quantBits:12);
-  ACP_EXTREME: tAudioCompressionProfile = (quantBits:16); // very nearly lossless.
-  ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:17);
+  ACP_VERYLOW: tAudioCompressionProfile  = (quantBits:10;ulawBits:5;log2Mu:7;filter:16);
+  ACP_LOW: tAudioCompressionProfile      = (quantBits:11;ulawBits:6;log2Mu:7;filter:16);
+  ACP_MEDIUM: tAudioCompressionProfile   = (quantBits:12;ulawBits:7;log2Mu:7;filter:0);
+  ACP_HIGH: tAudioCompressionProfile     = (quantBits:14;ulawBits:8;log2Mu:8;filter:0);
+  ACP_Q10: tAudioCompressionProfile      = (quantBits:10;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q12: tAudioCompressionProfile      = (quantBits:12;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q16: tAudioCompressionProfile      = (quantBits:16;ulawBits:0;log2Mu:0;filter:0);
+  ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:17;ulawBits:0;log2Mu:0;filter:0);
 
 implementation
 
@@ -81,11 +95,17 @@ const
   VER_SMALL = 1;
   VER_BIG = 0;
 
-{stub: remove}
-const
-  MU = 256;
-  BITS = 8;
-  QUANT_BITS = 17;
+{-------------------------------------------------------}
+
+function uLaw(x: int16; mu: int32): single;
+begin
+  result := sign(x)*(ln(1.0+abs(mu*x/(32*1024)))/ln(1+mu));
+end;
+
+function uLawInv(y: single; mu: int32): int16;
+begin
+  result := clamp16(sign(y)*32*1024/mu*(power(1+mu, abs(y))-1));
+end;
 
 {-------------------------------------------------------}
 
@@ -105,6 +125,8 @@ begin
   y := newX;
 end;
 
+{------}
+
 procedure tASPDelta.encode(newX: int32);
 begin
   prevX := x;
@@ -113,68 +135,55 @@ begin
   x := newX;
 end;
 
-function sign(x: int32): int32; overload;
+{------}
+
+constructor tASPDeltaULaw.create(uLawBits: byte=8;log2Mu: byte=8);
 begin
-  if x < 0 then exit(-1);
-  if x > 0 then exit(1);
-  exit(0);
+  self.uLawBits := uLawBits;
+  self.log2Mu := log2Mu;
 end;
 
-function sign(x: single): single; overload;
-begin
-  if x < 0 then exit(-1);
-  if x > 0 then exit(1);
-  exit(0);
-end;
-
-procedure tASPNonLinear.encode(newX: int32);
+procedure tASPDeltaULaw.encode(newX: int32);
 var
   delta: int32;
-  yReal: single;
-  ySqr: int32;
+  yInv: int32;
+  mu: int32;
 begin
+
+  mu := (1 shl log2Mu);
 
   prevX := x;
   prevY := y;
 
   x := newX;
 
-  delta := x - prevX;
-  yReal := sign(delta)*(ln(1.0+abs(MU*delta/(32*1024)))/ln(1+MU));
-
-  y := round(yReal*(1 SHL BITS));
-  ySqr := sign(y) * round(32*1024/MU*power(1+MU, abs(y/(1 SHL BITS)))-1);
-  {account for drift... very slowly}
-  currentError := (prevX+ySqr) - x;
+  delta := clamp16(x - prevX);
+  y := round(ulaw(delta, mu) * (1 shl uLawBits));
+  yInv := uLawInv(y / (1 shl uLawBits), mu);
+  currentError := (prevX+yInv) - x;
   if currentError > abs(y) then dec(y);
   if currentError < -abs(y) then inc(y);
 
 end;
 
-function uLaw(x: int32): single;
+{------}
+
+constructor tASPULawDelta.create(uLawBits: byte=8;log2Mu: byte=8);
 begin
-  result := sign(x)*(ln(1.0+abs(MU*x/(32*1024)))/ln(1+MU));
+  self.uLawBits := uLawBits;
+  self.log2Mu := log2Mu;
 end;
 
-function uLawInv(y: single): single;
-begin
-  result := sign(y) * round(32*1024/MU*(power(1+MU, abs(y))-1));
-end;
-
-procedure tASPULaw.encode(newX: int32);
+procedure tASPULawDelta.encode(newX: int32);
 var
   thisU, prevU: int32;
 begin
-
   prevX := x;
   prevY := y;
-
-  thisU := round(uLaw(newX) * (1 shl BITS));
-  prevU := round(uLaw(prevX) * (1 shl BITS));
-
+  thisU := round(uLaw(newX, 1 shl log2Mu)  * (1 shl uLawBits));
+  prevU := round(uLaw(prevX, 1 shl log2Mu) * (1 shl uLawBits));
   x := newX;
   y := thisU - prevU;
-
 end;
 
 {-------------------------------------------------------}
@@ -187,7 +196,7 @@ end;
 
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 var
-  i,j: int32;
+  i,j,k: int32;
 
   samplePtr: pAudioSample;
 
@@ -232,8 +241,8 @@ var
 
 begin
 
-  assert(profile.quantBits >= 1);
-  assert(profile.quantBits <= 17);
+  assert(profile.quantBits >= 0);
+  assert(profile.quantBits <= 16);
 
   if sfx.length = 0 then exit(nil);
 
@@ -259,17 +268,11 @@ begin
   midSigns := tStream.create();
   difSigns := tStream.create();
 
-  //stub: for ulaw
-  profile.quantBits := QUANT_BITS;
-
-  {note: 17bits is full precision as we are adding two 16bit values together}
-  shiftAmount := (17-profile.quantBits);
-
   framePtr := nil;
   frameMid := nil;
   frameDif := nil;
 
-  //aspMid := tASPULaw.create();
+  //aspMid := tASPULaw.create(profile.ulawBits, profile.mu);
   //aspDif := tASPUlaw.create();
   aspMid := tASPDelta.create();
   aspDif := tASPDelta.create();
@@ -350,8 +353,14 @@ begin
     stopTimer('LA96_process');
 
     {stub:}
-    if i mod 4 = 0 then
-      writeln(midCodes[0], ' ', midCodes[1], ' ', midCodes[2], ' ', midCodes[3]);
+    if i mod 4 = 0 then begin
+      for k := 0 to 20 do
+        write(midCodes[k], ' ');
+      writeln();
+    end;
+
+    {write frame header}
+    {todo:}
 
     {write out frame}
     startTimer('LA96_segments');

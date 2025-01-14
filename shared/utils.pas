@@ -111,6 +111,8 @@ function join(lines: array of string;seperator: string='#13#10'): string;
 
 function  negDecode(x: dword): int32; inline;
 function  negEncode(x: int32): dword; inline;
+function  sign(x: int32): int32; overload;
+function  sign(x: single): single; overload;
 
 function  bytesForBits(x: int32): int32;
 function  toBytes(x: array of dword): tBytes; overload;
@@ -816,6 +818,20 @@ begin
     postfix := ' > nul';
   dos.exec(getEnv('COMSPEC'), '/C '+s+postfix);
   result := dosExitCode;
+end;
+
+function sign(x: int32): int32; overload;
+begin
+  if x < 0 then exit(-1);
+  if x > 0 then exit(1);
+  exit(0);
+end;
+
+function sign(x: single): single; overload;
+begin
+  if x < 0 then exit(-1);
+  if x > 0 then exit(1);
+  exit(0);
 end;
 
 {-------------------------------------------------------------------}
