@@ -12,7 +12,14 @@ uses
   stream,
   crt;
 
-function sign(x: integer): integer;
+function sign(x: integer): integer; overload;
+begin
+  if x < 0 then exit(-1);
+  if x > 0 then exit(1);
+  exit(0);
+end;
+
+function sign(x: single): integer; overload;
 begin
   if x < 0 then exit(-1);
   if x > 0 then exit(1);
@@ -87,6 +94,73 @@ begin
 
 end;
 
+
+{
+Settings
+
+ULow:
+UMedium:     12bit-256-7    (3.1x?)
+UHigh:
+
+(no ulaw)
+QLow:   8bit      (3.0x) (sounds terriable)
+QMed:   10bit;    (2.2x) (not bad)
+QHigh:  12bit;    (1.7x) (I can't tell the difference)
+
+(no ulaw)
+QNearlossless: 16bit;  (1.2x)
+Qlossless: 17bit;      (?.?x)
+}
+const
+  MU = 128;
+  ULAW_BITS = 7;
+  QUANT_BITS = 12;
+  DIV_FACTOR = 1 SHL (16-QUANT_BITS);
+  EMA = 0; {0=off, 0.9 = very strong}
+
+{input is -32k..32k, output is -1..1}
+function uLaw(x: int32): single;
+begin
+  result := sign(x)*(ln(1.0+abs(MU*x/(32*1024)))/ln(1+MU));
+end;
+
+{input is -1..1, output is -32k..32k}
+function uLawInv(y: single): single;
+begin
+  result := sign(y) * round(32*1024/MU*(power(1+MU, abs(y))-1));
+end;
+
+function applyDeltaULaw2(sfx: tSoundEffect): tSoundEffect;
+var
+  i: integer;
+  uLeft, uRight: single;
+  sample: tAudioSample16S;
+  xLeft, xRight: single;
+  centerLeft, centerRight: single;
+begin
+  result := sfx.clone();
+  centerLeft := 0; centerRight := 0;
+  for i := 0 to sfx.length-1 do begin
+    sample := sfx[i];
+    uLeft  := round(uLaw((sample.left-round(centerLeft)) div DIV_FACTOR)  * (1 shl ULAW_BITS)) / (1 shl ULAW_BITS);
+    uRight := round(uLaw((sample.right-round(centerRight)) div DIV_FACTOR) * (1 shl ULAW_BITS)) / (1 shl ULAW_BITS);
+    {ema only needed for low quality mode}
+    xLeft := EMA * xLeft + (1-EMA) * clamp16((uLawInv(uLeft) * DIV_FACTOR)+round(centerLeft));
+    xRight := EMA * xRight + (1-EMA) * clamp16((uLawInv(uRight) * DIV_FACTOR)+round(centerRight));
+
+    {xLeft  := uLawInv(uLeft) * DIV_FACTOR;
+    xRight := uLawInv(uRight) * DIV_FACTOR;}
+    sample.left  := clamp16(xLeft);
+    sample.right := clamp16(xRight);
+    {roughly 100hz}
+    {I think this will kill the compression ratio though}
+    centerLeft := 0.985 * centerLeft + 0.015 * sample.left;
+    centerRight := 0.985 * centerRight + 0.015 * sample.right;
+    result[i] := sample;
+  end;
+
+end;
+
 procedure go();
 var
   music16, musicL, musicD: tSoundEffect;
@@ -102,7 +176,7 @@ begin
   //musicL := afButterworth(music16, 16000);
   //musicL := afLowPass(music16, 16000);
   //musicL := tSoundEffect.loadFromWave('c:\dev\masters\bearing 128kbps.wav', SAMPLE_LENGTH);
-  musicL := applyDeltaULaw(music16);
+  musicL := applyDeltaULaw2(music16);
   {musicL := afHighPass(music16, 10);     }
   musicD := afDelta(music16, musicL);
   writeln('Done.');
@@ -160,7 +234,7 @@ begin
 
   writeln('--------------------------');
   writeln('Compressing.');
-  encodeLA96(music16, ACP_LOW).writeToDisk('c:\dev\tools\out_low_std.a96');
+  encodeLA96(music16, ACP_LOW, False).writeToDisk('c:\dev\tools\out_low_std.a96');
 
   printTimers();
   writeln('Done.');
@@ -180,8 +254,8 @@ begin
   runTestSuites();
   initKeyboard();
 
-  //testCompression();
-  go();
+  testCompression();
+  //go();
 
   textAttr := LIGHTGRAY;
 

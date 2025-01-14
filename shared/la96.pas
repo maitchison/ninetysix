@@ -61,6 +61,10 @@ type
     procedure encode(newX: int32); override;
   end;
 
+  tASPULaw = class(tAudioStreamProcessor)
+    procedure encode(newX: int32); override;
+  end;
+
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
@@ -76,6 +80,12 @@ implementation
 const
   VER_SMALL = 1;
   VER_BIG = 0;
+
+{stub: remove}
+const
+  MU = 256;
+  BITS = 8;
+  QUANT_BITS = 17;
 
 {-------------------------------------------------------}
 
@@ -99,11 +109,18 @@ procedure tASPDelta.encode(newX: int32);
 begin
   prevX := x;
   prevY := y;
-  y := newX - x;
+  y := newX - prevX;
   x := newX;
 end;
 
-function sign(x: single): single;
+function sign(x: int32): int32; overload;
+begin
+  if x < 0 then exit(-1);
+  if x > 0 then exit(1);
+  exit(0);
+end;
+
+function sign(x: single): single; overload;
 begin
   if x < 0 then exit(-1);
   if x > 0 then exit(1);
@@ -112,45 +129,52 @@ end;
 
 procedure tASPNonLinear.encode(newX: int32);
 var
-  jumpDelta: int32;
-  yErr: int32;
+  delta: int32;
   yReal: single;
+  ySqr: int32;
 begin
-
-  {
-  all zeros
-
-  newX = 10
-  prevX = 0
-  prevY = 0
-  jumpDelta = 10-0 = 10
-  yReal := sqrt(10)*1 = 3.3
-  if 0 > 3 no
-  if 0 < -3 no
-  y := 3
-  yErr := 9 - 10 = -1
-  currentError += -1 (=-1)
-  }
-
 
   prevX := x;
   prevY := y;
 
-  {try to represent the actual delta we observed in x}
-  jumpDelta := newX - x;
+  x := newX;
 
-  yReal := sqrt(abs(jumpDelta)) * sign(jumpDelta);
+  delta := x - prevX;
+  yReal := sign(delta)*(ln(1.0+abs(MU*delta/(32*1024)))/ln(1+MU));
 
+  y := round(yReal*(1 SHL BITS));
+  ySqr := sign(y) * round(32*1024/MU*power(1+MU, abs(y/(1 SHL BITS)))-1);
   {account for drift... very slowly}
-  if currentError > abs(yReal) then yReal -= 0.5;
-  if currentError < -abs(yReal) then yReal += 0.5;
+  currentError := (prevX+ySqr) - x;
+  if currentError > abs(y) then dec(y);
+  if currentError < -abs(y) then inc(y);
 
-  y := round(yReal);
+end;
 
-  yErr := y*y - newX;
-  currentError += yErr;
+function uLaw(x: int32): single;
+begin
+  result := sign(x)*(ln(1.0+abs(MU*x/(32*1024)))/ln(1+MU));
+end;
+
+function uLawInv(y: single): single;
+begin
+  result := sign(y) * round(32*1024/MU*(power(1+MU, abs(y))-1));
+end;
+
+procedure tASPULaw.encode(newX: int32);
+var
+  thisU, prevU: int32;
+begin
+
+  prevX := x;
+  prevY := y;
+
+  thisU := round(uLaw(newX) * (1 shl BITS));
+  prevU := round(uLaw(prevX) * (1 shl BITS));
 
   x := newX;
+  y := thisU - prevU;
+
 end;
 
 {-------------------------------------------------------}
@@ -173,22 +197,22 @@ var
    the initial value}
   midCodes: array[0..1023-1] of dword;
   difCodes: array[0..1023-1] of dword;
+  midSignBits: array[0..1023-1] of dword;
+  difSignBits: array[0..1023-1] of dword;
 
   fs: tStream;  // our file stream
   ds: tStream;  // our data stream.
+  midSigns, difSigns: tStream;
 
   counter: int32;
   numFrames: int32;
   startPos: int32;
   shiftAmount: byte;
-
-  signChanges: integer;
-
   framePtr, frameMid, frameDif: tDwords;
-
   maxSamplePtr: pointer;
-
   aspMid, aspDif: tAudioStreamProcessor;
+  midSignCounter, difSignCounter: integer;
+
 
   function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
   asm
@@ -231,6 +255,13 @@ begin
   samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + 1023) div 1024;
+
+  midSigns := tStream.create();
+  difSigns := tStream.create();
+
+  //stub: for ulaw
+  profile.quantBits := QUANT_BITS;
+
   {note: 17bits is full precision as we are adding two 16bit values together}
   shiftAmount := (17-profile.quantBits);
 
@@ -238,8 +269,10 @@ begin
   frameMid := nil;
   frameDif := nil;
 
-  aspMid := tASPNonLinear.create();
-  aspDif := tASPNonLinear.create();
+  //aspMid := tASPULaw.create();
+  //aspDif := tASPUlaw.create();
+  aspMid := tASPDelta.create();
+  aspDif := tASPDelta.create();
 
   // -------------------------
   // Write Header
@@ -272,7 +305,14 @@ begin
     frameMid.append(negEncode(aspMid.y));
     frameDif.append(negEncode(aspDif.y));
 
-    signChanges := 0;
+    midSignCounter := 0;
+    difSignCounter := 0;
+
+    midSigns.softReset();
+    difSigns.softReset();
+
+    fillchar(midSignBits, sizeof(midSignBits), 0);
+    fillchar(difSignBits, sizeof(difSignBits), 0);
 
     startTimer('LA96_process');
     for j := 0 to 1023-1 do begin
@@ -280,16 +320,38 @@ begin
       aspMid.encode(quant(samplePtr^.left+samplePtr^.right, shiftAmount));
       aspDif.encode(quant(samplePtr^.left-samplePtr^.right, shiftAmount));
 
-      if (aspMid.y * aspMid.prevY) < 0 then inc(signChanges);
+      midCodes[j] := abs(aspMid.y);
+      difCodes[j] := abs(aspDif.y);
 
-      midCodes[j] := negEncode(aspMid.y);
-      difCodes[j] := negEncode(aspDif.y);
+      {note: this is wrong..
+       consider
+        neg zero zero pos,... this will not trigger a change
+        }
+
+      if (aspMid.y * aspMid.prevY) < 0 then begin
+        //stub:
+        write(midSignCounter, ' ');
+        midSigns.writeVLC(midSignCounter);
+        midSignCounter := 0;
+      end else
+        inc(midSignCounter);
+
+      if (aspDif.y * aspDif.prevY) < 0 then begin
+        difSigns.writeVLC(difSignCounter);
+        difSignCounter := 0;
+      end else
+        inc(difSignCounter);
+
+      if aspMid.y < 0 then midSignBits[j] := 1;
+      if aspDif.y < 0 then difSignBits[j] := 1;
 
       incPtr();
     end;
     stopTimer('LA96_process');
 
-    write(signChanges, ' ');
+    {stub:}
+    if i mod 4 = 0 then
+      writeln(midCodes[0], ' ', midCodes[1], ' ', midCodes[2], ' ', midCodes[3]);
 
     {write out frame}
     startTimer('LA96_segments');
@@ -297,8 +359,21 @@ begin
     ds.writeVLCSegment(difCodes, PACK_BEST);
     stopTimer('LA96_segments');
 
-    {when using compression every 128k or so write out the compressed data}
+    {write signs}
+    {if it's more efficent to just write out the bits then do that
+     instead}
+    if midSigns.len > (1024 div 8) then
+      ds.writeVLCSegment(midSignBits)
+    else
+      ds.writeBytes(midSigns.asBytes);
+    if midSigns.len > (1024 div 8) then
+      ds.writeVLCSegment(difSignBits)
+    else
+      ds.writeBytes(difSigns.asBytes);
 
+    write('.');
+
+    {when using compression every 128k or so write out the compressed data}
     if useLZ4 and (ds.len > 128*1024) then begin
       writeln('Compressing ',ds.len,' bytes');
       startTimer('LA96_compress');
@@ -321,6 +396,9 @@ begin
   fs.writeVLCSegment(frameMid, PACK_BEST);
   fs.writeVLCSegment(frameDif, PACK_BEST);
   fs.writeVLCSegment(framePtr, PACK_BEST);
+
+  midSigns.free;
+  difSigns.free;
 
   stopTimer('LA96');
 
