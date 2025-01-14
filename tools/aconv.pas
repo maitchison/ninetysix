@@ -11,7 +11,6 @@ uses
   stream,
   crt;
 
-  (*
 procedure go();
 var
   music16, musicL, musicD: tSoundEffect;
@@ -56,112 +55,6 @@ begin
   writeln('Done.');
 end;
 
-
-    *)
-
-function mem: int64;
-begin
-  result := getUsedMemory;
-end;
-
-{test appending to stream}
-procedure testMemoryLeak1();
-var
-  s: tStream;
-  initialMem, startMem, endMem, prevMem: int64;
-  i: int32;
-  data: tBytes;
-begin
-
-  data := nil;
-  setLength(data, 1*1024);
-
-  {look for memory leak}
-  initialMem := mem;
-  s := tStream.Create(0);
-  startMem := mem;
-  prevMem := startMem;
-  {allocate up to 16megs}
-  for i := 0 to 16*1024-1 do begin
-    if i mod 64 = 0 then
-      writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, length(data)*i]));
-    prevMem := mem;
-    s.writeBytes(data);
-    s.setSize(length(data)*i);
-  end;
-  s.free;
-  endMem := mem;
-  writeln(format('Memory still allocated %,', [initialMem-endMem]));
-  writeln(format('Initial commit %,', [initialMem-startMem]));
-   //repeat until keyDown(key_esc);
-end;
-
-
-procedure testMemoryLeak2();
-var
-  x: tStream;
-  initialMem: int64;
-  i: integer;
-  data: array of byte;
-begin
-  x := tStream.create();
-  initialMem := mem;
-  writeln(comma(mem-initialMem));
-
-  data := nil;
-  setLength(data, 1024*1024);
-
-  for i := 0 to 15 do begin
-    x := tStream.create();
-    x.writeBytes(data);
-    x.free;
-    writeln(comma(mem-initialMem));
-  end;
-
-  //repeat until keyDown(key_esc);
-end;
-
-{test incremental mememory allocations}
-procedure testMemoryLeak4();
-var
-  p: pointer;
-  i: integer;
-  error: boolean;
-begin
-  returnNilIfGrowHeapFails := true;
-
-  error := false;
-
-  logFullHeapStatus();
-
-  writeln('Used memory:', comma(getUsedMemory div 1024)+'kb');
-  writeln('Free memory:', comma(getFreeMemory div 1024)+'kb');
-
-  for i := 1 to 32 do begin
-    p := nil;
-    getMem(p, i*1024*1024);
-    if p = nil then begin
-      writeln('!failed to allocate at '+intToStr(i)+'mb');
-      error := true;
-      break;
-    end else
-      freeMem(p);
-  end;
-  if not error then begin
-     textAttr := GREEN;
-    writeln('Looks all good');
-  end;
-
-  logFullHeapStatus();
-
-  textAttr := WHITE;
-  //writeln('did allocate:    ',hexStr(p));
-  //writeln('size:            ',comma(memSize(p)));
-  writeln('Used memory:', comma(getUsedMemory div 1024)+'kb');
-  writeln('Free memory:', comma(getFreeMemory div 1024)+'kb');
-
-end;
-
 begin
 
   autoSetHeapSize();
@@ -175,6 +68,6 @@ begin
   //initKeyboard();
   //testCompression();
   //testMemoryLeak4();
-  testMemoryLeak1();
+
   textAttr := LIGHTGRAY;
 end.

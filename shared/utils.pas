@@ -135,7 +135,7 @@ function  getMSCount(): int64;
 
 {heap stuff}
 procedure setFixedHeapSize(size: int64);
-procedure autoSetHeapSize();
+procedure autoHeapSize();
 
 
 implementation
@@ -1092,7 +1092,12 @@ end;
 
 {--------------------------------------------------------}
 
-{Attempts to set a fixed size for the heap}
+{Attempts to set a fixed size for the heap
+I've found dynamic FPC heap growth does not work well under go32 so
+it's best to just set the heapsize to something large upfront, and
+then never go over this.
+}
+
 procedure setFixedHeapSize(size: int64);
 var
   p: pointer;
@@ -1101,7 +1106,8 @@ begin
   freemem(p);
 end;
 
-procedure autoSetHeapSize();
+{set heap size to max memory, minus a little, with a reasonable upper limit}
+procedure autoHeapSize();
 var
   freeMemMB: int64;
 begin
