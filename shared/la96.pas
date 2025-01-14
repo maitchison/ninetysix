@@ -46,6 +46,16 @@ type
     quantBits: word;
   end;
 
+  tAudioStreamProcessor = class
+    x, prevX, y, prevY: int32;
+    procedure encode(newX: int32); virtual;
+    procedure reset(initialValue: int32=0); virtual;
+  end;
+
+  tASPDelta = class(tAudioStreamProcessor)
+    procedure encode(newX: int32); override;
+  end;
+
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
@@ -62,6 +72,34 @@ const
   VER_SMALL = 1;
   VER_BIG = 0;
 
+{-------------------------------------------------------}
+
+procedure tAudioStreamProcessor.reset(initialValue: int32=0);
+begin
+  x := initialValue;
+  y := initialValue;
+  prevX := 0;
+  prevY := 0;
+end;
+
+procedure tAudioStreamProcessor.encode(newX: int32);
+begin
+  prevX := x;
+  x := newX;
+  prevY := y;
+  y := newX;
+end;
+
+procedure tASPDelta.encode(newX: int32);
+begin
+  prevX := x;
+  x := newX;
+  prevY := y;
+  x := newX - x;
+end;
+
+{-------------------------------------------------------}
+
 function decodeLA96(s: tStream): tSoundEffect;
 begin
   result := tSoundEffect.create();
@@ -74,8 +112,7 @@ var
 
   samplePtr: pAudioSample;
 
-  thisMidValue, lastMidValue: int32;
-  thisDifValue, lastDifValue: int32;
+  thisMidValue, thisDifValue: int32;
 
   {note: we write 1023 deltas, which is 1024 samples when including
    the initial value}
@@ -93,6 +130,8 @@ var
   framePtr, frameMid, frameDif: tDwords;
 
   maxSamplePtr: pointer;
+
+  aspMid, aspDif: tAudioStreamProcessor;
 
   function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
   asm
@@ -142,6 +181,9 @@ begin
   frameMid := nil;
   frameDif := nil;
 
+  aspMid := tASPDelta.create();
+  aspDif := tASPDelta.create();
+
   // -------------------------
   // Write Header
 
@@ -165,25 +207,22 @@ begin
   for i := 0 to numFrames-1 do begin
 
     {unfortunately we can not encode any final partial block}
-    lastMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
-    lastDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
+    aspMid.reset(quant(samplePtr^.left+samplePtr^.right, shiftAmount));
+    aspDif.reset(quant(samplePtr^.left-samplePtr^.right, shiftAmount));
     incPtr();
 
     framePtr.append(fs.pos);
-    frameMid.append(negEncode(lastMidValue));
-    frameDif.append(negEncode(lastDifValue));
+    frameMid.append(negEncode(aspMid.y));
+    frameDif.append(negEncode(aspDif.y));
 
     startTimer('LA96_process');
     for j := 0 to 1023-1 do begin
 
-      thisMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
-      thisDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
+      aspMid.encode(quant(samplePtr^.left+samplePtr^.right, shiftAmount));
+      aspDif.encode(quant(samplePtr^.left-samplePtr^.right, shiftAmount));
 
-      midCodes[j] := negEncode(thisMidValue-lastMidValue);
-      difCodes[j] := negEncode(thisDifValue-lastDifValue);
-
-      lastMidValue := thisMidValue;
-      lastDifValue := thisDifValue;
+      midCodes[j] := negEncode(aspMid.y);
+      difCodes[j] := negEncode(aspDif.y);
 
       incPtr();
     end;

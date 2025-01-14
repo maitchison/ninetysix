@@ -75,16 +75,16 @@ var
   quantBits: integer;
 begin
 
-  writeln('Loading music.');
   writeln('--------------------------');
+  writeln('Loading music.');
   music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav');
 
   mixer.play(music16, SCS_FIXED1);
   mixer.channels[1].looping := true;
 
-  writeln('Compressing.');
   writeln('--------------------------');
-  encodeLA96(music16, ACP_LOW, true).writeToDisk('c:\dev\tools\out_low_std.a96');
+  writeln('Compressing.');
+  encodeLA96(music16, ACP_LOW).writeToDisk('c:\dev\tools\out_low_std.a96');
 
   printTimers();
   writeln('Done.');
