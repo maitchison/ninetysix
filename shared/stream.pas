@@ -209,21 +209,13 @@ What get's modified
 }
 procedure tStream.setCapacity(newSize: dword);
 var
-  newBytes: pointer;
-  bytesToCopy: int32;
   blocks: int32;
 begin
 
   blocks := (newSize+1023) div 1024;
 
-  {todo: switch to realloc, (might be faster)}
-  getMem(newBytes, blocks*1024);
-  bytesToCopy := min(newSize, bytesUsed);
-  if bytesToCopy > 0 then
-    move(bytes^, newBytes^, bytesToCopy);
-  if assigned(bytes) then
-    freeMem(bytes);
-  bytes := newBytes;
+  reallocMem(bytes, blocks*1024);
+
   bytesAllocated := blocks*1024;
 
   {bytesUsed can not be more than actual buffer size}

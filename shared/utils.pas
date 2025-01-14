@@ -133,6 +133,11 @@ function  loadString(filename: string): string;
 function  getTickCount(): int64;
 function  getMSCount(): int64;
 
+{heap stuff}
+procedure setFixedHeapSize(size: int64);
+procedure autoSetHeapSize();
+
+
 implementation
 
 uses
@@ -1083,6 +1088,27 @@ begin
 
   assertEqual(join(['a','b'],','), 'a,b');
 
+end;
+
+{--------------------------------------------------------}
+
+{Attempts to set a fixed size for the heap}
+procedure setFixedHeapSize(size: int64);
+var
+  p: pointer;
+begin
+  getMem(p, size);
+  freemem(p);
+end;
+
+procedure autoSetHeapSize();
+var
+  freeMemMB: int64;
+begin
+  freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
+  freeMemMB := clamp(freeMemMB, 1, 64);
+  log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
+  setFixedHeapSize(freeMemMB*1024*1024);
 end;
 
 {--------------------------------------------------------}

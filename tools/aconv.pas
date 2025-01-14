@@ -61,10 +61,10 @@ end;
 
 function mem: int64;
 begin
-  //result := getUsedMemory;
-  result := getFreeMemory;
+  result := getUsedMemory;
 end;
 
+{test appending to stream}
 procedure testMemoryLeak1();
 var
   s: tStream;
@@ -73,71 +73,28 @@ var
   data: tBytes;
 begin
 
-  {notes:
-   no change in free memory until 256k allocated
-   no change in used memory until 512k allocated
-
-   }
-
-  {
-   I've allocated 1000*4k blocks, so 4 megs, but this has
-   taken up all 128MB of ram
-
-  For 16 allocations I'm expecting 64k deltas.
-
-  Ok, delta increases... so yeah we have a resizing problem.
-
-  }
-
   data := nil;
-  setLength(data, 8*1024);
+  setLength(data, 1*1024);
 
   {look for memory leak}
   initialMem := mem;
   s := tStream.Create(0);
   startMem := mem;
   prevMem := startMem;
-  {try to allocate 16megs (incremental)}
-  {set crashes at about 2000, which is 2megs}
-  {set, free, create crashes at about 4000, which is 4megs}
+  {allocate up to 16megs}
   for i := 0 to 16*1024-1 do begin
-    if (prevMem-mem) <> 0 then begin
+    if i mod 64 = 0 then
       writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, length(data)*i]));
-      prevMem := mem;
-    end else
-      writeln(i);
-    //s.writeBytes(data);
-    //s.setSize(length(data)*i);
-    s.free();
-    s := tStream.Create(length(data)*i);
+    prevMem := mem;
+    s.writeBytes(data);
+    s.setSize(length(data)*i);
   end;
   s.free;
   endMem := mem;
   writeln(format('Memory still allocated %,', [initialMem-endMem]));
   writeln(format('Initial commit %,', [initialMem-startMem]));
-  //repeat until keyDown(key_esc);
+   //repeat until keyDown(key_esc);
 end;
-
-(*
-  log(format('Update capacity: %d to %d %s', [bytesAllocated, newSize, hexStr(myESP)]));
-
-  blocks := (newSize+1023) div 1024;
-
-  getMem(newBytes, blocks*1024);
-  writeln(memSize(newBytes));
-
-  bytesToCopy := min(newSize, bytesUsed);
-  if bytesToCopy > 0 then
-    move(bytes^, newBytes^, bytesToCopy);
-  if assigned(bytes) then
-    freeMem(bytes);
-  bytes := newBytes;
-  bytesAllocated := blocks*1024;
-
-  {bytesUsed can not be more than actual buffer size}
-  if bytesUsed > newSize then
-    bytesUsed := newSize;
-*)
 
 
 procedure testMemoryLeak2();
@@ -164,40 +121,7 @@ begin
   //repeat until keyDown(key_esc);
 end;
 
-procedure testMemoryLeak3();
-var
-  s: tStream;
-  initialMem, startMem, endMem, prevMem: int64;
-  i: int32;
-  data: tBytes;
-begin
-
-  data := nil;
-  setLength(data, 8*1024);
-
-  {look for memory leak}
-  initialMem := mem;
-  s := tStream.Create(0);
-  startMem := mem;
-  prevMem := startMem;
-  for i := 0 to 16*1024-1 do begin
-    if (prevMem-mem) <> 0 then begin
-      writeln(format('%d: Delta:%, SinceInit:%, Total:%, Pos:%,',[i, prevMem-mem, initialMem-mem, mem, length(data)*i]));
-      prevMem := mem;
-    end else
-      writeln(i);
-    //s.writeBytes(data);
-    //s.setSize(length(data)*i);
-    s.free();
-    s := tStream.Create(length(data)*i);
-  end;
-  s.free;
-  endMem := mem;
-  writeln(format('Memory still allocated %,', [initialMem-endMem]));
-  writeln(format('Initial commit %,', [initialMem-startMem]));
-  //repeat until keyDown(key_esc);
-end;
-
+{test incremental mememory allocations}
 procedure testMemoryLeak4();
 var
   p: pointer;
@@ -239,6 +163,9 @@ begin
 end;
 
 begin
+
+  autoSetHeapSize();
+
   clrscr;
   textAttr := WHITE;
   debug.WRITE_TO_SCREEN := true;
@@ -247,7 +174,7 @@ begin
   //runTestSuites();
   //initKeyboard();
   //testCompression();
-  testMemoryLeak4();
-  //testMemoryLeak2();
+  //testMemoryLeak4();
+  testMemoryLeak1();
   textAttr := LIGHTGRAY;
 end.

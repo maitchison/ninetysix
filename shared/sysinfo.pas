@@ -23,6 +23,7 @@ function getMMXSupport: boolean;
 function getCPUName(): string;
 
 {memory stuff}
+function  getFreeSystemMemory: int64;
 function  getFreeMemory: int64;
 function  getTotalMemory: int64;
 function  getUsedMemory: int64;
@@ -48,7 +49,7 @@ var
   mmxString: string;
 begin
   if hasMMX then mmxString := '(MMX)' else mmxString := '';
-  info(format('System is %.0fMHZ with %.0fMB ram %s',[mhz, ram/1024/1024, mmxString]));
+  info(format('System is %.1fMHZ with %.1fMB ram %s',[mhz, ram/1024/1024, mmxString]));
 end;
 
 function getRDTSCRate(): double;
@@ -267,29 +268,7 @@ end;
 
 {-------------------------------------------------------------}
 
-{Attempts to set a fixed size for the heap}
-procedure setFixedHeapSize(size: int64);
-var
-  p: pointer;
-begin
-  getMem(p, size);
-  freemem(p);
-end;
-
-procedure autoSetHeapSize();
-var
-  freeMemMB: int64;
-begin
-  freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
-  freeMemMB := clamp(freeMemMB, 1, 64);
-  log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
-  setFixedHeapSize(freeMemMB*1024*1024);
-end;
-
 initialization
-
-  autoSetHeapSize();
-
   CPUInfo := getCPUInfo();
   cpuInfo.printToLog();
   logDPMIInfo();
