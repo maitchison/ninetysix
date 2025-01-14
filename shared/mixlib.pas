@@ -1,5 +1,5 @@
 {unit to handle sound mixing}
-unit mix;
+unit mixLib;
 
 {$MODE delphi}
 

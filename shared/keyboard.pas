@@ -123,6 +123,7 @@ procedure closeKeyboard;
 function keyDown(code: byte): boolean;
 function keyDownNoCheck(code: byte): boolean; inline;
 function readkey: char;
+procedure waitkey();
 function keyPressed: boolean;
 
 implementation
@@ -298,6 +299,14 @@ type TRegisters = record
   es,ds,cs,ss: word;
   IP: dword;
   Flags: word;
+end;
+
+procedure waitKey();
+begin
+  if doskey then
+    crt.readkey
+  else
+    repeat until key_hasbeenpressed;
 end;
 
 function readkey : char;

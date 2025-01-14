@@ -16,9 +16,10 @@ uses
 type
 
   tPackingMethod = (
-    PACK_OFF,
-    PACK_FAST,
-    PACK_ALL
+    PACK_OFF,    // do not use packing
+    PACK_FAST,   // use packing only on optimized bit lengths.
+    PACK_BEST,   // use packing on any bitlength, but only if it's smaller.
+    PACK_ALWAYS  // always use packing even if it's less efficent.
   );
 
   tStream = class
@@ -61,7 +62,7 @@ type
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
     procedure writeVLCControlCode(value: dword); inline;
-    procedure writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST);
+    function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): integer;
     function  VLCbits(value: dword): word; inline;
 
     procedure setSize(newSize: int32);
@@ -498,7 +499,7 @@ are out of band, and used for control codes
 procedure tStream.writeVLC(value: dword);
 begin
   {this is the nibble aligned method}
-  while True do begin
+  while true do begin
     if value < 8 then begin
       writeNibble(value);
       exit;
@@ -761,8 +762,10 @@ written, i.e. by first encoding a VLC length code
 
 This function can be useful to minimize the worst case, as we can
 make use of 8bit packing with very little loss in efficency.
+
+returns the packing bits used, or -1 for variable
 }
-procedure tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST);
+function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): integer;
 var
   i: int32;
   maxValue: int32;
@@ -786,15 +789,16 @@ begin
   if packing <> PACK_OFF then begin
     if packing = PACK_FAST then
       packingOptions := FAST_OPTIONS
-    else
+    else if packing in [PACK_BEST, PACK_ALWAYS] then
       packingOptions := ALL_OPTIONS;
     for n in packingOptions do begin
       if maxValue < (1 shl n) then begin
         packingCost := (length(values) * n)+8;
-        if packingCost < unpackedBits then begin
+        if (packingCost < unpackedBits) or (packing = PACK_ALWAYS) then begin
           {control-code}
           writeVLCControlCode(encodePackingCode(n));
           packBits(values, n, self);
+          result := n;
           exit;
         end;
       end;
@@ -804,6 +808,8 @@ begin
   {just write out the data}
   for i := 0 to length(values)-1 do
     writeVLC(values[i]);
+
+  result := -1;
 
   self.byteAlign();
 end;

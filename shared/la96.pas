@@ -39,18 +39,19 @@ uses
 
 type
   tAudioCompressionProfile = record
+    {we used to have lo and high freq cut, but
+     these did nothing, so I've removed them}
     quantBits: word;
-    freqLow: word;
-    freqHigh: word;
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile; s: tStream=nil): tStream;
 
 const
-  ACP_LOW: tAudioCompressionProfile = (quantBits:8; freqLow: 10; freqHigh:16000);
-  ACP_MEDIUM: tAudioCompressionProfile = (quantBits:10; freqLow: 10; freqHigh:18000);
-  ACP_HIGH: tAudioCompressionProfile = (quantBits:12; freqLow: 10; freqHigh:20000);
+  ACP_LOW: tAudioCompressionProfile = (quantBits:8);
+  ACP_MEDIUM: tAudioCompressionProfile = (quantBits:10);
+  ACP_HIGH: tAudioCompressionProfile = (quantBits:12);
+  ACP_EXTREME: tAudioCompressionProfile = (quantBits:16); //very nearly lossless.
 
 implementation
 
@@ -77,13 +78,25 @@ var
   counter: int32;
   bytes: tBytes;
 
-  //stub: remove
-  memInfo: tMemInfo;
+  maxCode, sumCode: int64;
+  meanValue, meanAbsValue: double;
+
+  packBitsMid, packBitsDif: integer;
+  shiftAmount: byte;
+
+function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
+asm
+  push cx
+  mov cl, [shiftAmount]
+  mov eax, [x]
+  sar eax, cl
+  pop cx
+  end;
 
 begin
 
-  {guess that we'll need 1 byte per sample, i.e 4:1 compression vs 16bit stereo}
-  if not assigned(s) then s := tStream.create(sfx.length);
+  {guess that we'll need 2 bytes per sample, i.e 4:1 compression vs 16bit stereo}
+  if not assigned(s) then s := tStream.create(2*sfx.length);
   result := s;
 
   if sfx.length = 0 then exit;
@@ -99,23 +112,28 @@ begin
   ds := tStream.create();
   counter := 0;
 
+  assert(profile.quantBits >= 1);
+  assert(profile.quantBits <= 17);
+  {note: 17bits is full precision as we are adding two 16bit values together}
+  shiftAmount := (17-profile.quantBits);
+  maxCode := 0;
+  sumCode := 0;
+  meanValue := 0;
+  meanAbsValue := 0;
+
   while samplesRemaining >= 1024 do begin
 
-    {unfortunately we can not encode any final partial}
+    {unfortunately we can not encode any final partial block}
 
-    firstMidValue := lastMidValue;
-    firstDifValue := lastDifValue;
+    firstMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
+    firstDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
+    lastMidValue := firstMidValue;
+    lastDifValue := firstDifValue;
 
     for j := 0 to 1024-1 do begin
-      {dividing by 2 is needed so as to not overflow.
-       This method looses 1-bit of quality, but only when stereo.}
 
-      thisMidValue := (samplePtr^.left+samplePtr^.right) div 2;
-      thisDifValue := (samplePtr^.left-samplePtr^.right) div 2;
-
-      {convert to 8-bit}
-      {thisMidValue := thisMidValue div 256;
-      thisDifValue := thisDifValue div 256;}
+      thisMidValue := quant(samplePtr^.left+samplePtr^.right, shiftAmount);
+      thisDifValue := quant(samplePtr^.left-samplePtr^.right, shiftAmount);
 
       midCodes[j] := negEncode(thisMidValue-lastMidValue);
       difCodes[j] := negEncode(thisDifValue-lastDifValue);
@@ -129,9 +147,9 @@ begin
     {prepare playload}
     ds.softReset();
     ds.writeVLC(negEncode(firstMidValue));
-    ds.writeVLCSegment(midCodes);
+    packBitsMid := ds.writeVLCSegment(midCodes, PACK_FAST);
     ds.writeVLC(negEncode(firstDifValue));
-    ds.writeVLCSegment(difCodes);
+    packBitsDif := ds.writeVLCSegment(difCodes, PACK_FAST);
 
     {write block header}
     s.byteAlign();
@@ -139,20 +157,7 @@ begin
     s.writeWord(1024);           {number of samples}
     s.writeWord(ds.len);         {compressed size}
 
-    get_memInfo(memInfo);
-    write(memInfo.available_physical_pages*get_page_size, ' -> ');
     s.writeBytes(ds.asBytes, ds.len); //todo: remove copy here
-    get_memInfo(memInfo);
-    write(memInfo.available_physical_pages*get_page_size);
-    writeln;
-
-
-    // stub:
-    //write('.');
-
-    //stub:
-    if counter and $f = 0 then
-      logHeapStatus(intToStr(counter));
 
     dec(samplesRemaining, 1024);
     inc(counter);
@@ -160,15 +165,8 @@ begin
   end;
 
   ds.free;
-  {note: we write out s.len bytes}
-  writeln(s.capacity);
-  writeln(s.len);
-  writeln(s.pos);
-  writeln(ds.capacity);
-  writeln(ds.len);
-  writeln(ds.pos);
 
-  note(format('Encoded size %fKB',[s.len/1024]));
+  note(format('Encoded size %fKB Original %fKB',[s.len/1024, 4*sfx.length/1024]));
 end;
 
 

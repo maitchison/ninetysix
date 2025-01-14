@@ -100,6 +100,7 @@ type
     function bytesPerSample: int32; inline;
 
     function asFormat(af: tAudioFormat): tSoundEffect;
+    function clone(): tSoundEffect;
     function getSample(pos: int32): tAudioSample;
     procedure setSample(pos: int32;sample: tAudioSample);
 
@@ -120,7 +121,7 @@ type
 implementation
 
 uses
-  mix;
+  mixLib;
 
 type
   tWaveFileHeader = packed record
@@ -161,7 +162,7 @@ end;
 
 class operator tAudioSample16S.subtract(a,b: tAudioSample16S): tAudioSample16S;
 begin
-  result.left  := clamp16(a.left - b.left);
+  result.left  := clamp16(a.left  - b.left);
   result.right := clamp16(a.right - b.right);
 end;
 
@@ -179,31 +180,31 @@ end;
 
 class operator tAudioSampleF32.add(a,b: tAudioSampleF32): tAudioSampleF32;
 begin
-  result.left  := a.left + b.left;
+  result.left  := a.left  + b.left;
   result.right := a.right + b.right;
 end;
 
 class operator tAudioSampleF32.subtract(a,b: tAudioSampleF32): tAudioSampleF32;
 begin
-  result.left  := a.left - b.left;
+  result.left  := a.left  - b.left;
   result.right := a.right - b.right;
 end;
 
 class operator tAudioSampleF32.multiply(a: tAudioSampleF32;b: single): tAudioSampleF32;
 begin
-  result.left  := a.left * b;
+  result.left  := a.left  * b;
   result.right := a.right * b;
 end;
 
 class operator tAudioSampleF32.multiply(b: single; a: tAudioSampleF32): tAudioSampleF32;
 begin
-  result.left  := a.left * b;
+  result.left  := a.left  * b;
   result.right := a.right * b;
 end;
 
 class operator tAudioSampleF32.multiply(b: single; a: tAudioSample16S): tAudioSampleF32;
 begin
-  result.left  := a.left * b;
+  result.left  := a.left  * b;
   result.right := a.right * b;
 end;
 
@@ -243,6 +244,11 @@ begin
     result.setSample(i, self.getSample(i));
 end;
 
+{create a copy}
+function tSoundEffect.clone(): tSoundEffect;
+begin
+  result := self.asFormat(self.format);
+end;
 
 function tSoundEffect.getSample(pos: int32): tAudioSample;
 begin
@@ -298,8 +304,8 @@ begin
   numSamples := trunc(44100 * duration);
   result := tSoundEffect.create(AF_16_STEREO, numSamples);
   for i := 0 to numSamples-1 do begin
-    sample.left := (rnd+rnd-256)*64;
-    sample.right := (rnd+rnd-256)*64;
+    sample.left := random(65536)-32768;
+    sample.right := random(65536)-32768;
     result.setSample(i, sample);
   end;
   result.tag := 'noise';

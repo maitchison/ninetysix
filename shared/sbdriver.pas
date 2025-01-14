@@ -72,7 +72,7 @@ var
 implementation
 
 uses
-  mix,
+  mixLib,
   sound;
 {-----------------------------------------------------}
 

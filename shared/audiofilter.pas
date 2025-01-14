@@ -15,7 +15,7 @@ uses
 function afDelta(s1,s2: tSoundEffect): tSoundEffect;
 function afQuantize(s1: tSoundEffect;bits: integer): tSoundEffect;
 function afLowPass(x: tSoundEffect;fc: single): tSoundEffect;
-function afHighPass(x: tSoundEffect;fc: single): tSoundEffect;
+function afHighPass(const x: tSoundEffect;fc: single): tSoundEffect;
 function afButterworth(x: tSoundEffect;fc: single): tSoundEffect;
 
 implementation
@@ -59,7 +59,6 @@ var
   y: tSoundEffect;
 begin
   alpha := exp(-2.0 * pi * fc / 44100);
-  writeln(format('%.2f %.2ff', [alpha, pi]));
   y := tSoundEffect.create(AF_16_STEREO, x.length);
   for i := 0 to x.length-1 do
     y[i] := (alpha * tAudioSampleF32(y[i-1])) + ((1-alpha) * tAudioSampleF32(x[i]));
@@ -68,14 +67,13 @@ end;
 
 {compulate a low pass filter via IIR filter
 fc: Frequency cutoff}
-function afHighPass(x: tSoundEffect;fc: single): tSoundEffect;
+function afHighPass(const x: tSoundEffect;fc: single): tSoundEffect;
 var
   i: int32;
   alpha: single;
   y: tSoundEffect;
 begin
   alpha := exp(-2.0 * pi * fc / 44100);
-  writeln(format('%.2f %.2ff', [alpha, pi]));
   y := tSoundEffect.create(AF_16_STEREO, x.length);
   for i := 0 to x.length-1 do
     y[i] := (alpha * tAudioSampleF32(y[i-1])) + (alpha * (tAudioSampleF32(x[i]) - tAudioSampleF32(x[i-1])));

@@ -5,6 +5,7 @@ uses
   {$I baseunits.inc},
   sound,
   audioFilter,
+  mixLib,
   la96,
   keyboard,
   stream,
@@ -38,25 +39,66 @@ begin
   writeln('Exiting.');
 end;
 
+function getStd(sfx: tSoundEffect): double;
+var
+  m1,m2,prevValue,value: double;
+  variance, mu: double;
+  n: int32;
+  i: integer;
+  x: double;
+begin
+  m1 := 0;
+  m2 := 0;
+  n := sfx.length;
+  prevValue := 0;
+  for i := 0 to n-1 do begin
+    value := sfx[i].left - sfx[i].right;
+
+    x := value-prevValue;
+
+    m1 += x;
+    m2 += x*x;
+
+    prevValue := value;
+  end;
+  variance := m2/n;
+  mu := m1/n;
+  result := sqrt(variance - mu*mu);
+end;
+
 procedure testCompression();
 var
-  music16, musicL, musicD: tSoundEffect;
+  music16, musicX, musicL, musicD: tSoundEffect;
   SAMPLE_LENGTH: int32;
+  profile: tAudioCompressionProfile;
+  quantBits: integer;
 begin
 
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', SAMPLE_LENGTH);
-  mixer.play(music16, SCS_FIXED1);
+  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav');
+
+  musicX := music16.clone();
+  writeln(format('%f', [getStd(musicX)]));
+
+  mixer.play(musicX, SCS_FIXED1);
+  mixer.channels[1].looping := true;
+
+  // problem: highpass changed music 16?}
 
   writeln('Compressing.');
-  encodeLA96(music16, ACP_MEDIUM).writeToDisk('c:\dev\tools\sample_1.a96');
+  for profile in [ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_EXTREME] do begin
+    write(profile.quantBits,':');
+    encodeLA96(musicX, profile).writeToDisk('c:\dev\tools\sample_'+intToStr(profile.quantBits)+'.a96');
+  end;
 
   writeln('Done.');
+
+  delay(3000);
 end;
 
 begin
 
-  autoSetHeapSize();
+  autoHeapSize();
 
   clrscr;
   textAttr := WHITE;
@@ -68,4 +110,5 @@ begin
   testCompression();
 
   textAttr := LIGHTGRAY;
+
 end.
