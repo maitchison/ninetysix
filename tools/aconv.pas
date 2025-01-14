@@ -12,6 +12,81 @@ uses
   stream,
   crt;
 
+function sign(x: integer): integer;
+begin
+  if x < 0 then exit(-1);
+  if x > 0 then exit(1);
+  exit(0);
+end;
+
+function applyDeltaULaw(sfx: tSoundEffect): tSoundEffect;
+var
+  i: integer;
+  delta: int32;
+  prevX, prevY, x, y: integer;
+  yReal: single;
+  yErr, currentError: int32;
+  ySqr: int32;
+  avCode: double;
+  avRMS: double;
+  sample: tAudioSample16S;
+const
+  MU = 1024;
+  BITS = 7;
+begin
+  result := sfx.clone();
+  prevX := 0;
+  prevY := 0;
+  currentError := 0;
+  avCode := 0;
+  avRMS := 0;
+  for i := 0 to sfx.length-1 do begin
+    {try to represent the actual delta we observed in x}
+    x := sfx[i].left;
+    delta := x - prevX;
+    yReal := sign(delta)*(ln(1.0+abs(MU*delta/(32*1024)))/ln(1+MU));
+    {account for drift... very slowly}
+    y := round(yReal*(1 SHL (BITS-1)));
+    ySqr := sign(y) * round(32*1024/MU*power(1+MU, abs(y/(1 SHL (BITS-1))))-1);
+    currentError := (prevX+ySqr) - x;
+    if currentError > abs(yReal) then dec(y);
+    if currentError < -abs(yReal) then inc(y);
+    ySqr := sign(y) * round(32*1024/MU*power(1+MU, abs(y/(1 SHL (BITS-1))))-1);
+    sample := result[i];
+    sample.left := clamp16(prevY + ySqr);
+    avCode := avCode * (0.999) + (1-0.999) * abs(y);
+    avRMS := avCode * (0.999) + (1-0.999) * abs(delta*delta);
+    prevX := x;
+    prevY := sample.left;
+    if i and $ffff = 0 then begin
+      writeln(format('%d %d %f %f', [y, currentError, avCode, avRMS]));
+    end;
+    result[i] := sample;
+  end;
+  for i := 0 to sfx.length-1 do begin
+    {try to represent the actual delta we observed in x}
+    x := sfx[i].right;
+    delta := x - prevX;
+    yReal := sign(delta)*(ln(1.0+abs(MU*delta/(32*1024)))/ln(1+MU));
+    {account for drift... very slowly}
+    y := round(yReal*(1 SHL (BITS-1)));
+    ySqr := sign(y) * round(32*1024/MU*power(1+MU, abs(y/(1 SHL (BITS-1))))-1);
+    currentError := (prevX+ySqr) - x;
+    if currentError > abs(yReal) then dec(y);
+    if currentError < -abs(yReal) then inc(y);
+    ySqr := sign(y) * round(32*1024/MU*power(1+MU, abs(y/(1 SHL (BITS-1))))-1);
+    sample := result[i];
+    sample.right := clamp16(prevY + ySqr);
+    prevX := x;
+    prevY := sample.right;
+    {if i and $ffff = 0 then begin
+      writeln(format('%d %d', [y, currentError]));
+    end;}
+    result[i] := sample;
+  end;
+
+end;
+
 procedure go();
 var
   music16, musicL, musicD: tSoundEffect;
@@ -26,7 +101,8 @@ begin
   writeln('Processing.');
   //musicL := afButterworth(music16, 16000);
   //musicL := afLowPass(music16, 16000);
-  musicL := tSoundEffect.loadFromWave('c:\dev\masters\bearing 128kbps.wav', SAMPLE_LENGTH);
+  //musicL := tSoundEffect.loadFromWave('c:\dev\masters\bearing 128kbps.wav', SAMPLE_LENGTH);
+  musicL := applyDeltaULaw(music16);
   {musicL := afHighPass(music16, 10);     }
   musicD := afDelta(music16, musicL);
   writeln('Done.');
@@ -103,7 +179,9 @@ begin
 
   runTestSuites();
   initKeyboard();
-  testCompression();
+
+  //testCompression();
+  go();
 
   textAttr := LIGHTGRAY;
 

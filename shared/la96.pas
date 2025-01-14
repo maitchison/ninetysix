@@ -56,6 +56,11 @@ type
     procedure encode(newX: int32); override;
   end;
 
+  tASPNonLinear = class(tAudioStreamProcessor)
+    currentError: int32;
+    procedure encode(newX: int32); override;
+  end;
+
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
@@ -85,17 +90,67 @@ end;
 procedure tAudioStreamProcessor.encode(newX: int32);
 begin
   prevX := x;
-  x := newX;
   prevY := y;
+  x := newX;
   y := newX;
 end;
 
 procedure tASPDelta.encode(newX: int32);
 begin
   prevX := x;
-  x := newX;
   prevY := y;
-  x := newX - x;
+  y := newX - x;
+  x := newX;
+end;
+
+function sign(x: single): single;
+begin
+  if x < 0 then exit(-1);
+  if x > 0 then exit(1);
+  exit(0);
+end;
+
+procedure tASPNonLinear.encode(newX: int32);
+var
+  jumpDelta: int32;
+  yErr: int32;
+  yReal: single;
+begin
+
+  {
+  all zeros
+
+  newX = 10
+  prevX = 0
+  prevY = 0
+  jumpDelta = 10-0 = 10
+  yReal := sqrt(10)*1 = 3.3
+  if 0 > 3 no
+  if 0 < -3 no
+  y := 3
+  yErr := 9 - 10 = -1
+  currentError += -1 (=-1)
+  }
+
+
+  prevX := x;
+  prevY := y;
+
+  {try to represent the actual delta we observed in x}
+  jumpDelta := newX - x;
+
+  yReal := sqrt(abs(jumpDelta)) * sign(jumpDelta);
+
+  {account for drift... very slowly}
+  if currentError > abs(yReal) then yReal -= 0.5;
+  if currentError < -abs(yReal) then yReal += 0.5;
+
+  y := round(yReal);
+
+  yErr := y*y - newX;
+  currentError += yErr;
+
+  x := newX;
 end;
 
 {-------------------------------------------------------}
@@ -126,6 +181,8 @@ var
   numFrames: int32;
   startPos: int32;
   shiftAmount: byte;
+
+  signChanges: integer;
 
   framePtr, frameMid, frameDif: tDwords;
 
@@ -181,8 +238,8 @@ begin
   frameMid := nil;
   frameDif := nil;
 
-  aspMid := tASPDelta.create();
-  aspDif := tASPDelta.create();
+  aspMid := tASPNonLinear.create();
+  aspDif := tASPNonLinear.create();
 
   // -------------------------
   // Write Header
@@ -215,11 +272,15 @@ begin
     frameMid.append(negEncode(aspMid.y));
     frameDif.append(negEncode(aspDif.y));
 
+    signChanges := 0;
+
     startTimer('LA96_process');
     for j := 0 to 1023-1 do begin
 
       aspMid.encode(quant(samplePtr^.left+samplePtr^.right, shiftAmount));
       aspDif.encode(quant(samplePtr^.left-samplePtr^.right, shiftAmount));
+
+      if (aspMid.y * aspMid.prevY) < 0 then inc(signChanges);
 
       midCodes[j] := negEncode(aspMid.y);
       difCodes[j] := negEncode(aspDif.y);
@@ -227,6 +288,8 @@ begin
       incPtr();
     end;
     stopTimer('LA96_process');
+
+    write(signChanges, ' ');
 
     {write out frame}
     startTimer('LA96_segments');
