@@ -69,6 +69,7 @@ type
 
     procedure writeChars(s: string);
     procedure writeBytes(aBytes: tBytes;aLen:int32=-1);
+    procedure writeBlock(var x;numBytes: int32);
 
     function  peekByte: byte; inline;
     function  peekWord: word; inline;
@@ -81,6 +82,7 @@ type
     function  readVLC: dword; inline;
     function  readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
     function  readBytes(n: int32): tBytes;
+    procedure readBlock(var x;numBytes: int32);
 
     procedure byteAlign(); inline;
     procedure seek(aPos: dword; aMidByte: boolean=False);
@@ -146,7 +148,6 @@ var
   packing1: array[0..255] of array[0..7] of dword;
   packing2: array[0..255] of array[0..3] of dword;
   packing4: array[0..255] of array[0..1] of dword;
-  packing8: array[0..255] of array[0..0] of dword;
 
 {builds lookup tables used to accelerate unpacking.}
 procedure buildUnpackingTables();
@@ -161,7 +162,6 @@ begin
       packing2[i][j] := (i shr (j*2)) and $3;
     for j := 0 to 1 do
       packing4[i][j] := (i shr (j*4)) and $f;
-    packing8[i][0] := i;
   end;
 end;
 
@@ -244,11 +244,6 @@ end;
 
 procedure tStream.writeNibble(b: byte); inline;
 begin
-  {$IFDEF debug}
-  if (b and $f) <> b then
-    Error('Invalid nibble value '+intToStr(b));
-  {$ENDIF}
-
   if midByte then begin
     bytes[fPos] := bytes[fPos] or (b shl 4);
     midByte := false;
@@ -411,19 +406,38 @@ begin
 end;
 
 function tStream.readBytes(n: int32): tBytes;
-var
-  i: integer;
 begin
+  result := nil;
+  if n = 0 then exit;
   if midByte then
     error('Unaligned readBytes');
   if n > (len-fPos) then
     error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (fPos + n)]));
-  result := nil;
-  if n = 0 then
-    exit;
+
   system.setLength(result, n);
   move(bytes[fPos], result[0], n);
   fPos += n;
+end;
+
+{read a block from stream into variable}
+procedure tStream.readBlock(var x;numBytes: int32);
+begin
+  if numBytes = 0 then exit;
+  if midByte then error('Unaligned readBlock');
+  if numBytes > (len-fPos) then
+    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [numBytes,  (fPos + numBytes)]));
+  move(bytes[fPos], x, numBytes);
+  fPos += numBytes;
+end;
+
+{write a block from stream into variable}
+procedure tStream.writeBlock(var x;numBytes: int32);
+begin
+  if numBytes = 0 then exit;
+  if midByte then error('unaligned writeBlock');
+  setLength(fPos + numBytes);
+  move(x, self.bytes[fPos], numBytes);
+  inc(fPos, numBytes);
 end;
 
 {writes memory stream to disk}
@@ -642,13 +656,6 @@ begin
     jnz @PACKLOOP
     popad
   end;
-  {
-  for i := 1 to n do begin
-    move(packing8[inBuf^], outBuf^, 4);
-    inc(inBuf);
-    inc(outBuf);
-  end;
-  }
 end;
 
 {General unpacking routine.

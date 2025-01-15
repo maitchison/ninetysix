@@ -91,13 +91,6 @@ type
     procedure encode(newX: int32); override;
   end;
 
-  tLA96Reader = class
-    constructor create(filename: string);
-    destructor destroy(); override;
-    procedure load(): tSoundEffect;
-    function readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
-  end;
-
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 
@@ -119,8 +112,39 @@ implementation
 const
   VER_SMALL = 1;
   VER_BIG = 0;
+  FRAME_SIZE = 1024;
 
 {-------------------------------------------------------}
+
+type
+
+  tLA96FrameHeader = record
+    offset: dword;
+    startMid, startDif: int16;
+  end;
+
+  tLA96FileHeader = packed record
+    tag: array[1..4] of char;
+    versionSmall, versionBig: word;
+    format, compressionMode: byte;
+    numFrames: dWord;
+    numSamples: dWord;
+    frameSize: word;
+    log2mu: byte;
+    postFilter: byte;
+  end;
+
+  {todo: make a LA96Writer aswell (for progressive save)}
+  tLA96Reader = class
+    fs: tStream;
+    header: tLA96FileHeader;
+    frames: array of tLA96FrameHeader;
+    constructor create(filename: string);
+    destructor destroy(); override;
+    procedure close();
+    function  readSfx(): tSoundEffect;
+    procedure readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+  end;
 
 {
 How this will work.
@@ -130,26 +154,59 @@ Mixer will request SFX to decompress frame by frame via readFrame
 }
 
 constructor tLA96Reader.create(filename: string);
+var
+  f: file;
 begin
+
+  {first read header, and make sure everything is ok}
+  system.assign(f, filename);
+  system.reset(f, 1);
+  system.blockread(f, header, sizeof(header));
+  system.close(f);
+
+  if header.tag <> 'LA96' then raise ValueError.create('Not a LA96 file.');
+  if (header.versionSmall <> VER_SMALL) or (header.versionBig <> VER_BIG) then
+    raise ValueError.create(format('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]));
+  if header.format <> 0 then raise ValueError.create(format('Format type %d not supported', [header.format]));
+  if header.compressionMode <> 0 then raise ValueError.create('Compression not supported');
+  if header.frameSize <> 1024 then raise ValueError.create('Framesize must be 1024');
+
   {load entire file into stream}
   {process header etc}
   {also load our ulaw tables here}
   {we just need 5-7,6-7,7-7,8-8}
 end;
 
-destructor tLA96Reader.destroy(); override;
+destructor tLA96Reader.destroy();
 begin
+  close();
+  inherited destroy();
+end;
+
+procedure tLA96Reader.close();
+begin
+  if assigned(fs) then begin
+    fs.free;
+    fs := nil;
+  end;
+  frames := nil;
+  fillchar(header, sizeof(header), 0);
 end;
 
 {read entire SFX out and return it uncompressed}
-procedure tLA96Reader.readSFX(): tSoundEffect;
+function tLA96Reader.readSFX(): tSoundEffect;
+var
+  i: integer;
 begin
   {just loop through all frames}
+  result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
+  for i := 0 to length(frames)-1 do
+    readFrame(i, result, i*header.frameSize);
 end;
 
 {decodes a single frame into sfx at given sample position.
  can be used to stream music compressed in memory.}
-function tLA96Reader.readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+procedure tLA96Reader.readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
 begin
   {todo: this should be super fast, like maybe MMX fast}
   {get initial values}
@@ -316,15 +373,7 @@ asm
   pop cx
   end;
 
-{decode an LA96 file}
-function decodeLA96(fs: tStream): tStream;
-begin
-end;
-
-
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
-const
-  FRAME_SIZE = 1024;
 var
   i,j,k: int32;
 
@@ -344,8 +393,8 @@ var
 
   counter: int32;
   numFrames: int32;
-  startPos: int32;
-  framePtr, frameMid, frameDif: tDwords;
+  framePtr: tDwords;
+  frameSizes: tDwords;
   maxSamplePtr: pointer;
   aspMid, aspDif: tAudioStreamProcessor;
   midSignCounter, difSignCounter: integer;
@@ -353,6 +402,7 @@ var
 
   cMid, cDif: int32; {centers}
   tmp: int32;
+  header: tLA96FileHeader;
 
   fullStats, frameStats: tCSVWriter;
 
@@ -360,13 +410,6 @@ var
 
   midXStats, difXStats,
   midYStats, difYStats: tStats;
-
-  procedure incPtr(); inline;
-  begin
-    {once we reach end just write out the last value repeatedly}
-    if samplePtr < maxSamplePtr then
-      inc(samplePtr);
-  end;
 
 begin
 
@@ -408,8 +451,6 @@ begin
   difSigns := tStream.create();
 
   framePtr := nil;
-  frameMid := nil;
-  frameDif := nil;
 
   if profile.ulawBits > 0 then begin
     aspMid := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
@@ -422,21 +463,22 @@ begin
   // -------------------------
   // Write Header
 
-  {write header}
-  startPos := fs.pos;
-  fs.writeChars('LA96');
-  fs.writebyte(VER_SMALL);
-  fs.writebyte(VER_BIG);
-  fs.writeByte($00);          {joint 16bit-stereo}
-  fs.writeByte($00);          {this was LZ4 compression, but it's now removed}
-  fs.writeDWord(numFrames);
-  fs.writeDWord(sfx.length); // samples might be different if length is not multiple of FRAME_SIZE
-  {some file-wide profile stuff}
-  fs.writebyte(profile.log2mu);
-  fs.writebyte(profile.filter);
+  header.tag := 'LA96';
+  header.versionSmall := VER_SMALL;
+  header.versionBig := VER_BIG;
+  header.format := 0;
+  header.compressionMode := 0;
+  header.numFrames := numFrames;
+  header.numSamples := sfx.length;
+  header.frameSize := 1024;
+  header.log2mu := profile.log2mu;
+  header.postFilter := profile.filter;
+
+  fs.writeBlock(header, sizeof(header));
 
   {write reserved header space}
-  while fs.pos < startPos+128 do
+  if fs.pos > 128 then raise Exception.create('Header length exceeds 128 bytes');
+  while fs.pos < 128 do
     fs.writeByte(0);
 
   // -------------------------
@@ -454,11 +496,7 @@ begin
 
     aspMid.reset(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
     aspDif.reset(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
-    incPtr();
-
-    framePtr.append(fs.pos);
-    frameMid.append(negEncode(aspMid.y));
-    frameDif.append(negEncode(aspDif.y));
+    if samplePtr < maxSamplePtr then inc(samplePtr);
 
     midSignCounter := 0;
     difSignCounter := 0;
@@ -479,11 +517,19 @@ begin
     cMid := (aspMid.xPrime div 256) * 256;
     cDif := (aspDif.xPrime div 256) * 256;
 
+    {write frame header (one for each channel)}
+    framePtr.append(fs.pos);
+    fs.writeByte(profile.quantBits + profile.ulawBits*16);
+    fs.writeByte(profile.quantBits + profile.ulawBits*16);
+    fs.writeByte(min(negEncode(aspMid.y), 255));
+    fs.writeByte(min(negEncode(aspDif.y), 255));
+
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
       aspMid.encode(quant(samplePtr^.left+samplePtr^.right-cMid, profile.quantBits));
       aspDif.encode(quant(samplePtr^.left-samplePtr^.right-cDif, profile.quantBits));
+      if samplePtr < maxSamplePtr then inc(samplePtr);
 
       {xPrime is decoders quant(decoded-cMid)}
       cMid := ((aspMid.xPrime shl profile.quantBits) + cMid) div 256 * 256;
@@ -528,13 +574,8 @@ begin
           difXStats.ema
         ]);
 
-      incPtr();
     end;
     stopTimer('LA96_process');
-
-    {write frame header (one for each channel)}
-    fs.writeByte(profile.quantBits + profile.ulawBits*16);
-    fs.writeByte(profile.quantBits + profile.ulawBits*16);
 
     {write out frame}
     startTimer('LA96_segments');
@@ -584,8 +625,6 @@ begin
 
   // -------------------------
   // Write Footer
-  fs.writeVLCSegment(frameMid, PACK_BEST);
-  fs.writeVLCSegment(frameDif, PACK_BEST);
   fs.writeVLCSegment(framePtr, PACK_BEST);
 
   {clean up}

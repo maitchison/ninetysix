@@ -1,5 +1,6 @@
 {check for memory leaks etc.}
 program testmem;
+
 uses
   {$I baseunits.inc},
   go32,
