@@ -46,12 +46,11 @@ type
 
   {fast uLaw calculations via a lookup table}
   {settings bits to 0 gives identity transform}
-  tULawLookup = class
-    encodeTable: tIntList;
-    decodeTable: tIntList;
-    constructor create(bits: byte; log2Mu: byte);
-    function encode(x: int32): int32; inline;
-    function decode(x: int32): int32; inline;
+  tULawLookup = record
+    table: tIntList;
+    procedure initEncode(bits: byte; log2Mu: byte);
+    procedure initDecode(bits: byte; log2Mu: byte);
+    function lookup(x: int32): int32; inline;
   end;
 
   tAudioCompressionProfile = record
@@ -77,11 +76,12 @@ type
   tLA96Reader = class
     fs: tStream;
     header: tLA96FileHeader;
+    ulawTable: array[6..8] of tULawLookup;
     constructor create(filename: string);
     destructor destroy(); override;
     procedure close();
     function  readSfx(): tSoundEffect;
-    procedure readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+    procedure nextFrame(sfx: tSoundEffect;sfxOffset: dword);
   end;
 
 
@@ -131,7 +131,7 @@ type
   end;
 
   tASPULaw = class(tAudioStreamProcessor)
-    lut: tULawLookup;
+    ulawEncode, ulawDecode: tULawLookup;
     log2Mu: byte;
     uLawBits: byte;
     constructor create(uLawBits: byte=8;log2Mu: byte=8);
@@ -146,7 +146,6 @@ type
     procedure encode(newX: int32); override;
   end;
 
-
 {
 How this will work.
 
@@ -157,6 +156,7 @@ Mixer will request SFX to decompress frame by frame via readFrame
 constructor tLA96Reader.create(filename: string);
 var
   f: file;
+  bits: integer;
 begin
 
   {first read header, and make sure everything is ok}
@@ -173,9 +173,13 @@ begin
   if header.frameSize <> 1024 then raise ValueError.create('Framesize must be 1024');
 
   {load entire file into stream}
-  {process header etc}
-  {also load our ulaw tables here}
-  {we just need 5-7,6-7,7-7,8-8}
+  fs := tStream.create();
+  fs.readFromFile(filename);
+  fs.seek(128);
+
+  {create ulaw tables}
+  for bits := low(ulawTable) to high(ulawTable) do
+    ulawTable[bits].initDecode(bits, header.log2mu);
 end;
 
 destructor tLA96Reader.destroy();
@@ -198,15 +202,14 @@ function tLA96Reader.readSFX(): tSoundEffect;
 var
   i: integer;
 begin
-  {just loop through all frames}
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
   for i := 0 to header.numFrames-1 do
-    readFrame(i, result, i*header.frameSize);
+    nextFrame(result, i*header.frameSize);
 end;
 
-{decodes a single frame into sfx at given sample position.
+{decodes the next frame into sfx at given sample position.
  can be used to stream music compressed in memory.}
-procedure tLA96Reader.readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+procedure tLA96Reader.nextFrame(sfx: tSoundEffect;sfxOffset: dword);
 begin
   {todo: this should be super fast, like maybe MMX fast}
   {get initial values}
@@ -231,7 +234,7 @@ end;
 
 {--------------}
 
-constructor tULawLookup.create(bits: byte; log2Mu: byte);
+procedure tULawLookup.initDecode(bits: byte; log2Mu: byte);
 var
   i: int32;
   codeSize: int32;
@@ -239,27 +242,27 @@ var
 begin
   mu := 1 shl log2Mu;
   codeSize := (1 shl bits);
-  decodeTable := tIntList.create(codeSize+1); {0..codesize (inclusive)}
-  encodeTable := tIntList.create(32*1024+1);
-  for i := 0 to 32*1024 do
-    encodeTable[i] := round(uLaw(i, mu) * codeSize);
+  table := tIntList.create(codeSize+1); {0..codesize (inclusive)}
   for i := 0 to codeSize do
-    decodeTable[i] := uLawInv(i / codeSize, mu);
-
+    table[i] := uLawInv(i / codeSize, mu);
 end;
 
-{ input is -2^bits..2^bits, output is -32k...32k }
-function tULawLookup.decode(x: int32): int32; inline;
+procedure tULawLookup.initEncode(bits: byte; log2Mu: byte);
+var
+  i: int32;
+  codeSize: int32;
+  mu: int32;
 begin
-  result := decodeTable[abs(x)];
-  if x < 0 then result := -result;
+  mu := 1 shl log2Mu;
+  codeSize := (1 shl bits);
+  table := tIntList.create(32*1024+1);
+  for i := 0 to 32*1024 do
+    table[i] := round(uLaw(i, mu) * codeSize);
 end;
 
-{input is -32k to 32k, output is -2^bits..2^bits}
-function tULawLookup.encode(x: int32): int32; inline;
+function tULawLookup.lookup(x: int32): int32; inline;
 begin
-  if abs(x) > 32*1024 then exit(encodeTable[32*1024]);
-  result := encodeTable[abs(x)];
+  result := table[abs(x)];
   if x < 0 then result := -result;
 end;
 
@@ -309,12 +312,12 @@ begin
   assert(uLawBits <= 16);
   self.uLawBits := uLawBits;
   self.log2Mu := log2Mu;
-  lut := tULawLookup.create(uLawBits, log2Mu);
+  uLawEncode.initEncode(uLawBits, log2Mu);
+  uLawDecode.initDecode(uLawBits, log2Mu);
 end;
 
 destructor tASPULaw.destroy();
 begin
-  lut.free;
   inherited destroy();
 end;
 
@@ -322,9 +325,9 @@ procedure tASPULaw.encode(newX: int32);
 begin
   prevX := x;
   prevY := y;
-  y := lut.encode(newX);
+  y := ulawEncode.lookup(newX);
   x := newX;
-  xPrime := lut.decode(y);
+  xPrime := uLawDecode.lookup(y);
 end;
 
 {------}
@@ -340,13 +343,13 @@ begin
   //self inline... :(
   ax := abs(newX);
   if ax > 32*1024 then ax := 32*1024;
-  thisU := lut.encodeTable.data[ax];
+  thisU := uLawEncode.table.data[ax];
   if newX < 0 then thisU := -thisU;
 
   y := thisU - prevU;
   x := newX;
   prevU := thisU;
-  xPrime := lut.decodeTable.data[abs(thisU)];
+  xPrime := uLawDecode.table.data[abs(thisU)];
   if thisU < 0 then xPrime := -xPrime;
 end;
 
@@ -651,7 +654,8 @@ type
 
 procedure tLA96Test.run();
 var
-  lut: tULawLookup;
+  lutEncode: tULawLookup;
+  lutDecode: tULawLookup;
   i: int32;
 const
   mu = 256;
@@ -659,13 +663,14 @@ const
   codeSize = 1 shl bits;
 begin
   {test lookups}
-  lut := tULawLookup.create(bits, round(log2(mu)));
+  lutEncode.initEncode(bits, round(log2(mu)));
+  lutDecode.initDecode(bits, round(log2(mu)));
   for i := -codeSize to codeSize do
-    assertEqual(lut.decode(i), uLawInv(i/codeSize, mu));
+    assertEqual(lutDecode.lookup(i), uLawInv(i/codeSize, mu));
   for i := -1024 to 1024 do begin
     {check all values -1k..-1k, and also samples from whole range}
-    assertEqual(lut.encode(32*i), round(uLaw(32*i, mu) * codeSize));
-    assertEqual(lut.encode(i), round(uLaw(i, mu) * codeSize));
+    assertEqual(lutEncode.lookup(32*i), round(uLaw(32*i, mu) * codeSize));
+    assertEqual(lutEncode.lookup(i), round(uLaw(i, mu) * codeSize));
   end;
 end;
 

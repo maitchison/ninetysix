@@ -352,7 +352,7 @@ begin
     music16.tag := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_new', [profile.quantBits, profile.ulawBits, profile.log2mu]);
     if not fs.exists(music16.tag+'.a96') then begin
       outStream := encodeLA96(music16, profile);
-      outStream.writeToDisk(music16.tag+'.a96');
+      outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
     end;
   end;

@@ -87,8 +87,8 @@ type
     procedure byteAlign(); inline;
     procedure seek(aPos: dword; aMidByte: boolean=False);
 
-    procedure writeToDisk(fileName: string);
-    procedure readFromDisk(fileName: string);
+    procedure writeToFile(fileName: string);
+    procedure readFromFile(fileName: string);
 
     procedure reset();
     procedure softReset();
@@ -186,7 +186,7 @@ end;
 class function tStream.FromFile(filename: string): tStream; static;
 begin
   result := tStream.Create();
-  result.readFromDisk(filename);
+  result.readFromFile(filename);
 end;
 
 {------------------------------------------------------}
@@ -440,8 +440,8 @@ begin
   inc(fPos, numBytes);
 end;
 
-{writes memory stream to disk}
-procedure tStream.writeToDisk(fileName: string);
+{writes memory stream to file}
+procedure tStream.writeToFile(fileName: string);
 var
   f: file;
   bytesWritten: dword;
@@ -452,8 +452,8 @@ begin
   close(f);
 end;
 
-{loads memory stream from disk, and resets position to start of stream.}
-procedure tStream.readFromDisk(fileName: string);
+{loads memory stream from file, and resets position to start of stream.}
+procedure tStream.readFromFile(fileName: string);
 var
   f: file;
   bytesRead: dword;
@@ -969,11 +969,11 @@ begin
   for i := 0 to 15 do
     s.writeNibble(i);
   assertEqual(s.len, 8);
-  s.writeToDisk('tmp.dat');
+  s.writeToFile('tmp.dat');
   s.free;
 
   s := tStream.Create();
-  s.readFromDisk('tmp.dat');
+  s.readFromFile('tmp.dat');
   assertEqual(s.len, 8);
   for i := 0 to 15 do
     assertEqual(s.readNibble, i);
@@ -984,11 +984,11 @@ begin
   for i := 1 to 16 do
     s.writeByte(i);
   assertEqual(s.len, 16);
-  s.writeToDisk('tmp.dat');
+  s.writeToFile('tmp.dat');
   s.free;
 
   s := tStream.Create();
-  s.readFromDisk('tmp.dat');
+  s.readFromFile('tmp.dat');
   assertEqual(s.len, 16);
   for i := 1 to 16 do
     assertEqual(s.readByte, i);
@@ -999,11 +999,11 @@ begin
   for i := 1 to 16 do
     s.writeWord(256+i);
   assertEqual(s.len, 32);
-  s.writeToDisk('tmp.dat');
+  s.writeToFile('tmp.dat');
   s.free;
 
   s := tStream.Create();
-  s.readFromDisk('tmp.dat');
+  s.readFromFile('tmp.dat');
   assertEqual(s.len, 32);
   for i := 1 to 16 do
     assertEqual(s.readWord, 256+i);
