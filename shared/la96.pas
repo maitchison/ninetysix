@@ -39,6 +39,7 @@ uses
   sound,
   csv,
   audioFilter,
+  keyboard, {stub: remove}
   stream;
 
 type
@@ -53,6 +54,7 @@ type
   end;
 
   tAudioCompressionProfile = record
+    tag: string;
     quantBits: byte; // number of bits to remove 0..16 (0=off)
     ulawBits: byte;  // number of ulaw bits, (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
@@ -95,14 +97,14 @@ function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
 const
-  ACP_VERYLOW: tAudioCompressionProfile  = (quantBits:7;ulawBits:5;log2Mu:7;filter:16);
-  ACP_LOW: tAudioCompressionProfile      = (quantBits:6;ulawBits:6;log2Mu:7;filter:16);
-  ACP_MEDIUM: tAudioCompressionProfile   = (quantBits:5;ulawBits:7;log2Mu:7;filter:0);
-  ACP_HIGH: tAudioCompressionProfile     = (quantBits:3;ulawBits:8;log2Mu:8;filter:0);
-  ACP_Q10: tAudioCompressionProfile      = (quantBits:7;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q12: tAudioCompressionProfile      = (quantBits:5;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q16: tAudioCompressionProfile      = (quantBits:1;ulawBits:0;log2Mu:0;filter:0);
-  ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:0;ulawBits:0;log2Mu:0;filter:0);
+  ACP_VERYLOW: tAudioCompressionProfile  = (tag:'verylow'; quantBits:7;ulawBits:5;log2Mu:7;filter:16);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:6;log2Mu:7;filter:16);
+  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:7;log2Mu:7;filter:0);
+  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:3;ulawBits:8;log2Mu:8;filter:0);
+  ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:7;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:5;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q16: tAudioCompressionProfile      = (tag:'q16';     quantBits:1;ulawBits:0;log2Mu:0;filter:0);
+  ACP_LOSSLESS: tAudioCompressionProfile = (tag:'lossless';quantBits:0;ulawBits:0;log2Mu:0;filter:0);
 
 var
   LA96_ENABLE_STATS: boolean = false;
@@ -400,6 +402,9 @@ begin
   // Write Frames
 
   for i := 0 to numFrames-1 do begin
+
+    //stub:
+    if keyDown(key_esc) then break;
 
     {unfortunately we can not encode any final partial block}
     aspMid.reset(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));

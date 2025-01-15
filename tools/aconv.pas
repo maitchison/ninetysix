@@ -224,23 +224,62 @@ var
   music16, musicL, musicD: tSoundEffect;
   SAMPLE_LENGTH: int32;
   profile: tAudioCompressionProfile;
-  quantBits: integer;
+  log2mu, ulawBits, quantBits: integer;
+
 begin
 
   writeln('--------------------------');
   writeln('Loading music.');
   music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
 
-  mixer.play(music16, SCS_FIXED1);
-  mixer.channels[1].looping := true;
+  //mixer.play(music16, SCS_FIXED1);
+  //mixer.channels[1].looping := true;
 
   writeln('--------------------------');
   writeln('Compressing.');
   LA96_ENABLE_STATS := true;
-  music16.tag := 'c:\dev\logs\low_std';
-  encodeLA96(music16, ACP_LOW, False).writeToDisk('c:\dev\tools\out_low_std.a96');
 
-  printTimers();
+  profile := ACP_MEDIUM;
+
+  for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
+    music16.tag := 'c:\dev\logs\'+profile.tag+'_'+format('%d_%d_%d_std', [quantBits, ulawBits, log2mu]);
+    encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
+  end;
+
+
+  {look into options for getting medium quality to sound great}
+  (*
+  for quantBits in [2,3,4,5,6] do
+    for ulawbits in [5,6,7,8] do
+      for log2mu in [7] do begin
+        if keyDown(key_esc) then exit;
+        profile.quantBits := quantBits;
+        profile.ulawBits := ulawBits;
+        profile.log2mu := log2mu;
+        profile.filter := 0;
+        music16.tag := 'c:\dev\logs\'+format('%d_%d_%d_std', [quantBits, ulawBits, log2mu]);
+        encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
+        printTimers();
+    end;
+  *)
+  (*
+  for quantBits in [2,3,4,5,6] do
+    for ulawbits in [5,6,7,8] do
+      for log2mu in [7] do begin
+        if keyDown(key_esc) then exit;
+        profile.quantBits := quantBits;
+        profile.ulawBits := ulawBits;
+        profile.log2mu := log2mu;
+        profile.filter := 0;
+        music16.tag := 'c:\dev\logs\'+format('%d_%d_%d_std', [quantBits, ulawBits, log2mu]);
+        encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
+        printTimers();
+    end;
+  *)
+
+  //encodeLA96(music16, ACP_LOW, False).writeToDisk('c:\dev\tools\out_low_std.a96');
+
+
   writeln('Done.');
 
   delay(3000);
