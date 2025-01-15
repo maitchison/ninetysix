@@ -251,6 +251,7 @@ end;
 procedure tASPULawDelta.encode(newX: int32);
 var
   thisU: int32;
+  restoredX: int32;
   ax: int32;
 begin
   prevX := x;
@@ -265,6 +266,9 @@ begin
   y := thisU - prevU;
   x := newX;
   prevU := thisU;
+  restoredX := lut.decodeTable.data[abs(thisU)];
+  if thisU < 0 then restoredX := -restoredX;
+  lastError := (restoredX - newX);
 end;
 
 {-------------------------------------------------------}
@@ -337,15 +341,15 @@ begin
 
   if LA96_ENABLE_STATS then begin
     fullStats := tCSVWriter.create(removeExtension(sfx.tag)+'_full.csv');
-    fullStats.writeHeader('frame, sample, mid_true, mid, mid_code, mid_ema, dif_true, dif, dif_code, dif_ema');
+    fullStats.writeHeader('frame,sample,mid_true,mid,mid_code,mid_ema,dif_true,dif,dif_code,dif_ema');
     frameStats := tCSVWriter.create(removeExtension(sfx.tag)+'_frame.csv');
     frameStats.writeHeader(
-      'frame, '+
-      'midFrameSize, difFrameSize, '+
-      'midTrueMin, midTrueMax, midTrueMean, midTrueVar, '+
-      'midMin, midMax, midMean, midVar, '+
-      'difTrueMin, difTrueMax, difTrueMean, difTrueVar, '+
-      'difMin, difMax, difMean, difVar '
+      'frame,'+
+      'midFrameSize,difFrameSize,'+
+      'midTrueMin,midTrueMax,midTrueMean,midTrueVar,'+
+      'midMin,midMax,midMean,midVar,'+
+      'difTrueMin,difTrueMax,difTrueMean,difTrueVar,'+
+      'difMin,difMax,difMean,difVar'
       );
   end else begin
     fullStats := nil;
@@ -401,6 +405,11 @@ begin
   // -------------------------
   // Write Frames
 
+  midXStats.init();
+  difXStats.init();
+  midYStats.init();
+  difYStats.init();
+
   for i := 0 to numFrames-1 do begin
 
     //stub:
@@ -426,10 +435,10 @@ begin
     currentMidSign := 1;
     currentDifSign := 1;
 
-    midXStats.init();
-    difXStats.init();
-    midYStats.init();
-    difYStats.init();
+    midXStats.init(false);
+    difXStats.init(false);
+    midYStats.init(false);
+    difYStats.init(false);
 
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
@@ -465,15 +474,15 @@ begin
 
       if assigned(fullStats) then
         fullStats.writeRow([
-          i, j,
+          i, i*FRAME_SIZE+j,
           aspMid.x,
           aspMid.x+aspMid.lastError,
           aspMid.y,
-          midYStats.ema,
+          midXStats.ema,
           aspDif.x,
           aspDif.x+aspMid.lastError,
           aspDif.y,
-          difYStats.ema
+          difXStats.ema
         ]);
 
       incPtr();

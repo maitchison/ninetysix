@@ -14,18 +14,19 @@ type
     minValue, maxValue: int64;
     ema: double;
     procedure addValue(x: int32);
-    procedure init();
+    procedure init(clearEMA: boolean=true);
     function  mean: double;
     function  variance: double;
   end;
 
 implementation
 
-procedure tStats.init();
+procedure tStats.init(clearEMA: boolean=true);
 begin
   m1 := 0; m2 := 0; n := 0; alpha := 0.985;
   minValue := high(int64); maxValue := low(int64);
-  ema := 0;
+  if clearEMA then
+    ema := 0;
 end;
 
 procedure tStats.addValue(x: int32);

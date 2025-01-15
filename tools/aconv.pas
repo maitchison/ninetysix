@@ -241,11 +241,11 @@ begin
 
   profile := ACP_MEDIUM;
 
-  for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
-    music16.tag := 'c:\dev\logs\'+profile.tag+'_'+format('%d_%d_%d_std', [quantBits, ulawBits, log2mu]);
+  //for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
+  for profile in [ACP_MEDIUM] do begin
+    music16.tag := 'c:\dev\logs\'+profile.tag+'_'+format('%d_%d_%d_std', [profile.quantBits, profile.ulawBits, profile.log2mu]);
     encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
   end;
-
 
   {look into options for getting medium quality to sound great}
   (*
@@ -300,8 +300,8 @@ begin
   runTestSuites();
   initKeyboard();
 
-  testCompression();
-  //go();
+  //testCompression();
+  abTest();
 
   textAttr := LIGHTGRAY;
 
