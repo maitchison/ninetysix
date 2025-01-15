@@ -236,6 +236,8 @@ begin
 
   writeln('--------------------------');
   writeln('Compressing.');
+  LA96_ENABLE_STATS := true;
+  music16.tag := 'c:\dev\logs\low_std';
   encodeLA96(music16, ACP_LOW, False).writeToDisk('c:\dev\tools\out_low_std.a96');
 
   printTimers();

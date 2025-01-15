@@ -62,7 +62,7 @@ type
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
     procedure writeVLCControlCode(value: dword); inline;
-    function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): integer;
+    function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): int32;
     function  VLCbits(value: dword): word; inline;
 
     procedure setSize(newSize: int32);
@@ -763,20 +763,24 @@ written, i.e. by first encoding a VLC length code
 This function can be useful to minimize the worst case, as we can
 make use of 8bit packing with very little loss in efficency.
 
-returns the packing bits used, or -1 for variable
+returns the number of bytes used
 }
-function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): integer;
+function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): int32;
 var
   i: int32;
   maxValue: int32;
   unpackedBits: int32;
   packingCost: int32;
   packingOptions: set of byte;
-  n: integer;
+  n: int32;
+  startPos: int32;
 const
   FAST_OPTIONS = [0,1,2,4,8];
   ALL_OPTIONS = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24];
 begin
+
+  startPos := fPos;
+
   maxValue := 0;
   unpackedBits := 0;
   for i := 0 to length(values)-1 do begin
@@ -798,7 +802,7 @@ begin
           {control-code}
           writeVLCControlCode(encodePackingCode(n));
           packBits(values, n, self);
-          result := n;
+          result := fPos-startPos;
           exit;
         end;
       end;
@@ -809,7 +813,7 @@ begin
   for i := 0 to length(values)-1 do
     writeVLC(values[i]);
 
-  result := -1;
+  result := fPos-startPos;
 
   self.byteAlign();
 end;

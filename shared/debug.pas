@@ -64,12 +64,34 @@ var
   WRITE_TO_SCREEN: boolean = false;
   WRITE_TO_LOG: boolean = true;
 
+type
+  Exception = class
+  private
+    fMessage: string;
+  public
+    constructor create(const msg: string);
+    property message: string read fMessage;
+  end;
+
+  ValueError = class(Exception)
+  end;
+
+
 implementation
 
 uses
   utils,
   sysInfo,
   vga;
+
+{------------------------------------------------}
+
+constructor Exception.create(const msg: string);
+begin
+  fMessage := msg;
+end;
+
+{------------------------------------------------}
 
 function tLogEntry.toString(): String;
 begin

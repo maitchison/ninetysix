@@ -34,8 +34,10 @@ uses
   go32,
   sysInfo,
   timer,
+  stats,
   list,
   sound,
+  csv,
   audioFilter,
   stream;
 
@@ -59,6 +61,7 @@ type
 
   tAudioStreamProcessor = class
     x, prevX, y, prevY: int32;
+    lastError: int32;
     procedure encode(newX: int32); virtual;
     procedure reset(initialValue: int32=0); virtual;
   end;
@@ -79,7 +82,6 @@ type
 
   {uLaw on deltas}
   tASPDeltaULaw = class(tASPULaw)
-    currentError: int32;  // to track drift
     procedure encode(newX: int32); override;
   end;
 
@@ -101,6 +103,9 @@ const
   ACP_Q12: tAudioCompressionProfile      = (quantBits:5;ulawBits:0;log2Mu:0;filter:0);
   ACP_Q16: tAudioCompressionProfile      = (quantBits:1;ulawBits:0;log2Mu:0;filter:0);
   ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:0;ulawBits:0;log2Mu:0;filter:0);
+
+var
+  LA96_ENABLE_STATS: boolean = false;
 
 implementation
 
@@ -164,6 +169,7 @@ begin
   y := initialValue;
   prevX := 0;
   prevY := 0;
+  lastError := 0;
 end;
 
 procedure tAudioStreamProcessor.encode(newX: int32);
@@ -172,6 +178,7 @@ begin
   prevY := y;
   x := newX;
   y := newX;
+  lastError := 0;
 end;
 
 {------}
@@ -182,6 +189,7 @@ begin
   prevY := y;
   y := newX - prevX;
   x := newX;
+  lastError := 0;
 end;
 
 {------}
@@ -208,6 +216,7 @@ begin
   prevY := y;
   y := lut.encode(newX);
   x := newX;
+  lastError := newX-lut.decode(y);
 end;
 
 {------}
@@ -229,9 +238,9 @@ begin
   delta := clamp16(x - prevX);
   y := round(ulaw(delta, mu) * (1 shl uLawBits));
   yInv := uLawInv(y / (1 shl uLawBits), mu);
-  currentError := (prevX+yInv) - x;
-  if currentError > abs(y) then dec(y);
-  if currentError < -abs(y) then inc(y);
+  lastError := (prevX+yInv) - x;
+  if lastError > abs(y) then dec(y);
+  if lastError < -abs(y) then inc(y);
 
 end;
 
@@ -303,6 +312,13 @@ var
   midSignCounter, difSignCounter: integer;
   currentMidSign, currentDifSign: integer;
 
+  fullStats, frameStats: tCSVWriter;
+
+  midFrameSize, difFrameSize: int32;
+
+  midXStats, difXStats,
+  midYStats, difYStats: tStats;
+
   procedure incPtr(); inline;
   begin
     {once we reach end just write out the last value repeatedly}
@@ -316,6 +332,23 @@ begin
   assert(profile.quantBits <= 16);
 
   if sfx.length = 0 then exit(nil);
+
+  if LA96_ENABLE_STATS then begin
+    fullStats := tCSVWriter.create(removeExtension(sfx.tag)+'_full.csv');
+    fullStats.writeHeader('frame, sample, mid_true, mid, mid_code, mid_ema, dif_true, dif, dif_code, dif_ema');
+    frameStats := tCSVWriter.create(removeExtension(sfx.tag)+'_frame.csv');
+    frameStats.writeHeader(
+      'frame, '+
+      'midFrameSize, difFrameSize, '+
+      'midTrueMin, midTrueMax, midTrueMean, midTrueVar, '+
+      'midMin, midMax, midMean, midVar, '+
+      'difTrueMin, difTrueMax, difTrueMean, difTrueVar, '+
+      'difMin, difMax, difMean, difVar '
+      );
+  end else begin
+    fullStats := nil;
+    frameStats := nil;
+  end;
 
   // Setup out output stream
   {guess that we'll need 2 bytes per sample, i.e 4:1 compression vs 16bit stereo}
@@ -388,12 +421,22 @@ begin
     currentMidSign := 1;
     currentDifSign := 1;
 
+    midXStats.init();
+    difXStats.init();
+    midYStats.init();
+    difYStats.init();
 
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
       aspMid.encode(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
       aspDif.encode(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
+
+      {stats}
+      midXStats.addValue(aspMid.x);
+      difXStats.addValue(aspDif.x);
+      midYStats.addValue(aspMid.y);
+      difYStats.addValue(aspDif.y);
 
       midCodes[j] := abs(aspMid.y);
       difCodes[j] := abs(aspDif.y);
@@ -415,6 +458,19 @@ begin
       if aspMid.y < 0 then midSignBits[j] := 1;
       if aspDif.y < 0 then difSignBits[j] := 1;
 
+      if assigned(fullStats) then
+        fullStats.writeRow([
+          i, j,
+          aspMid.x,
+          aspMid.x+aspMid.lastError,
+          aspMid.y,
+          midYStats.ema,
+          aspDif.x,
+          aspDif.x+aspMid.lastError,
+          aspDif.y,
+          difYStats.ema
+        ]);
+
       incPtr();
     end;
     stopTimer('LA96_process');
@@ -424,10 +480,8 @@ begin
 
     {write out frame}
     startTimer('LA96_segments');
-    //stub
-    writeln(midCodes[0], ' ' , midCodes[1], ' ' ,midCodes[2]);
-    ds.writeVLCSegment(midCodes, PACK_BEST);
-    ds.writeVLCSegment(difCodes, PACK_BEST);
+    midFrameSize := ds.writeVLCSegment(midCodes, PACK_BEST);
+    difFrameSize := ds.writeVLCSegment(difCodes, PACK_BEST);
     stopTimer('LA96_segments');
 
     {write signs}
@@ -441,6 +495,30 @@ begin
       ds.writeVLCSegment(difSignBits)
     else
       ds.writeBytes(difSigns.asBytes);
+
+    if assigned(frameStats) then
+      frameStats.writeRow([
+        i,
+        midFrameSize,
+        difFrameSize,
+        midXStats.minValue,
+        midXStats.maxValue,
+        midXStats.mean,
+        midXStats.variance,
+        midYStats.minValue,
+        midYStats.maxValue,
+        midYStats.mean,
+        midYStats.variance,
+        difXStats.minValue,
+        difXStats.maxValue,
+        difXStats.mean,
+        difXStats.variance,
+        difYStats.minValue,
+        difYStats.maxValue,
+        difYStats.mean,
+        difYStats.variance
+      ]);
+
 
     write('.');
 
@@ -468,11 +546,15 @@ begin
   fs.writeVLCSegment(frameDif, PACK_BEST);
   fs.writeVLCSegment(framePtr, PACK_BEST);
 
+  {clean up}
   midSigns.free;
   difSigns.free;
 
   aspMid.free;
   aspDif.free;
+
+  if assigned(fullStats) then fullStats.free;
+  if assigned(frameStats) then frameStats.free;
 
   stopTimer('LA96');
 
