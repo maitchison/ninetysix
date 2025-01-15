@@ -211,7 +211,7 @@ begin
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
   //stub:
   //for i := 0 to header.numFrames-1 do begin
-  for i := 0 to 10-1 do begin
+  for i := 0 to 100-1 do begin
     nextFrame(result, i*header.frameSize);
     //stub:
     if keyDown(key_esc) then break;
@@ -222,9 +222,10 @@ end;
  can be used to stream music compressed in memory.}
 procedure tLA96Reader.nextFrame(sfx: tSoundEffect;sfxOffset: dword);
 var
-  midFrameParams, difFrameParams: byte;
+  frameType: byte;
+  midShift, difShift, midULaw, difULaw: byte;
 
-  midValue, difValue: int32;
+  midCode, difCode: int32;
   signFormat: byte;
 
   i: int32;
@@ -233,8 +234,18 @@ var
 
   procedure readSigns(var signs: tDwords);
   begin
-    writeln(format('%d %d %d %d', [fs.readByte(), fs.readByte(), fs.readByte(), fs.readByte()]));
+    if fs.readByte() <> $00 then error('invalid sign format');
     fs.readVLCSegment(header.frameSize-1, signs);
+  end;
+
+  function generateSample(midCode, difCode: int32): tAudioSample16S;
+  var
+    mid, dif: int32;
+  begin
+    mid := midCode shl midShift;
+    dif := difCode shl difShift;
+    result.left := clamp16((mid + dif) div 2);
+    result.right := clamp16((mid - dif) div 2);
   end;
 
 begin
@@ -242,18 +253,19 @@ begin
   writeln('processing frame ',frameOn);
 
   {read frame header}
-  midFrameParams := fs.readByte();
-  difFrameParams := fs.readByte();
+  frameType := fs.readByte(); midShift := frameType and $f; midULaw := frameType shr 8;
+  frameType := fs.readByte(); difShift := frameType and $f; difULaw := frameType shr 8;
 
-  writeln(format('codes %d %d',[midFrameParams, difFrameParams]));
+  writeln(format('frameType: %d',[frameType]));
 
-  midValue := fs.readVLC();
-  difValue := fs.readVLC();
+  midCode := fs.readVLC();
+  difCode := fs.readVLC();
   fs.byteAlign();
 
-  writeln('values:', midValue, ' ', difValue);
+  writeln('codes :', midCode, ' ', difCode);
 
   writeln('mid');
+
   fs.readVLCSegment(header.frameSize-1, midCodes);
   writeln(midCodes.toString);
   writeln('dif');
@@ -264,17 +276,22 @@ begin
   readSigns(midSigns);
   readSigns(difSigns);
 
+  sfx[sfxOffset] := generateSample(midCode, difCode);
+
   {process frame}
-  for i := 0 to header.frameSize-1 do begin
-    sample.left := negDecode(midValue)+round(rnd*32);
-    sample.right := negDecode(difValue)+round(rnd*32);
-    sfx[sfxOffset+i] := sample;
+  for i := 0 to (header.frameSize-1)-1 do begin
+
+    if difSigns[i] = 1 then difCode -= difCodes[i] else difCode += difCodes[i];
+    if midSigns[i] = 1 then midCode -= midCodes[i] else midCode += difCodes[i];
+
+    sample := generateSample(midCode, difCode);
+    sfx[sfxOffset+i+1] := sample;
   end;
 
   inc(frameOn);
 
   {stub:}
-  if not keyDown(key_esc) then delay(1000);
+  if keyDown(key_s) then delay(100);
   while keyDown(key_p) do delay(10);
 
 end;
@@ -481,10 +498,7 @@ var
     i: integer;
   begin
     startPos := fs.pos;
-    fs.writeByte($01); // magic marker...
-    fs.writeByte($02);
-    fs.writeByte($03);
-    fs.writeByte($04);
+    fs.writeByte($00); // sign format
     {todo: support writing these out as gaps between sign changes,
      or even auto detect which is better}
     fillchar(signBits, sizeof(signBits), 0);
@@ -497,6 +511,9 @@ var
     {todo: detect when this doesn't work, and just write out the bits}
     {also.. is this really worth it?}
   end;
+
+const
+  ENABLE_CENTERING = false;
 
 begin
 
@@ -600,6 +617,11 @@ begin
 
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
+
+      if not ENABLE_CENTERING then begin
+        cMid := 0;
+        cDif := 0;
+      end;
 
       aspMid.encode(quant(samplePtr^.left+samplePtr^.right-cMid, profile.quantBits));
       aspDif.encode(quant(samplePtr^.left-samplePtr^.right-cDif, profile.quantBits));

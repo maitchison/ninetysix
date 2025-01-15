@@ -141,6 +141,7 @@ begin
     6: exit(5);
     7: exit(6);
   end;
+  if value >= 100 then exit(value-100);
   exit(-1);
 end;
 
