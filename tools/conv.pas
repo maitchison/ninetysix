@@ -334,6 +334,7 @@ var
   profile: tAudioCompressionProfile;
   log2mu, ulawBits, quantBits: integer;
   outStream: tStream;
+  reader: tLA96Reader;
 begin
 
   writeln('--------------------------');
@@ -355,6 +356,12 @@ begin
       outStream.free;
     end;
   end;
+
+  writeln('--------------------------');
+  writeln('Read compressed file.');
+
+  reader := tLA96Reader.create('c:\dev\tmp\high_3_8_8_new.a96');
+  reader.free;
 
   writeln('Done.');
 

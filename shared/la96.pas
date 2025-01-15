@@ -62,34 +62,28 @@ type
     filter: byte;    // frequency of low pass filter (in khz) = (0 off).
   end;
 
-  tAudioStreamProcessor = class
-    x, prevX, y, prevY: int32;
-    xPrime: int32; {what our decoder will produce}
-    function lastError: int32;
-    procedure encode(newX: int32); virtual;
-    procedure reset(initialValue: int32=0); virtual;
+  tLA96FileHeader = packed record
+    tag: array[1..4] of char;
+    versionSmall, versionBig: word;
+    format, compressionMode: byte;
+    numFrames: dWord;
+    numSamples: dWord;
+    frameSize: word;
+    log2mu: byte;
+    postFilter: byte;
   end;
 
-  {encode the difference between samples}
-  tASPDelta = class(tAudioStreamProcessor)
-    procedure encode(newX: int32); override;
-  end;
-
-  tASPULaw = class(tAudioStreamProcessor)
-    lut: tULawLookup;
-    log2Mu: byte;
-    uLawBits: byte;
-    constructor create(uLawBits: byte=8;log2Mu: byte=8);
+  {todo: make a LA96Writer aswell (for progressive save)}
+  tLA96Reader = class
+    fs: tStream;
+    header: tLA96FileHeader;
+    constructor create(filename: string);
     destructor destroy(); override;
-    procedure encode(newX: int32); override;
+    procedure close();
+    function  readSfx(): tSoundEffect;
+    procedure readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
   end;
 
-  {delta on uLaw}
-  tASPULawDelta = class(tASPULaw)
-    prevU: int32;
-    procedure reset(initialValue: int32=0); override;
-    procedure encode(newX: int32); override;
-  end;
 
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
@@ -123,28 +117,35 @@ type
     startMid, startDif: int16;
   end;
 
-  tLA96FileHeader = packed record
-    tag: array[1..4] of char;
-    versionSmall, versionBig: word;
-    format, compressionMode: byte;
-    numFrames: dWord;
-    numSamples: dWord;
-    frameSize: word;
-    log2mu: byte;
-    postFilter: byte;
+  tAudioStreamProcessor = class
+    x, prevX, y, prevY: int32;
+    xPrime: int32; {what our decoder will produce}
+    function lastError: int32;
+    procedure encode(newX: int32); virtual;
+    procedure reset(initialValue: int32=0); virtual;
   end;
 
-  {todo: make a LA96Writer aswell (for progressive save)}
-  tLA96Reader = class
-    fs: tStream;
-    header: tLA96FileHeader;
-    frames: array of tLA96FrameHeader;
-    constructor create(filename: string);
-    destructor destroy(); override;
-    procedure close();
-    function  readSfx(): tSoundEffect;
-    procedure readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+  {encode the difference between samples}
+  tASPDelta = class(tAudioStreamProcessor)
+    procedure encode(newX: int32); override;
   end;
+
+  tASPULaw = class(tAudioStreamProcessor)
+    lut: tULawLookup;
+    log2Mu: byte;
+    uLawBits: byte;
+    constructor create(uLawBits: byte=8;log2Mu: byte=8);
+    destructor destroy(); override;
+    procedure encode(newX: int32); override;
+  end;
+
+  {delta on uLaw}
+  tASPULawDelta = class(tASPULaw)
+    prevU: int32;
+    procedure reset(initialValue: int32=0); override;
+    procedure encode(newX: int32); override;
+  end;
+
 
 {
 How this will work.
@@ -189,7 +190,6 @@ begin
     fs.free;
     fs := nil;
   end;
-  frames := nil;
   fillchar(header, sizeof(header), 0);
 end;
 
@@ -200,7 +200,7 @@ var
 begin
   {just loop through all frames}
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
-  for i := 0 to length(frames)-1 do
+  for i := 0 to header.numFrames-1 do
     readFrame(i, result, i*header.frameSize);
 end;
 
