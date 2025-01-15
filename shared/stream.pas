@@ -61,7 +61,6 @@ type
     procedure writeWord(w: word); inline;
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
-    procedure writeVLCControlCode(value: dword); inline;
     function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): int32;
     function  VLCbits(value: dword): word; inline;
 
@@ -108,42 +107,12 @@ implementation
 {$I stream_ref.inc}
 {$I stream_asm.inc}
 
+const
+  {segment types}
+  ST_VLC1 = 0;  {this is the less efficent VLC method}
+  ST_PACK = 16; {packing bits - segmentType-16}
+
 {------------------------------------------------------}
-
-{Returns the packing code for given number of bits}
-function encodePackingCode(nBits: byte): int32;
-begin
-  case nBits of
-    0: exit(0);
-    1: exit(1);
-    2: exit(2);
-    4: exit(3);
-    8: exit(4);
-    {extra ones}
-    3: exit(5);
-    5: exit(6);
-    6: exit(7);
-  end;
-  exit(100+nBits); {stub: support all codes}
-end;
-
-{Returns the packing code for given number of bits}
-function decodePackingCode(value: byte): int32;
-begin
-  case value of
-    0: exit(0);
-    1: exit(1);
-    2: exit(2);
-    3: exit(4);
-    4: exit(8);
-    {extra codes}
-    5: exit(3);
-    6: exit(5);
-    7: exit(6);
-  end;
-  if value >= 100 then exit(value-100);
-  exit(-1);
-end;
 
 var
   packing1: array[0..255] of array[0..7] of dword;
@@ -413,7 +382,7 @@ begin
   if midByte then
     error('Unaligned readBytes');
   if n > (len-fPos) then
-    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (fPos + n)]));
+    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (len - fpos)]));
 
   system.setLength(result, n);
   move(bytes[fPos], result[0], n);
@@ -501,7 +470,7 @@ with most signficant nibbles on the right.
 xxx0               (0-7)
 xxx1xxx0           (8-63)
 xxx1xxx1xxx0       (64-511)
-xxx1xxx1xxx1xxx0  (512-4095)
+xxx1xxx1xxx1xxx0   (512-4095)
 
 Note: codes in the form
 
@@ -517,23 +486,6 @@ begin
   while true do begin
     if value < 8 then begin
       writeNibble(value);
-      exit;
-    end else begin
-      writeNibble($8+(value and $7));
-      value := value shr 3;
-    end;
-  end;
-end;
-
-{write a special out-of-band control code.}
-procedure tStream.writeVLCControlCode(value: dword);
-begin
-  {these codes will never appear in normal VLC encoding as they
-   would always be encoded using the smaller length.}
-  while true do begin
-    if value < 8 then begin
-      writeNibble($8+value);
-      writeNibble(0);
       exit;
     end else begin
       writeNibble($8+(value and $7));
@@ -669,17 +621,17 @@ var
   value: dword;
   bytePos: int32;
 
-function nextBit: byte; inline;
-begin
-  if bitsRemaining = 0 then begin
-    inc(inBuffer);
-    bitBuffer := inBuffer^;
-    bitsRemaining := 8;
+  function nextBit: byte; inline;
+  begin
+    if bitsRemaining = 0 then begin
+      inc(inBuffer);
+      bitBuffer := inBuffer^;
+      bitsRemaining := 8;
+    end;
+    result := bitBuffer and $1;
+    bitBuffer := bitBuffer shr 1;
+    dec(bitsRemaining);
   end;
-  result := bitBuffer and $1;
-  bitBuffer := bitBuffer shr 1;
-  dec(bitsRemaining);
-end;
 
 begin
   bitBuffer := inBuffer^;
@@ -727,16 +679,9 @@ begin
   exit(outBuffer);
 end;
 
-function isControlCode(b: byte): boolean;
-begin
-  result := (b >= 8) and (b < 16);
-end;
-
 function tStream.readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
 var
-  ctrlCode: word;
-  b: byte;
-  packingBits: int32;
+  segmentType: byte;
 begin
 
   if not assigned(outBuffer) then
@@ -744,20 +689,15 @@ begin
 
   self.byteAlign();
 
-  b := peekByte;
-  if isControlCode(b) then begin
-    {this is a control code}
-    packingBits := decodePackingCode(readByte-8);
-    if packingBits < 0 then
-      Error('Invalid packing code');
-    unpackBits(self, packingBits, n, outBuffer);
-    exit(outBuffer);
+  segmentType := readByte();
+
+  case segmentType of
+    ST_VLC1: readVLCSequence_ASM(self, n, outBuffer);
+    ST_PACK..ST_PACK+64: unpackBits(self, segmentType-16, n, outBuffer);
+    else error('Invalid segment type '+intToStr(segmentType));
   end;
 
-  readVLCSequence_ASM(self, n, outBuffer);
-
   self.byteAlign();
-
   exit(outBuffer);
 end;
 
@@ -779,8 +719,8 @@ function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=P
 var
   i: int32;
   maxValue: int32;
-  unpackedBits: int32;
-  packingCost: int32;
+  unpackedBytes: int32;
+  packingBytes: int32;
   packingOptions: set of byte;
   n: int32;
   startPos: int32;
@@ -792,10 +732,10 @@ begin
   startPos := fPos;
 
   maxValue := 0;
-  unpackedBits := 0;
+  unpackedBytes := 0;
   for i := 0 to length(values)-1 do begin
     maxValue := max(maxValue, values[i]);
-    unpackedBits += VLCBits(values[i]);
+    unpackedBytes += bytesForBits(VLCBits(values[i]));
   end;
 
   self.byteAlign();
@@ -807,10 +747,10 @@ begin
       packingOptions := ALL_OPTIONS;
     for n in packingOptions do begin
       if maxValue < (1 shl n) then begin
-        packingCost := (length(values) * n)+8;
-        if (packingCost < unpackedBits) or (packing = PACK_ALWAYS) then begin
+        packingBytes := bytesForBits(length(values) * n)+1;
+        if (packingBytes <= unpackedBytes) or (packing = PACK_ALWAYS) then begin
           {control-code}
-          writeVLCControlCode(encodePackingCode(n));
+          writeByte(ST_PACK+n);
           packBits(values, n, self);
           result := fPos-startPos;
           exit;
@@ -820,9 +760,9 @@ begin
   end;
 
   {just write out the data}
+  writeByte(ST_VLC1);
   for i := 0 to length(values)-1 do
     writeVLC(values[i]);
-
   result := fPos-startPos;
 
   self.byteAlign();

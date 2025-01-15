@@ -73,7 +73,7 @@ function roundUpToPowerOfTwo(x: dword): dword;
 { SysUtils replacements}
 
 function  Now(): TDateTime;
-function  Format(fmt: string; args: array of Const): string;
+function  format(fmt: string; args: array of Const): string;
 procedure Sleep(ms: integer);
 
 procedure GetDate(var year, month, mday, wday: word);
@@ -223,7 +223,7 @@ end;
 {----------------------------------------------------------}
 
 {Cut down version of format}
-function Format(fmt: string; args: array of Const): string;
+function format(fmt: string; args: array of Const): string;
 var
   i, ArgIndex: Integer;
   InPlaceholder: Boolean;
@@ -244,6 +244,7 @@ begin
         result += '%';
       end else
         inPlaceholder := True;
+        places := 1;
       continue;
     end;
     if inPlaceholder then begin

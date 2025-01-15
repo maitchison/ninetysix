@@ -209,9 +209,7 @@ var
   i: integer;
 begin
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
-  //stub:
-  //for i := 0 to header.numFrames-1 do begin
-  for i := 0 to 100-1 do begin
+  for i := 0 to header.numFrames-1 do begin
     nextFrame(result, i*header.frameSize);
     //stub:
     if keyDown(key_esc) then break;
@@ -252,47 +250,46 @@ begin
 
   writeln('processing frame ',frameOn);
 
+  startTimer('LA96_DF');
+
   {read frame header}
   frameType := fs.readByte(); midShift := frameType and $f; midULaw := frameType shr 8;
   frameType := fs.readByte(); difShift := frameType and $f; difULaw := frameType shr 8;
 
-  writeln(format('frameType: %d',[frameType]));
-
-  midCode := fs.readVLC();
-  difCode := fs.readVLC();
+  midCode := negDecode(fs.readVLC());
+  difCode := negDecode(fs.readVLC());
   fs.byteAlign();
 
-  writeln('codes :', midCode, ' ', difCode);
-
-  writeln('mid');
-
+  startTimer('LA96_DF_ReadSegments');
   fs.readVLCSegment(header.frameSize-1, midCodes);
-  writeln(midCodes.toString);
-  writeln('dif');
   fs.readVLCSegment(header.frameSize-1, difCodes);
-  writeln(difCodes.toString);
 
-  writeln('Signs');
   readSigns(midSigns);
   readSigns(difSigns);
+  stopTimer('LA96_DF_ReadSegments');
 
   sfx[sfxOffset] := generateSample(midCode, difCode);
 
-  {process frame}
+  startTimer('LA96_DF_Process');
   for i := 0 to (header.frameSize-1)-1 do begin
 
+    if midSigns[i] = 1 then midCode -= midCodes[i] else midCode += midCodes[i];
     if difSigns[i] = 1 then difCode -= difCodes[i] else difCode += difCodes[i];
-    if midSigns[i] = 1 then midCode -= midCodes[i] else midCode += difCodes[i];
 
     sample := generateSample(midCode, difCode);
     sfx[sfxOffset+i+1] := sample;
   end;
+  stopTimer('LA96_DF_Process');
 
   inc(frameOn);
+
+  stopTimer('LA96_DF');
 
   {stub:}
   if keyDown(key_s) then delay(100);
   while keyDown(key_p) do delay(10);
+
+  printTimers();
 
 end;
 
@@ -352,7 +349,7 @@ begin
   y := initialValue;
   prevX := 0;
   prevY := 0;
-  xPrime := 0;
+  xPrime := initialValue;
 end;
 
 {returns the value the decode will produce for x}
@@ -434,7 +431,8 @@ end;
 procedure tASPULawDelta.reset(initialValue: int32=0);
 begin
   inherited reset(initialValue);
-  prevU := 0;
+  prevU := uLawEncode.lookup(initialValue);
+  xPrime := initialValue;
 end;
 
 {-------------------------------------------------------}
@@ -595,9 +593,9 @@ begin
     //stub:
     if keyDown(key_esc) then break;
 
+    if samplePtr < maxSamplePtr then inc(samplePtr);
     aspMid.reset(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
     aspDif.reset(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
-    if samplePtr < maxSamplePtr then inc(samplePtr);
 
     midXStats.init(false);
     difXStats.init(false);
@@ -623,9 +621,14 @@ begin
         cDif := 0;
       end;
 
+      {stub: show first few expected value}
+      if (i = 0) and (j < 10) then begin
+        log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x,aspMid.y, aspMid.xPrime shl profile.quantBits, samplePtr^.left+samplePtr^.right]));
+      end;
+
+      if samplePtr < maxSamplePtr then inc(samplePtr);
       aspMid.encode(quant(samplePtr^.left+samplePtr^.right-cMid, profile.quantBits));
       aspDif.encode(quant(samplePtr^.left-samplePtr^.right-cDif, profile.quantBits));
-      if samplePtr < maxSamplePtr then inc(samplePtr);
 
       {xPrime is decoders quant(decoded-cMid)}
       cMid := ((aspMid.xPrime shl profile.quantBits) + cMid) div 256 * 256;

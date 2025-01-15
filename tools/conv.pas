@@ -342,9 +342,6 @@ begin
   writeln('Loading music.');
   music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
 
-  //mixer.play(music16, SCS_FIXED1);
-  //mixer.channels[1].looping := true;
-
   writeln('--------------------------');
   writeln('Compressing.');
   LA96_ENABLE_STATS := false;
@@ -365,10 +362,11 @@ begin
   sfx := reader.readSFX;
   reader.free;
   mixer.play(sfx);
+  mixer.channels[1].looping := true;
 
   writeln('Done.');
 
-  delay(3000);
+  repeat until keyDown(key_esc);
 end;
 
 var
