@@ -55,8 +55,8 @@ type
 
   tAudioCompressionProfile = record
     tag: string;
-    quantBits: byte; // number of bits to remove 0..16 (0=off)
-    ulawBits: byte;  // number of ulaw bits, (0 = off).
+    quantBits: byte; // number of bits to remove 0..15 (0=off)
+    ulawBits: byte;  // number of ulaw bits, 0..15 (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
     filter: byte;    // frequency of low pass filter (in khz) = (0 off).
   end;
@@ -77,6 +77,9 @@ type
     fs: tStream;
     header: tLA96FileHeader;
     ulawTable: array[6..8] of tULawLookup;
+    midCodes, difCodes: tDwords;
+    midSigns, difSigns: tDwords;
+    frameOn: int32;
     constructor create(filename: string);
     destructor destroy(); override;
     procedure close();
@@ -111,11 +114,6 @@ const
 {-------------------------------------------------------}
 
 type
-
-  tLA96FrameHeader = record
-    offset: dword;
-    startMid, startDif: int16;
-  end;
 
   tAudioStreamProcessor = class
     x, prevX, y, prevY: int32;
@@ -177,6 +175,14 @@ begin
   fs.readFromFile(filename);
   fs.seek(128);
 
+  frameOn := 0;
+
+  {setup our buffers}
+  setLength(midCodes, header.frameSize-1);
+  setLength(difCodes, header.frameSize-1);
+  setLength(midSigns, header.frameSize-1);
+  setLength(difSigns, header.frameSize-1);
+
   {create ulaw tables}
   for bits := low(ulawTable) to high(ulawTable) do
     ulawTable[bits].initDecode(bits, header.log2mu);
@@ -210,12 +216,52 @@ end;
 {decodes the next frame into sfx at given sample position.
  can be used to stream music compressed in memory.}
 procedure tLA96Reader.nextFrame(sfx: tSoundEffect;sfxOffset: dword);
+var
+  midFrameParams, difFrameParams: byte;
+
+  midValue, difValue: int32;
+  signFormat: byte;
+
+  i: int32;
+
+  sample: tAudioSample16S;
 begin
-  {todo: this should be super fast, like maybe MMX fast}
-  {get initial values}
+
+  writeln('processing frame ',frameOn);
+
   {read frame header}
-  {read frame}
-  {processs}
+  midFrameParams := fs.readByte();
+  difFrameParams := fs.readByte();
+
+  writeln(format('codes %d %d',[midFrameParams, difFrameParams]));
+
+  midValue := fs.readVLC();
+  difValue := fs.readVLC();
+  fs.byteAlign();
+
+  fs.readVLCSegment(header.frameSize-1, midCodes);
+  fs.readVLCSegment(header.frameSize-1, difCodes);
+
+  writeln(midCodes.toString);
+
+  signFormat := fs.readByte();
+  if signFormat <> 0 then error(format('Invalid sign format %d', [signFormat]));
+  fs.readVLCSegment(header.frameSize-1, midSigns);
+  signFormat := fs.readByte();
+  if signFormat <> 0 then error(format('Invalid sign format %d', [signFormat]));
+  fs.readVLCSegment(header.frameSize-1, difSigns);
+
+  for i := 0 to header.frameSize-1 do begin
+    sample.left := negDecode(midValue)+round(rnd*32);
+    sample.right := negDecode(difValue)+round(rnd*32);
+    sfx[sfxOffset+i] := sample;
+  end;
+
+  inc(frameOn);
+
+  {stub:}
+  if not keyDown(key_esc) then delay(1000);
+
 end;
 
 {-------------------------------------------------------}
@@ -388,11 +434,12 @@ var
    the initial value}
   midCodes: array[0..(FRAME_SIZE-1)-1] of dword;
   difCodes: array[0..(FRAME_SIZE-1)-1] of dword;
-  midSignBits: array[0..(FRAME_SIZE-1)-1] of dword;
-  difSignBits: array[0..(FRAME_SIZE-1)-1] of dword;
+  midSigns: array[0..(FRAME_SIZE-1)-1] of int8;
+  difSigns: array[0..(FRAME_SIZE-1)-1] of int8;
+
+  signBits: array[0..(FRAME_SIZE-1)-1] of dword;
 
   fs: tStream;  // our file stream
-  midSigns, difSigns: tStream;
 
   counter: int32;
   numFrames: int32;
@@ -400,8 +447,6 @@ var
   frameSizes: tDwords;
   maxSamplePtr: pointer;
   aspMid, aspDif: tAudioStreamProcessor;
-  midSignCounter, difSignCounter: integer;
-  currentMidSign, currentDifSign: integer;
 
   cMid, cDif: int32; {centers}
   tmp: int32;
@@ -414,10 +459,31 @@ var
   midXStats, difXStats,
   midYStats, difYStats: tStats;
 
+  procedure writeOutSigns(signs: array of int8);
+  var
+    startPos: int32;
+    bytesUsed: int32;
+    i: integer;
+  begin
+    startPos := fs.pos;
+    fs.writeByte($00);
+    {todo: support writing these out as gaps between sign changes,
+     or even auto detect which is better}
+    fillchar(signBits, sizeof(signBits), 0);
+    for i := 0 to (FRAME_SIZE-1)-1 do
+      if signs[i] < 0 then signBits[i] := 1;
+    bytesUsed := fs.writeVLCSegment(signBits);
+    {also todo: move sign change detection here}
+    {try writing these out as differences}
+    //bytesUsed := fs.writeVLCSegment(difSignBits);
+    {todo: detect when this doesn't work, and just write out the bits}
+    {also.. is this really worth it?}
+  end;
+
 begin
 
-  assert(profile.quantBits >= 0);
-  assert(profile.quantBits <= 16);
+  assert(profile.quantBits <= 15);
+  assert(profile.ulawBits <= 15);
 
   if sfx.length = 0 then exit(nil);
 
@@ -450,9 +516,6 @@ begin
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
 
-  midSigns := tStream.create();
-  difSigns := tStream.create();
-
   framePtr := nil;
 
   if profile.ulawBits > 0 then begin
@@ -473,7 +536,7 @@ begin
   header.compressionMode := 0;
   header.numFrames := numFrames;
   header.numSamples := sfx.length;
-  header.frameSize := 1024;
+  header.frameSize := FRAME_SIZE;
   header.log2mu := profile.log2mu;
   header.postFilter := profile.filter;
 
@@ -501,17 +564,6 @@ begin
     aspDif.reset(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
     if samplePtr < maxSamplePtr then inc(samplePtr);
 
-    midSignCounter := 0;
-    difSignCounter := 0;
-
-    midSigns.softReset();
-    difSigns.softReset();
-
-    fillchar(midSignBits, sizeof(midSignBits), 0);
-    fillchar(difSignBits, sizeof(difSignBits), 0);
-    currentMidSign := 1;
-    currentDifSign := 1;
-
     midXStats.init(false);
     difXStats.init(false);
     midYStats.init(false);
@@ -524,8 +576,9 @@ begin
     framePtr.append(fs.pos);
     fs.writeByte(profile.quantBits + profile.ulawBits*16);
     fs.writeByte(profile.quantBits + profile.ulawBits*16);
-    fs.writeByte(min(negEncode(aspMid.y), 255));
-    fs.writeByte(min(negEncode(aspDif.y), 255));
+    fs.writeVLC(negEncode(aspMid.y));
+    fs.writeVLC(negEncode(aspDif.y));
+    fs.byteAlign();
 
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
@@ -547,22 +600,8 @@ begin
       midCodes[j] := abs(aspMid.y);
       difCodes[j] := abs(aspDif.y);
 
-      if (sign(aspMid.y) * currentMidSign) < 0 then begin
-        midSigns.writeVLC(midSignCounter);
-        midSignCounter := 0;
-        currentMidSign *= -1;
-      end else
-        inc(midSignCounter);
-
-      if (sign(aspDif.y) * currentDifSign) < 0 then begin
-        difSigns.writeVLC(difSignCounter);
-        difSignCounter := 0;
-        currentDifSign *= -1;
-      end else
-        inc(difSignCounter);
-
-      if aspMid.y < 0 then midSignBits[j] := 1;
-      if aspDif.y < 0 then difSignBits[j] := 1;
+      midSigns[j] := sign(aspMid.y);
+      difSigns[j] := sign(aspDif.y);
 
       if assigned(fullStats) then
         fullStats.writeRow([
@@ -587,16 +626,8 @@ begin
     stopTimer('LA96_segments');
 
     {write signs}
-    {if it's more efficent to just write out the bits then do that
-     instead}
-    if midSigns.len > (FRAME_SIZE div 8) then
-      fs.writeVLCSegment(midSignBits)
-    else
-      fs.writeBytes(midSigns.asBytes);
-    if midSigns.len > (FRAME_SIZE div 8) then
-      fs.writeVLCSegment(difSignBits)
-    else
-      fs.writeBytes(difSigns.asBytes);
+    writeOutSigns(midSigns);
+    writeOutSigns(difSigns);
 
     if assigned(frameStats) then
       frameStats.writeRow([
@@ -631,9 +662,6 @@ begin
   fs.writeVLCSegment(framePtr, PACK_BEST);
 
   {clean up}
-  midSigns.free;
-  difSigns.free;
-
   aspMid.free;
   aspDif.free;
 

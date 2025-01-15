@@ -755,6 +755,8 @@ begin
 
   readVLCSequence_ASM(self, n, outBuffer);
 
+  self.byteAlign();
+
   exit(outBuffer);
 end;
 
