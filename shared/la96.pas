@@ -91,6 +91,13 @@ type
     procedure encode(newX: int32); override;
   end;
 
+  tLA96Reader = class
+    constructor create(filename: string);
+    destructor destroy(); override;
+    procedure load(): tSoundEffect;
+    function readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+  end;
+
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 
@@ -112,6 +119,44 @@ implementation
 const
   VER_SMALL = 1;
   VER_BIG = 0;
+
+{-------------------------------------------------------}
+
+{
+How this will work.
+
+SFX will store compressed in memory via LA96Reader.
+Mixer will request SFX to decompress frame by frame via readFrame
+}
+
+constructor tLA96Reader.create(filename: string);
+begin
+  {load entire file into stream}
+  {process header etc}
+  {also load our ulaw tables here}
+  {we just need 5-7,6-7,7-7,8-8}
+end;
+
+destructor tLA96Reader.destroy(); override;
+begin
+end;
+
+{read entire SFX out and return it uncompressed}
+procedure tLA96Reader.readSFX(): tSoundEffect;
+begin
+  {just loop through all frames}
+end;
+
+{decodes a single frame into sfx at given sample position.
+ can be used to stream music compressed in memory.}
+function tLA96Reader.readFrame(frameId: integer;sfx: tSoundEffect;sfxOffset: dword);
+begin
+  {todo: this should be super fast, like maybe MMX fast}
+  {get initial values}
+  {read frame header}
+  {read frame}
+  {processs}
+end;
 
 {-------------------------------------------------------}
 
@@ -270,6 +315,12 @@ asm
   sar eax, cl
   pop cx
   end;
+
+{decode an LA96 file}
+function decodeLA96(fs: tStream): tStream;
+begin
+end;
+
 
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 const

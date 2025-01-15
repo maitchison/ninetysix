@@ -249,7 +249,6 @@ begin
       writeln(format('%d %d %d %d' , [i, sqrt(fastRMS) - sqrt(slowRMS) , sqrt(fastRMS), sqrt(slowRMS)]));
     end;
 
-
     {roughly 100hz}
     {I think this will kill the compression ratio though}
     {actually it only slightly adjusts it}
