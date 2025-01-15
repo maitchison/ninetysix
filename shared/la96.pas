@@ -41,6 +41,15 @@ uses
 
 type
 
+  {fast uLaw calculations via a lookup table}
+  tULawLookup = class
+    encodeTable: tIntList;
+    decodeTable: tIntList;
+    constructor create(bits: byte; log2Mu: byte);
+    function encode(x: int32): int32; inline;
+    function decode(x: int32): int32; inline;
+  end;
+
   tAudioCompressionProfile = record
     quantBits: byte; // number of bits to remove 0..16 (0=off)
     ulawBits: byte;  // number of ulaw bits, (0 = off).
@@ -59,20 +68,24 @@ type
     procedure encode(newX: int32); override;
   end;
 
-  {uLaw on deltas}
-  tASPDeltaULaw = class(tAudioStreamProcessor)
+  tASPULaw = class(tAudioStreamProcessor)
+    lut: tULawLookup;
     log2Mu: byte;
     uLawBits: byte;
-    currentError: int32;  // to track drift
     constructor create(uLawBits: byte=8;log2Mu: byte=8);
+    destructor destroy();
+    procedure encode(newX: int32); override;
+  end;
+
+  {uLaw on deltas}
+  tASPDeltaULaw = class(tASPULaw)
+    currentError: int32;  // to track drift
     procedure encode(newX: int32); override;
   end;
 
   {delta on uLaw}
-  tASPULawDelta = class(tAudioStreamProcessor)
-    log2Mu: byte;
-    uLawBits: byte;
-    constructor create(uLawBits: byte=8;log2Mu: byte=8);
+  tASPULawDelta = class(tASPULaw)
+    prevU: int32;
     procedure encode(newX: int32); override;
   end;
 
@@ -94,17 +107,6 @@ implementation
 const
   VER_SMALL = 1;
   VER_BIG = 0;
-
-type
-  {fast uLaw calculations via a lookup table}
-  tULawLookup = class
-    encodeTable: tIntList;
-    decodeTable: tIntList;
-    constructor create(bits: byte; log2Mu: byte);
-    function encode(x: int32): int32;
-    function decode(x: int32): int32;
-  end;
-
 
 {-------------------------------------------------------}
 
@@ -139,66 +141,17 @@ begin
 
 end;
 
-{input is -32k to 32k, output is -2^bits..2^bits}
-{this was often off by 1 due to rounding, so I gave up}
-(*
-function tULawLookup.encode(x: int32): int32;
-var
-  ax, value: int32;
-  left, right, mid: int32;
-begin
-  ax := abs(x);
-  {binary search it}
-  {if value exists is it between [i,j] (inclusive)}
-  left := 0; right := table.len-1;
-  while left <= right do begin
-    mid := (left + right) div 2;
-    value := table[mid];
-    if value = ax then
-      exit(sign(x)*(mid+1) div 2);
-
-    if value < ax then
-      left := mid + 1
-    else
-      right := mid -1;
-  end;
-
-  writeln(left, ' ' , right, ' ' , table.len, ' ', ax, ' ', table[left], ' ' , table[right]);
-
-  if left >= table.len then
-    // too high, return largest value
-    exit(sign(x) * (table.len) div 2);
-
-  if right < 0 then
-    //this can't happen
-    exit(sign(x) * 0);
-
-  // check which side is closer
-  // always go smallest
-  if table[right] < table[left] then
-    exit(sign(x) * (right+1) div 2)
-  else
-    exit(sign(x) * (left+1) div 2)
-  {
-  if (ax - table[right]) < (table[left] - ax) then
-    exit(sign(x) * (right+1) div 2)
-  else
-    exit(sign(x) * (left+1) div 2);
-  }
-
-end;
-*)
-
 { input is -2^bits..2^bits, output is -32k...32k }
-function tULawLookup.decode(x: int32): int32;
+function tULawLookup.decode(x: int32): int32; inline;
 begin
   result := decodeTable[abs(x)];
   if x < 0 then result := -result;
 end;
 
 {input is -32k to 32k, output is -2^bits..2^bits}
-function tULawLookup.encode(x: int32): int32;
+function tULawLookup.encode(x: int32): int32; inline;
 begin
+  if abs(x) > 32*1024 then exit(encodeTable[32*1024]);
   result := encodeTable[abs(x)];
   if x < 0 then result := -result;
 end;
@@ -233,11 +186,31 @@ end;
 
 {------}
 
-constructor tASPDeltaULaw.create(uLawBits: byte=8;log2Mu: byte=8);
+constructor tASPULaw.create(uLawBits: byte=8;log2Mu: byte=8);
 begin
+  inherited create();
+  assert(log2MU <= 16);
+  assert(uLawBits <= 16);
   self.uLawBits := uLawBits;
   self.log2Mu := log2Mu;
+  lut := tULawLookup.create(uLawBits, log2Mu);
 end;
+
+destructor tASPULaw.destroy();
+begin
+  lut.free;
+  inherited destroy();
+end;
+
+procedure tASPULaw.encode(newX: int32);
+begin
+  prevX := x;
+  prevY := y;
+  y := lut.encode(newX);
+  x := newX;
+end;
+
+{------}
 
 procedure tASPDeltaULaw.encode(newX: int32);
 var
@@ -264,22 +237,23 @@ end;
 
 {------}
 
-constructor tASPULawDelta.create(uLawBits: byte=8;log2Mu: byte=8);
-begin
-  self.uLawBits := uLawBits;
-  self.log2Mu := log2Mu;
-end;
-
 procedure tASPULawDelta.encode(newX: int32);
 var
-  thisU, prevU: int32;
+  thisU: int32;
+  ax: int32;
 begin
   prevX := x;
   prevY := y;
-  thisU := round(uLaw(newX, 1 shl log2Mu)  * (1 shl uLawBits));
-  prevU := round(uLaw(prevX, 1 shl log2Mu) * (1 shl uLawBits));
-  x := newX;
+  //thisU := lut.encode(newX);
+  //self inline... :(
+  ax := abs(newX);
+  if ax > 32*1024 then ax := 32*1024;
+  thisU := lut.encodeTable.data[ax];
+  if newX < 0 then thisU := -thisU;
+
   y := thisU - prevU;
+  x := newX;
+  prevU := thisU;
 end;
 
 {-------------------------------------------------------}
@@ -336,6 +310,28 @@ var
       inc(samplePtr);
   end;
 
+  procedure writeFrameData(data: array of dword);
+  var
+    bytes: tBytes;
+    tokens: tDwords;
+    i,j: integer;
+  begin
+    {bpe preprocessing method...}
+    setLength(bytes, length(data));
+    for j := 0 to length(data)-1 do
+      bytes[j] := data[j];
+
+    bytes := lz4.doBPE(bytes, 10);
+
+    {annoying}
+    tokens := nil;
+    for j := 0 to length(bytes)-1 do
+      tokens.append(bytes[j]);
+
+    {simplest method, just write VLC codes}
+    ds.writeVLCSegment(tokens, PACK_BEST);
+  end;
+
 begin
 
   assert(profile.quantBits >= 0);
@@ -369,10 +365,8 @@ begin
   frameMid := nil;
   frameDif := nil;
 
-  //aspMid := tASPULaw.create(profile.ulawBits, profile.mu);
-  //aspDif := tASPUlaw.create();
-  aspMid := tASPDelta.create();
-  aspDif := tASPDelta.create();
+  aspMid := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
+  aspDif := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
 
   // -------------------------
   // Write Header
@@ -459,10 +453,12 @@ begin
     {write frame header}
     {todo:}
 
+
+
     {write out frame}
     startTimer('LA96_segments');
-    ds.writeVLCSegment(midCodes, PACK_BEST);
-    ds.writeVLCSegment(difCodes, PACK_BEST);
+    writeFrameData(midCodes);
+    writeFrameData(difCodes);
     stopTimer('LA96_segments');
 
     {write signs}
@@ -505,6 +501,9 @@ begin
 
   midSigns.free;
   difSigns.free;
+
+  aspMid.free;
+  aspDif.free;
 
   stopTimer('LA96');
 

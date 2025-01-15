@@ -242,6 +242,9 @@ begin
   delay(3000);
 end;
 
+var
+  i: integer;
+
 begin
 
   autoHeapSize();
@@ -258,5 +261,8 @@ begin
   //go();
 
   textAttr := LIGHTGRAY;
+
+  {silly bug in dosbox not showing video}
+  for i := 0 to 25 do writeln();
 
 end.

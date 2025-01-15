@@ -63,6 +63,9 @@ function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes; overload;
 function LZ4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
 function LZ4Debug(bytes: tBytes;ref: tBytes=nil;print:boolean=False): tBytes;
 
+{todo: remove?}
+function doBPE(data: tDwords; maxReplacements: integer=256): tDwords;
+
 implementation
 
 {---------------------------------------------------------------}
@@ -511,6 +514,79 @@ begin
   result := value;
 end;
 
+function firstFreeToken(data: tDwords): int16; pascal;
+var
+  used: array[0..255] of byte;
+  dataPtr: pointer;
+  usedPtr: pointer;
+  value: int16;
+  i: integer;
+  len: dword;
+begin
+  dataPtr := @data[0];
+  usedPtr := @used;
+  value := 101;
+  len := length(data);
+  asm
+    pushad
+
+  {---- clear buffer ----------}
+
+
+    mov edi, [usedPtr]
+    mov eax, 0
+    mov ecx, 256/4
+    cld
+    rep stosd
+
+{---- loop through bytes ------}
+
+    mov ecx, [len]
+    xor edx, edx
+    xor eax, eax
+    mov esi, [dataPtr]
+    mov edi, [usedPtr]
+
+  @LOOP:
+
+    mov al, byte ptr esi[edx]
+    mov  byte ptr [edi+eax], 1
+
+    inc edx
+    dec ecx
+    jnz @LOOP
+
+
+  {---- scan through codewords ------}
+
+    mov ecx, 256
+    xor edx, edx
+
+  @SCAN:
+
+    mov al, byte ptr edi[edx]
+    cmp al, 0
+    jne @SKIP
+
+    mov [value], dx
+    jmp @FINISH
+
+
+  @SKIP:
+
+    inc edx
+    dec ecx
+    jnz @SCAN
+
+    mov [value], -1
+
+
+  @FINISH:
+    popad
+  end;
+  result := value;
+end;
+
 
 {finds some minumum x not contained within data, or -1 if all
  256 codewords have been used.}
@@ -528,7 +604,7 @@ begin
 end;
 
 {Perform byte pair encoding.}
-function doBPE(bytes: tBytes; maxReplacements: integer=256): tBytes;
+function doBPE(data: tDwords; maxReplacements: integer=256; out dictionary: tDwords): tDwords;
 var
 
   i: int32;
@@ -536,21 +612,23 @@ var
   useByte: int32;
 
   a,b: int32;
-  outStream: tStream;
+  outS: tDwords;
 
   {freq: array of word;}
   pair, value, freq : word;
 
 begin
 
-  if maxReplacements <= 0 then exit(bytes);
+  dictionary := nil;
+
+  if maxReplacements <= 0 then exit(data);
 
   {initialization}
-  outStream := tStream.Create();
+  outS := nil;
   numReplacements := 0;
 
   {work out which byte to use in substitutions}
-  useByte := firstFreeByte(bytes);
+  useByte := firstFreeToken(data);
 
   {no free codespace for BPE}
   if useByte < 0 then begin

@@ -28,8 +28,8 @@ type
 
     procedure clear();
 
-    function getItem(index: int32): int32;
-    procedure setItem(index: int32; value: int32);
+    function getItem(index: int32): int32; inline;
+    procedure setItem(index: int32; value: int32); inline;
 
     property items[index: int32]: int32 read getItem write setItem; default;
     class operator add(a: tIntList;b: int32): tIntList;
