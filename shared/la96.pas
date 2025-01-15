@@ -310,28 +310,6 @@ var
       inc(samplePtr);
   end;
 
-  procedure writeFrameData(data: array of dword);
-  var
-    bytes: tBytes;
-    tokens: tDwords;
-    i,j: integer;
-  begin
-    {bpe preprocessing method...}
-    setLength(bytes, length(data));
-    for j := 0 to length(data)-1 do
-      bytes[j] := data[j];
-
-    bytes := lz4.doBPE(bytes, 10);
-
-    {annoying}
-    tokens := nil;
-    for j := 0 to length(bytes)-1 do
-      tokens.append(bytes[j]);
-
-    {simplest method, just write VLC codes}
-    ds.writeVLCSegment(tokens, PACK_BEST);
-  end;
-
 begin
 
   assert(profile.quantBits >= 0);
@@ -441,24 +419,13 @@ begin
     end;
     stopTimer('LA96_process');
 
-    {stub:}
-    {
-    if i mod 4 = 0 then begin
-      for k := 0 to 20 do
-        write(midCodes[k], ' ');
-      writeln('!!');
-    end;
-    }
-
     {write frame header}
     {todo:}
 
-
-
     {write out frame}
     startTimer('LA96_segments');
-    writeFrameData(midCodes);
-    writeFrameData(difCodes);
+    ds.writeVLCSegment(midCodes, PACK_BEST);
+    ds.writeVLCSegment(difCodes, PACK_BEST);
     stopTimer('LA96_segments');
 
     {write signs}

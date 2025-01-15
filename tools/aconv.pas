@@ -139,6 +139,8 @@ var
   centerLeft, centerRight: single;
 begin
   result := sfx.clone();
+  xLeft := 0;
+  xRight := 0;
   centerLeft := 0; centerRight := 0;
   for i := 0 to sfx.length-1 do begin
     sample := sfx[i];
