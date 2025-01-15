@@ -92,7 +92,7 @@ type
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 
 const
   ACP_VERYLOW: tAudioCompressionProfile  = (tag:'verylow'; quantBits:7;ulawBits:5;log2Mu:7;filter:16);
@@ -271,7 +271,7 @@ asm
   pop cx
   end;
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 const
   FRAME_SIZE = 1024;
 var
@@ -289,7 +289,6 @@ var
   difSignBits: array[0..(FRAME_SIZE-1)-1] of dword;
 
   fs: tStream;  // our file stream
-  ds: tStream;  // our data stream.
   midSigns, difSigns: tStream;
 
   counter: int32;
@@ -349,13 +348,6 @@ begin
 
   startTimer('LA96');
 
-  // Initialize variables
-  if useLZ4 then
-    {must defer writes as LZ4 doesn't work with streaming yet}
-    ds := tStream.create()
-  else
-    {no compression means we can write directly to the file stream}
-    ds := fs;
   counter := 0;
   samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
@@ -385,7 +377,7 @@ begin
   fs.writebyte(VER_SMALL);
   fs.writebyte(VER_BIG);
   fs.writeByte($00);          {joint 16bit-stereo}
-  fs.writeByte(byte(useLZ4)); {LZ4 compression}
+  fs.writeByte($00);          {this was LZ4 compression, but it's now removed}
   fs.writeDWord(numFrames);
   fs.writeDWord(sfx.length); // samples might be different if length is not multiple of FRAME_SIZE
   {some file-wide profile stuff}
@@ -490,26 +482,26 @@ begin
     stopTimer('LA96_process');
 
     {write frame header (one for each channel)}
-    ds.writeByte(profile.quantBits + profile.ulawBits*16);
-    ds.writeByte(profile.quantBits + profile.ulawBits*16);
+    fs.writeByte(profile.quantBits + profile.ulawBits*16);
+    fs.writeByte(profile.quantBits + profile.ulawBits*16);
 
     {write out frame}
     startTimer('LA96_segments');
-    midFrameSize := ds.writeVLCSegment(midCodes, PACK_BEST);
-    difFrameSize := ds.writeVLCSegment(difCodes, PACK_BEST);
+    midFrameSize := fs.writeVLCSegment(midCodes, PACK_BEST);
+    difFrameSize := fs.writeVLCSegment(difCodes, PACK_BEST);
     stopTimer('LA96_segments');
 
     {write signs}
     {if it's more efficent to just write out the bits then do that
      instead}
     if midSigns.len > (FRAME_SIZE div 8) then
-      ds.writeVLCSegment(midSignBits)
+      fs.writeVLCSegment(midSignBits)
     else
-      ds.writeBytes(midSigns.asBytes);
+      fs.writeBytes(midSigns.asBytes);
     if midSigns.len > (FRAME_SIZE div 8) then
-      ds.writeVLCSegment(difSignBits)
+      fs.writeVLCSegment(difSignBits)
     else
-      ds.writeBytes(difSigns.asBytes);
+      fs.writeBytes(difSigns.asBytes);
 
     if assigned(frameStats) then
       frameStats.writeRow([
@@ -537,22 +529,6 @@ begin
 
     write('.');
 
-    {when using compression every 128k or so write out the compressed data}
-    if useLZ4 and (ds.len > 128*1024) then begin
-      writeln('Compressing ',ds.len,' bytes');
-      startTimer('LA96_compress');
-      fs.writeBytes(LZ4Compress(ds.asBytes));
-      ds.reset();
-      stopTimer('LA96_compress');
-      printTimers();
-    end;
-  end;
-
-  if useLZ4 then begin
-    startTimer('LA96_compress');
-    fs.writeBytes(LZ4Compress(ds.asBytes));
-    ds.free;
-    stopTimer('LA96_compress');
   end;
 
   // -------------------------

@@ -351,7 +351,7 @@ begin
   for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
     music16.tag := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_std', [profile.quantBits, profile.ulawBits, profile.log2mu]);
     if not fs.exists(music16.tag+'.a96') then begin
-      outStream := encodeLA96(music16, profile, false);
+      outStream := encodeLA96(music16, profile);
       outStream.writeToDisk(music16.tag+'.a96');
       outStream.free;
     end;
