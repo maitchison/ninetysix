@@ -334,7 +334,7 @@ var
   SAMPLE_LENGTH: int32;
   profile: tAudioCompressionProfile;
   log2mu, ulawBits, quantBits: integer;
-
+  outStream: tStream;
 begin
 
   writeln('--------------------------');
@@ -346,14 +346,15 @@ begin
 
   writeln('--------------------------');
   writeln('Compressing.');
-  LA96_ENABLE_STATS := true;
+  LA96_ENABLE_STATS := false;
 
-  profile := ACP_MEDIUM;
-
-  //for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
-  for profile in [ACP_MEDIUM] do begin
-    music16.tag := 'c:\dev\logs\'+profile.tag+'_'+format('%d_%d_%d_std', [profile.quantBits, profile.ulawBits, profile.log2mu]);
-    encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
+  for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
+    music16.tag := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_std', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+    if not fs.exists(music16.tag+'.a96') then begin
+      outStream := encodeLA96(music16, profile, false);
+      outStream.writeToDisk(music16.tag+'.a96');
+      outStream.free;
+    end;
   end;
 
   {look into options for getting medium quality to sound great}
@@ -409,8 +410,8 @@ begin
   runTestSuites();
   initKeyboard();
 
-  //testCompression();
-  ABTest();
+  testCompression();
+  //ABTest();
 
   textAttr := LIGHTGRAY;
 

@@ -45,6 +45,7 @@ uses
 type
 
   {fast uLaw calculations via a lookup table}
+  {settings bits to 0 gives identity transform}
   tULawLookup = class
     encodeTable: tIntList;
     decodeTable: tIntList;
@@ -63,7 +64,8 @@ type
 
   tAudioStreamProcessor = class
     x, prevX, y, prevY: int32;
-    lastError: int32;
+    xPrime: int32; {what our decoder will produce}
+    function lastError: int32;
     procedure encode(newX: int32); virtual;
     procedure reset(initialValue: int32=0); virtual;
   end;
@@ -78,19 +80,14 @@ type
     log2Mu: byte;
     uLawBits: byte;
     constructor create(uLawBits: byte=8;log2Mu: byte=8);
-    destructor destroy();
-    procedure encode(newX: int32); override;
-  end;
-
-  {uLaw on deltas}
-  tASPDeltaULaw = class(tASPULaw)
+    destructor destroy(); override;
     procedure encode(newX: int32); override;
   end;
 
   {delta on uLaw}
   tASPULawDelta = class(tASPULaw)
     prevU: int32;
-    procedure reset(initialValue: int32=0); virtual;
+    procedure reset(initialValue: int32=0); override;
     procedure encode(newX: int32); override;
   end;
 
@@ -138,6 +135,11 @@ var
   codeSize: int32;
   mu: int32;
 begin
+  if bits = 0 then begin
+    decodeTable.clear();
+    encodeTable.clear();
+    exit;
+  end;
   mu := 1 shl log2Mu;
   codeSize := (1 shl bits);
   decodeTable := tIntList.create(codeSize+1); {0..codesize (inclusive)}
@@ -152,6 +154,7 @@ end;
 { input is -2^bits..2^bits, output is -32k...32k }
 function tULawLookup.decode(x: int32): int32; inline;
 begin
+  if decodeTable.len = 0 then exit(x);
   result := decodeTable[abs(x)];
   if x < 0 then result := -result;
 end;
@@ -159,6 +162,7 @@ end;
 {input is -32k to 32k, output is -2^bits..2^bits}
 function tULawLookup.encode(x: int32): int32; inline;
 begin
+  if encodeTable.len = 0 then exit(x);
   if abs(x) > 32*1024 then exit(encodeTable[32*1024]);
   result := encodeTable[abs(x)];
   if x < 0 then result := -result;
@@ -172,7 +176,13 @@ begin
   y := initialValue;
   prevX := 0;
   prevY := 0;
-  lastError := 0;
+  xPrime := 0;
+end;
+
+{returns the value the decode will produce for x}
+function tAudioStreamProcessor.lastError: int32;
+begin
+  result := x-xPrime;
 end;
 
 procedure tAudioStreamProcessor.encode(newX: int32);
@@ -181,7 +191,7 @@ begin
   prevY := y;
   x := newX;
   y := newX;
-  lastError := 0;
+  xPrime := newX;
 end;
 
 {------}
@@ -192,7 +202,7 @@ begin
   prevY := y;
   y := newX - prevX;
   x := newX;
-  lastError := 0;
+  xPrime := newX;
 end;
 
 {------}
@@ -219,32 +229,7 @@ begin
   prevY := y;
   y := lut.encode(newX);
   x := newX;
-  lastError := newX-lut.decode(y);
-end;
-
-{------}
-
-procedure tASPDeltaULaw.encode(newX: int32);
-var
-  delta: int32;
-  yInv: int32;
-  mu: int32;
-begin
-
-  mu := (1 shl log2Mu);
-
-  prevX := x;
-  prevY := y;
-
-  x := newX;
-
-  delta := clamp16(x - prevX);
-  y := round(ulaw(delta, mu) * (1 shl uLawBits));
-  yInv := uLawInv(y / (1 shl uLawBits), mu);
-  lastError := (prevX+yInv) - x;
-  if lastError > abs(y) then dec(y);
-  if lastError < -abs(y) then inc(y);
-
+  xPrime := lut.decode(y);
 end;
 
 {------}
@@ -252,7 +237,6 @@ end;
 procedure tASPULawDelta.encode(newX: int32);
 var
   thisU: int32;
-  restoredX: int32;
   ax: int32;
 begin
   prevX := x;
@@ -267,9 +251,8 @@ begin
   y := thisU - prevU;
   x := newX;
   prevU := thisU;
-  restoredX := lut.decodeTable.data[abs(thisU)];
-  if thisU < 0 then restoredX := -restoredX;
-  lastError := (restoredX - newX);
+  xPrime := lut.decodeTable.data[abs(thisU)];
+  if thisU < 0 then xPrime := -xPrime;
 end;
 
 procedure tASPULawDelta.reset(initialValue: int32=0);
@@ -324,6 +307,9 @@ var
   aspMid, aspDif: tAudioStreamProcessor;
   midSignCounter, difSignCounter: integer;
   currentMidSign, currentDifSign: integer;
+
+  cMid, cDif: int32; {centers}
+  tmp: int32;
 
   fullStats, frameStats: tCSVWriter;
 
@@ -446,11 +432,18 @@ begin
     midYStats.init(false);
     difYStats.init(false);
 
+    cMid := (aspMid.xPrime div 256) * 256;
+    cDif := (aspDif.xPrime div 256) * 256;
+
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
-      aspMid.encode(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
-      aspDif.encode(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
+      aspMid.encode(quant(samplePtr^.left+samplePtr^.right-cMid, profile.quantBits));
+      aspDif.encode(quant(samplePtr^.left-samplePtr^.right-cDif, profile.quantBits));
+
+      {xPrime is decoders quant(decoded-cMid)}
+      cMid := ((aspMid.xPrime shl profile.quantBits) + cMid) div 256 * 256;
+      cDif := ((aspMid.xPrime shl profile.quantBits) + cDif) div 256 * 256;
 
       {stats}
       midXStats.addValue(aspMid.x);
@@ -495,8 +488,9 @@ begin
     end;
     stopTimer('LA96_process');
 
-    {write frame header}
-    {todo:}
+    {write frame header (one for each channel)}
+    ds.writeByte(profile.quantBits + profile.ulawBits*16);
+    ds.writeByte(profile.quantBits + profile.ulawBits*16);
 
     {write out frame}
     startTimer('LA96_segments');
