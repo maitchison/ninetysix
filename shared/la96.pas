@@ -135,11 +135,6 @@ var
   codeSize: int32;
   mu: int32;
 begin
-  if bits = 0 then begin
-    decodeTable.clear();
-    encodeTable.clear();
-    exit;
-  end;
   mu := 1 shl log2Mu;
   codeSize := (1 shl bits);
   decodeTable := tIntList.create(codeSize+1); {0..codesize (inclusive)}
@@ -154,7 +149,6 @@ end;
 { input is -2^bits..2^bits, output is -32k...32k }
 function tULawLookup.decode(x: int32): int32; inline;
 begin
-  if decodeTable.len = 0 then exit(x);
   result := decodeTable[abs(x)];
   if x < 0 then result := -result;
 end;
@@ -162,7 +156,6 @@ end;
 {input is -32k to 32k, output is -2^bits..2^bits}
 function tULawLookup.encode(x: int32): int32; inline;
 begin
-  if encodeTable.len = 0 then exit(x);
   if abs(x) > 32*1024 then exit(encodeTable[32*1024]);
   result := encodeTable[abs(x)];
   if x < 0 then result := -result;
@@ -375,8 +368,13 @@ begin
   frameMid := nil;
   frameDif := nil;
 
-  aspMid := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
-  aspDif := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
+  if profile.ulawBits > 0 then begin
+    aspMid := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
+    aspDif := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
+  end else begin
+    aspMid := tASPDelta.create();
+    aspDif := tASPDelta.create();
+  end;
 
   // -------------------------
   // Write Header
@@ -386,10 +384,13 @@ begin
   fs.writeChars('LA96');
   fs.writebyte(VER_SMALL);
   fs.writebyte(VER_BIG);
-  fs.writeByte($00);    {joint 16bit-stereo}
+  fs.writeByte($00);          {joint 16bit-stereo}
   fs.writeByte(byte(useLZ4)); {LZ4 compression}
   fs.writeDWord(numFrames);
   fs.writeDWord(sfx.length); // samples might be different if length is not multiple of FRAME_SIZE
+  {some file-wide profile stuff}
+  fs.writebyte(profile.log2mu);
+  fs.writebyte(profile.filter);
 
   {write reserved header space}
   while fs.pos < startPos+128 do

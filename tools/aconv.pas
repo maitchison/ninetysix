@@ -357,39 +357,6 @@ begin
     end;
   end;
 
-  {look into options for getting medium quality to sound great}
-  (*
-  for quantBits in [2,3,4,5,6] do
-    for ulawbits in [5,6,7,8] do
-      for log2mu in [7] do begin
-        if keyDown(key_esc) then exit;
-        profile.quantBits := quantBits;
-        profile.ulawBits := ulawBits;
-        profile.log2mu := log2mu;
-        profile.filter := 0;
-        music16.tag := 'c:\dev\logs\'+format('%d_%d_%d_std', [quantBits, ulawBits, log2mu]);
-        encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
-        printTimers();
-    end;
-  *)
-  (*
-  for quantBits in [2,3,4,5,6] do
-    for ulawbits in [5,6,7,8] do
-      for log2mu in [7] do begin
-        if keyDown(key_esc) then exit;
-        profile.quantBits := quantBits;
-        profile.ulawBits := ulawBits;
-        profile.log2mu := log2mu;
-        profile.filter := 0;
-        music16.tag := 'c:\dev\logs\'+format('%d_%d_%d_std', [quantBits, ulawBits, log2mu]);
-        encodeLA96(music16, profile, false).writeToDisk(music16.tag+'.a96');
-        printTimers();
-    end;
-  *)
-
-  //encodeLA96(music16, ACP_LOW, False).writeToDisk('c:\dev\tools\out_low_std.a96');
-
-
   writeln('Done.');
 
   delay(3000);
