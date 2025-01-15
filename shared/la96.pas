@@ -93,14 +93,14 @@ function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
 
 const
-  ACP_VERYLOW: tAudioCompressionProfile  = (quantBits:10;ulawBits:5;log2Mu:7;filter:16);
-  ACP_LOW: tAudioCompressionProfile      = (quantBits:11;ulawBits:6;log2Mu:7;filter:16);
-  ACP_MEDIUM: tAudioCompressionProfile   = (quantBits:12;ulawBits:7;log2Mu:7;filter:0);
-  ACP_HIGH: tAudioCompressionProfile     = (quantBits:14;ulawBits:8;log2Mu:8;filter:0);
-  ACP_Q10: tAudioCompressionProfile      = (quantBits:10;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q12: tAudioCompressionProfile      = (quantBits:12;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q16: tAudioCompressionProfile      = (quantBits:16;ulawBits:0;log2Mu:0;filter:0);
-  ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:17;ulawBits:0;log2Mu:0;filter:0);
+  ACP_VERYLOW: tAudioCompressionProfile  = (quantBits:7;ulawBits:5;log2Mu:7;filter:16);
+  ACP_LOW: tAudioCompressionProfile      = (quantBits:6;ulawBits:6;log2Mu:7;filter:16);
+  ACP_MEDIUM: tAudioCompressionProfile   = (quantBits:5;ulawBits:7;log2Mu:7;filter:0);
+  ACP_HIGH: tAudioCompressionProfile     = (quantBits:3;ulawBits:8;log2Mu:8;filter:0);
+  ACP_Q10: tAudioCompressionProfile      = (quantBits:7;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q12: tAudioCompressionProfile      = (quantBits:5;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q16: tAudioCompressionProfile      = (quantBits:1;ulawBits:0;log2Mu:0;filter:0);
+  ACP_LOSSLESS: tAudioCompressionProfile = (quantBits:0;ulawBits:0;log2Mu:0;filter:0);
 
 implementation
 
@@ -264,7 +264,18 @@ begin
   {todo: implement decode}
 end;
 
+function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
+asm
+  push cx
+  mov cl, [shiftAmount]
+  mov eax, [x]
+  sar eax, cl
+  pop cx
+  end;
+
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;useLZ4: boolean=false): tStream;
+const
+  FRAME_SIZE = 1024;
 var
   i,j,k: int32;
 
@@ -272,12 +283,12 @@ var
 
   thisMidValue, thisDifValue: int32;
 
-  {note: we write 1023 deltas, which is 1024 samples when including
+  {note: we write FRAME_SIZE-1 deltas, which is FRAME_SIZE samples when including
    the initial value}
-  midCodes: array[0..1023-1] of dword;
-  difCodes: array[0..1023-1] of dword;
-  midSignBits: array[0..1023-1] of dword;
-  difSignBits: array[0..1023-1] of dword;
+  midCodes: array[0..(FRAME_SIZE-1)-1] of dword;
+  difCodes: array[0..(FRAME_SIZE-1)-1] of dword;
+  midSignBits: array[0..(FRAME_SIZE-1)-1] of dword;
+  difSignBits: array[0..(FRAME_SIZE-1)-1] of dword;
 
   fs: tStream;  // our file stream
   ds: tStream;  // our data stream.
@@ -286,22 +297,11 @@ var
   counter: int32;
   numFrames: int32;
   startPos: int32;
-  shiftAmount: byte;
   framePtr, frameMid, frameDif: tDwords;
   maxSamplePtr: pointer;
   aspMid, aspDif: tAudioStreamProcessor;
   midSignCounter, difSignCounter: integer;
   currentMidSign, currentDifSign: integer;
-
-
-  function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
-  asm
-    push cx
-    mov cl, [shiftAmount]
-    mov eax, [x]
-    sar eax, cl
-    pop cx
-    end;
 
   procedure incPtr(); inline;
   begin
@@ -334,7 +334,7 @@ begin
   counter := 0;
   samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
-  numFrames := (sfx.length + 1023) div 1024;
+  numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
 
   midSigns := tStream.create();
   difSigns := tStream.create();
@@ -357,7 +357,7 @@ begin
   fs.writeByte($00);    {joint 16bit-stereo}
   fs.writeByte(byte(useLZ4)); {LZ4 compression}
   fs.writeDWord(numFrames);
-  fs.writeDWord(sfx.length); // samples might be different if length is not multiple of 1024
+  fs.writeDWord(sfx.length); // samples might be different if length is not multiple of FRAME_SIZE
 
   {write reserved header space}
   while fs.pos < startPos+128 do
@@ -369,8 +369,8 @@ begin
   for i := 0 to numFrames-1 do begin
 
     {unfortunately we can not encode any final partial block}
-    aspMid.reset(quant(samplePtr^.left+samplePtr^.right, shiftAmount));
-    aspDif.reset(quant(samplePtr^.left-samplePtr^.right, shiftAmount));
+    aspMid.reset(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
+    aspDif.reset(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
     incPtr();
 
     framePtr.append(fs.pos);
@@ -390,10 +390,10 @@ begin
 
 
     startTimer('LA96_process');
-    for j := 0 to 1023-1 do begin
+    for j := 0 to (FRAME_SIZE-1)-1 do begin
 
-      aspMid.encode(quant(samplePtr^.left+samplePtr^.right, shiftAmount));
-      aspDif.encode(quant(samplePtr^.left-samplePtr^.right, shiftAmount));
+      aspMid.encode(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
+      aspDif.encode(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
 
       midCodes[j] := abs(aspMid.y);
       difCodes[j] := abs(aspDif.y);
@@ -424,6 +424,8 @@ begin
 
     {write out frame}
     startTimer('LA96_segments');
+    //stub
+    writeln(midCodes[0], ' ' , midCodes[1], ' ' ,midCodes[2]);
     ds.writeVLCSegment(midCodes, PACK_BEST);
     ds.writeVLCSegment(difCodes, PACK_BEST);
     stopTimer('LA96_segments');
@@ -431,11 +433,11 @@ begin
     {write signs}
     {if it's more efficent to just write out the bits then do that
      instead}
-    if midSigns.len > (1024 div 8) then
+    if midSigns.len > (FRAME_SIZE div 8) then
       ds.writeVLCSegment(midSignBits)
     else
       ds.writeBytes(midSigns.asBytes);
-    if midSigns.len > (1024 div 8) then
+    if midSigns.len > (FRAME_SIZE div 8) then
       ds.writeVLCSegment(difSignBits)
     else
       ds.writeBytes(difSigns.asBytes);
