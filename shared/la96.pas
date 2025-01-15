@@ -209,8 +209,13 @@ var
   i: integer;
 begin
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
-  for i := 0 to header.numFrames-1 do
+  //stub:
+  //for i := 0 to header.numFrames-1 do begin
+  for i := 0 to 10-1 do begin
     nextFrame(result, i*header.frameSize);
+    //stub:
+    if keyDown(key_esc) then break;
+  end;
 end;
 
 {decodes the next frame into sfx at given sample position.
@@ -225,6 +230,13 @@ var
   i: int32;
 
   sample: tAudioSample16S;
+
+  procedure readSigns(var signs: tDwords);
+  begin
+    writeln(format('%d %d %d %d', [fs.readByte(), fs.readByte(), fs.readByte(), fs.readByte()]));
+    fs.readVLCSegment(header.frameSize-1, signs);
+  end;
+
 begin
 
   writeln('processing frame ',frameOn);
@@ -239,18 +251,20 @@ begin
   difValue := fs.readVLC();
   fs.byteAlign();
 
+  writeln('values:', midValue, ' ', difValue);
+
+  writeln('mid');
   fs.readVLCSegment(header.frameSize-1, midCodes);
-  fs.readVLCSegment(header.frameSize-1, difCodes);
-
   writeln(midCodes.toString);
+  writeln('dif');
+  fs.readVLCSegment(header.frameSize-1, difCodes);
+  writeln(difCodes.toString);
 
-  signFormat := fs.readByte();
-  if signFormat <> 0 then error(format('Invalid sign format %d', [signFormat]));
-  fs.readVLCSegment(header.frameSize-1, midSigns);
-  signFormat := fs.readByte();
-  if signFormat <> 0 then error(format('Invalid sign format %d', [signFormat]));
-  fs.readVLCSegment(header.frameSize-1, difSigns);
+  writeln('Signs');
+  readSigns(midSigns);
+  readSigns(difSigns);
 
+  {process frame}
   for i := 0 to header.frameSize-1 do begin
     sample.left := negDecode(midValue)+round(rnd*32);
     sample.right := negDecode(difValue)+round(rnd*32);
@@ -261,6 +275,7 @@ begin
 
   {stub:}
   if not keyDown(key_esc) then delay(1000);
+  while keyDown(key_p) do delay(10);
 
 end;
 
@@ -466,7 +481,10 @@ var
     i: integer;
   begin
     startPos := fs.pos;
-    fs.writeByte($00);
+    fs.writeByte($01); // magic marker...
+    fs.writeByte($02);
+    fs.writeByte($03);
+    fs.writeByte($04);
     {todo: support writing these out as gaps between sign changes,
      or even auto detect which is better}
     fillchar(signBits, sizeof(signBits), 0);

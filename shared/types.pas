@@ -10,7 +10,7 @@ type
 
 type tDwordsHelper = record helper for tDwords
   procedure append(x: dword);
-  function toString(): string;
+  function  toString(maxEntries: int32=16): string;
   end;
 
 implementation
@@ -26,13 +26,13 @@ begin
   self[length(self)-1] := x;
 end;
 
-function tDwordsHelper.toString: string;
+function tDwordsHelper.toString(maxEntries: int32=16): string;
 var
   i: int32;
 begin
   result := '[';
   for i := 0 to length(self)-1 do begin
-    if i > 1024 then begin
+    if i > maxEntries then begin
       result +='...,';
       break;
     end;

@@ -139,7 +139,7 @@ begin
     {extra codes}
     5: exit(3);
     6: exit(5);
-    7: exit(5);
+    7: exit(6);
   end;
   exit(-1);
 end;
@@ -529,7 +529,7 @@ procedure tStream.writeVLCControlCode(value: dword);
 begin
   {these codes will never appear in normal VLC encoding as they
    would always be encoded using the smaller length.}
-  while True do begin
+  while true do begin
     if value < 8 then begin
       writeNibble($8+value);
       writeNibble(0);
@@ -548,16 +548,16 @@ var
   s: tStream;
   i,j: int32;
 
-procedure writeBit(b: byte);
-begin
-  bitBuffer += b shl bitPos;
-  inc(bitPos);
-  if bitPos = 8 then begin
-    s.writeByte(bitBuffer);
-    bitBuffer := 0;
-    bitPos := 0;
+  procedure writeBit(b: byte);
+  begin
+    bitBuffer += b shl bitPos;
+    inc(bitPos);
+    if bitPos = 8 then begin
+      s.writeByte(bitBuffer);
+      bitBuffer := 0;
+      bitPos := 0;
+    end;
   end;
-end;
 
 begin
   s := outStream;
@@ -936,6 +936,8 @@ const
   testData2: array of dword = [100, 0, 127, 32, 15, 16, 17];
   {this will get packed}
   testData3: array of dword = [15, 14, 0, 15, 15, 12, 11];
+  {this will be packed to 5 bits}
+  testData4: array of dword = [31, 31, 31, 31, 31, 31, 31];
 begin
   {check pack and unpack}
   for bits := 7 to 15 do begin
@@ -1035,6 +1037,16 @@ begin
   for i := 0 to length(testData1)-1 do
     assertEqual(s.readVLC, testData1[i]);
   s.free;
+
+  {check odd size packing}
+  s := tStream.Create();
+  s.writeVLCSegment(testData4);
+  s.seek(0);
+  data := s.readVLCSegment(length(testData4));
+  assertEqual(toBytes(data), toBytes(testData4));
+  assertEqual(s.pos, s.len);
+  s.free;
+
 end;
 
 {--------------------------------------------------}
