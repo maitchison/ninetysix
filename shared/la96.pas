@@ -90,6 +90,7 @@ type
   {delta on uLaw}
   tASPULawDelta = class(tASPULaw)
     prevU: int32;
+    procedure reset(initialValue: int32=0); virtual;
     procedure encode(newX: int32); override;
   end;
 
@@ -271,6 +272,12 @@ begin
   lastError := (restoredX - newX);
 end;
 
+procedure tASPULawDelta.reset(initialValue: int32=0);
+begin
+  inherited reset(initialValue);
+  prevU := 0;
+end;
+
 {-------------------------------------------------------}
 
 function decodeLA96(s: tStream): tSoundEffect;
@@ -415,7 +422,6 @@ begin
     //stub:
     if keyDown(key_esc) then break;
 
-    {unfortunately we can not encode any final partial block}
     aspMid.reset(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
     aspDif.reset(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
     incPtr();
