@@ -113,7 +113,7 @@ const
 
 type
   tFrameSpec = record
-    length: word;
+    length: word; {number of samples in frame}
     midShift, difShift:byte;
     {add ulaw here}
   end;
@@ -171,10 +171,16 @@ begin
   result.right := clamp16(right);
 
   {stub: check for clipping}
-  if (result.left <> left) then
-    writeln('Clipping ',left);
-  if (result.right <> right) then
-    writeln('Clipping ',right);
+  if (result.left <> left) then begin
+    writeln(format('Clipping L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
+    delay(1);
+  end;
+  if (result.right <> right) then begin
+    writeln(format('Clipping L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
+    delay(1);
+  end;
+
+  if keyDown(key_s) then delay(2);
 end;
 
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
@@ -182,7 +188,7 @@ var
   i: int32;
 begin
   // reference, 0.5ms
-  for i := 0 to frameSpec^.length-1 do begin
+  for i := 0 to (frameSpec^.length-1)-1 do begin
     if midSigns[i] > 0 then midCode -= midCodes[i] else midCode += midCodes[i];
     if difSigns[i] > 0 then difCode -= difCodes[i] else difCode += difCodes[i];
     sfxSamplePtr^ := generateSample(midCode, difCode, frameSpec);
@@ -200,7 +206,7 @@ var
   MC,DC: int32;
   i: integer;
 begin
-  maxCounter := frameSpec^.length;
+  maxCounter := frameSpec^.length-1;
   {todo: this might be around the wrong way}
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
   midCodePtr := @midCodes[0];
@@ -495,6 +501,9 @@ begin
 
   sfx[sfxOffset] := generateSample(midCode, difCode, @frameSpec);
   inc(sfxSamplePtr);
+
+  //stub: show first few codes
+  //writeln(midCodes.toString);
 
   startTimer('LA96_DF_Process');
   process_REF(
