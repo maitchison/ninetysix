@@ -232,6 +232,25 @@ begin
     mov esi, 0
     mov edi, sfxSamplePtr
 
+    {
+    MMX would look like this...
+
+    MM0   tmp
+    MM1   [difCode]  [midCode]
+    MM2   [dMidCode] [d
+    MM5   [left]     [right]
+
+    process is
+
+    Read and pack deltaCodes (it's a shame there are not interleaved)
+    MMX addition
+    MMX shift
+
+    MMX shift
+    MMX mid+dif -> left right
+    MMX clamp
+
+
   @SAMPLE_LOOP:
 
     {
