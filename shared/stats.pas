@@ -9,7 +9,7 @@ uses
 type
   tStats = record
     alpha: single;
-    m1, m2: int64;
+    m1, m2: double;
     n: int32;
     minValue, maxValue: int64;
     ema: double;
@@ -32,7 +32,7 @@ end;
 procedure tStats.addValue(x: int32);
 begin
   m1 += x;
-  m2 += (x*x);
+  m2 += ((x*1.0)*x);
   if x < minValue then minValue := x;
   if x > maxValue then maxValue := x;
   ema := (alpha * ema) + (1-alpha) * x;

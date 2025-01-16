@@ -327,6 +327,11 @@ begin
   result := sqrt(variance - mu*mu);
 end;
 
+function profileToTagName(profile: tAudioCompressionProfile): string;
+begin
+  result := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_alp', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+end;
+
 procedure testCompression();
 var
   music16, musicL, musicD: tSoundEffect;
@@ -335,8 +340,18 @@ var
   log2mu, ulawBits, quantBits: integer;
   outStream: tStream;
   reader: tLA96Reader;
-  sfx: tSoundEffect;
+  outSFX: array of tSoundEffect;
+  i: integer;
+  profiles: array of tAudioCompressionProfile;
+
 begin
+
+  setLength(outSFX, 0);
+
+  profiles := [
+    ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH,
+    ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS
+  ];
 
   writeln('--------------------------');
   writeln('Loading music.');
@@ -346,34 +361,51 @@ begin
   writeln('Compressing.');
   LA96_ENABLE_STATS := false;
 
-  for profile in [ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS] do begin
-    music16.tag := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_new', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  setLength(outSfx, length(outSFX)+1);
+  outSFX[length(outSFX)-1] := music16;
+
+  for profile in PROFILES do begin
+    music16.tag := profileToTagName(profile);
     if not fs.exists(music16.tag+'.a96') then begin
       outStream := encodeLA96(music16, profile);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
     end;
+    {reader := tLA96Reader.create(music16.tag+'.a96');
+    setLength(outSfx, length(outSFX)+1);
+    outSFX[length(outSFX)-1] := reader.readSFX();
+    reader.free;}
   end;
+
+  music16.tag := 'origional';
 
   writeln('--------------------------');
   writeln('Read compressed file.');
 
   //reader := tLA96Reader.create('c:\dev\tmp\q10_7_0_0_new.a96');
-  reader := tLA96Reader.create('c:\dev\tmp\high_3_8_8_new.a96');
-  sfx := reader.readSFX;
-  reader.free;
-  mixer.play(sfx);
-  mixer.channels[1].looping := true;
+  //reader := tLA96Reader.create('c:\dev\tmp\high_3_8_8_new.a96');
+  //sfx := reader.readSFX();
+  //reader.free;
+  //mixer.play(sfx);
 
+  {start playing sound}
+  mixer.play(outSFX[0], SCS_FIXED1); writeln(outSFX[0].tag);
+  mixer.channels[1].looping := true;
   writeln('Done.');
 
-  repeat until keyDown(key_esc);
+  repeat
+    if keyDown(key_0) then begin mixer.channels[1].sfx := outSFX[0]; writeln(outSFX[0].tag); end;
+    for i := 1 to 8 do
+      if keyDown(key_1+i-1) then begin mixer.channels[1].sfx := outSFX[i]; writeln(outSFX[i].tag); end;
+    until keyDown(key_esc);
 end;
 
 var
   i: integer;
 
 begin
+
+  returnNilIfGrowHeapFails := true;
 
   autoHeapSize();
 

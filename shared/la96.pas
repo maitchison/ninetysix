@@ -947,10 +947,10 @@ begin
       end;
 
       {stub: show first few expected value}
-      if (i = 0) and (j < 10) then begin
+      {if (i = 0) and (j < 10) then begin
         log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x, aspMid.y, aspMid.xPrime shl profile.quantBits, samplePtr^.left+samplePtr^.right]));
         log(format('%d %d ', [profile.quantBits, qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits)]));
-      end;
+      end;}
 
       if samplePtr < maxSamplePtr then inc(samplePtr);
       aspMid.encode(qMid(samplePtr^.left, samplePtr^.right, cMid, profile.quantBits));
@@ -1020,7 +1020,6 @@ begin
         difYStats.mean,
         difYStats.variance
       ]);
-
 
     write('.');
 

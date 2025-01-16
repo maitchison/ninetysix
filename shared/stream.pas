@@ -183,9 +183,21 @@ var
   blocks: int32;
 begin
 
+  if newSize > 64*1024 then
+    log(format('Allocating large block of size %,->%,', [bytesAllocated, newSize]));
+
   blocks := (newSize+1023) div 1024;
 
-  reallocMem(bytes, blocks*1024);
+  {quick check to make sure everythings ok}
+  if assigned(bytes) <> (bytesAllocated > 0) then
+    error('Looks like stream was not initialized.');
+
+  if blocks=0 then begin
+    freeMem(bytes);
+  end else begin
+    reallocMem(bytes, blocks*1024);
+    if bytes = nil then error('Could not allocate memory block');
+  end;
 
   bytesAllocated := blocks*1024;
 
