@@ -611,6 +611,29 @@ begin
   end;
 end;
 
+procedure unpack16(inBuf: pByte; outBuf: pDWord;n: dWord);
+var
+  i: integer;
+  inPtr, outPtr: pointer;
+begin
+  asm
+    pushad
+    mov ecx, n
+    mov esi, inBuf
+    mov edi, outBuf
+  @PACKLOOP:
+
+    movzx eax, word ptr [esi]
+    add esi, 2
+    mov dword ptr [edi], eax
+    add edi, 4
+
+    dec ecx
+    jnz @PACKLOOP
+    popad
+  end;
+end;
+
 {General unpacking routine. Works on any number of bits, but is a bit slow.}
 procedure unpack_REF(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
 var
@@ -657,7 +680,13 @@ var
 begin
 
   {we require the following}
-  {atleast 3 padding bytes left in buffer}
+  {atleast 1 padding bytes left in buffer}
+  {bits must be <= 16}
+  if bitsPerCode > 16 then begin
+    unpack_REF(inBUffer, outBuffer, n, bitsPerCode);
+    exit;
+  end;
+
 
   inPtr := @inBuffer^;
   outPtr := @outBuffer^;
@@ -692,18 +721,18 @@ begin
 
       {note: could be faster if we read 32 bits at a time.. just need padding bits}
       cmp cl, ch
-      jae @DONE_READ_VALUE
+      jae @SKIP_READ_VALUE
 
       { read value }
-      movzx eax, byte ptr ds:[esi]
+      { note: we assume there is atleast 1 spare bytes at the end of
+        this array }
+      movzx eax, word ptr ds:[esi]
       shl eax, cl
       or  edx, eax
-      inc esi
-      add cl, 8
+      add esi, 2
+      add cl, 16
 
-      jmp @LOOP_START
-
-    @DONE_READ_VALUE:
+    @SKIP_READ_VALUE:
 
       { extract code }
       mov eax, edx
@@ -760,6 +789,7 @@ begin
     2: unpack2(bytesPtr, @outBuffer[0], nCodes);
     4: unpack4(bytesPtr, @outBuffer[0], nCodes);
     8: unpack8(bytesPtr, @outBuffer[0], nCodes);
+    16: unpack16(bytesPtr, @outBuffer[0], nCodes);
     else unpack(bytesPtr, @outBuffer[0], nCodes, bitsPerCode);
   end;
 
