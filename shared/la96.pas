@@ -5,6 +5,7 @@ unit la96;
 
 {
 
+  (todo: update these...)
   LA96 will eventually support the following modes
 
   16LR Truely lossless                  1.2:1
@@ -20,6 +21,25 @@ unit la96;
     - add support for full byte packing (only 5%, maybe skip this)
     - support lossless modes
     - add support for a LZ4 compress layer (should be 30%, so worth it)
+
+
+  To try
+    - Expriment with non-joint stereo
+    - Experiment with diff channel at lower rate
+    - Experiment with initial scan and then assigning variable rate to frames
+
+  How it all works
+
+  (LEFT,RIGHT) -> [clip protection] -> MID,DIF -> CENTERING? -> QUANTIZE?
+    -> ULAW? -> DELTA -> SIGN_EXTRACT
+
+  and unwind
+
+  process_REF
+  SIGN_ADD -> INVDELTA ->
+  generate_sample
+  INVULAW -> INVQUANT -> INVCENTER -> INV MID,DIF -> (LEFT,RIGHT)
+
 }
 
 interface
@@ -52,6 +72,7 @@ type
     procedure initDecode(bits: byte; log2Mu: byte);
     function lookup(x: int32): int32; inline;
   end;
+  pULawLookup = ^tULawLookup;
 
   tAudioCompressionProfile = record
     tag: string;
@@ -76,17 +97,20 @@ type
   tLA96Reader = class
     fs: tStream;
     header: tLA96FileHeader;
-    ulawTable: array[6..8] of tULawLookup;
+    ulawTable: array[1..8] of tULawLookup;
     midCodes, difCodes: tDwords;
     midSigns, difSigns: tDwords;
     frameOn: int32;
+  protected
+    function  getULAW(bits: byte): pULawLookup;
+  public
     constructor create(filename: string);
     destructor destroy(); override;
     procedure close();
     function  readSfx(): tSoundEffect;
+
     procedure nextFrame(sfx: tSoundEffect;sfxOffset: dword);
   end;
-
 
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
@@ -115,14 +139,12 @@ type
   tFrameSpec = record
     length: word; {number of samples in frame}
     midShift, difShift:byte;
-    {add ulaw here}
+    midUTable, difUTable: ^tULawLookup;
   end;
 
   pFrameSpec = ^tFrameSpec;
 
-
 type
-
   tAudioStreamProcessor = class
     x, prevX, y, prevY: int32;
     xPrime: int32; {what our decoder will produce}
@@ -157,30 +179,46 @@ type
 { helpers }
 {-------------------------------------------------------}
 
-function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; inline;
+//stub: make inline
+function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S;
 var
   mid, dif: int32;
   left,right: int32;
 begin
-  mid := midCode shl frameSpec^.midShift;
-  dif := difCode shl frameSpec^.difShift;
+
+  mid := midCode;
+  dif := difCode;
+
+  if assigned(frameSpec^.midUTable) then
+    mid := frameSpec^.midUTable^.lookup(mid);
+  if assigned(frameSpec^.difUTable) then
+    dif := frameSpec^.difUTable^.lookup(dif);
+
+  {stub:}
+  //writeln(format('%d %d %d %d', [midCode, mid, difCode, dif]));
+
+  mid := mid shl frameSpec^.midShift;
+  dif := dif shl frameSpec^.difShift;
+
+  {centering goes here}
 
   left := (mid + dif) div 2;
   right := (mid - dif) div 2;
   result.left := clamp16(left);
   result.right := clamp16(right);
 
-  {stub: check for clipping}
-  if (result.left <> left) then begin
-    writeln(format('Clipping L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
-    delay(1);
-  end;
-  if (result.right <> right) then begin
-    writeln(format('Clipping L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
-    delay(1);
-  end;
+  //stub:
 
-  if keyDown(key_s) then delay(2);
+{  while keyDown(key_p) do;
+  if not keyDown(key_g) then begin
+    delay(10);
+    writeln(format('L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
+  end;
+}
+  {$ifdef DEBUG}
+  //if (result.left <> left) or (result.right <> right) then
+  //  writeln(format('Clipping L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
+  {$endif}
 end;
 
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
@@ -441,6 +479,15 @@ begin
   printTimers();
 end;
 
+function tLA96Reader.getULAW(bits: byte): pULawLookup;
+begin
+  if bits = 0 then exit(nil);
+  if bits in [1..8] then
+    result := @ulawTable[bits]
+  else
+    error(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
+end;
+
 {decodes the next frame into sfx at given sample position.
  can be used to stream music compressed in memory.}
 procedure tLA96Reader.nextFrame(sfx: tSoundEffect;sfxOffset: dword);
@@ -478,8 +525,8 @@ begin
   startTimer('LA96_DF');
 
   {read frame header}
-  frameType := fs.readByte(); midShift := frameType and $f; midULaw := frameType shr 8;
-  frameType := fs.readByte(); difShift := frameType and $f; difULaw := frameType shr 8;
+  frameType := fs.readByte(); midShift := frameType and $f; midUlaw := frameType shr 4;
+  frameType := fs.readByte(); difShift := frameType and $f; difUlaw := frameType shr 4;
 
   midCode := negDecode(fs.readVLC());
   difCode := negDecode(fs.readVLC());
@@ -498,6 +545,8 @@ begin
   frameSpec.length := header.frameSize;
   frameSpec.midShift := midShift;
   frameSpec.difShift := difShift;
+  frameSpec.midUTable := getULAW(midULaw);
+  frameSpec.difUTable := getULAW(difULaw);
 
   sfx[sfxOffset] := generateSample(midCode, difCode, @frameSpec);
   inc(sfxSamplePtr);
@@ -664,6 +713,7 @@ procedure tASPULawDelta.reset(initialValue: int32=0);
 begin
   inherited reset(initialValue);
   prevU := uLawEncode.lookup(initialValue);
+  y := prevU;
   xPrime := initialValue;
 end;
 
@@ -898,7 +948,8 @@ begin
 
       {stub: show first few expected value}
       if (i = 0) and (j < 10) then begin
-        log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x,aspMid.y, aspMid.xPrime shl profile.quantBits, samplePtr^.left+samplePtr^.right]));
+        log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x, aspMid.y, aspMid.xPrime shl profile.quantBits, samplePtr^.left+samplePtr^.right]));
+        log(format('%d %d ', [profile.quantBits, qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits)]));
       end;
 
       if samplePtr < maxSamplePtr then inc(samplePtr);

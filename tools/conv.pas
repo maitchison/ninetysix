@@ -358,7 +358,8 @@ begin
   writeln('--------------------------');
   writeln('Read compressed file.');
 
-  reader := tLA96Reader.create('c:\dev\tmp\q10_7_0_0_new.a96');
+  //reader := tLA96Reader.create('c:\dev\tmp\q10_7_0_0_new.a96');
+  reader := tLA96Reader.create('c:\dev\tmp\high_3_8_8_new.a96');
   sfx := reader.readSFX;
   reader.free;
   mixer.play(sfx);
