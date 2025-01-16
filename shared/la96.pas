@@ -160,11 +160,21 @@ type
 function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; inline;
 var
   mid, dif: int32;
+  left,right: int32;
 begin
   mid := midCode shl frameSpec^.midShift;
   dif := difCode shl frameSpec^.difShift;
-  result.left := clamp16((mid + dif) div 2);
-  result.right := clamp16((mid - dif) div 2);
+
+  left := (mid + dif) div 2;
+  right := (mid - dif) div 2;
+  result.left := clamp16(left);
+  result.right := clamp16(right);
+
+  {stub: check for clipping}
+  if (result.left <> left) then
+    writeln('Clipping ',left);
+  if (result.right <> right) then
+    writeln('Clipping ',right);
 end;
 
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
@@ -487,7 +497,7 @@ begin
   inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
-  process_ASM(
+  process_REF(
     sfxSamplePtr,
     midCode, difCode,
     midCodes, difCodes,
@@ -659,11 +669,54 @@ end;
 function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
 asm
   push cx
-  mov cl, [shiftAmount]
-  mov eax, [x]
-  sar eax, cl
+  mov cl,   shiftAmount
+  mov eax,  x
+  sar eax,  cl
   pop cx
   end;
+
+{return mid channel given left, right, and settings}
+function qMid(left, right:int32; center: int32; quantBits: byte): int32; inline;
+begin
+  {best is to add then divide, but this means we 'round' and therefore
+   occasionly overshoot. To compenstate for this I first clip LF}
+  {note: I think this is right. For 8 quant bits we divide by 256,
+   so we should exclude the last 128 (unscaled) values}
+  if quantBits > 0 then begin
+    left := clamp16(left, (1 shl (quantBits-1)));
+    right := clamp16(right, (1 shl (quantBits-1)))
+  end;
+  asm
+    push cx
+    mov cl,   quantBits
+    mov eax,  left
+    add eax,  right
+    sub eax,  center
+    sar eax,  cl
+    pop cx
+    end;
+end;
+
+{return mid channel given left, right, and settings}
+function qDif(left, right:int32; center: int32; quantBits: byte): int32; inline;
+begin
+  {best is to add then divide, but this means we 'round' and therefore
+   occasionly overshoot. To compenstate for this I first clip LF}
+  if quantBits > 0 then begin
+    left := clamp16(left, (1 shl (quantBits-1)));
+    right := clamp16(right, (1 shl (quantBits-1)))
+  end;
+  asm
+    push cx
+    mov cl,   quantBits
+    mov eax,  left
+    sub eax,  right
+    sub eax,  center
+    sar eax,  cl
+    pop cx
+    end;
+end;
+
 
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 var
@@ -807,8 +860,8 @@ begin
     if keyDown(key_esc) then break;
 
     if samplePtr < maxSamplePtr then inc(samplePtr);
-    aspMid.reset(quant(samplePtr^.left+samplePtr^.right, profile.quantBits));
-    aspDif.reset(quant(samplePtr^.left-samplePtr^.right, profile.quantBits));
+    aspMid.reset(qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
+    aspDif.reset(qDif(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
 
     midXStats.init(false);
     difXStats.init(false);
@@ -840,8 +893,8 @@ begin
       end;
 
       if samplePtr < maxSamplePtr then inc(samplePtr);
-      aspMid.encode(quant(samplePtr^.left+samplePtr^.right-cMid, profile.quantBits));
-      aspDif.encode(quant(samplePtr^.left-samplePtr^.right-cDif, profile.quantBits));
+      aspMid.encode(qMid(samplePtr^.left, samplePtr^.right, cMid, profile.quantBits));
+      aspDif.encode(qDif(samplePtr^.left, samplePtr^.right, cDif, profile.quantBits));
 
       {xPrime is decoders quant(decoded-cMid)}
       cMid := ((aspMid.xPrime shl profile.quantBits) + cMid) div 256 * 256;

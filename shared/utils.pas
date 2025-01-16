@@ -124,6 +124,7 @@ function  Quantize(value, levels: byte): byte;
 function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
 function  clamp16(x: int32): int32; inline; overload;
+function  clamp16(x: int32;padding: int32): int32; inline; overload;
 function  clamp16(x: single): int32; inline; overload;
 function  GetTSC(): uint64; assembler; register;
 function  GetSec(): double;
@@ -582,6 +583,7 @@ var
   value: double;
   code: word;
 begin
+  result := false; {to make compiler happy}
   s := s.toLower;
   if s = 'false' then exit(false);
   if s = 'true' then exit(true);
@@ -717,6 +719,11 @@ end;
 function clamp16(x: int32): int32; inline; overload;
 begin
   result := clamp(x, -32768, +32767);
+end;
+
+function clamp16(x: int32;padding: int32): int32; inline; overload;
+begin
+  result := clamp(x, -32768+padding, +32767-padding);
 end;
 
 function clamp16(x: single): int32; inline; overload;
