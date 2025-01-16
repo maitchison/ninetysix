@@ -1,3 +1,4 @@
+
 function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; inline;
 var
   mid, dif: int32;
@@ -17,10 +18,14 @@ begin
     if difCode < 0 then dif := - dif;
   end;
 
-  mid := mid shl frameSpec^.midShift;
-  dif := dif shl frameSpec^.difShift;
+  mid := (mid shl frameSpec^.midShift) + frameSpec^.cMid;
+  dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;
 
-  {centering goes here}
+  {keep track of centering}
+{  frameSpec^.cMid := mid and frameSpec^.centerMask;
+  frameSpec^.cDif := dif and frameSpec^.centerMask;}
+  frameSpec^.cMid := (mid shr 8) shl 8;
+  frameSpec^.cDif := (dif shr 8) shl 8;
 
   result.left := (mid + dif) div 2;
   result.right := (mid - dif) div 2;

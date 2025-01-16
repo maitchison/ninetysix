@@ -28,7 +28,7 @@ unit la96;
     - Experiment with diff channel at lower rate
     - Experiment with initial scan and then assigning variable rate to frames
 
-  How it all works
+  How it all works (x? means x is optional via config settings)
 
   (LEFT,RIGHT) -> [clip protection] -> MID,DIF -> CENTERING? -> QUANTIZE?
     -> ULAW? -> DELTA -> SIGN_EXTRACT
@@ -90,7 +90,8 @@ type
     numSamples: dWord;
     frameSize: word;
     log2mu: byte;
-    postFilter: byte;
+    postFilter: byte; {requested post processing highpass filter in KHZ}
+    centering: byte;  {0=off, 8=on with 256 resolution}
   end;
 
   {todo: make a LA96Writer aswell (for progressive save)}
@@ -140,6 +141,8 @@ type
     length: word; {number of samples in frame}
     midShift, difShift:byte;
     midUTable, difUTable: ^tULawLookup;
+    centerMask: dword;
+    cMid, cDif: int32;
   end;
 
   pFrameSpec = ^tFrameSpec;
@@ -298,6 +301,7 @@ var
   sample: tAudioSample16S;
   sfxSamplePtr: pAudioSample16S;
   frameSpec: tFrameSpec;
+  centerShift: byte;
 
   procedure readSigns(var signs: tDwords);
   var
@@ -342,6 +346,13 @@ begin
   frameSpec.difShift := difShift;
   frameSpec.midUTable := getULAW(midULaw);
   frameSpec.difUTable := getULAW(difULaw);
+  if header.centering = 0 then
+    frameSpec.centerMask := not $00000000
+  else begin
+    centerShift := 16-header.centering;
+    frameSpec.centerMask := not ((1 shl centerShift) - 1);
+  end;
+  frameSpec.cMid := 0; frameSpec.cDif := 0;
 
   {final frame support}
   if frameOn = header.numFrames-1 then
@@ -601,6 +612,7 @@ var
   frameSizes: tDwords;
   maxSamplePtr: pointer;
   aspMid, aspDif: tAudioStreamProcessor;
+  decMid, decDif: int32; {what the decoder will output}
 
   cMid, cDif: int32; {centers}
   tmp: int32;
@@ -612,6 +624,9 @@ var
 
   midXStats, difXStats,
   midYStats, difYStats: tStats;
+
+  centerShift: byte;
+
 
   procedure writeOutSigns(signs: array of int8);
   var
@@ -635,7 +650,7 @@ var
   end;
 
 const
-  ENABLE_CENTERING = false;
+  CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
 
 begin
 
@@ -672,6 +687,8 @@ begin
   samplePtr := sfx.data-4; // points to sample just read, so start one sample behind.
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
+  centerShift := 16-CENTERING_RESOLUTION;
+  cMid := 0; cDif := 0;
 
   framePtr := nil;
 
@@ -689,13 +706,14 @@ begin
   header.tag := 'LA96';
   header.versionSmall := VER_SMALL;
   header.versionBig := VER_BIG;
-  header.format := 0;
+  header.format := 0; // this will be for stero / mono etc
   header.compressionMode := 0;
   header.numFrames := numFrames;
   header.numSamples := sfx.length;
   header.frameSize := FRAME_SIZE;
   header.log2mu := profile.log2mu;
   header.postFilter := profile.filter;
+  header.centering := CENTERING_RESOLUTION;
 
   fs.writeBlock(header, sizeof(header));
 
@@ -726,8 +744,10 @@ begin
     midYStats.init(false);
     difYStats.init(false);
 
-    cMid := (aspMid.xPrime div 256) * 256;
-    cDif := (aspDif.xPrime div 256) * 256;
+    if CENTERING_RESOLUTION > 0 then begin
+      cMid := ((aspMid.xPrime shl profile.quantBits) shr centerShift) shl centerShift;
+      cDif := ((aspDif.xPrime shl profile.quantBits) shr centerShift) shl centerShift;
+    end;
 
     {write frame header (one for each channel)}
     framePtr.append(fs.pos);
@@ -740,24 +760,26 @@ begin
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
-      if not ENABLE_CENTERING then begin
-        cMid := 0;
-        cDif := 0;
-      end;
-
-      {stub: show first few expected value}
+      {stub: show first few expected values}
       {if (i = 0) and (j < 10) then begin
         log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x, aspMid.y, aspMid.xPrime shl profile.quantBits, samplePtr^.left+samplePtr^.right]));
         log(format('%d %d ', [profile.quantBits, qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits)]));
       end;}
 
       if samplePtr < maxSamplePtr then inc(samplePtr);
+
       aspMid.encode(qMid(samplePtr^.left, samplePtr^.right, cMid, profile.quantBits));
       aspDif.encode(qDif(samplePtr^.left, samplePtr^.right, cDif, profile.quantBits));
 
+      {calculate the decoder's output}
+      decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
+      decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
+
       {xPrime is decoders quant(decoded-cMid)}
-      cMid := ((aspMid.xPrime shl profile.quantBits) + cMid) div 256 * 256;
-      cDif := ((aspMid.xPrime shl profile.quantBits) + cDif) div 256 * 256;
+      if CENTERING_RESOLUTION > 0 then begin
+        cMid := (decMid shr centerShift) shl centerShift;
+        cDif := (decDif shr centerShift) shl centerShift;
+      end;
 
       {stats}
       midXStats.addValue(aspMid.x);

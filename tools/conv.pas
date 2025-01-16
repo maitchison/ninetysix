@@ -329,7 +329,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_alp', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  result := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_c8', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
 procedure testCompression();
