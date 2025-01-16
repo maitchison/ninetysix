@@ -341,12 +341,16 @@ var
   outStream: tStream;
   reader: tLA96Reader;
   outSFX: array of tSoundEffect;
+  deltaSFX: array of tSoundEffect;
   i: integer;
   profiles: array of tAudioCompressionProfile;
+  selection: integer;
+  delta: boolean;
 
 begin
 
   setLength(outSFX, 0);
+  setLength(deltaSFX, 0);
 
   profiles := [
     ACP_VERYLOW, ACP_LOW, ACP_MEDIUM, ACP_HIGH,
@@ -356,6 +360,7 @@ begin
   writeln('--------------------------');
   writeln('Loading music.');
   music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
+  writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   writeln('--------------------------');
   writeln('Compressing.');
@@ -363,18 +368,17 @@ begin
 
   setLength(outSfx, length(outSFX)+1);
   outSFX[length(outSFX)-1] := music16;
+  setLength(deltaSfx, length(deltaSFX)+1);
+  deltaSFX[length(deltaSFX)-1] := music16;
 
   for profile in PROFILES do begin
+    {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if not fs.exists(music16.tag+'.a96') then begin
       outStream := encodeLA96(music16, profile);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
     end;
-    {reader := tLA96Reader.create(music16.tag+'.a96');
-    setLength(outSfx, length(outSFX)+1);
-    outSFX[length(outSFX)-1] := reader.readSFX();
-    reader.free;}
   end;
 
   music16.tag := 'origional';
@@ -382,21 +386,38 @@ begin
   writeln('--------------------------');
   writeln('Read compressed file.');
 
-  //reader := tLA96Reader.create('c:\dev\tmp\q10_7_0_0_new.a96');
-  //reader := tLA96Reader.create('c:\dev\tmp\high_3_8_8_new.a96');
-  //sfx := reader.readSFX();
-  //reader.free;
-  //mixer.play(sfx);
+  for profile in PROFILES do begin
+    reader := tLA96Reader.create(profileToTagName(profile)+'.a96');
+    setLength(outSFX, length(outSFX)+1);
+    outSFX[length(outSFX)-1] := reader.readSFX();
+    outSFX[length(outSFX)-1].tag := profileToTagName(profile); //shouldn't be needed. but is for some reason
+    reader.free;
+
+    setLength(deltaSFX, length(deltaSFX)+1);
+    deltaSFX[length(deltaSFX)-1] := afDelta(outSFX[length(outSFX)-1], music16);
+    writeln(format('ERROR RMS: %f',[deltaSFX[length(deltaSFX)-1].calculateRMS()]));
+    writeln(format('FILE RMS: %f',[outSFX[length(outSFX)-1].calculateRMS()]));
+  end;
 
   {start playing sound}
   mixer.play(outSFX[0], SCS_FIXED1); writeln(outSFX[0].tag);
   mixer.channels[1].looping := true;
   writeln('Done.');
 
+  selection := 0;
+  delta := false;
+
   repeat
-    if keyDown(key_0) then begin mixer.channels[1].sfx := outSFX[0]; writeln(outSFX[0].tag); end;
+    if keyDown(key_0) then selection := 0;
+    delta := keyDown(key_leftshift);
     for i := 1 to 8 do
-      if keyDown(key_1+i-1) then begin mixer.channels[1].sfx := outSFX[i]; writeln(outSFX[i].tag); end;
+      if keyDown(key_1+i-1) then selection := i;
+    if selection = 0 then
+      mixer.channels[1].sfx := outSFX[0]
+    else begin
+      if delta then mixer.channels[1].sfx := deltaSFX[selection] else mixer.channels[1].sfx := outSFX[selection];
+    end;
+
     until keyDown(key_esc);
 end;
 
@@ -404,8 +425,6 @@ var
   i: integer;
 
 begin
-
-  returnNilIfGrowHeapFails := true;
 
   autoHeapSize();
 

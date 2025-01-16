@@ -12,7 +12,7 @@ uses
   utils,
   sound;
 
-function afDelta(s1,s2: tSoundEffect): tSoundEffect;
+function afDelta(s1,s2: tSoundEffect;phase: integer=0): tSoundEffect;
 function afQuantize(s1: tSoundEffect;bits: integer): tSoundEffect;
 function afLowPass(x: tSoundEffect;fc: single): tSoundEffect;
 function afHighPass(const x: tSoundEffect;fc: single): tSoundEffect;
@@ -22,16 +22,18 @@ implementation
 
 {----------------------------------------------------------}
 
-function afDelta(s1,s2: tSoundEffect): tSoundEffect;
+function afDelta(s1,s2: tSoundEffect;phase: integer=0): tSoundEffect;
 var
   i: int32;
   deltaSample: tAudioSample16S;
   sample1, sample2: tAudioSample16S;
+  RMS: double;
 begin
+  phase := 1;
   assert(s1.length = s2.length);
   result := tSoundEffect.create(AF_16_STEREO, s1.length);
   for i := 0 to result.length-1 do begin
-    deltaSample := s1[i] - s2[i];
+    deltaSample := s1[i] - s2[i+phase];
     result[i] := deltaSample;
   end;
 end;

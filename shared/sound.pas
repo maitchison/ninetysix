@@ -98,6 +98,7 @@ type
     function toString(): string;
 
     function bytesPerSample: int32; inline;
+    function calculateRMS: double;
 
     function asFormat(af: tAudioFormat): tSoundEffect;
     function clone(): tSoundEffect;
@@ -279,6 +280,26 @@ function tSoundEffect.bytesPerSample: int32; inline;
 begin
   result := AF_SIZE[format];
 end;
+
+{returns the RMS of the sample}
+function tSoundEffect.calculateRMS: double;
+var
+  i: int32;
+  ll, rr: int32;
+  sample: tAudioSample16S;
+begin
+  result := 0;
+  for i := 0 to length-1 do begin
+    sample := self[i];
+    ll := sample.left*sample.left;
+    rr := sample.right*sample.right;
+    result += ll;
+    result += rr;
+  end;
+  result /= length;
+  result := sqrt(result);
+end;
+
 
 procedure tSoundEffect.setSample(pos: int32; sample: tAudioSample);
 begin
