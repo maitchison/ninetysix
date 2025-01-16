@@ -249,6 +249,7 @@ begin
     MMX shift
     MMX mid+dif -> left right
     MMX clamp
+    }
 
 
   @SAMPLE_LOOP:
@@ -264,37 +265,28 @@ begin
     mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
     mov esi, midSignPtr
     mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
-    {sub}
-    mov eax, ebx                    // eax = abs(midCode[i])
-    and eax, edx                    // eax = masked(abs(midCode[i]);
-    sub MC,  eax                    // midCode -= midCode[i] (if sign bit)
-    {add}
-    mov eax, ebx
-    not edx
-    and eax, edx
-    add MC,  eax
+    {this performs the following
+     if mask is 1s then ebx = -ebx, if mask is 0s then ebx is unchanged}
+    xor ebx, edx
+    sub ebx, edx
+    add MC,  ebx
 
     {process difcode add/subtract}
     mov esi, difCodePtr
     mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
     mov esi, difSignPtr
     mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
-    {sub}
-    mov eax, ebx
-    and eax, edx
-    sub DC,  eax
-    {add}
-    mov eax, ebx
-    not edx
-    and eax, edx
-    add DC,  eax
+    xor ebx, edx
+    sub ebx, edx
+    add DC,  ebx
+
 
     {convert mid+dif into sample}
     {
       cx = shiftCode
       eax = tmp
       ebx = tmp
-      edx = dmp
+      edx = tmp
     }
 
     push cx
