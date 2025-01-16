@@ -111,7 +111,15 @@ const
   VER_BIG = 0;
   FRAME_SIZE = 1024;
 
-{-------------------------------------------------------}
+type
+  tFrameSpec = record
+    length: word;
+    midShift, difShift:byte;
+    {add ulaw here}
+  end;
+
+  pFrameSpec = ^tFrameSpec;
+
 
 type
 
@@ -144,12 +152,144 @@ type
     procedure encode(newX: int32); override;
   end;
 
-{
-How this will work.
 
-SFX will store compressed in memory via LA96Reader.
-Mixer will request SFX to decompress frame by frame via readFrame
-}
+{-------------------------------------------------------}
+{ helpers }
+{-------------------------------------------------------}
+
+function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; inline;
+var
+  mid, dif: int32;
+begin
+  mid := midCode shl frameSpec^.midShift;
+  dif := difCode shl frameSpec^.difShift;
+  result.left := clamp16((mid + dif) div 2);
+  result.right := clamp16((mid - dif) div 2);
+end;
+
+
+procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
+var
+  i: int32;
+begin
+  // reference, 0.5ms
+  for i := 0 to frameSpec^.length-1 do begin
+
+    if midSigns[i] > 0 then midCode -= midCodes[i] else midCode += midCodes[i];
+    if difSigns[i] > 0 then difCode -= difCodes[i] else difCode += difCodes[i];
+
+    sfxSamplePtr^ := generateSample(midCode, difCode, frameSpec);
+    inc(sfxSamplePtr);
+  end;
+end;
+
+
+  (*
+  maxCounter := header.frameSize-1;
+
+  asm
+
+    pushad
+
+    {note: mmx would help a bit here with the register issues, and with
+     saturation}
+
+    {
+      eax   tmp (used to hold current sample)
+      ebx   tmp
+      ecx   counter
+      edx   tmp
+
+      esi   tmp
+      edi   samplePtr
+    }
+
+    mov eax, 0
+    mov ebx, 0
+    mov ecx, 0
+    mov edx, 0
+
+    mov esi, 0
+    mov edi, sfxSamplePtr
+
+  @SAMPLE_LOOP:
+
+    {
+      eax = masked code
+      ebx = code
+      edx = sign mask
+    }
+
+
+    {process midcode add/subtract}
+    mov ebx, [midCodes+ecx*4]      // ebx = abs(midCode[i])
+    mov edx, [midSigns+ecx*4]      // edx = signMask (0s for add, 1s for subtract)
+    {sub}
+    mov eax, ebx
+    and eax, edx
+    sub midCode, eax
+    {add}
+    mov eax, ebx
+    not edx
+    and eax, edx
+    add midCode, eax
+
+    {process difcode add/subtract}
+    mov ebx, [difCodes+ecx*4]      // ebx = abs(midCode[i])
+    mov edx, [difSigns+ecx*4]      // edx = signMask (0s for add, 1s for subtract)
+    {sub}
+    mov eax, ebx
+    and eax, edx
+    sub difCode, eax
+    {add}
+    mov eax, ebx
+    not edx
+    and eax, edx
+    add difCode, eax
+
+    {convert (shifted) mid+dif into
+
+
+
+
+
+    mov esi, difCodes
+    add edx, [esi+ecx*4]
+
+    mov [edi+ecx*4], eax
+
+    inc ecx
+    cmp ecx, maxCounter
+    jl @SAMPLE_LOOP
+
+    popad
+  end;
+    *)
+
+{convert from +=0, -=1 to +=$00.., -=$FF..}
+procedure convertSigns(signs: tDwords);
+var
+  signsPtr: pointer;
+  len: dword;
+begin
+  signsPtr := @signs[0];
+  len := length(signs);
+  asm
+    push ecx
+    push edi
+    mov  ecx, len
+    mov  edi, signsPtr
+  @SIGN_LOOP:
+    neg  [edi]
+    add  edi, 4
+    dec  ecx
+    jnz @SIGN_LOOP
+    pop  edi
+    pop  ecx
+  end;
+end;
+
+{-------------------------------------------------------}
 
 constructor tLA96Reader.create(filename: string);
 var
@@ -214,6 +354,8 @@ begin
     //stub:
     if keyDown(key_esc) then break;
   end;
+  //stub:
+  printTimers();
 end;
 
 {decodes the next frame into sfx at given sample position.
@@ -229,26 +371,26 @@ var
   i: int32;
 
   sample: tAudioSample16S;
+  sfxSamplePtr: pAudioSample16S;
+  frameSpec: tFrameSpec;
 
   procedure readSigns(var signs: tDwords);
+  var
+    len: dword;
+    signsPtr: pointer;
   begin
     if fs.readByte() <> $00 then error('invalid sign format');
-    fs.readVLCSegment(header.frameSize-1, signs);
-  end;
-
-  function generateSample(midCode, difCode: int32): tAudioSample16S;
-  var
-    mid, dif: int32;
-  begin
-    mid := midCode shl midShift;
-    dif := difCode shl difShift;
-    result.left := clamp16((mid + dif) div 2);
-    result.right := clamp16((mid - dif) div 2);
+    len := header.frameSize-1;
+    signsPtr := signs;
+    fs.readVLCSegment(len, signs);
+    convertSigns(signs);
   end;
 
 begin
 
-  writeln('processing frame ',frameOn);
+  if sfx.format <> AF_16_STEREO then error('Can only decompress to 16bit stereo');
+
+  //writeln('processing frame ',frameOn);
 
   startTimer('LA96_DF');
 
@@ -268,17 +410,23 @@ begin
   readSigns(difSigns);
   stopTimer('LA96_DF_ReadSegments');
 
-  sfx[sfxOffset] := generateSample(midCode, difCode);
+  sfxSamplePtr := sfx.data + (sfxOffset * 4);
+
+  frameSpec.length := header.frameSize;
+  frameSpec.midShift := midShift;
+  frameSpec.difShift := difShift;
+
+  sfx[sfxOffset] := generateSample(midCode, difCode, @frameSpec);
+  inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
-  for i := 0 to (header.frameSize-1)-1 do begin
-
-    if midSigns[i] = 1 then midCode -= midCodes[i] else midCode += midCodes[i];
-    if difSigns[i] = 1 then difCode -= difCodes[i] else difCode += difCodes[i];
-
-    sample := generateSample(midCode, difCode);
-    sfx[sfxOffset+i+1] := sample;
-  end;
+  process_REF(
+    sfxSamplePtr,
+    midCode, difCode,
+    midCodes, difCodes,
+    midSigns, difSigns,
+    @frameSpec
+  );
   stopTimer('LA96_DF_Process');
 
   inc(frameOn);
@@ -288,8 +436,6 @@ begin
   {stub:}
   if keyDown(key_s) then delay(100);
   while keyDown(key_p) do delay(10);
-
-  printTimers();
 
 end;
 

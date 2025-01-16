@@ -78,3 +78,90 @@ begin
   stream.fpos += (nibblesRead + 1) div 2;
 
 end;
+
+procedure unpack_ASM(inBuffer: pByte;outBuffer: pDWord; n: dword;bitsPerCode: byte);
+var
+  i,j: int32;
+  bitBuffer: dword;         { buffer for our bits }
+  bitsRemaining: int32;     { number of bits left in the buffer }
+  value: dword;             { current value being unpacked}
+  mask: dword;              { mask for extracting bits}
+
+  inPtr,outPtr: pointer;
+
+begin
+
+  {we require the following}
+  {atleast 1 padding bytes left in buffer}
+  {bits must be <= 16}
+  if bitsPerCode > 16 then begin
+    unpack_REF(inBUffer, outBuffer, n, bitsPerCode);
+    exit;
+  end;
+
+
+  inPtr := @inBuffer^;
+  outPtr := @outBuffer^;
+  mask := (1 shl bitsPerCode) - 1;
+
+  asm
+    {
+      eax = temp
+      ebx = remaining dwords
+      ecx = [bitsRemaining] [bitsPerCode] 0 0
+      edx = bitBuffer
+
+      esi = inBuffer
+      edi = outBuffer
+      ebp = mask
+
+    }
+
+    pushad
+
+    xor eax,  eax
+    mov ebx,  n
+    mov cl,   0     // bitsRemaining=0
+    mov ch,   bitsPerCode
+    xor edx,  edx   // bitbuffer=0
+
+    mov esi,  inPtr
+    mov edi,  outPtr
+    mov ebp,  mask
+
+    @LOOP_START:
+
+      {note: could be faster if we read 32 bits at a time.. just need padding bits}
+      cmp cl, ch
+      jae @SKIP_READ_VALUE
+
+      { read value }
+      { note: we assume there is atleast 1 spare bytes at the end of
+        this array }
+      movzx eax, word ptr ds:[esi]
+      shl eax, cl
+      or  edx, eax
+      add esi, 2
+      add cl, 16
+
+    @SKIP_READ_VALUE:
+
+      { extract code }
+      mov eax, edx
+      and eax, ebp
+      mov dword ptr ds:[edi], eax
+      add edi, 4
+
+      {remove code from bit buffer}
+      xchg cl, ch
+      shr edx, cl
+      xchg cl, ch
+      sub cl, ch
+
+      dec ebx
+      jnz @LOOP_START
+
+    popad
+
+  end;
+end;
