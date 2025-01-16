@@ -742,7 +742,7 @@ end;
 function unpackBits(s: tStream;bitsPerCode: byte;nCodes: integer;outBuffer: tDWords=nil): tDWords;
 var
   bytesRequired: int32;
-  bytes: tBytes;
+  bytesPtr: pointer;
 begin
 
   if not assigned(outBuffer) then
@@ -751,16 +751,19 @@ begin
   if nCodes = 0 then exit(outBuffer);
 
   bytesRequired := bytesForBits(bitsPerCode * nCodes);
-  bytes := s.readBytes(bytesRequired);
+
+  bytesPtr := @s.bytes[s.pos];
 
   case bitsPerCode of
-    0: unpack0(nil, @outBuffer[0], nCodes);
-    1: unpack1(@bytes[0], @outBuffer[0], nCodes);
-    2: unpack2(@bytes[0], @outBuffer[0], nCodes);
-    4: unpack4(@bytes[0], @outBuffer[0], nCodes);
-    8: unpack8(@bytes[0], @outBuffer[0], nCodes);
-    else unpack(@bytes[0], @outBuffer[0], nCodes, bitsPerCode);
+    0: unpack0(bytesPtr, @outBuffer[0], nCodes);
+    1: unpack1(bytesPtr, @outBuffer[0], nCodes);
+    2: unpack2(bytesPtr, @outBuffer[0], nCodes);
+    4: unpack4(bytesPtr, @outBuffer[0], nCodes);
+    8: unpack8(bytesPtr, @outBuffer[0], nCodes);
+    else unpack(bytesPtr, @outBuffer[0], nCodes, bitsPerCode);
   end;
+
+  s.fPos += bytesRequired;
 
   exit(outBuffer);
 end;
