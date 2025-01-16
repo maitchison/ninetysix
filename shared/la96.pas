@@ -167,25 +167,45 @@ begin
   result.right := clamp16((mid - dif) div 2);
 end;
 
-
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
 var
   i: int32;
 begin
   // reference, 0.5ms
   for i := 0 to frameSpec^.length-1 do begin
-
     if midSigns[i] > 0 then midCode -= midCodes[i] else midCode += midCodes[i];
     if difSigns[i] > 0 then difCode -= difCodes[i] else difCode += difCodes[i];
-
     sfxSamplePtr^ := generateSample(midCode, difCode, frameSpec);
     inc(sfxSamplePtr);
   end;
 end;
 
+procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
+var
+  maxCounter: dword;
+  shiftCode: word;
+  left, right: word;
+  midCodePtr, midSignPtr: pointer;
+  difCodePtr, difSignPtr: pointer;
+  MC,DC: int32;
+  i: integer;
+begin
+  maxCounter := frameSpec^.length;
+  {todo: this might be around the wrong way}
+  shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
+  midCodePtr := @midCodes[0];
+  midSignPtr := @midSigns[0];
+  difCodePtr := @difCodes[0];
+  difSignPtr := @difSigns[0];
+  MC := midCode;
+  DC := difCode;
 
-  (*
-  maxCounter := header.frameSize-1;
+  {not yet supported
+    ULAW
+    Centering
+    EMA
+    Clipping (encoder should insure this does not happen)
+  }
 
   asm
 
@@ -195,7 +215,7 @@ end;
      saturation}
 
     {
-      eax   tmp (used to hold current sample)
+      eax   tmp
       ebx   tmp
       ecx   counter
       edx   tmp
@@ -220,43 +240,78 @@ end;
       edx = sign mask
     }
 
-
     {process midcode add/subtract}
-    mov ebx, [midCodes+ecx*4]      // ebx = abs(midCode[i])
-    mov edx, [midSigns+ecx*4]      // edx = signMask (0s for add, 1s for subtract)
+    mov esi, midCodePtr
+    mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    mov esi, midSignPtr
+    mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
     {sub}
-    mov eax, ebx
-    and eax, edx
-    sub midCode, eax
+    mov eax, ebx                    // eax = abs(midCode[i])
+    and eax, edx                    // eax = masked(abs(midCode[i]);
+    sub MC,  eax                    // midCode -= midCode[i] (if sign bit)
     {add}
     mov eax, ebx
     not edx
     and eax, edx
-    add midCode, eax
+    add MC,  eax
 
     {process difcode add/subtract}
-    mov ebx, [difCodes+ecx*4]      // ebx = abs(midCode[i])
-    mov edx, [difSigns+ecx*4]      // edx = signMask (0s for add, 1s for subtract)
+    mov esi, difCodePtr
+    mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    mov esi, difSignPtr
+    mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
     {sub}
     mov eax, ebx
     and eax, edx
-    sub difCode, eax
+    sub DC,  eax
     {add}
     mov eax, ebx
     not edx
     and eax, edx
-    add difCode, eax
+    add DC,  eax
 
-    {convert (shifted) mid+dif into
+    {convert mid+dif into sample}
+    {
+      cx = shiftCode
+      eax = tmp
+      ebx = tmp
+      edx = dmp
+    }
 
+    push cx
 
+    mov cx, shiftCode
 
+    mov eax, MC
+    shl eax, cl
+    mov ebx, DC
+    xchg cl, ch
+    shl ebx, cl
 
+    mov edx, eax
+    add edx, ebx
+    sar edx, 1
+    mov LEFT, dx
 
-    mov esi, difCodes
-    add edx, [esi+ecx*4]
+    mov edx, eax
+    sub edx, ebx
+    sar edx, 1
+    mov RIGHT, dx
 
-    mov [edi+ecx*4], eax
+    pop cx
+
+    {write out sample}
+
+    {
+      eax = tmp
+      edi = samplePtr
+    }
+
+    {todo: these might be swapped}
+    mov ax, LEFT
+    shl eax, 16
+    mov ax, RIGHT
+    mov dword ptr [edi+ecx*4], eax
 
     inc ecx
     cmp ecx, maxCounter
@@ -264,7 +319,8 @@ end;
 
     popad
   end;
-    *)
+end;
+
 
 {convert from +=0, -=1 to +=$00.., -=$FF..}
 procedure convertSigns(signs: tDwords);
@@ -420,7 +476,7 @@ begin
   inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
-  process_REF(
+  process_ASM(
     sfxSamplePtr,
     midCode, difCode,
     midCodes, difCodes,
