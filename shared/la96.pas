@@ -347,7 +347,7 @@ begin
   if frameOn = header.numFrames-1 then
     frameSpec.length := ((header.numSamples-1) mod header.frameSize)+1;
 
-  sfx[sfxOffset] := generateSample(midCode, difCode, @frameSpec);
+  sfxSamplePtr^ := generateSample(midCode, difCode, @frameSpec);
   inc(sfxSamplePtr);
 
   //stub: show first few codes
@@ -669,7 +669,7 @@ begin
   startTimer('LA96');
 
   counter := 0;
-  samplePtr := sfx.data;
+  samplePtr := sfx.data-4; // points to sample just read, so start one sample behind.
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
 

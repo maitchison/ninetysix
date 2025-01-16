@@ -730,7 +730,7 @@ function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=P
 var
   i: int32;
   maxValue: int32;
-  unpackedBytes: int32;
+  unpackedBytes, unpackedBits: int32;
   packingBytes: int32;
   packingOptions: set of byte;
   n: int32;
@@ -743,11 +743,12 @@ begin
   startPos := fPos;
 
   maxValue := 0;
-  unpackedBytes := 0;
+  unpackedBits := 0;
   for i := 0 to length(values)-1 do begin
     maxValue := max(maxValue, values[i]);
-    unpackedBytes += bytesForBits(VLCBits(values[i]));
+    unpackedBits += VLCBits(values[i]);
   end;
+  unpackedBytes := bytesForBits(unpackedBits);
 
   self.byteAlign();
 

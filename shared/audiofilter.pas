@@ -29,7 +29,6 @@ var
   sample1, sample2: tAudioSample16S;
   RMS: double;
 begin
-  phase := 1;
   assert(s1.length = s2.length);
   result := tSoundEffect.create(AF_16_STEREO, s1.length);
   for i := 0 to result.length-1 do begin
