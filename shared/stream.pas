@@ -611,51 +611,16 @@ begin
   end;
 end;
 
-{General unpacking routine.
- Works on any number of bits, but is a bit slow.}
-procedure unpack_ref(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
-var
-  i,j: int32;
-  bitBuffer: byte;
-  bitsRemaining: integer;
-  value: dword;
-  bytePos: int32;
-
-  function nextBit: byte; inline;
-  begin
-    if bitsRemaining = 0 then begin
-      inc(inBuffer);
-      bitBuffer := inBuffer^;
-      bitsRemaining := 8;
-    end;
-    result := bitBuffer and $1;
-    bitBuffer := bitBuffer shr 1;
-    dec(bitsRemaining);
-  end;
-
-begin
-  bitBuffer := inBuffer^;
-  bitsRemaining := 8;
-  for i := 0 to n-1 do begin
-    value := 0;
-    for j := 0 to bitsPerCode-1 do
-      value += nextBit shl j;
-    outBuffer^ := value;
-    inc(outBuffer);
-  end;
-end;
-
 {General unpacking routine. Works on any number of bits, but is a bit slow.}
-procedure unpack(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
+procedure unpack_REF(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
 var
-  i,j: int32;
+  i, j: int32;
   bitBuffer: dword;         { buffer for our bits }
   bitsRemaining: int32;     { number of bits left in the buffer }
   value: dword;             { current value being unpacked}
-  mask: dword;              { mask for exracting bits}
+  mask: dword;              { mask for extracting bits}
 
 begin
-
   bitBuffer := 0;
   bitsRemaining := 0;
   mask := (1 shl bitsPerCode) - 1;
@@ -679,6 +644,92 @@ begin
   end;
 end;
 
+procedure unpack_ASM(inBuffer: pByte;outBuffer: pDWord; n: dword;bitsPerCode: byte);
+var
+  i,j: int32;
+  bitBuffer: dword;         { buffer for our bits }
+  bitsRemaining: int32;     { number of bits left in the buffer }
+  value: dword;             { current value being unpacked}
+  mask: dword;              { mask for extracting bits}
+
+  inPtr,outPtr: pointer;
+
+begin
+
+  {we require the following}
+  {atleast 3 padding bytes left in buffer}
+
+  inPtr := @inBuffer^;
+  outPtr := @outBuffer^;
+  mask := (1 shl bitsPerCode) - 1;
+
+  asm
+    {
+      eax = temp
+      ebx = remaining dwords
+      ecx = [bitsRemaining] [bitsPerCode] 0 0
+      edx = bitBuffer
+
+      esi = inBuffer
+      edi = outBuffer
+      ebp = mask
+
+    }
+
+    pushad
+
+    xor eax,  eax
+    mov ebx,  n
+    mov cl,   0     // bitsRemaining=0
+    mov ch,   bitsPerCode
+    xor edx,  edx   // bitbuffer=0
+
+    mov esi,  inPtr
+    mov edi,  outPtr
+    mov ebp,  mask
+
+    @LOOP_START:
+
+      {note: could be faster if we read 32 bits at a time.. just need padding bits}
+      cmp cl, ch
+      jae @DONE_READ_VALUE
+
+      { read value }
+      movzx eax, byte ptr ds:[esi]
+      shl eax, cl
+      or  edx, eax
+      inc esi
+      add cl, 8
+
+      jmp @LOOP_START
+
+    @DONE_READ_VALUE:
+
+      { extract code }
+      mov eax, edx
+      and eax, ebp
+      mov dword ptr ds:[edi], eax
+      add edi, 4
+
+      {remove code from bit buffer}
+      xchg cl, ch
+      shr edx, cl
+      xchg cl, ch
+      sub cl, ch
+
+      dec ebx
+      jnz @LOOP_START
+
+    popad
+
+  end;
+end;
+
+{General unpacking routine. Works on any number of bits, but is a bit slow.}
+procedure unpack(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
+begin
+  unpack_ASM(inBuffer, outBuffer, n, bitsPerCode)
+end;
 
 {Unpack bits
   s             the stream to read from
