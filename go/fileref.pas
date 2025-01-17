@@ -46,12 +46,12 @@ type
     fSize: int64;
     fModified: int32;
 
-    procedure updateHash();
     function getHash(): string;
     function getFileSize(): int64;
     function getModified(): int32;
 
   public
+    procedure updateHash();
     function fqn: string;
     function assigned: boolean;
     property fileSize: int64 read getFileSize write fSize;

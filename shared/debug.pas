@@ -14,15 +14,13 @@ var
 CONST
   HOOK_EXIT: boolean = True;
 
-CONST
-  LOG_DEBUG = 0;
-  LOG_NOTE = 1;
-  LOG_INFO = 2;
-  LOG_WARNING = 3;
-  LOG_ERROR = 4;
-
-  LOG_COLOR : array[LOG_DEBUG..LOG_ERROR] of byte = (
-    DarkGray, LightGray, Green, Yellow, Red
+type
+  tLogLevel = (
+    llDebug=0,
+    llNote=1,
+    llInfo=2,
+    llWarning=3,
+    llError=4
   );
 
 type
@@ -30,7 +28,7 @@ type
   tLogEntry = record
     time: tDateTime;
     msg: string;
-    level: byte;
+    level: tLogLevel;
     function toString: String;
   end;
 
@@ -41,12 +39,14 @@ var
   LogFile: Text;
   LogFileOpen: Boolean = False;
 
-procedure Log(s: string; level: byte=LOG_NOTE);
+procedure Log(s: string; level: tLogLevel=llNote);
 procedure Debug(s: string);
 procedure Note(s: string);
 procedure Info(s: string);
-procedure Warn(s: string);
+procedure Warning(s: string);
 procedure Error(s: string;code: byte=100);
+
+function GetLogLevelColor(level: tLogLevel): byte;
 
 procedure BasicPrintLog();
 procedure PrintLog(maxEntries: integer=20);
@@ -64,8 +64,8 @@ const
 
 var
   {todo: make these both levels, not bools}
-  WRITE_TO_SCREEN: boolean = false;
-  WRITE_TO_LOG: boolean = true;
+  VERBOSE_SCREEN: tLogLevel = llWarning;
+  VERBOSE_LOG: tLogLevel = {$ifdef debug} llDebug; {$else} llNote; {$endif}
 
 type
   Exception = class
@@ -102,7 +102,7 @@ begin
 end;
 
 {write entry to log}
-procedure Log(s: string; level: byte=LOG_NOTE);
+procedure Log(s: string; level: tLogLevel=llNote);
 var
   entry: TLogEntry;
   isText: boolean;
@@ -117,14 +117,14 @@ begin
   {Save to memory}
   LogEntries[LogCount] := entry;
   {Write to disk}
-  If WRITE_TO_LOG and logFileOpen then begin
+  If (level >= VERBOSE_LOG) and logFileOpen then begin
     writeln(logFile, tMyDateTime(entry.time).YYMMDD + ' ' +tMyDateTime(entry.time).HHMMSS + ' ' + entry.toString);
     flush(logFile);
   end;
 
-  if (WRITE_TO_SCREEN or (level >= LOG_WARNING)) and assigned(videoDriver) and videoDriver.isText then begin
+  if (level >= VERBOSE_SCREEN) and assigned(videoDriver) and videoDriver.isText then begin
     oldTextAttr := textAttr;
-    textAttr := (textAttr and $f0) + LOG_COLOR[entry.level];
+    textAttr := (textAttr and $f0) + getLogLevelColor(entry.level);
     writeln(entry.toString);
     textAttr := oldTextAttr;
   end;
@@ -132,30 +132,30 @@ begin
   Inc(LogCount);
 end;
 
-procedure Warn(s: string);
+procedure Warning(s: string);
 begin
-  Log(s, LOG_WARNING);
+  Log(s, llWarning);
 end;
 
 procedure Error(s: string; code: byte=100);
 begin
-  Log(s, LOG_ERROR);
+  Log(s, llError);
   RunErrorSkipFrame(code);
 end;
 
 procedure Note(s: string);
 begin
-  Log(s, LOG_NOTE);
+  Log(s, llNote);
 end;
 
 procedure Debug(s: string);
 begin
-  Log(s, LOG_DEBUG);
+  Log(s, llDebug);
 end;
 
 procedure Info(s: string);
 begin
-  Log(s, LOG_INFO);
+  Log(s, llInfo);
 end;
 
 procedure Assert(condition: boolean; msg: string='');
@@ -180,10 +180,22 @@ var
 
   oldTextAttr := textAttr and $0F;
   for i := firstEntry to LogCount-1 do begin
-    textAttr := LOG_COLOR[LogEntries[i].level];
+    textAttr := getLogLevelColor(LogEntries[i].level);
     writeln(LogEntries[i].ToString());
   end;
   textAttr := oldTextAttr;
+end;
+
+function getLogLevelColor(level: tLogLevel): byte;
+begin
+  case level of
+    llDebug: result := DarkGray;
+    llNote: result := LightGray;
+    llInfo: result := Green;
+    llWarning: result := Yellow;
+    llError: result := Red;
+    else result := White;
+  end;
 end;
 
 procedure BasicPrintLog();
@@ -217,15 +229,15 @@ begin
   i := 0;
   while true do begin
     if (fp < prevfp) then begin
-      warn('Stack frame corrupted');
+      warning('Stack frame corrupted');
       exit;
     end;
     if (fp = prevfp) then begin
-      warn('Stack frame has loop');
+      warning('Stack frame has loop');
       exit;
     end;
     if (fp >= StackTop) then begin
-      warn('Stack frame out of bounds');
+      warning('Stack frame out of bounds');
       exit;
     end;
     prevfp:=fp;
@@ -260,7 +272,7 @@ begin
     end;
   end;
 
-  warn('An error has occured!');
+  warning('An error has occured!');
 
   case ErrNo of
     100: RunError := 'General Error (100)';
@@ -268,7 +280,7 @@ begin
     else RunError := 'Runtime error '+IntToStr(ErrNo);
   end;
 
-  warn(RunError);
+  warning(RunError);
   note(backTraceStrFunc(address));
   dumpStack(frame);
 
@@ -348,7 +360,7 @@ begin
       1. It's really big
       2. It's not in the 'stuff from 1996' theme
     }
-    warn('Sysutils has been detected, but not not compatiable with the debug unit.');
+    warning('Sysutils has been detected, but not not compatiable with the debug unit.');
   end;
 
   // Open Log File

@@ -187,7 +187,7 @@ begin
   for filePath in filePaths do begin
     fr := tFileRef.create(filePath, path);
     if fr.fileSize > MAX_FILESIZE then begin
-      warn(format('Skipping %s as it is too large (%fkb)',[fr.fqn, fr.fileSize/1024]));
+      warning(format('Skipping %s as it is too large (%fkb)',[fr.fqn, fr.fileSize/1024]));
       fr.free;
       continue;
     end;
@@ -366,7 +366,7 @@ begin
   for fileRef in checkpoint.fileList do begin
     if not assigned(objectStore.lookupByHash(fileRef.hash)) then begin
       missingFileMsg := format(' - missing object %s referenced by %s', [copy(fileRef.hash, 1, 8), fileRef.path]);
-      warn(missingFileMsg);
+      warning(missingFileMsg);
       if verbose then
         writeln(missingFileMsg);
       result := false;
@@ -406,6 +406,7 @@ begin
 
   {look for renamed files}
   for fr in newFiles do begin
+    if length(removedFiles) = 0 then continue;
     note(format(' - checking for rename on %s against %d files.', [fr.fqn, length(removedFiles)]));
     oldFr := checkForRename(fr, removedFiles);
     if not oldFr.assigned then continue;
@@ -426,7 +427,6 @@ begin
 
   {finally check for modified}
   for fr in newFiles do begin
-    note(' - checking for modified on '+fr.fqn);
     if renamedFiles.contains(fr) then continue;
     oldFr := oldFiles.lookup(fr.path);
     if not oldFr.assigned then continue;
@@ -591,8 +591,8 @@ begin
   debug.debug(format(' - read in %fms', [getTimer('diff_read_file').elapsed*1000]));
 
   startTimer('diff_cache_key');
-  if oldHash := '' then oldHash := MD5.hash(join(old.data)).toHex;
-  if newHash := '' then newHash := MD5.hash(join(new.data)).toHex;
+  if oldHash = '' then oldHash := MD5.hash(join(old.data)).toHex;
+  if newHash = '' then newHash := MD5.hash(join(new.data)).toHex;
   cacheKey := 'new:'+newHash+' old:'+oldHash;
   stopTimer('diff_cache_key');
   debug.debug(format(' - cache key in %fms', [getTimer('diff_cache_key').elapsed*1000]));

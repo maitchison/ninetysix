@@ -610,6 +610,13 @@ var
 begin
   repo := tCheckpointRepo.create(REPO_PATH);
   checkpoint := tCheckpoint.create(repo);
+
+  {check object store}
+  outputLn('Verifying object store');
+  repo.objectStore.verify();
+  outputLn(' - done');
+
+  {check checkpoints}
   for checkpointName in repo.getCheckpointNames() do begin
     checkpoint.load(joinPath(REPO_PATH, checkpointName)+'.txt');
     textAttr := LIGHTGRAY;
@@ -828,7 +835,7 @@ begin
   if (paramCount = 2) then
     if paramSTR(2) = '-v' then begin
       {verbose mode}
-      debug.WRITE_TO_SCREEN := true;
+      debug.VERBOSE_SCREEN := llDebug;
     end;
 
   if command = 'diff' then

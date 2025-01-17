@@ -117,7 +117,7 @@ begin
         tkFloat: writeFloat(propInfo^.name, getFloatProp(value, propInfo));
         tkString, tkLString, tkWString, tkUString, tkAString: writeString(propInfo^.name, getStrProp(value, propInfo));
         tkBool: writeBool(propInfo^.name, getOrdProp(value, propInfo) < 0);
-        else warn(format('unknown property type %s on %s.%s', [propInfo^.propType^.kind, sectionName, propInfo^.name]));
+        else warning(format('unknown property type %s on %s.%s', [propInfo^.propType^.kind, sectionName, propInfo^.name]));
       end;
     end;
   finally
@@ -214,7 +214,7 @@ begin
         tkBool:
           setOrdProp(obj, propInfo, ord(strToBool(value)));
         else
-          warn(format('unknown property type %s on %s.%s', [propInfo^.propType^.kind, pi^.name, propInfo^.name]));
+          warning(format('unknown property type %s on %s.%s', [propInfo^.propType^.kind, pi^.name, propInfo^.name]));
       end;
       exit;
     end;

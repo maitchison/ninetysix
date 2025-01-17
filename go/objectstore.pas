@@ -14,6 +14,7 @@ type
 
     function lookupByHash(hash: string): tFileRef;
     function addObject(hash: string;objectPath: string): boolean;
+    function verify(): boolean;
     procedure reload();
     procedure clear();
 
@@ -79,6 +80,26 @@ begin
     fileRef.free;
   files := nil;
 end;
+
+{make sure that hashes in objectstore are correct. (very slow)}
+function tObjectStore.verify(): boolean;
+var
+  fileRef: tFileRef;
+  oldHash: string;
+  i: integer;
+begin
+  result := true;
+  for fileRef in files do begin
+    oldHash := fileRef.hash;
+    debug.debug(format('Checking %s', [fileRef.fqn]));
+    fileRef.updateHash();
+    if oldHash <> fileRef.hash then begin
+      warning(' - found invalid hash');
+      result := false;
+    end;
+  end;
+end;
+
 
 {reload file references from disk}
 procedure tObjectStore.reload();

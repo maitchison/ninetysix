@@ -130,7 +130,7 @@ begin
         if numberLength = 0 then
           error('Invalid tIntList string');
         value := strToInt(copy(s,i-numberLength,numberLength));
-        self += value;
+        self.append(value);
         numberLength := 0;
       end;
       ']': begin
@@ -138,7 +138,7 @@ begin
         {process final number (if any)}
         if numberLength = 0 then exit;
         value := strToInt(copy(s,i-numberLength,numberLength));
-        self += value;
+        self.append(value);
         exit;
       end;
       else error('Invalid character "'+s[i]+'" in tIntList string.');

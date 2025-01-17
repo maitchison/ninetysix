@@ -64,7 +64,7 @@ begin
   while getTickCount() = tick+1 do;
   endTSC := getTSC;
   if (endTSC = startTSC) then
-    warn(format('RDTSC seems to not be working, assuming default of %fMHZ', [(result)/1000/1000]))
+    warning(format('RDTSC seems to not be working, assuming default of %fMHZ', [(result)/1000/1000]))
   else
     result := (endTSC - startTSC) / (1/18.2065);
 end;
@@ -261,8 +261,8 @@ begin
   go32.get_dpmi_version(ver);
   log(format('DPMI Version: %d.%d', [ver.major, ver.minor]));
   note(' - Page size '+comma(get_page_size)+' bytes');
-  if ver.flags and $1 <> $1 then warn(' - 16-bit');
-  if ver.flags and $2 = $2 then warn(' - Real Mode');
+  if ver.flags and $1 <> $1 then warning(' - 16-bit');
+  if ver.flags and $2 = $2 then warning(' - Real Mode');
   if ver.flags and $4 = $4 then note(' - Virtual Memory Support');
 end;
 
