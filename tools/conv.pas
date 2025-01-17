@@ -353,8 +353,8 @@ begin
   setLength(deltaSFX, 0);
 
   profiles := [
-    ACP_VERYLOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
-    ACP_Q10, ACP_Q12, ACP_Q16, ACP_LOSSLESS
+    ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
+    ACP_Q10, ACP_Q12, ACP_Q16
   ];
 
   writeln('--------------------------');

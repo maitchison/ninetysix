@@ -130,7 +130,7 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStre
 
 const
   {note: very low sounds very noisy, but I think we can fix this with some post filtering}
-  ACP_VERYLOW: tAudioCompressionProfile  = (tag:'verylow'; quantBits:7;ulawBits:5;log2Mu:7;filter:16);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:5;log2Mu:6;filter:16);
   ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:6;log2Mu:7;filter:0);
   ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:5;ulawBits:7;log2Mu:7;filter:0);
   ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:3;ulawBits:8;log2Mu:8;filter:0);
@@ -642,7 +642,7 @@ end;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 const
   CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
-  MAX_ATTEMPTS = 20; {max attempts for clipping protection (0=off)}
+  MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
 var
   i,j,k: int32;
 
@@ -690,6 +690,7 @@ var
   neededChange: boolean;
   penultimateValue: single;
   ulawMaxError: int32;
+  clipAdjustment: int32;
 
   procedure writeOutSigns(signs: array of int8);
   var
@@ -875,19 +876,20 @@ begin
 
         neededChange := false;
 
+        clipAdjustment := (1 shl profile.quantBits) + (clipGuard div 10);
         if outLeft > (high(int16)-clipGuard) then begin
-          inLeft -= 1 shl profile.quantBits;
+          inLeft -= clipAdjustment;
           neededChange := true;
         end else if outLeft < (low(int16)+clipGuard) then begin
-          inLeft += 1 shl profile.quantBits;
+          inLeft += clipAdjustment;
           neededChange := true;
         end;
 
         if outRight > (high(int16)-clipGuard) then begin
-          inRight -= 1 shl profile.quantBits;
+          inRight -= clipAdjustment;
           neededChange := true;
         end else if outRight < (low(int16)+clipGuard) then begin
-          inRight += 1 shl profile.quantBits;
+          inRight += clipAdjustment;
           neededChange := true;
         end;
 
