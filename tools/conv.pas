@@ -14,7 +14,7 @@ uses
 
 const
   {if true exports compressed audio and deltas to wave files for analysis}
-  EXPORT_WAVE: boolean = true;
+  EXPORT_WAVE: boolean = false;
 
 function sign(x: integer): integer; overload;
 begin
@@ -333,7 +333,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_ndiv', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  result := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
 procedure testCompression();
@@ -481,8 +481,8 @@ begin
   runTestSuites();
   initKeyboard();
 
-  testADPCM();
-  //testCompression();
+  //testADPCM();
+  testCompression();
   //ABTest();
 
   textAttr := LIGHTGRAY;

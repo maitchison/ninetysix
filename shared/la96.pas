@@ -676,6 +676,7 @@ var
   midXStats, difXStats,
   midYStats, difYStats: tStats;
 
+  trueLeft, trueRight: int32;
   outLeft, outRight: int32;
   inLeft, inRight: int32;
 
@@ -686,6 +687,9 @@ var
   penultimateValue: single;
   ulawMaxError: int32;
   clipAdjustment: int32;
+
+  leftError, rightError: single;
+  noiseAlpha: single;
 
   procedure writeOutSigns(signs: array of int8);
   var
@@ -745,6 +749,7 @@ begin
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
   centerShift := 16-CENTERING_RESOLUTION;
   cMid := 0; cDif := 0;
+  leftError := 0; rightError := 0;
 
   framePtr := nil;
 
@@ -799,8 +804,12 @@ begin
   midYStats.init();
   difYStats.init();
 
+  // doesn't work ,so turn off.
+  noiseAlpha := 1.0;
+
   for i := 0 to numFrames-1 do begin
 
+    {todo: noise shaping here might be a good idea?}
     aspMid.reset(qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
     aspDif.reset(qDif(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
     if samplePtr < maxSamplePtr then inc(samplePtr);
@@ -847,9 +856,15 @@ begin
         log(format('%d %d ', [profile.quantBits, qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits)]));
       end;}
 
-      inLeft := samplePtr^.left;
-      inRight := samplePtr^.right;
+      inLeft := samplePtr^.left; trueLeft := inLeft;
+      inRight := samplePtr^.right; trueRight := inRight;
       if samplePtr < maxSamplePtr then inc(samplePtr);
+
+      {noise shaping}
+      if noiseAlpha <> 1 then begin
+        inLeft -= round(leftError); leftError *= noiseAlpha;
+        inRight -= round(rightError); rightError *= noiseAlpha;
+      end;
 
       aspMid.save();
       aspDif.save();
@@ -923,6 +938,12 @@ begin
 
       midSigns[j] := sign(aspMid.y);
       difSigns[j] := sign(aspDif.y);
+
+      {keep track of noise}
+      if noiseAlpha <> 1 then begin
+        leftError += (1-noiseAlpha) * (trueLeft-outLeft);
+        rightError += (1-noiseAlpha) * (trueRight-outRight);
+      end;
 
       if assigned(fullStats) then
         fullStats.writeRow([
