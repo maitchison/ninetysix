@@ -5,33 +5,45 @@ unit la96;
 
 {
 
-  (todo: update these...)
-  LA96 will eventually support the following modes
+  LA96 supports the following formats
 
-  16LR Truely lossless                  1.2:1
-  16JS Nearly lossless                  2.2:1
-  8JS  Sounds ok for 'retro' music      6.0:1
+  note: quality is subjective quality
+  -------------------------------------------------
+   5 = I can not tell the difference
+   4 = I can only tell the difference if I listen carefully
+   3 = I can tell the difference but it's not distracting
+   2 = Difference is annoying.
+   1 = Difference is very annoying.
 
-  Mono can be stored as joint, with very little overhead.
-  Optional LZ4 layer should be around 8:1 on 8JS
-
-  Todo:
-    - decompress to 8bit audio in memory (mixer needs to support this)
-    - formally define the 'frame' codes
-    - add support for full byte packing (only 5%, maybe skip this)
-    - support lossless modes
-    - add support for a LZ4 compress layer (should be 30%, so worth it)
+  Profile   Quality   Ratio
+  LOSSLESS  5         1.2x
+  VERY_LOW  2         5x
+  MEDIUM    4         4x
+  HIGH      5         3x
+  Q10       5         2.7x  (10bit audio)
 
 
-  To try
-    - Expriment with non-joint stereo
-    - Experiment with diff channel at lower rate
-    - Experiment with initial scan and then assigning variable rate to frames
+  Decompression speed is very fast. Currently at 20x realtime on P166 MMX
+  An ASM/MMX decoder should get this to 30x.
 
+  There are also some compression improvements to be made. I think we'll probably
+  get VERY_LOW=7x, MEDIUM=5x and HIGH=4x. For the moment you can just zip them
+  for some extra compression.
+
+  Pending features
+  -------------------------------------------------
+  Sign bit compression (should be +5% or so)
+  ASM Decoder (should be 25x realtime)
+  MMX Decoder (should be 35x realtime)
+  lowpass post filter - to help with VERY_LOW quality setting.
+  variable bit-rate (hoping for medium level with 5x compression)
+
+  -------------------------------------------------
   How it all works (x? means x is optional via config settings)
 
   (LEFT,RIGHT) -> [clip protection] -> MID,DIF -> CENTERING? -> QUANTIZE?
     -> ULAW? -> DELTA -> SIGN_EXTRACT
+
 
   and unwind
 
@@ -117,10 +129,11 @@ function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
 
 const
+  {note: very low sounds very noisy, but I think we can fix this with some post filtering}
   ACP_VERYLOW: tAudioCompressionProfile  = (tag:'verylow'; quantBits:7;ulawBits:5;log2Mu:7;filter:16);
-  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:6;log2Mu:7;filter:16);
-  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:7;log2Mu:7;filter:0);
-  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:3;ulawBits:8;log2Mu:8;filter:0);
+  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:6;log2Mu:7;filter:0);
+  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:5;ulawBits:7;log2Mu:7;filter:0);
+  ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:3;ulawBits:8;log2Mu:8;filter:0);
   ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:7;ulawBits:0;log2Mu:0;filter:0);
   ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:5;ulawBits:0;log2Mu:0;filter:0);
   ACP_Q16: tAudioCompressionProfile      = (tag:'q16';     quantBits:1;ulawBits:0;log2Mu:0;filter:0);
