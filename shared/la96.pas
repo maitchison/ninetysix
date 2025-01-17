@@ -139,6 +139,7 @@ const
 type
   tFrameSpec = record
     length: word; {number of samples in frame}
+    idx: int32; {might be -1}
     midShift, difShift:byte;
     midUTable, difUTable: ^tULawLookup;
     centerMask: dword;
@@ -151,12 +152,16 @@ type
 {$I la96_asm.inc}
 
 type
+  {todo: make one record with options...}
   tAudioStreamProcessor = class
     x, prevX, y, prevY: int32;
     xPrime: int32; {what our decoder will produce}
+    savedX, savedY: int32;
     function lastError: int32;
     procedure encode(newX: int32); virtual;
     procedure reset(initialValue: int32=0); virtual;
+    procedure save(); virtual;
+    procedure restore(); virtual;
   end;
 
   {encode the difference between samples}
@@ -176,6 +181,9 @@ type
   {delta on uLaw}
   tASPULawDelta = class(tASPULaw)
     prevU: int32;
+    savedU: int32;
+    procedure save(); override;
+    procedure restore(); override;
     procedure reset(initialValue: int32=0); override;
     procedure encode(newX: int32); override;
   end;
@@ -279,7 +287,8 @@ end;
 
 function tLA96Reader.getULAW(bits: byte): pULawLookup;
 begin
-  if bits = 0 then exit(nil);
+  result := nil;
+  if bits = 0 then exit;
   if bits in [1..8] then
     result := @ulawTable[bits]
   else
@@ -346,8 +355,9 @@ begin
   frameSpec.difShift := difShift;
   frameSpec.midUTable := getULAW(midULaw);
   frameSpec.difUTable := getULAW(difULaw);
+  frameSpec.idx := 0;
   if header.centering = 0 then
-    frameSpec.centerMask := not $00000000
+    frameSpec.centerMask := $ffffffff
   else begin
     centerShift := 16-header.centering;
     frameSpec.centerMask := not ((1 shl centerShift) - 1);
@@ -443,6 +453,20 @@ begin
   xPrime := initialValue;
 end;
 
+{saves enough of the stats of the stream processor to be able to call encode again}
+procedure tAudioStreamProcessor.save();
+begin
+  savedX := x;
+  savedY := y;
+end;
+
+{restores enough of the stats of the stream processor to be able to call encode again}
+procedure tAudioStreamProcessor.restore();
+begin
+  x := savedX;
+  y := savedY;
+end;
+
 {returns the value the decode will produce for x}
 function tAudioStreamProcessor.lastError: int32;
 begin
@@ -496,7 +520,22 @@ begin
   xPrime := uLawDecode.lookup(y);
 end;
 
+
 {------}
+
+procedure tASPULawDelta.save();
+begin
+  savedX := x;
+  savedY := y;
+  savedU := prevU;
+end;
+
+procedure tASPULawDelta.restore();
+begin
+  x := savedX;
+  y := savedY;
+  prevU := savedU;
+end;
 
 procedure tASPULawDelta.encode(newX: int32);
 var
@@ -588,6 +627,9 @@ end;
 
 
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
+const
+  CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
+  MAX_ATTEMPTS = 20; {max attempts for clipping protection (0=off)}
 var
   i,j,k: int32;
 
@@ -617,6 +659,7 @@ var
   cMid, cDif: int32; {centers}
   tmp: int32;
   header: tLA96FileHeader;
+  attempt: int32;
 
   fullStats, frameStats: tCSVWriter;
 
@@ -626,7 +669,14 @@ var
   midYStats, difYStats: tStats;
 
   centerShift: byte;
+  outLeft, outRight: int32;
+  inLeft, inRight: int32;
 
+  clipGuard: int32; {padding for clipping}
+
+  neededChange: boolean;
+  penultimateValue: single;
+  ulawMaxError: int32;
 
   procedure writeOutSigns(signs: array of int8);
   var
@@ -648,9 +698,6 @@ var
     {todo: detect when this doesn't work, and just write out the bits}
     {also.. is this really worth it?}
   end;
-
-const
-  CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
 
 begin
 
@@ -684,7 +731,7 @@ begin
   startTimer('LA96');
 
   counter := 0;
-  samplePtr := sfx.data-4; // points to sample just read, so start one sample behind.
+  samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
   centerShift := 16-CENTERING_RESOLUTION;
@@ -699,7 +746,6 @@ begin
     aspMid := tASPDelta.create();
     aspDif := tASPDelta.create();
   end;
-
   // -------------------------
   // Write Header
 
@@ -716,6 +762,20 @@ begin
   header.centering := CENTERING_RESOLUTION;
 
   fs.writeBlock(header, sizeof(header));
+
+  // guard against half a quantization step (otherwise rounding might cause clipping)}
+  if profile.quantBits = 0 then
+    clipGuard := 0
+  else
+    clipGuard := (1 shl profile.quantBits);
+
+  {not sure why we need to include ulaw error here, decoder tracking should sort this out?}
+  if profile.uLawBits <> 0 then begin
+    penultimateValue := 1 - (1/(1 shl profile.ulawBits));
+    ulawMaxError := uLawInv(1, profile.log2Mu) - uLawInv(penultimateValue, profile.log2Mu);
+    clipGuard += ulawMaxError;
+    note(format('Adding %d to clip guard due to ulaw', [ulawMaxError]));
+  end;
 
   {write reserved header space}
   if fs.pos > 128 then raise Exception.create('Header length exceeds 128 bytes');
@@ -735,9 +795,20 @@ begin
     //stub:
     if keyDown(key_esc) then break;
 
-    if samplePtr < maxSamplePtr then inc(samplePtr);
     aspMid.reset(qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
     aspDif.reset(qDif(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
+    if samplePtr < maxSamplePtr then inc(samplePtr);
+
+    {stub: double check no initial clipping}
+    (*
+    decMid := (aspMid.xPrime shl profile.quantBits);
+    decDif := (aspDif.xPrime shl profile.quantBits);
+    outLeft := (decMid + decDif) div 2;
+    outRight := (decMid - decDif) div 2;
+    if (clamp16(outLeft, clipGuard) <> outLeft) or (clamp16(outRight, clipGuard) <> outRight) then
+      {indicate clipping}
+      warn(format('Initial Clipping %d %d', [outLeft, outRight]));
+    *)
 
     midXStats.init(false);
     difXStats.init(false);
@@ -762,18 +833,67 @@ begin
 
       {stub: show first few expected values}
       {if (i = 0) and (j < 10) then begin
-        log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x, aspMid.y, aspMid.xPrime shl profile.quantBits, samplePtr^.left+samplePtr^.right]));
+        log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x, aspMid.y, aspMid.xPrime shl profile.quantBits, inLeft+inRight]));
         log(format('%d %d ', [profile.quantBits, qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits)]));
       end;}
 
+      inLeft := samplePtr^.left;
+      inRight := samplePtr^.right;
       if samplePtr < maxSamplePtr then inc(samplePtr);
 
-      aspMid.encode(qMid(samplePtr^.left, samplePtr^.right, cMid, profile.quantBits));
-      aspDif.encode(qDif(samplePtr^.left, samplePtr^.right, cDif, profile.quantBits));
+      aspMid.save();
+      aspDif.save();
+
+      aspMid.encode(qMid(inLeft, inRight, cMid, profile.quantBits));
+      aspDif.encode(qDif(inLeft, inRight, cDif, profile.quantBits));
 
       {calculate the decoder's output}
       decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
       decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
+      outLeft := (decMid + decDif) div 2;
+      outRight := (decMid - decDif) div 2;
+
+      {see if we have clipping and fix it}
+      for attempt := 1 to MAX_ATTEMPTS do begin
+
+        {not an efficent solution at handling clipping, but it'll get the
+         job done. And I'm more worried about the decoder speed than
+         encoder speed}
+
+        neededChange := false;
+
+        if outLeft > (high(int16)-clipGuard) then begin
+          inLeft -= 1 shl profile.quantBits;
+          neededChange := true;
+        end else if outLeft < (low(int16)+clipGuard) then begin
+          inLeft += 1 shl profile.quantBits;
+          neededChange := true;
+        end;
+
+        if outRight > (high(int16)-clipGuard) then begin
+          inRight -= 1 shl profile.quantBits;
+          neededChange := true;
+        end else if outRight < (low(int16)+clipGuard) then begin
+          inRight += 1 shl profile.quantBits;
+          neededChange := true;
+        end;
+
+        if not neededChange then break;
+
+        {try again..}
+        aspMid.restore;
+        aspDif.restore;
+        aspMid.encode(qMid(inLeft, inRight, cMid, profile.quantBits));
+        aspDif.encode(qDif(inLeft, inRight, cDif, profile.quantBits));
+        decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
+        decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
+        outLeft := (decMid + decDif) div 2;
+        outRight := (decMid - decDif) div 2;
+      end;
+
+      if (clamp16(outLeft) <> outLeft) or (clamp16(outRight) <> outRight) then
+        {indicate clipping}
+        warn(format('Clipping %d %d', [outLeft, outRight]));
 
       {xPrime is decoders quant(decoded-cMid)}
       if CENTERING_RESOLUTION > 0 then begin

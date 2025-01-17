@@ -22,18 +22,29 @@ begin
   dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;
 
   {keep track of centering}
-{  frameSpec^.cMid := mid and frameSpec^.centerMask;
-  frameSpec^.cDif := dif and frameSpec^.centerMask;}
-  frameSpec^.cMid := (mid shr 8) shl 8;
-  frameSpec^.cDif := (dif shr 8) shl 8;
+  frameSpec^.cMid := mid and frameSpec^.centerMask;
+  frameSpec^.cDif := dif and frameSpec^.centerMask;
 
-  result.left := (mid + dif) div 2;
-  result.right := (mid - dif) div 2;
+  left := (mid + dif) div 2;
+  right := (mid - dif) div 2;
 
   {$ifdef DEBUG}
-  //if (result.left <> left) or (result.right <> right) then
-  //  writeln(format('Clipping L:%d R:%d mid:%d dif:%d shift:%d %d', [left, right, midCode, difCode, frameSpec^.midShift, frameSpec^.difShift]));
+  if (left > high(int16)) then
+    writeln(format('Clipping LO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+  if (left < low(int16)) then
+    writeln(format('Clipping LU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+  if (right > high(int16)) then
+    writeln(format('Clipping RO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+  if (right < low(int16)) then
+    writeln(format('Clipping RU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+  result.left := clamp16(left);
+  result.right := clamp16(right);
+  {$else}
+  result.left := left;
+  result.right := right;
   {$endif}
+
+
 end;
 
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
@@ -44,6 +55,7 @@ begin
   for i := 0 to (frameSpec^.length-1)-1 do begin
     if midSigns[i] > 0 then midCode -= midCodes[i] else midCode += midCodes[i];
     if difSigns[i] > 0 then difCode -= difCodes[i] else difCode += difCodes[i];
+    frameSpec^.idx := i+1;
     sfxSamplePtr^ := generateSample(midCode, difCode, frameSpec);
     inc(sfxSamplePtr);
   end;
