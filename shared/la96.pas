@@ -154,7 +154,7 @@ type
     idx: int32; {might be -1}
     midShift, difShift:byte;
     midUTable, difUTable: ^tULawLookup;
-    centerMask: dword;
+    centerShift: byte;
     cMid, cDif: int32;
   end;
 
@@ -226,14 +226,6 @@ begin
     pop  edi
     pop  ecx
   end;
-end;
-
-{generates a mask that performs x SAR shift SHL shift}
-function getCenterMask(shift: byte): dword;
-begin
-  if shift = 0 then
-    exit($ffffffff);
-  result := not ((1 shl shift) - 1);
 end;
 
 {-------------------------------------------------------}
@@ -375,7 +367,7 @@ begin
   frameSpec.midUTable := getULAW(midULaw);
   frameSpec.difUTable := getULAW(difULaw);
   frameSpec.idx := 0;
-  frameSpec.centerMask := getCenterMask(16-header.centering);
+  frameSpec.centerShift := 16-header.centering;
   frameSpec.cMid := 0; frameSpec.cDif := 0;
 
   {final frame support}
@@ -684,11 +676,11 @@ var
   midXStats, difXStats,
   midYStats, difYStats: tStats;
 
-  centerMask: dword;
   outLeft, outRight: int32;
   inLeft, inRight: int32;
 
   clipGuard: int32; {padding for clipping}
+  centerShift: byte;
 
   neededChange: boolean;
   penultimateValue: single;
@@ -751,7 +743,7 @@ begin
   samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
-  centerMask := getCenterMask(16-CENTERING_RESOLUTION);
+  centerShift := 16-CENTERING_RESOLUTION;
   cMid := 0; cDif := 0;
 
   framePtr := nil;
@@ -833,8 +825,8 @@ begin
     difYStats.init(false);
 
     if CENTERING_RESOLUTION > 0 then begin
-      cMid := (aspMid.xPrime shl profile.quantBits) and centerMask;
-      cDif := (aspDif.xPrime shl profile.quantBits) and centerMask;
+      cMid := (aspMid.xPrime shl profile.quantBits) shr centerShift shl centerShift;
+      cDif := (aspDif.xPrime shl profile.quantBits) shr centerShift shl centerShift;
     end else begin
       cMid := 0;
       cDif := 0;
@@ -919,8 +911,8 @@ begin
 
       {xPrime is decoders quant(decoded-cMid)}
       if CENTERING_RESOLUTION > 0 then begin
-        cMid := decMid and centerMask;
-        cDif := decDif and centerMask;
+        cMid := decMid shr centerShift shl centerShift;
+        cDif := decDif shr centerShift shl centerShift;
       end;
 
       {stats}

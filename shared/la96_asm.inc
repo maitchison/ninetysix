@@ -9,7 +9,6 @@ var
   i: integer;
 begin
   maxCounter := frameSpec^.length-1;
-  {todo: this might be around the wrong way}
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
   midCodePtr := @midCodes[0];
   midSignPtr := @midSigns[0];

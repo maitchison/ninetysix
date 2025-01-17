@@ -1,8 +1,9 @@
 
-function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; inline;
+function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; {stub: inline}
 var
   mid, dif: int32;
   left,right: int32;
+  shift: byte;
 begin
 
   mid := midCode;
@@ -22,8 +23,9 @@ begin
   dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;
 
   {keep track of centering}
-  frameSpec^.cMid := mid and frameSpec^.centerMask;
-  frameSpec^.cDif := dif and frameSpec^.centerMask;
+  shift := frameSpec^.centerShift;
+  frameSpec^.cMid := mid shr shift shl shift;
+  frameSpec^.cDif := dif shr shift shl shift;
 
   left := (mid + dif);
   right := (mid - dif);
@@ -43,8 +45,6 @@ begin
   result.left := left;
   result.right := right;
   {$endif}
-
-
 end;
 
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
