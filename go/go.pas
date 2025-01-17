@@ -185,6 +185,7 @@ begin
   old := repo.loadHead();
   new := tCheckpoint.create(repo, WORKSPACE);
 
+  textAttr := White;
   outputln();
   outputDiv();
   outputln(' SUMMARY');
@@ -799,6 +800,7 @@ begin
       showDiff(old, new, matches);
   end;
 
+  textAttr := White;
   outputDiv();
   outputLn(' SUMMARY');
   outputDiv();
