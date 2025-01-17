@@ -5,7 +5,9 @@ var
   left, right: word;
   midCodePtr, midSignPtr: pointer;
   difCodePtr, difSignPtr: pointer;
+  midUTable,difUTable: pointer;
   MC,DC: int32;
+  midCenter, difCenter: int32;
   i: integer;
 begin
   maxCounter := frameSpec^.length-1;
@@ -14,13 +16,17 @@ begin
   midSignPtr := @midSigns[0];
   difCodePtr := @difCodes[0];
   difSignPtr := @difSigns[0];
+  left := 0; right := 0; // make compiler happy
   MC := midCode;
   DC := difCode;
+  midCenter := frameSpec^.cMid;
+  difCenter := frameSpec^.cDif;
+  if assigned(frameSpec^.difUTable) then difUTable := @frameSpec^.difUTable^.table.data[0] else difUTable := nil;
+  if assigned(frameSpec^.midUTable) then midUTable := @frameSpec^.midUTable^.table.data[0] else midUTable := nil;
 
   {not yet supported
     ULAW
     Centering
-    EMA
     Clipping (encoder should insure this does not happen)
   }
 
@@ -72,21 +78,23 @@ begin
   @SAMPLE_LOOP:
 
     {
-      eax = masked code
-      ebx = code
-      edx = sign mask
+      eax = free
+      ebx = tmp
+      ecx = reserved (i)
+      edx = tmp
     }
 
     {process midcode add/subtract}
     mov esi, midCodePtr
-    mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    mov eax, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
     mov esi, midSignPtr
     mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
     {this performs the following
      if mask is 1s then ebx = -ebx, if mask is 0s then ebx is unchanged}
-    xor ebx, edx
-    sub ebx, edx
-    add MC,  ebx
+    xor eax, edx
+    sub eax, edx
+    add eax, MC
+    mov MC, eax                        // eax = MC + delta
 
     {process difcode add/subtract}
     mov esi, difCodePtr
@@ -95,50 +103,98 @@ begin
     mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
     xor ebx, edx
     sub ebx, edx
-    add DC,  ebx
+    add ebx, DC
+    mov DC, ebx                        // ebx = DC + delta
 
-
-    {convert mid+dif into sample}
     {
-      cx = shiftCode
-      eax = tmp
-      ebx = tmp
-      edx = tmp
+      eax=mid
+      ebx=dif
     }
 
+    {note: we could make the lookup table include negative numbers and make
+     this a bit faster}
+
+    {------------------------}
+    {ULAW Mid}
+    mov esi, MIDUTABLE
+    test esi, esi
+    jz @MID_DONE
+
+    cmp eax, 0
+    jl @MID_IS_NEG
+
+  @MID_IS_POS:
+    mov eax, dword ptr [esi+eax*4]
+    jmp @MID_DONE
+
+  @MID_IS_NEG:
+    neg eax
+    mov eax, dword ptr [esi+eax*4]
+    neg eax
+  @MID_DONE:
+
+    {------------------------}
+    {ULAW Dif}
+    mov esi, difUTable
+    test esi, esi
+    jz @DIF_DONE
+
+    cmp ebx, 0
+    jl @DIF_IS_NEG
+
+  @DIF_IS_POS:
+    mov ebx, dword ptr [esi+ebx*4]
+    jmp @DIF_DONE
+
+  @DIF_IS_NEG:
+    neg ebx
+    mov ebx, dword ptr [esi+ebx*4]
+    neg ebx
+  @DIF_DONE:
+
+    {at this point
+      eax = mid
+      ebx = dif
+    }
+
+    {multiply mid and shift by our quantization level, and adjust for centering}
     push cx
+    mov cx, SHIFTCODE
 
-    mov cx, shiftCode
-
-    mov eax, MC
     shl eax, cl
-    mov ebx, DC
     xchg cl, ch
     shl ebx, cl
+    add eax, MIDCENTER    // eax = mid shl midShift + cDif
+    add ebx, DIFCENTER    // ebx = mid shl midShift + cMid
+
+    {update to new center}
+    mov edx, eax
+    shr edx, 8
+    shl edx, 8              // todo: have this be configured
+    mov MIDCENTER, edx
+    mov edx, ebx
+    shr edx, 8
+    shl edx, 8              // todo: have this be configured
+    mov DIFCENTER, edx
 
     mov edx, eax
     add edx, ebx
-    sar edx, 1
     mov LEFT, dx
 
     mov edx, eax
     sub edx, ebx
-    sar edx, 1
     mov RIGHT, dx
-
     pop cx
 
     {write out sample}
-
     {
       eax = tmp
       edi = samplePtr
     }
 
-    {todo: these might be swapped}
-    mov ax, LEFT
-    shl eax, 16
     mov ax, RIGHT
+    shl eax, 16
+    mov ax, LEFT
     mov dword ptr [edi+ecx*4], eax
 
     inc ecx
@@ -147,4 +203,9 @@ begin
 
     popad
   end;
+
+  {write back out our centering positions}
+  frameSpec^.cMid := midCenter;
+  frameSpec^.cDif := difCenter;
+
 end;

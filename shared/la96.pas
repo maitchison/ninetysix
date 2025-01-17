@@ -378,7 +378,7 @@ begin
   inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
-  process_REF(
+  process_ASM(
     sfxSamplePtr,
     midCode, difCode,
     midCodes, difCodes,

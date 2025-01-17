@@ -415,6 +415,7 @@ begin
     end;
   end;
 
+  printTimers();
 
   {start playing sound}
   mixer.play(outSFX[0], SCS_FIXED1); writeln(outSFX[0].tag);
