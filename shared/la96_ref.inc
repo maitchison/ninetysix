@@ -25,8 +25,8 @@ begin
   frameSpec^.cMid := mid and frameSpec^.centerMask;
   frameSpec^.cDif := dif and frameSpec^.centerMask;
 
-  left := (mid + dif) div 2;
-  right := (mid - dif) div 2;
+  left := (mid + dif);
+  right := (mid - dif);
 
   {$ifdef DEBUG}
   if (left > high(int16)) then

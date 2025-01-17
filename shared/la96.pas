@@ -130,14 +130,13 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStre
 
 const
   {note: very low sounds very noisy, but I think we can fix this with some post filtering}
-  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:5;log2Mu:6;filter:16);
-  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:6;log2Mu:7;filter:0);
-  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:5;ulawBits:7;log2Mu:7;filter:0);
-  ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:3;ulawBits:8;log2Mu:8;filter:0);
-  ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:7;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:5;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q16: tAudioCompressionProfile      = (tag:'q16';     quantBits:1;ulawBits:0;log2Mu:0;filter:0);
-  ACP_LOSSLESS: tAudioCompressionProfile = (tag:'lossless';quantBits:0;ulawBits:0;log2Mu:0;filter:0);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:5;ulawBits:5;log2Mu:6;filter:16);
+  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:6;log2Mu:7;filter:0);
+  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:7;log2Mu:7;filter:0);
+  ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:2;ulawBits:8;log2Mu:8;filter:0);
+  ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:6;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:4;ulawBits:0;log2Mu:0;filter:0);
+  ACP_Q16: tAudioCompressionProfile      = (tag:'q16';     quantBits:0;ulawBits:0;log2Mu:0;filter:0);
 
 var
   LA96_ENABLE_STATS: boolean = false;
@@ -227,6 +226,14 @@ begin
     pop  edi
     pop  ecx
   end;
+end;
+
+{generates a mask that performs x SAR shift SHL shift}
+function getCenterMask(shift: byte): dword;
+begin
+  if shift = 0 then
+    exit($ffffffff);
+  result := not ((1 shl shift) - 1);
 end;
 
 {-------------------------------------------------------}
@@ -323,7 +330,6 @@ var
   sample: tAudioSample16S;
   sfxSamplePtr: pAudioSample16S;
   frameSpec: tFrameSpec;
-  centerShift: byte;
 
   procedure readSigns(var signs: tDwords);
   var
@@ -369,12 +375,7 @@ begin
   frameSpec.midUTable := getULAW(midULaw);
   frameSpec.difUTable := getULAW(difULaw);
   frameSpec.idx := 0;
-  if header.centering = 0 then
-    frameSpec.centerMask := $ffffffff
-  else begin
-    centerShift := 16-header.centering;
-    frameSpec.centerMask := not ((1 shl centerShift) - 1);
-  end;
+  frameSpec.centerMask := getCenterMask(16-header.centering);
   frameSpec.cMid := 0; frameSpec.cDif := 0;
 
   {final frame support}
@@ -612,6 +613,7 @@ begin
     mov cl,   quantBits
     mov eax,  left
     add eax,  right
+    sar eax,  1
     sub eax,  center
     sar eax,  cl
     pop cx
@@ -632,6 +634,7 @@ begin
     mov cl,   quantBits
     mov eax,  left
     sub eax,  right
+    sar eax,  1
     sub eax,  center
     sar eax,  cl
     pop cx
@@ -681,7 +684,7 @@ var
   midXStats, difXStats,
   midYStats, difYStats: tStats;
 
-  centerShift: byte;
+  centerMask: dword;
   outLeft, outRight: int32;
   inLeft, inRight: int32;
 
@@ -748,7 +751,7 @@ begin
   samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
-  centerShift := 16-CENTERING_RESOLUTION;
+  centerMask := getCenterMask(16-CENTERING_RESOLUTION);
   cMid := 0; cDif := 0;
 
   framePtr := nil;
@@ -830,9 +833,13 @@ begin
     difYStats.init(false);
 
     if CENTERING_RESOLUTION > 0 then begin
-      cMid := ((aspMid.xPrime shl profile.quantBits) shr centerShift) shl centerShift;
-      cDif := ((aspDif.xPrime shl profile.quantBits) shr centerShift) shl centerShift;
+      cMid := (aspMid.xPrime shl profile.quantBits) and centerMask;
+      cDif := (aspDif.xPrime shl profile.quantBits) and centerMask;
+    end else begin
+      cMid := 0;
+      cDif := 0;
     end;
+
 
     {write frame header (one for each channel)}
     framePtr.append(fs.pos);
@@ -864,8 +871,8 @@ begin
       {calculate the decoder's output}
       decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
       decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
-      outLeft := (decMid + decDif) div 2;
-      outRight := (decMid - decDif) div 2;
+      outLeft := decMid + decDif;
+      outRight := decMid - decDif;
 
       {see if we have clipping and fix it}
       for attempt := 1 to MAX_ATTEMPTS do begin
@@ -902,8 +909,8 @@ begin
         aspDif.encode(qDif(inLeft, inRight, cDif, profile.quantBits));
         decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
         decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
-        outLeft := (decMid + decDif) div 2;
-        outRight := (decMid - decDif) div 2;
+        outLeft := decMid + decDif;
+        outRight := decMid - decDif;
       end;
 
       if (clamp16(outLeft) <> outLeft) or (clamp16(outRight) <> outRight) then
@@ -912,8 +919,8 @@ begin
 
       {xPrime is decoders quant(decoded-cMid)}
       if CENTERING_RESOLUTION > 0 then begin
-        cMid := (decMid shr centerShift) shl centerShift;
-        cDif := (decDif shr centerShift) shl centerShift;
+        cMid := decMid and centerMask;
+        cDif := decDif and centerMask;
       end;
 
       {stats}
