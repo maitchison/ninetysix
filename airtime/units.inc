@@ -4,9 +4,13 @@
   test,
   utils,
   types,
+  sysInfo,
+{airtime specific}
+  configFile,
 {some base units}
   mymath,
   mydos,
+
   keyboard,
   mouse,
   timer,
@@ -22,5 +26,5 @@
   screen,
 {sound}
   sound,
-  mix,
+  mixLib,
   sbDriver

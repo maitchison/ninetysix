@@ -15,13 +15,14 @@ CONST
   HOOK_EXIT: boolean = True;
 
 CONST
+  LOG_DEBUG = 0;
   LOG_NOTE = 1;
   LOG_INFO = 2;
   LOG_WARNING = 3;
   LOG_ERROR = 4;
 
-  LOG_COLOR : array[LOG_NOTE..LOG_ERROR] of byte = (
-    LightGray, Green, Yellow, Red
+  LOG_COLOR : array[LOG_DEBUG..LOG_ERROR] of byte = (
+    DarkGray, LightGray, Green, Yellow, Red
   );
 
 type
@@ -41,6 +42,7 @@ var
   LogFileOpen: Boolean = False;
 
 procedure Log(s: string; level: byte=LOG_NOTE);
+procedure Debug(s: string);
 procedure Note(s: string);
 procedure Info(s: string);
 procedure Warn(s: string);
@@ -61,6 +63,7 @@ const
   IO_ACCESS_DENIED = 5;
 
 var
+  {todo: make these both levels, not bools}
   WRITE_TO_SCREEN: boolean = false;
   WRITE_TO_LOG: boolean = true;
 
@@ -119,7 +122,7 @@ begin
     flush(logFile);
   end;
 
-  if WRITE_TO_SCREEN and assigned(videoDriver) and videoDriver.isText then begin
+  if (WRITE_TO_SCREEN or (level >= LOG_WARNING)) and assigned(videoDriver) and videoDriver.isText then begin
     oldTextAttr := textAttr;
     textAttr := (textAttr and $f0) + LOG_COLOR[entry.level];
     writeln(entry.toString);
@@ -143,6 +146,11 @@ end;
 procedure Note(s: string);
 begin
   Log(s, LOG_NOTE);
+end;
+
+procedure Debug(s: string);
+begin
+  Log(s, LOG_DEBUG);
 end;
 
 procedure Info(s: string);

@@ -592,7 +592,7 @@ begin
 
   logHeapStatus('Resources loaded');
 
-  videoDriver := tVesaDriver.create();
+  enableVideoDriver(tVesaDriver.create());
 
   if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
     error('Requires VESA 2.0 or greater.');

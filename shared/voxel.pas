@@ -14,6 +14,8 @@ uses
   debug,
   graph32,
   graph2d,
+  filesystem,
+  sysInfo,
   vga,
   vertex,
   lc96;
@@ -221,7 +223,7 @@ begin
    Eventually we will so this somewhere else, and perform
    a single image load}
 
-  if exists(filename+'.p96') then
+  if fs.exists(filename+'.p96') then
     img := loadLC96(filename+'.p96')
   else begin
     img := loadBMP(filename+'.bmp');
@@ -232,7 +234,7 @@ begin
   note(format('Voxel sprite is (%d, %d)', [img.width, img.height]));
   result.setPage(img, height);
 
-  if exists(filename+'.sdf') then begin
+  if fs.exists(filename+'.sdf') then begin
     sdf := loadLC96(filename+'.sdf');
   end else begin
     sdf := result.generateSDF();

@@ -48,19 +48,12 @@ begin
   result := hexDigit(b shr 4) + hexDigit(b);
 end;
 
-function appendToBytes(data: tBytes;b: byte): tBytes;
-begin
-  setLength(data, length(data)+1);
-  data[length(data)-1] := b;
-  result := data;
-end;
-
-function leftRotate(value: dword;shifts: byte): dword;
+function leftRotate(value: dword;shifts: byte): dword; inline;
 begin
   result := (value shl shifts) or (value shr (32-shifts));
 end;
 
-function swapEdian(value: dword): dword;
+function swapEdian(value: dword): dword; inline;
 begin
   {bswap would do this in 1 instruction...}
   result :=
@@ -113,10 +106,12 @@ var
   A,B,C,D: dword;
   F,g: dword;
   chunk: tChunk;
-  originalLength: dword;
+  originalLen: dword;
+  finalLen: dword;
   lengthInBits: qword;
   chunks: dword;
   i, j, z: int32;
+  paddingBytes: int32;
 
 begin
 
@@ -128,16 +123,20 @@ begin
   b0 := $efcdab89;
   c0 := $98badcfe;
   d0 := $10325476;
-  originalLength := length(bytes);
-  bytes := appendToBytes(bytes, $80);
-  while length(bytes) mod 64 <> 56 do begin
-    bytes := appendToBytes(bytes, $00);
-  end;
 
-  lengthInBits := 8*originalLength;
-  for i := 0 to 7 do
-    bytes := appendToBytes(bytes, (lengthInBits shr (i * 8)) and $ff);
+  originalLen := length(bytes);
+  paddingBytes := (64 - ((originalLen+9) and 63)) and 63;
+  finalLen := originalLen + 9 + paddingBytes;
+  setLength(bytes, finalLen);
 
+  {clear the newly added bytes}
+  fillchar(bytes[originalLen], finalLen-originalLen, 0);
+  {add padding is done by fillchar, but set first bit to one}
+  bytes[originalLen] := $80;
+  {then write the length out}
+  lengthInBits := 8*originalLen;
+  move(lengthInBits, bytes[finalLen-8], 8);
+  assert(length(bytes) and $3f = 0);
   chunks := length(bytes) div 64;
   for j := 0 to chunks-1 do begin
 

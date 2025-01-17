@@ -22,6 +22,7 @@ uses
   debug,
   test,
   utils,
+  types,
   stream,
   graph2d,
   graph32;
@@ -421,7 +422,7 @@ const
 
 begin
 
-  startPos := s.getPos;
+  startPos := s.pos;
 
   for i := 1 to 4 do
     if s.readByte <> ord(CODE_4CC[i]) then
@@ -438,7 +439,7 @@ begin
   compressedSize := s.readDWord;
 
   {read reserved bytes}
-  while s.getPos < startPos+32 do
+  while s.pos < startPos+32 do
     s.readByte();
 
   if (verBig <> VER_BIG) and (verSmall <> VER_SMALL) then
@@ -514,7 +515,7 @@ begin
   if not assigned(s) then
     s := tStream.Create();
 
-  startPos := s.getPos;
+  startPos := s.pos;
 
   if withAlpha then bpp := 32 else bpp := 24;
 
@@ -551,7 +552,7 @@ begin
   s.writeDWord(compressedSize);
 
   {write reserved space}
-  while s.getPos < startPos+32 do
+  while s.pos < startPos+32 do
     s.writeByte(0);
 
   s.writeBytes(compressedData);
@@ -576,7 +577,7 @@ begin
   withAlpha := forceAlpha or page.checkForAlpha;
   s := encodeLC96(page, nil, withAlpha);
 
-  s.writeToDisk(filename);
+  s.writeToFile(filename);
   s.free;
 end;
 
@@ -585,7 +586,7 @@ var
   s: tStream;
 begin
   s := tStream.create();
-  s.readFromDisk(filename);
+  s.readFromFile(filename);
   result := decodeLC96(s);
   s.free;
 end;

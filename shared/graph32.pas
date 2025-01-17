@@ -11,6 +11,8 @@ uses
   test,
   debug,
   vga,
+  types,
+  sysInfo,
   utils,
   graph2d;
 

@@ -121,7 +121,7 @@ var
   CACHE: tStringToStringMap;
 
 {cached diff}
-function diff(oldFile, newFile: string): tMergeInfo; forward;
+function diff(oldFile, newFile: string;oldHash:string='';newHash:string=''): tMergeInfo; forward;
 
 {-------------------------------------------------------------}
 
@@ -342,14 +342,14 @@ begin
     // do not check ourselves
     if fileRef.path = originalFile.path then continue;
     fileSizeRatio := fileRef.fileSize / originalFile.fileSize;
-    //writeln(format('fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile.path, fileRef.path]));
+    debug.debug(format(' > fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile.path, fileRef.path]));
     if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
 
     diff.init(originalFile, fileRef);
     stats := diff.getStats();
 
     changedRatio := stats.unchanged / stats.newLen;
-    //writeln(format('changeratio %f %s %s ', [changedRatio, originalFile.path, fileRef.path]));
+    debug.debug(format(' > changeratio %f %s %s ', [changedRatio, originalFile.path, fileRef.path]));
     if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
     result := fileRef;
     exit;
@@ -394,6 +394,8 @@ begin
   oldFiles := old.fileList;
   newFiles := new.fileList;
 
+  note('Generating checkpoing diff');
+
   for fr in newFiles do
     if not oldFiles.contains(fr) then
       addedFiles.append(fr);
@@ -404,6 +406,7 @@ begin
 
   {look for renamed files}
   for fr in newFiles do begin
+    note(format(' - checking for rename on %s against %d files.', [fr.fqn, length(removedFiles)]));
     oldFr := checkForRename(fr, removedFiles);
     if not oldFr.assigned then continue;
     result.append(tFileDiff.MakeRenamed(oldFr, fr));
@@ -423,6 +426,7 @@ begin
 
   {finally check for modified}
   for fr in newFiles do begin
+    note(' - checking for modified on '+fr.fqn);
     if renamedFiles.contains(fr) then continue;
     oldFr := oldFiles.lookup(fr.path);
     if not oldFr.assigned then continue;
@@ -432,6 +436,7 @@ begin
     if fs.compareText(fr.fqn, oldFr.fqn) then continue;
     result.append(tFileDiff.MakeModified(oldFr, fr));
   end;
+  note(' - all done');
 end;
 
 function tCheckpointRepo.hasCheckpoint(checkpointName: string): boolean;
@@ -566,37 +571,52 @@ const
   {for the moment just hard code this to the repo folder}
   CACHE_PATH = 'c:\dev\$repo\.cache';
 
-{cached diff}
-function diff(oldFile, newFile: string): tMergeInfo;
+{cached diff
+If you happen to have the MD5 has for either input you can pass them
+in to make things slightly faster.
+}
+function diff(oldFile, newFile: string;oldHash: string='';newHash: string=''): tMergeInfo;
 var
   new, old: tStringList;
   sln: tIntList;
   cacheKey: string;
 begin
 
+  debug.debug(format('Dif between old:%s and new:%s', [oldFile, newFile]));
+
   startTimer('diff_read_file');
   old := fs.readText(oldFile);
   new := fs.readText(newFile);
   stopTimer('diff_read_file');
+  debug.debug(format(' - read in %fms', [getTimer('diff_read_file').elapsed*1000]));
 
   startTimer('diff_cache_key');
-  cacheKey := 'new:'+MD5.hash(join(new.data)).toHex+' old:'+MD5.hash(join(old.data)).toHex;
+  if oldHash := '' then oldHash := MD5.hash(join(old.data)).toHex;
+  if newHash := '' then newHash := MD5.hash(join(new.data)).toHex;
+  cacheKey := 'new:'+newHash+' old:'+oldHash;
   stopTimer('diff_cache_key');
+  debug.debug(format(' - cache key in %fms', [getTimer('diff_cache_key').elapsed*1000]));
 
   if CACHE.hasKey(cacheKey) then begin
     startTimer('diff_cache_hit');
     sln.loadS(cache.getValue(cacheKey));
     stopTimer('diff_cache_hit');
+    debug.debug(format(' - lookup in %fms', [getTimer('diff_cache_hit').elapsed*1000]));
+
   end else begin
+    debug.debug(' - cache miss');
     startTimer('diff_cache_miss');
     sln := run(old, new);
     CACHE.setValue(cacheKey, sln.dumpS);
     stopTimer('diff_cache_miss');
+    debug.debug(format(' - dif in %fms', [getTimer('diff_cache_miss').elapsed*1000]));
   end;
 
   result.merge := sln;
   result.oldLen := old.len;
   result.newLen := new.len;
+
+  debug.debug(' - done');
 end;
 
 procedure loadCache();

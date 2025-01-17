@@ -541,11 +541,14 @@ begin
   for checkpoint in checkpoints do begin
 
     dateCode := copy(checkpoint, 1, 8);
+
     if (dateCode <> prevDateCode) and (dayTotal.net <> 0) then begin
-      writeln();
-      dayTotal.printShort(8);
-      writeln;
+      outputDiv();
+      output(dateCode+' ');dayTotal.printShort(8);
+      outputLn();
+      outputDiv;
       dayTotal.clear();
+      prevDateCode := dateCode;
     end;
 
     write(pad(checkpoint, 40, ' '));
@@ -591,7 +594,6 @@ begin
 
     counter += 1;
 
-    prevDateCode := dateCode;
     previousCheckpoint := checkpoint;
 
   end;
@@ -814,10 +816,20 @@ begin
   textAttr := WHITE;
   clrscr;
 
+  {todo: remove these}
+  runTestSuites();
+
+  {todo: proper parameter handling}
   if (paramCount = 0) then
     command := 'status'
   else
     command := paramSTR(1);
+
+  if (paramCount = 2) then
+    if paramSTR(2) = '-v' then begin
+      {verbose mode}
+      debug.WRITE_TO_SCREEN := true;
+    end;
 
   if command = 'diff' then
     showDiffOnWorkspace()

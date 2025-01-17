@@ -9,8 +9,6 @@ unit diff;
 
 interface
 
-
-
 {todo: support LCS accross a line aswell}
 
 uses
@@ -199,11 +197,13 @@ begin
   init(newLines, oldLines);
   maxChanges := oldLines.len + newLines.len;
   minChanges := max(abs(oldLines.len - newLines.len), 1);
-  editLimit := minChanges + 10;
+  editLimit := (minChanges + 10) div 2;
   repeat
-    blockSolve(editLimit);
     editLimit *= 2;
-  until solutionLength > 0;
+    blockSolve(editLimit);
+    if solutionLength >= 0 then break;
+  until (editLimit > maxChanges);
+  assert(solutionLength >= 0, 'Diff algorithm did not produce a result.');
   result := extractSolution();
 end;
 
