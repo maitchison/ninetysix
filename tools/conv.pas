@@ -438,6 +438,34 @@ begin
     until keyDown(key_esc);
 end;
 
+
+procedure testADPCM();
+var
+  music16, musicL, musicD: tSoundEffect;
+
+begin
+
+  writeln('--------------------------');
+  writeln('Loading music.');
+  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
+  writeln(format('Source RMS: %f',[music16.calculateRMS()]));
+  musicL := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample (ADPCM).wav', 10*44100);
+  musicD := afDelta(music16, musicL);
+  {rms}
+  writeln(format('ERROR RMS: %f',[musicD.calculateRMS()]));
+
+  {start playing sound}
+  mixer.play(MusicL, SCS_FIXED1);
+  mixer.channels[1].looping := true;
+
+  repeat
+    if keyDown(key_1) then mixer.channels[1].sfx := musicL;
+    if keyDown(key_2) then mixer.channels[1].sfx := music16;
+    if keyDown(key_3) then mixer.channels[1].sfx := musicD;
+
+    until keyDown(key_esc);
+end;
+
 var
   i: integer;
 
@@ -453,7 +481,8 @@ begin
   runTestSuites();
   initKeyboard();
 
-  testCompression();
+  testADPCM();
+  //testCompression();
   //ABTest();
 
   textAttr := LIGHTGRAY;
