@@ -71,8 +71,10 @@ uses
   sound,
   csv,
   audioFilter,
-  keyboard, {stub: remove}
   stream;
+
+const
+  ENABLE_POST_PROCESS = false; {doesn't really help right now, need a better noise gate}
 
 type
 
@@ -114,6 +116,7 @@ type
     midCodes, difCodes: tDwords;
     midSigns, difSigns: tDwords;
     frameOn: int32;
+    cLeft, cRight: single; {used for EMA}
   protected
     function  getULAW(bits: byte): pULawLookup;
   public
@@ -290,11 +293,7 @@ begin
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
   for i := 0 to header.numFrames-1 do begin
     nextFrame(result, i*header.frameSize);
-    //stub:
-    if keyDown(key_esc) then break;
   end;
-  //stub:
-  printTimers();
 end;
 
 function tLA96Reader.getULAW(bits: byte): pULawLookup;
@@ -316,6 +315,7 @@ var
 
   midCode, difCode: int32;
   signFormat: byte;
+  alpha: single;
 
   i: int32;
 
@@ -377,9 +377,6 @@ begin
   sfxSamplePtr^ := generateSample(midCode, difCode, @frameSpec);
   inc(sfxSamplePtr);
 
-  //stub: show first few codes
-  //writeln(midCodes.toString);
-
   startTimer('LA96_DF_Process');
   process_REF(
     sfxSamplePtr,
@@ -390,13 +387,16 @@ begin
   );
   stopTimer('LA96_DF_Process');
 
+  if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
+    startTimer('LA96_DF_PostProcess');
+    alpha := exp((-2 * pi * header.postFilter * 1000) / 44100);
+    postProcessEMA(sfxSamplePtr, cLeft, cRight, frameSpec.length, alpha);
+    stopTimer('LA96_DF_PostProcess');
+  end;
+
   inc(frameOn);
 
   stopTimer('LA96_DF');
-
-  {stub:}
-  if keyDown(key_s) then delay(100);
-  while keyDown(key_p) do delay(10);
 
 end;
 
@@ -782,7 +782,7 @@ begin
   if profile.uLawBits <> 0 then begin
     penultimateValue := 1 - (1/(1 shl profile.ulawBits));
     ulawMaxError := uLawInv(1, profile.log2Mu) - uLawInv(penultimateValue, profile.log2Mu);
-    clipGuard += ulawMaxError;
+    clipGuard += ulawMaxError*2;
     note(format('Adding %d to clip guard due to ulaw', [ulawMaxError]));
   end;
 
@@ -800,9 +800,6 @@ begin
   difYStats.init();
 
   for i := 0 to numFrames-1 do begin
-
-    //stub:
-    if keyDown(key_esc) then break;
 
     aspMid.reset(qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
     aspDif.reset(qDif(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));

@@ -183,8 +183,8 @@ var
   blocks: int32;
 begin
 
-  if newSize > 64*1024 then
-    log(format('Allocating large block of size %,->%,', [bytesAllocated, newSize]));
+  //if newSize > 64*1024 then
+  //  log(format('Allocating large block of size %,->%,', [bytesAllocated, newSize]));
 
   blocks := (newSize+1023) div 1024;
 

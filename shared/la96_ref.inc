@@ -1,3 +1,16 @@
+procedure postProcessEMA(samplePtr: pAudioSample16S; out left: single; out right: single; count: int32; alpha: single);
+var
+  i: integer;
+  sample: tAudioSample16S;
+begin
+  for i := 0 to count-1 do begin
+    left := (alpha) * left + ((alpha-1) * samplePtr^.left);
+    right := (alpha) * right + ((alpha-1) * samplePtr^.right);
+    samplePtr^.left := round(left);
+    samplePtr^.right := round(right);
+    inc(samplePtr);
+  end;
+end;
 
 function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; {stub: inline}
 var
@@ -32,13 +45,13 @@ begin
 
   {$ifdef DEBUG}
   if (left > high(int16)) then
-    writeln(format('Clipping LO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warn(format('Clipping LO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   if (left < low(int16)) then
-    writeln(format('Clipping LU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warn(format('Clipping LU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   if (right > high(int16)) then
-    writeln(format('Clipping RO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warn(format('Clipping RO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   if (right < low(int16)) then
-    writeln(format('Clipping RU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warn(format('Clipping RU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   result.left := clamp16(left);
   result.right := clamp16(right);
   {$else}
