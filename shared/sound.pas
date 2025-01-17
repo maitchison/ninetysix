@@ -105,6 +105,8 @@ type
     function getSample(pos: int32): tAudioSample;
     procedure setSample(pos: int32;sample: tAudioSample);
 
+    procedure saveToWave(filename: string);
+
     class function loadFromWave(filename: string;maxSamples: int32=-1): tSoundEffect;
     class function createNoise(duration: single): tSoundEffect;
 
@@ -114,7 +116,6 @@ type
     class function loadFromFile(filename: string): tSoundEffect;
     class function loadFromLA96(filename: string): tSoundEffect;
     procedure saveToLA96(filename: string);
-    procedure saveToWave(filename: string);
     *)
 
   end;
@@ -135,7 +136,7 @@ type
     numChannels: word;
     frequency: dword;
     bytePerSec: dword;
-    bytesPerBlock: word;
+    bytePerBlock: word;
     bitsPerSample: word;
   end;
 
@@ -420,6 +421,55 @@ begin
   finally
     close(f);
   end;
+
+end;
+
+{saves sound file to a wave file}
+procedure tSoundEffect.saveToWave(filename: string);
+var
+  f: file;
+  fileHeader: tWaveFileHeader;
+  chunkHeader: tChunkHeader;
+  chunkBytes: int32;
+  IOError: word;
+begin
+
+  fileMode := 0;
+  {$I-}
+  assign(f, filename);
+  rewrite(f,1);
+  {$I+}
+
+  IOError := IOResult;
+  if IOError <> 0 then
+    error('Could not open file "'+FileName+'" for output.'+GetIOError(IOError));
+
+  chunkBytes := length * 4;
+
+  with fileHeader do begin
+    fileTypeBlockID := 'RIFF';
+    fileSize        := 36 + chunkBytes;
+    fileFormatId    := 'WAVE';
+    formatBlockID   := 'fmt ';
+    blockSize       := 16;
+    audioFormat     := 1; {PCM}
+    numChannels     := 2;
+    frequency       := 44100;
+    bytePerSec      := chunkBytes*2;
+    bytePerBlock    := 4; // chanels * bitsPerSample / 8
+    bitsPerSample   := 16;
+  end;
+
+  with chunkHeader do begin
+    chunkBlockID := 'data';
+    chunkSize := chunkBytes;
+  end;
+
+  blockwrite(f, fileHeader, sizeof(fileHeader));
+  blockwrite(f, chunkHeader, sizeof(chunkHeader));
+  blockwrite(f, data^, chunkBytes);
+
+  close(f);
 
 end;
 

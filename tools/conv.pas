@@ -12,6 +12,10 @@ uses
   stream,
   crt;
 
+const
+  {if true exports compressed audio and deltas to wave files for analysis}
+  EXPORT_WAVE: boolean = true;
+
 function sign(x: integer): integer; overload;
 begin
   if x < 0 then exit(-1);
@@ -342,10 +346,12 @@ var
   reader: tLA96Reader;
   outSFX: array of tSoundEffect;
   deltaSFX: array of tSoundEffect;
+  curSFX, errSFX: tSoundEffect;
   i: integer;
   profiles: array of tAudioCompressionProfile;
   selection: integer;
   delta: boolean;
+  tag: string;
 
 begin
 
@@ -381,23 +387,34 @@ begin
     end;
   end;
 
-  music16.tag := 'origional';
+  music16.tag := 'original';
 
   writeln('--------------------------');
   writeln('Read compressed file.');
 
   for profile in PROFILES do begin
-    reader := tLA96Reader.create(profileToTagName(profile)+'.a96');
+    tag := profileToTagName(profile);
+    {read it}
+    reader := tLA96Reader.create(tag+'.a96');
+    curSFX := reader.readSFX();
     setLength(outSFX, length(outSFX)+1);
-    outSFX[length(outSFX)-1] := reader.readSFX();
-    outSFX[length(outSFX)-1].tag := profileToTagName(profile); //shouldn't be needed. but is for some reason
+    outSFX[length(outSFX)-1] := curSFX;
+    curSFX.tag := tag; //shouldn't be needed. but is for some reason
     reader.free;
-
+    {find delta}
+    errSFX := afDelta(outSFX[length(outSFX)-1], music16);
     setLength(deltaSFX, length(deltaSFX)+1);
-    deltaSFX[length(deltaSFX)-1] := afDelta(outSFX[length(outSFX)-1], music16);
-    writeln(format('ERROR RMS: %f',[deltaSFX[length(deltaSFX)-1].calculateRMS()]));
-    writeln(format('FILE RMS: %f',[outSFX[length(outSFX)-1].calculateRMS()]));
+    deltaSFX[length(deltaSFX)-1] := errSFX;
+    {rms}
+    writeln(format('FILE RMS: %f',[curSFX.calculateRMS()]));
+    writeln(format('ERROR RMS: %f',[errSFX.calculateRMS()]));
+    {export}
+    if EXPORT_WAVE then begin
+      curSFX.saveToWave(tag+'.wav');
+      errSFX.saveToWave(tag+'_delta.wav');
+    end;
   end;
+
 
   {start playing sound}
   mixer.play(outSFX[0], SCS_FIXED1); writeln(outSFX[0].tag);
