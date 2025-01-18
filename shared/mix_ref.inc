@@ -14,7 +14,7 @@ begin
 end;
 
 {Copies a 16S source directly into the 32bit buffer (e.g. for initialization)}
-procedure loadBuffer_REF(samplePtr: pAudioSample16S; bufSamples: int32);
+procedure initializeBuffer_REF(samplePtr: pAudioSample16S; bufSamples: int32);
 var
   i: int32;
   left,right: int32;

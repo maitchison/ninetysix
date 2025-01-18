@@ -236,8 +236,7 @@ begin
 
   {intialize buffer with currently playing music (if any)}
   if musicReader.isLoaded then begin
-    {todo: make an asm one of these}
-    loadBuffer_REF(musicBuffer.data+(mbReadPos mod MUSIC_BUFFER_SAMPLES)*4, bufSamples);
+    initializeBuffer_ASM(musicBuffer.data+(mbReadPos mod MUSIC_BUFFER_SAMPLES)*4, bufSamples);
     {advance our position within music buffer. Since music buffer length
      is a multiple of the SB buffer, we will never up straddling the
      start/end of the buffer}
@@ -661,4 +660,5 @@ initialization
   musicReader.looping := true;
   initMixer();
   addExitProc(closeMixer);
+
 end.

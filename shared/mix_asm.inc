@@ -38,6 +38,43 @@ begin
   end;
 end;
 
+{only slightly faster (due to loop unrolling}
+procedure initializeBuffer_ASM(samplePtr: pAudioSample16S; bufSamples: int32);
+var
+  srcPtr, dstPtr: pointer;
+begin
+  srcPtr := samplePtr;
+  dstPtr := @scratchBufferI32[0];
+
+  asm
+    pushad
+
+    mov ecx, bufSamples
+    mov esi, srcPtr
+    mov edi, dstPtr
+
+  @LOOP:
+
+    {left}
+    movsx eax, word ptr [esi]
+    shl eax, 8
+    mov dword ptr [edi], eax
+    {right}
+    movsx eax, word ptr [esi+2]
+    shl eax, 8
+    mov dword ptr [edi+4], eax
+
+    add esi, 4
+    add edi, 8
+    dec ecx
+    jnz @LOOP
+
+    popad
+
+  end;
+end;
+
+
 procedure direct16S(count: int32; srcPtr, dstPtr: pointer);
 begin
   {direct copy case}

@@ -19,8 +19,9 @@ type
     llDebug=0,
     llNote=1,
     llInfo=2,
-    llWarning=3,
-    llError=4
+    llImportant=3,
+    llWarning=4,
+    llError=5
   );
 
 type
@@ -192,6 +193,7 @@ begin
     llDebug: result := DarkGray;
     llNote: result := LightGray;
     llInfo: result := Green;
+    llImportant: result := White;
     llWarning: result := Yellow;
     llError: result := Red;
     else result := White;

@@ -521,10 +521,11 @@ begin
   watches.ENABLE_WATCHES := config.DEBUG;
   debug.VERBOSE_SCREEN := llNote; // startup should have done this?
 
-  textAttr := LightGray;
+  textAttr := LightGray + Blue * 16;
   clrscr;
 
-  info('Starting AIRTIME ');
+  log('Starting AIRTIME', llImportant);
+  log('---------------------------', llImportant);
 
   if cpuInfo.ram < 30*1024*1024 then
     error('Application required 30MB of ram.');
@@ -552,9 +553,6 @@ begin
 
   logHeapStatus('Resources loaded');
   info('Done.');
-
-  // Small delay so people can see the loading text.
-  delay(1500);
 
   videoDriver.setMode(640,480,32);
 
