@@ -97,9 +97,13 @@ begin
   if config.XMAS then
     music := loadSound('music2')
   else
-    music := loadSound('music1');
+    //stub:
+    //music := loadSound('music1');
+    music := loadSound('engine2');
 
   mixer.play(music, SCS_FIXED1);
+  mixer.channels[1].looping := true;
+  warning(intToStr(music.length));
 
   if config.XMAS then
     titleBackground := tPage.Load('res\titleX.p96')

@@ -276,8 +276,6 @@ begin
   startPos := fs.pos;
   fs.readBlock(header, sizeof(header));
 
-  log(header.tag);
-
   if header.tag <> 'LA96' then raise ValueError.create(format('Not an LA96 file. Found "%s", expecting LA96', [header.tag]));
   if (header.versionSmall <> VER_SMALL) or (header.versionBig <> VER_BIG) then
     raise ValueError.create(format('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]));
@@ -406,7 +404,7 @@ begin
   inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
-  process_REF(
+  process_ASM(
     sfxSamplePtr,
     midCode, difCode,
     midCodes, difCodes,
@@ -416,9 +414,11 @@ begin
   stopTimer('LA96_DF_Process');
 
   {stub: show values}
+  {
   for i := 0 to 10 do begin
     log(format('%d (%d,%d)', [sfxOffset, sfx[sfxOffset+i].left, sfx[sfxOffset+i].right]));
   end;
+  }
 
   if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
     startTimer('LA96_DF_PostProcess');
@@ -615,7 +615,6 @@ begin
   reader.load(s);
   result := reader.readSFX();
   reader.free;
-  s.free;
 end;
 
 function quant(x: int32;shiftAmount: byte): int32; inline; pascal;

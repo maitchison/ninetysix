@@ -10,6 +10,7 @@ uses
   s3,
   resLib,
   resources,
+  sndViz,
   {airtime}
   raceTrack,
   car,
@@ -230,6 +231,9 @@ begin
   textOut(titleBackground, 640-140, 480-25, verStr, RGBA.create(250,250,250,240));
 
   screen.background := titleBackground;
+
+  {stub:}
+  displayAudio(screen.background, engineSFX, 64);
 
   screen.clear();
   screen.pageFlip();

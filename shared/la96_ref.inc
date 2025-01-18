@@ -38,12 +38,7 @@ begin
   left := (mid + dif);
   right := (mid - dif);
 
-  //stub:
-  note(intToStr(length(frameSpec^.midUTable^.table.data)));
-  note(intToStr(frameSpec^.midUTable^.table.data[0]));
-  note(intToStr(frameSpec^.midUTable^.table.data[1]));
-  note(intToStr(frameSpec^.midUTable^.table.data[2]));
-  note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midCode, difCode]));
+  //note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midCode, difCode]));
 
   {keep track of centering}
   shift := frameSpec^.centerShift;

@@ -115,7 +115,8 @@ type
     function GetPixel(x, y: integer): RGBA; inline; overload;
     function GetPixel(fx,fy: single): RGBA; overload;
     function GetPixelScaled(x, y, s: integer;doGamma: boolean=False): RGBA;
-    procedure HLine(x1, y, x2: int16;c: RGBA); pascal;
+    procedure hLine(x1, y, x2: int16;c: RGBA); pascal;
+    procedure vLine(x, y1, y2: int16;c: RGBA); pascal;
     procedure PutPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure SetPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure Clear(c: RGBA);
@@ -777,7 +778,7 @@ asm
   end;
 
 {Draw line from (x1,y) to (x2,y) inclusive at start and exclusive at end.}
-procedure TPage.HLine(x1,y,x2: int16; c: RGBA); pascal;
+procedure TPage.hLine(x1,y,x2: int16; c: RGBA); pascal;
 var
   x: int32;
   count: int32;
@@ -884,6 +885,21 @@ begin
   end;
 end;
 
+{draw line from (x,y1) to (x,y2) inclusive at start and exclusive at end.}
+procedure tPage.vLine(x,y1,y2: int16; c: RGBA); pascal;
+var
+  y: int32;
+  tmp: int32;
+begin
+  y1 := clamp(y1, 0, height);
+  y2 := clamp(y2, 0, height);
+  if y1 > y2 then begin
+    tmp := y1; y1 := y2; y2 := tmp;
+  end;
+  // +1 should be wrong... but we need it for some reason?
+  for y := y1 to y2+1 do
+    putPixel(x, y, c);
+end;
 
 procedure TPage.FillRect(aRect: TRect; c: RGBA);
 var
