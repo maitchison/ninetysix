@@ -658,6 +658,7 @@ initialization
   mixer := tSoundMixer.create();
   musicBuffer := tSoundEffect.create(AF_16_STEREO, MUSIC_BUFFER_SAMPLES); // holds 64k of sound
   musicReader := tLA96Reader.create();
+  musicReader.looping := true;
   initMixer();
   addExitProc(closeMixer);
 end.

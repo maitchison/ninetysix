@@ -125,6 +125,8 @@ type
     function  getULAW(bits: byte): pULawLookup;
     procedure loadHeader();
   public
+    looping: boolean;
+  public
     constructor create();
     function  isLoaded: boolean;
     function  frameSize: integer;
@@ -249,6 +251,7 @@ begin
   {init vars}
   fillchar(header, sizeof(header), 0);
   fs := nil;
+  looping := false;
 end;
 
 procedure tLA96Reader.load(filename: string); overload;
@@ -443,6 +446,11 @@ begin
   end;
 
   inc(frameOn);
+
+  if (frameOn = header.numFrames) and looping then begin
+    frameOn := 0;
+    fs.seek(128);
+  end;
 
   stopTimer('LA96_DF');
 
