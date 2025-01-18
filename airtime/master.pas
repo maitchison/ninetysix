@@ -10,7 +10,6 @@ uses
   graph32,
   filesystem,
   crt,
-  dos,
   sysPNG,
   lc96;
 
@@ -196,6 +195,36 @@ end;
 
 {-----------------------------------------------}
 
+procedure copyFile(filename: string; srcPath:string); overload;
+var
+  dstPath: string;
+begin
+  {only copy if needed.}
+  textAttr := LightGray;
+  write(pad(extractFilename(filename),14, ' '));
+
+  dstPath := joinPath('res', filename);
+
+  if not fs.exists(dstPath) or fs.wasModified(srcPath, dstPath) then begin
+    fs.copyFile(srcPath, dstPath);
+    textAttr := LightRed;
+    writeln('[copied]');
+    textAttr := LightGray;
+  end else begin
+    textAttr := Green;
+    writeln('[skip]');
+    textAttr := LightGray;
+  end;
+end;
+
+
+{e.g. copyFile('fonts\font.fnt')}
+procedure copyFile(filePath: string); overload;
+begin
+  copyFile(extractFilename(filePath), joinPath(MASTER_FOLDER, filePath));
+end;
+
+
 {e.g. convert('title', 'c:\dev\masters\airtime\title.bmp')}
 procedure convertImage(filename: string;srcPath:string;processProc: tProcessProc=nil); overload;
 var
@@ -206,7 +235,7 @@ begin
 
   dstPath := 'res\'+filename+'.p96';
 
-  textAttr := $07;
+  textAttr := LightGray;
   write(pad(filename,14, ' '));
 
   {make sure it exists}
@@ -214,9 +243,9 @@ begin
     //stub
     writeln();
     writeln(srcPath);
-    textAttr := $0C;
+    textAttr := LightRed;
     writeln('[missing]');
-    textAttr := $07;
+    textAttr := LightGray;
     exit;
   end;
 
@@ -229,9 +258,9 @@ begin
       (res.modifiedTime = fs.getModified(res.srcFile)) and
       fs.exists(dstPath)
     then begin
-      textAttr := $02;
+      textAttr := Green;
       writeln('[skip]');
-      textAttr := $07;
+      textAttr := LightGray;
       exit;
     end;
   end;
@@ -244,9 +273,9 @@ begin
     if assigned(processProc) then
       img := processProc(img);
     saveLC96(dstFile, img);
-    textAttr := $0A;
+    textAttr := LightGreen;
     writeln(format('[%dx%d]',[img.width, img.height]));
-    textAttr := $07;
+    textAttr := LightGray;
   end;
 
   resourceLibrary.updateResource(res);
@@ -307,7 +336,7 @@ begin
   convertImage('font',    joinPath(MASTER_FOLDER, 'fonts',  'font.bmp'));
 
   {todo:...}
-  //copyFile('font.fnt', joinPath(MASTER_FOLDER, 'fonts', 'font.fnt'));
+  copyFile(joinPath('fonts', 'font.fnt'));
 end;
 
 {-------------------------------------------}
