@@ -12,5 +12,5 @@ begin
   textAttr := $1f;
   clrscr();
   writeln('Airtime is starting up.');
-  WRITE_TO_SCREEN := true;
+  debug.VERBOSE_SCREEN := llInfo;
 end.

@@ -582,7 +582,7 @@ begin
   if sbGood then
     info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
   else
-    warn('No SoundBlaster detected');
+    warning('No SoundBlaster detected');
 
   if BUFFER_SIZE > 32*1024 then
     error('Invalid BUFFER_SIZE, must be <= 32k');
@@ -598,7 +598,7 @@ begin
 
   addr := (dosSegment shl 4);
   if getPage(addr) <> getPage(addr + BUFFER_SIZE) then begin
-    warn('SB Buffer allocation spanned a page, so I moved it.');
+    warning('SB Buffer allocation spanned a page, so I moved it.');
     dosOffset := BUFFER_SIZE;
   end else
     dosOffset := 0;
@@ -622,7 +622,7 @@ begin
   note('[done] sound');
   note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   if debug_dma_page_corrections > 0 then
-    warn('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
+    warning('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
   DSPWrite($D3); // mute the speaker so we don't get crackle.
   stopDMAPlayback();
   uninstall_ISR();

@@ -10,7 +10,7 @@ interface
 uses
   sysinfo,
   dos,
-  types,
+  sysTypes,
   go32;
 
 {todo:
@@ -91,7 +91,8 @@ function toLowerCase(const s: string): string;
 function extractExtension(const path: string): string;
 function extractFilename(const path: string): string;
 function extractPath(const path: string): string;
-function joinPath(const path, filename: string): string;
+function joinPath(const path, filename: string): string; overload;
+function joinPath(const path, subpath, filename: string): string; overload;
 function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
@@ -501,7 +502,7 @@ begin
   result := copy(path, 1, length(path) - length(filename));
 end;
 
-function joinPath(const path, filename: string): string;
+function joinPath(const path, filename: string): string; overload;
 begin
   if path = '' then exit(filename);
   if filename = '' then exit(path);
@@ -509,6 +510,11 @@ begin
     result := path+filename
   else
     result := path+'\'+filename;
+end;
+
+function joinPath(const path, subpath, filename: string): string; overload;
+begin
+  result := joinPath(joinPath(path, subpath), filename);
 end;
 
 function comma(value: int64; width: word; padding: char=' '): string;

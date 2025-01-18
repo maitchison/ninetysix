@@ -12,7 +12,7 @@ interface
 
 uses
   test,
-  types,
+  sysTypes,
   debug,
   hashmap,
   stream,
@@ -69,7 +69,7 @@ implementation
 
 const
   MIN_MATCH_LENGTH = 4;
-  MAX_BLOCK_SIZE = 256*1024;
+  MAX_BLOCK_SIZE = 4*1024*1024;
 
 type
   TMatchRecord = record
@@ -667,8 +667,12 @@ begin
   bytesLen := length(bytes);
   bytesEnd := bytesPtr + bytesLen;
   hadBuffer := assigned(buffer);
-  if not hadBuffer then
+  if not hadBuffer then begin
+    {this is every inefficent.}
+    {todo: support small initial buffer with buffer doubling in asm loop}
     setLength(buffer, MAX_BLOCK_SIZE);
+    warning('No LZ4 output buffer given so guessed size is MAX_BLOCK_SIZE, which is slow.');
+  end;
   bufferPtr := @buffer[0];
   asm
     {

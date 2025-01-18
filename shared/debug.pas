@@ -51,7 +51,7 @@ function GetLogLevelColor(level: tLogLevel): byte;
 procedure BasicPrintLog();
 procedure PrintLog(maxEntries: integer=20);
 
-function GetIOError(code: word): string;
+function GetIOErrorString(code: word): string;
 
 procedure Assert(condition: boolean; msg: string='');
 procedure RunError(code: word);
@@ -207,7 +207,7 @@ begin
 end;
 
 
-function GetIOError(code: word): string;
+function GetIOErrorString(code: word): string;
 begin
   case code of
     IO_FILE_NOT_FOUND: result := 'File not found';

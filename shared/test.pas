@@ -4,7 +4,7 @@ unit test;
 interface
 
 uses
-  types;
+  sysTypes;
 
 type
 

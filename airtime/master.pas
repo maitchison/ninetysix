@@ -8,13 +8,14 @@ uses
   test,
   debug,
   graph32,
+  filesystem,
   crt,
   dos,
   sysPNG,
   lc96;
 
-var
-  img: tPage;
+const
+  MASTER_FOLDER = 'c:\dev\masters';
 
 {-----------------------------------------------}
 
@@ -47,6 +48,14 @@ type
 
   end;
 
+type
+  // apply some changes to a page, and output a new page
+  tProcessProc = function(input: tPage): tPage;
+
+var
+  img: tPage;
+  resourceLibrary: tResourceLibrary;
+
 {-----------------------------------------------}
 
 constructor tResourceLibrary.Create(); overload;
@@ -64,7 +73,7 @@ end;
 
 constructor tResourceLibrary.CreateOrLoad(fileName: string);
 begin
-  if exists(fileName) then
+  if fs.exists(fileName) then
     Create(fileName)
   else
     Create();
@@ -187,17 +196,7 @@ end;
 
 {-----------------------------------------------}
 
-type
-  // apply some changes to a page, and output a new page
-  tProcessProc = function(input: tPage): tPage;
-
-var
-  resourceLibrary: tResourceLibrary;
-
-const
-  DEFAULT_SRC_FOLDER = 'd:\masters\airtime\';
-
-{e.g. convert('title', 'c:\masters\airtime\title.bmp')}
+{e.g. convert('title', 'c:\dev\masters\airtime\title.bmp')}
 procedure convertImage(filename: string;srcPath:string;processProc: tProcessProc=nil); overload;
 var
   res: tResource;
@@ -211,7 +210,10 @@ begin
   write(pad(filename,14, ' '));
 
   {make sure it exists}
-  if not exists(srcPath) then begin
+  if not fs.exists(srcPath) then begin
+    //stub
+    writeln();
+    writeln(srcPath);
     textAttr := $0C;
     writeln('[missing]');
     textAttr := $07;
@@ -224,8 +226,8 @@ begin
     res := resourceLibrary.resource[id];
     if
       (res.srcFile = srcPath) and
-      (res.modifiedTime = fileModifiedTime(res.srcFile)) and
-      exists(dstPath)
+      (res.modifiedTime = fs.getModified(res.srcFile)) and
+      fs.exists(dstPath)
     then begin
       textAttr := $02;
       writeln('[skip]');
@@ -237,7 +239,7 @@ begin
   with res do begin
     srcFile := srcPath;
     dstFile := dstPath;
-    modifiedTime := fileModifiedTime(srcFile);
+    modifiedTime := fs.getModified(srcFile);
     img := tPage.Load(srcFile);
     if assigned(processProc) then
       img := processProc(img);
@@ -255,7 +257,7 @@ end;
 {e.g. convert('title.bmp')}
 procedure convertImage(filename: string;processProc: tProcessProc=nil); overload;
 begin
-  convertImage(removeExtension(filename), 'c:\masters\airtime\'+filename, processProc);
+  convertImage(removeExtension(filename), joinPath(MASTER_FOLDER, 'airtime', filename), processProc);
 end;
 
 function mapTerrainColors(page: tPage): tPage;
@@ -295,18 +297,22 @@ begin
 
   {christmas variation}
   convertImage('titleX.bmp');
-  convertImage('carSanta.png');
+  convertImage('carSan.png');
 
+  convertImage('button', joinPath(MASTER_FOLDER, 'gui', 'EC_Button_Pressed.png'));
 
-  convertImage('button', 'c:\masters\gui\EC_Button_Pressed.png');
   {gui stuff}
-//  convertBMP('ec_frame', 'c:\masters\gui\ec_frame.bmp');
-//  convertBMP('panel', 'c:\masters\gui\panel.bmp');
-//  convertBMP('font', 'c:\masters\font\font.bmp');
+  convertImage('ec_frame',joinPath(MASTER_FOLDER, 'gui',    'ec_frame.bmp'));
+  convertImage('panel',   joinPath(MASTER_FOLDER, 'gui',    'panel.bmp'));
+  convertImage('font',    joinPath(MASTER_FOLDER, 'fonts',  'font.bmp'));
+
+  {todo:...}
+  //copyFile('font.fnt', joinPath(MASTER_FOLDER, 'fonts', 'font.fnt'));
 end;
 
 {-------------------------------------------}
 
+{todo: declare this as a test suite}
 procedure runTests();
 var
   rl: tResourceLibrary;
@@ -341,9 +347,19 @@ end;
 {-------------------------------------------}
 
 begin
+  textAttr := LightGray;
+  clrscr;
+  {make sure everything is ok}
+  runTestSuites();
+  assert(fs.folderExists('res'), 'We were expecting a "res" folder, but could not find it. Are you in the right path?');
+  assert(fs.folderExists(MASTER_FOLDER), format('Could not open masters folder "%s"', [MASTER_FOLDER]));
+  assert(fs.folderExists(joinPath(MASTER_FOLDER, 'airtime')), format('Could not open "%s"', [joinPath(MASTER_FOLDER, 'airtime')]));
+
   runTests();
   resourceLibrary := tResourceLibrary.CreateOrLoad('resources.ini');
   processAll();
   resourceLibrary.serialize('resources.ini');
-  writeln('done.');
+  writeln('------------------');
+  writeln('Done.');
+  delay(2000);
 end.

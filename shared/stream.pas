@@ -10,14 +10,14 @@ interface
 uses
   utils,
   debug,
-  types,
+  myMath,
+  sysTypes,
   test;
 
 type
 
   tPackingMethod = (
     PACK_OFF,    // do not use packing
-    PACK_FAST,   // use packing only on optimized bit lengths.
     PACK_BEST,   // use packing on any bitlength, but only if it's smaller.
     PACK_ALWAYS  // always use packing even if it's less efficent.
   );
@@ -61,7 +61,7 @@ type
     procedure writeWord(w: word); inline;
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
-    function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): int32;
+    function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_BEST): int32;
     function  VLCbits(value: dword): word; inline;
 
     procedure setSize(newSize: int32);
@@ -427,11 +427,16 @@ procedure tStream.writeToFile(fileName: string);
 var
   f: file;
   bytesWritten: dword;
+  ioError: word;
 begin
+  {$i-}
   assignFile(f, fileName);
   rewrite(f,1);
+  ioError := IORESULT; if ioError <> 0 then error(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
   blockwrite(f, bytes[0], bytesUsed, bytesWritten);
+  ioError := IORESULT; if ioError <> 0 then error(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
   close(f);
+  {$i+}
 end;
 
 {loads memory stream from file, and resets position to start of stream.}
@@ -442,14 +447,11 @@ var
   ioError: word;
 begin
 
-  {$I-}
+  {$i-}
   assignFile(f, fileName);
   system.reset(f,1);
-  {$I+}
-
-  IOError := IOResult;
-  if IOError <> 0 then
-    Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
+  ioError := IOResult; if ioError <> 0 then Error(format('Could not open file "%s" for reading, Error:%s', [filename, getIOErrorString(ioError)]));
+  {$+}
 
   setCapacity(fileSize(f));
   bytesUsed := fileSize(f);
@@ -533,7 +535,7 @@ begin
   {$IFDEF Debug}
   for i := 0 to length(values)-1 do
     if values[i] >= (1 shl bits) then
-      Error('Value too high');
+      Error(format('Value %d in segment exceeds expected bound of %d', [values[i], 1 shl bits]));
   {$ENDIF}
 
   {special cases}
@@ -726,18 +728,15 @@ make use of 8bit packing with very little loss in efficency.
 
 returns the number of bytes used
 }
-function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_FAST): int32;
+function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_BEST): int32;
 var
   i: int32;
   maxValue: int32;
   unpackedBytes, unpackedBits: int32;
+  packBitsRequired: byte;
   packingBytes: int32;
-  packingOptions: set of byte;
   n: int32;
   startPos: int32;
-const
-  FAST_OPTIONS = [0,1,2,4,8];
-  ALL_OPTIONS = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24];
 begin
 
   startPos := fPos;
@@ -753,21 +752,14 @@ begin
   self.byteAlign();
 
   if packing <> PACK_OFF then begin
-    if packing = PACK_FAST then
-      packingOptions := FAST_OPTIONS
-    else if packing in [PACK_BEST, PACK_ALWAYS] then
-      packingOptions := ALL_OPTIONS;
-    for n in packingOptions do begin
-      if maxValue < (1 shl n) then begin
-        packingBytes := bytesForBits(length(values) * n)+1;
-        if (packingBytes <= unpackedBytes) or (packing = PACK_ALWAYS) then begin
-          {control-code}
-          writeByte(ST_PACK+n);
-          packBits(values, n, self);
-          result := fPos-startPos;
-          exit;
-        end;
-      end;
+    {support up to 32 bits with packing}
+    packBitsRequired := ceil(log2(maxValue+1));
+    packingBytes := bytesForBits(length(values) * packBitsRequired)+1;
+    if (packingBytes <= unpackedBytes) or (packing = PACK_ALWAYS) then begin
+      writeByte(ST_PACK+packBitsRequired);
+      packBits(values, packBitsRequired, self);
+      result := fPos-startPos;
+      exit;
     end;
   end;
 

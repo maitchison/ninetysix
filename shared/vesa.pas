@@ -251,14 +251,14 @@ begin
   {Find our physical address}
   physicalAddress := dword(getModeInfo(mode).PhysBasePtr);
   if physicalAddress <> $E0000000 then
-    Warn('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
+    warning('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
 
   if mappedPhysicalAddress = 0 then begin
     {allocate for the first time}
     allocateLFB(physicalAddress);
   end else if mappedPhysicalAddress <> physicalAddress then begin
     {address moved, this is a bit weird}
-    warn(format(
+    warning(format(
       'Physical address moved, was at $%s and is now at $%s $',
       [hexStr(mappedPhysicalAddress, 8), hexStr(physicalAddress, 8)]
     ));

@@ -11,7 +11,7 @@ uses
   test,
   debug,
   vga,
-  types,
+  sysTypes,
   sysInfo,
   utils,
   graph2d;
@@ -440,7 +440,7 @@ begin
   {$I+}
   IOError := IOResult;
   if IOError <> 0 then
-    Error('Could not open file "'+FileName+'" '+GetIOError(IOError));
+    Error('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
 
   BlockRead(F, FileHeader, SizeOf(TBMPHeader), BytesRead);
   if BytesRead <> SizeOf(TBMPHeader) then

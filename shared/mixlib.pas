@@ -506,20 +506,20 @@ procedure initMixer();
 begin
   note('[init] Mixer');
   if not lock_data(scratchBuffer, sizeof(scratchBuffer)) then
-    warn('Could not lock mixer buffer. Audio might stutter.' );
+    warning('Could not lock mixer buffer. Audio might stutter.' );
   if not lock_data(scratchBufferF32, sizeof(scratchBufferF32)) then
-    warn('Could not lock mixer buffer. Audio might stutter.' );
+    warning('Could not lock mixer buffer. Audio might stutter.' );
   if not lock_data(scratchBufferI32, sizeof(scratchBufferI32)) then
-    warn('Could not lock mixer buffer. Audio might stutter.' );
+    warning('Could not lock mixer buffer. Audio might stutter.' );
 end;
 
 procedure closeMixer();
 begin
   note('[close] Mixer');
   if MIX_WARNINGS > 0 then
-    warn(format(' - %d warnings occured, the last of which was: %s', [MIX_WARNINGS, MIX_WARNING_STR]));
+    warning(format(' - %d warnings occured, the last of which was: %s', [MIX_WARNINGS, MIX_WARNING_STR]));
   if MIX_ERRORS > 0 then
-    warn(format(' - %d errors occured, the last of which was: %s', [MIX_ERRORS, MIX_ERROR_STR]));
+    warning(format(' - %d errors occured, the last of which was: %s', [MIX_ERRORS, MIX_ERROR_STR]));
   if MIX_NOTE_STR <> '' then
     note(' - Last note:' + MIX_NOTE_STR);
   note(' - DR1:' + intToStr(DR1));

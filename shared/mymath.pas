@@ -16,6 +16,7 @@ type
 
 function degToRad(x: tFloat): tFloat;
 function radToDeg(x: tFloat): tFloat;
+function ceil(x: tFloat): int64;
 function arccos(x: tFloat): tFloat;
 function arctan2(y,x: tFloat): tFloat;
 
@@ -29,6 +30,15 @@ end;
 function radToDeg(x: tFloat): tFloat;
 begin
   result := x * 180 / pi;
+end;
+
+{weird that I have to implement this...}
+function ceil(x: tFloat): int64;
+begin
+  if frac(x) > 0 then
+    result := trunc(x) + 1
+  else
+    result := trunc(x);
 end;
 
 function arccos(x: tFloat): tFloat;
@@ -73,6 +83,11 @@ begin
   assertClose(arctan2(0,-1), pi);
   assertClose(arctan2(-1,0), -pi/2);
   assertClose(arctan2(1,1), pi/4);
+
+  assertEqual(ceil(3.2), 4);
+  assertEqual(ceil(3.0), 3);
+  assertEqual(ceil(-2.3), -2);
+  assertEqual(ceil(-0.3), 0);
 end;
 
 initialization

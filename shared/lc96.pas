@@ -22,7 +22,7 @@ uses
   debug,
   test,
   utils,
-  types,
+  sysTypes,
   stream,
   graph2d,
   graph32;
@@ -521,8 +521,8 @@ begin
 
   {check everything is ok}
   if ((page.width and $3) <> 0) or ((page.height and $3) <> 0) then
-    warn(format(
-        'Page (%d, %d) has invalid dimensions, cropping to multiple of 4.',
+    warning(format(
+        'Page (%d, %d) has invalid dims, cropping to multiple of 4.',
         [page.width, page.height]
     ));
 
