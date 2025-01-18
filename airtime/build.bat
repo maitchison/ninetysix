@@ -8,9 +8,9 @@ set DATE=ERR
 dt.exe
 call dt.bat
 
-set VERSION=04
-set BUILD_DIR=\builds\%VERSION%
-set LATEST_DIR=\builds\latest
+set VERSION=05
+set BUILD_DIR=c:\dev\build\%VERSION%
+set LATEST_DIR=c:dev\build\latest
 set MAIN=airtime
 
 echo Build dir is '%BUILD_DIR%'
@@ -31,7 +31,7 @@ echo =======================
 if EXIST _tmp\marker.txt deltree /y _tmp
 mkdir _tmp
 type NUL > _tmp\marker.txt
-fpc @fp.cfg -dDEBUG -B -v0 -vv -FE"_tmp" -CX -XX %MAIN%.pas
+fpc @fp.cfg -dDEBUG -B -v0 -FE"_tmp" -CX -XX %MAIN%.pas
 copy fpcdebug.txt %BUILD_DIR%\build_d.txt
 IF ERRORLEVEL 1 goto :buildError
 
@@ -44,7 +44,7 @@ echo =======================
 if EXIST _tmp\marker.txt deltree /y _tmp
 mkdir _tmp
 type NUL > _tmp\marker.txt
-fpc @fp.cfg -dNORMAL -B -v0 -vv -FE"_tmp" -CX -XX %MAIN%.pas
+fpc @fp.cfg -dNORMAL -B -v0 -FE"_tmp" -CX -XX %MAIN%.pas
 copy fpcdebug.txt %BUILD_DIR%\build.txt
 IF ERRORLEVEL 1 goto :buildError
 
@@ -57,6 +57,10 @@ deltree /y _tmp
 
 mkdir %BUILD_DIR%\res
 copy res\*.* %BUILD_DIR%\res
+copy resources.ini %BUILD_DIR%\resources.ini
+copy changes.txt %BUILD_DIR%\changes.txt
+copy readme.txt %BUILD_DIR%\readme.txt
+
 
 :: ---------------------------------
 :: Update Latest
