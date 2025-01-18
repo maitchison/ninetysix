@@ -61,6 +61,7 @@ uses
   test,
   utils,
   sysTypes,
+  filesystem,
   lz4,
   dos,
   go32,
@@ -238,6 +239,8 @@ var
   f: file;
   bits: integer;
 begin
+
+  if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
 
   {first read header, and make sure everything is ok}
   system.assign(f, filename);
@@ -718,6 +721,15 @@ begin
   assert(profile.ulawBits <= 15);
 
   if sfx.length = 0 then exit(nil);
+  if sfx.format <> AF_16_STEREO then begin
+    {convert as needed}
+    sfx := sfx.asFormat(AF_16_STEREO);
+    result := encodeLA96(sfx, profile);
+    sfx.free;
+    exit;
+  end;
+
+  assert(sfx.format = AF_16_STEREO);
 
   if LA96_ENABLE_STATS then begin
     fullStats := tCSVWriter.create(removeExtension(sfx.tag)+'_full.csv');
@@ -1026,6 +1038,8 @@ var
   lutEncode: tULawLookup;
   lutDecode: tULawLookup;
   i: int32;
+  s: tStream;
+  sfx: tSoundEffect;
 const
   mu = 256;
   bits = 6;
@@ -1041,6 +1055,16 @@ begin
     assertEqual(lutEncode.lookup(32*i), round(uLaw(32*i, mu) * codeSize));
     assertEqual(lutEncode.lookup(i), round(uLaw(i, mu) * codeSize));
   end;
+
+  {make sure that encoding a very short works correctly}
+  {
+  sfx := tSoundEffect(16, AF_16_STEREO);
+  fillchar(sfx.data^, 16*4, 0);
+  function decodeLA96(s: tStream): tSoundEffect;
+  function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
+  }
+
+
 end;
 
 {--------------------------------------------------------}

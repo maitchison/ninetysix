@@ -83,14 +83,12 @@ type
     procedure update(elapsed:single);
   end;
 
-procedure loadCarResources();
-procedure initCarResources();
+procedure initCarSounds();
 
 implementation
 
-var
-  slideSFX, landSFX, boostSFX, engineSFX: tSoundEffect;
-  wheelVox: tVoxelSprite;
+uses
+  resources;
 
 {--------------------------------------------------------}
 {  helpers  }
@@ -554,25 +552,7 @@ begin
   end;
 end;
 
-{---------------------------------------------------------------------}
-
-procedure loadCarResources();
-begin
-  wheelVox := tVoxelSprite.loadFromFile('res\wheel1', 8);
-
-  {the sound engine is currently optimized for 16bit stereo sound}
-  slideSFX := tSoundEffect.loadFromWave('res\skid.wav').asFormat(AF_16_STEREO);
-  if config.XMAS then
-    engineSFX:= tSoundEffect.loadFromWave('res\bell.wav').asFormat(AF_16_STEREO)
-  else
-    engineSFX:= tSoundEffect.loadFromWave('res\engine2.wav').asFormat(AF_16_STEREO);
-
-  landSFX := tSoundEffect.loadFromWave('res\land.wav').asFormat(AF_16_STEREO);
-  boostSFX := tSoundEffect.loadFromWave('res\boost.wav').asFormat(AF_16_STEREO);
-
-end;
-
-procedure initCarResources();
+procedure initCarSounds();
 begin
   // start our sliding sound
   mixer.playRepeat(slideSFX, SCS_FIXED2);
@@ -581,6 +561,9 @@ begin
   mixer.playRepeat(engineSFX, SCS_FIXED3);
   mixer.channels[3].volume := 0.0;
 end;
+
+
+{---------------------------------------------------------------------}
 
 begin
 end.

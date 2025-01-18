@@ -8,6 +8,8 @@ uses
   lc96,
   font,
   s3,
+  resLib,
+  resources,
   {airtime}
   raceTrack,
   car,
@@ -18,13 +20,6 @@ var
   {screen}
   screen: tScreen;
 
-  {resources}
-  titleBackground: tPage;
-  music: tSoundEffect;
-
-  startSFX: tSoundEffect;
-  track: tRaceTrack;
-
   {global time keeper}
   elapsed: double = 0;
   smoothElapsed: double = 0;
@@ -32,6 +27,9 @@ var
   frameCount: dword = 0;
 
   carDrawTime: double = 0;
+
+  {global vars}
+  track: tRaceTrack;
 
 var
   nextBellSound: double = 0;
@@ -127,12 +125,6 @@ end;
 
 {-----------------------------------------------------------}
 
-var
-  CC_RED,
-  CC_POLICE,
-  CC_BOX,
-  CC_SANTA: tCarChassis;
-
 procedure debugTextOut(dx,dy: integer; s: string;col: RGBA); overload;
 var
   r: tRect;
@@ -161,72 +153,6 @@ begin
 end;
 
 {-------------------------------------------------}
-
-procedure loadResources();
-var
-  musicPostfix: string;
-begin
-
-  note('Loading Resources.');
-
-  if cpuInfo.ram < 70*1024*1024 then begin
-    {8bit music if we don't have enough ram.}
-    musicPostfix := '_8';
-    note('Low memory detected, using 8bit music.');
-  end else
-    musicPostfix := '';
-
-
-  {music first}
-  if config.XMAS then
-    music := tSoundEffect.loadFromWave('res\music2'+musicPostfix+'.wav')
-  else
-    music := tSoundEffect.loadFromWave('res\music1'+musicPostfix+'.wav');
-
-  mixer.play(music, SCS_FIXED1);
-
-  if config.XMAS then
-    titleBackground := tPage.Load('res\titleX.p96')
-  else
-    titleBackground := tPage.Load('res\title.p96');
-
-  {setup chassis}
-  {todo: have these as meta data}
-  with CC_RED do begin
-    setDefault();
-    wheelPos := V3D.create(8, 7, 0);
-    wheelOffset := V3D.create(-1, 0, 0);
-    vox := tVoxelSprite.loadFromFile('res\carRed', 16);;
-  end;
-  with CC_POLICE do begin
-    setDefault();
-    wheelPos := V3D.create(10, 7, 0);
-    wheelOffset := V3D.create(+1, 0, 3);
-    vox := tVoxelSprite.loadFromFile('res\carPol', 16);
-  end;
-  with CC_BOX do begin
-    setDefault();
-    wheelPos := V3D.create(9, 7, 0);
-    wheelOffset := V3D.create(-1, 0, 1);
-    vox := tVoxelSprite.loadFromFile('res\carBox', 16);
-  end;
-  with CC_SANTA do begin
-    setDefault();
-    wheelPos := V3D.create(10, 7, 0);
-    wheelOffset := V3D.create(+1, 0, 3);
-    wheelSize := 0;
-    vox := tVoxelSprite.loadFromFile('res\carSan', 16);
-  end;
-
-  if config.XMAS then begin
-    CC_RED := CC_SANTA;
-    CC_BOX := CC_SANTA;
-  end;
-
-  startSFX := tSoundEffect.loadFromWave('res\start.wav').asFormat(AF_16_STEREO);
-
-  loadCarResources();
-end;
 
 procedure drawGUI();
 var
@@ -481,7 +407,7 @@ begin
   if not config.XMAS then
     mixer.channels[1].reset();
 
-  initCarResources();
+  initCarSounds();
 
   if not config.XMAS then
     mixer.play(startSFX);
