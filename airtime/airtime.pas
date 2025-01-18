@@ -232,9 +232,6 @@ begin
 
   screen.background := titleBackground;
 
-  {stub:}
-  displayAudio(screen.background, engineSFX, 64);
-
   screen.clear();
   screen.pageFlip();
 

@@ -112,12 +112,6 @@ type
 
     property items[index: int32]: tAudioSample read getSample write setSample; default;
 
-    (*
-    class function loadFromFile(filename: string): tSoundEffect;
-    class function loadFromLA96(filename: string): tSoundEffect;
-    procedure saveToLA96(filename: string);
-    *)
-
   end;
 
 implementation
@@ -382,7 +376,9 @@ begin
       if frequency <> 44100 then
         error(utils.format('frequency must be 44100 but was %d', [frequency]));
 
-      // will error if not valid
+      if audioFormat <> 1 then
+        error(utils.format('format must be 1 (PCM) but was %d', [audioFormat]));
+
       af := getAudioFormat(bitsPerSample, numChannels);
       if af = AF_INVALID then
         error(utils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));

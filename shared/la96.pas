@@ -136,7 +136,7 @@ type
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;printDots: boolean=false): tStream;
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
@@ -671,7 +671,7 @@ begin
 end;
 
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;printDots: boolean=false): tStream;
 const
   CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
   MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
@@ -1039,7 +1039,7 @@ begin
         difYStats.variance
       ]);
 
-    write('.');
+    if printDots then write('.');
 
   end;
 

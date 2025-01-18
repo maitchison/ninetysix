@@ -97,9 +97,7 @@ begin
   if config.XMAS then
     music := loadSound('music2')
   else
-    //stub:
-    //music := loadSound('music1');
-    music := loadSound('engine2');
+    music := loadSound('music1');
 
   mixer.play(music, SCS_FIXED1);
   mixer.channels[1].looping := true;

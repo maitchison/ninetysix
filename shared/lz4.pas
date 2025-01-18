@@ -60,7 +60,8 @@ type
 
 function LZ4Compress(data: tBytes): tBytes; overload;
 function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes; overload;
-function LZ4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
+function LZ4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes; overload;
+function lz4Decompress(bytes: tBytes;outputLength: int32):tBytes; overload;
 function LZ4Debug(bytes: tBytes;ref: tBytes=nil;print:boolean=False): tBytes;
 
 implementation
@@ -649,8 +650,7 @@ begin
   result := buffer;
 end;
 
-
-function lz4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes;
+function lz4Decompress(bytes: tBytes;buffer: tBytes=nil):tBytes; overload;
 var
   bytesPtr: pointer;
   bytesLen: dword;
@@ -787,6 +787,17 @@ begin
   result := buffer;
 end;
 
+{decompress LZ4. you must pass in the maximum size of the output buffer
+ and if this is incorrect an error will occur (or potentially memory coruption)}
+function lz4Decompress(bytes: tBytes;outputLength: int32):tBytes; overload;
+var
+  outBuffer: tBytes;
+begin
+  outBuffer := nil;
+  setLength(outBuffer, outputLength);
+  result := lz4Decompress(bytes, outBuffer);
+end;
+
 {------------------------------------------------}
 
 type
@@ -860,7 +871,7 @@ begin
   for i := 1 to length(testString) do
     inBytes.writeByte(ord(testString[i]));
   compressedData := lz4Compress(inBytes.asBytes);
-  uncompressedData := lz4Decompress(compressedData);
+  uncompressedData := lz4Decompress(compressedData, inBytes.len);
   AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
@@ -868,7 +879,7 @@ begin
   for i := 0 to 100 do
     inBytes.writeByte(ord('x'));
   compressedData := LZ4Compress(inBytes.asBytes);
-  uncompressedData := lz4Decompress(compressedData);
+  uncompressedData := lz4Decompress(compressedData, inBytes.len);
   AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
@@ -877,7 +888,7 @@ begin
   for i := 0 to length(testCase1)-1 do
     inBytes.writeByte(testCase1[i]);
   compressedData := lz4Compress(inBytes.asBytes);
-  uncompressedData := lz4Decompress(compressedData);
+  uncompressedData := lz4Decompress(compressedData, inBytes.len);
   AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
