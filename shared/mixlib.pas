@@ -10,6 +10,7 @@ uses
   debug,
   utils,
   sound,
+  timer,
   sysInfo,
   go32;
 
@@ -62,6 +63,14 @@ type
     function play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
   end;
 
+type
+  tMusicStats = record
+    bufferFramesMax: integer;
+    bufferFramesFilled: integer;
+    bufferFramesFree: integer;
+    cpuUsage: single; // as a fraction
+  end;
+
 var
   {our global mixer}
   mixer: tSoundMixer;
@@ -73,8 +82,8 @@ const
 function  mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 procedure musicPlay(filename: string);
 procedure musicStop();
+function  getMusicStats(): tMusicStats;
 procedure musicUpdate(maxNewFrames: integer=4);
-function  musicBufferFilled: single;
 
 implementation
 
@@ -99,6 +108,7 @@ var
   mbReadPos, mbWritePos: dword;
   {handles reading music.}
   musicReader: tLA96Reader;
+  musicTimer: tTimer;
 
   // debug registers, used to indicate errors during interupt.
   MIX_ERRORS: dword;
@@ -457,36 +467,36 @@ begin
   mbWritePos += musicReader.frameSize;
 end;
 
-function musicBufferFilled: single;
-var
-  framesDone, framesMax: integer;
-  sbSamples: int32;
-begin
-  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
-  if not musicReader.isLoaded then exit(-1);
-  framesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div musicReader.frameSize;
-  framesDone := (mbWritePos - mbReadPos) div musicReader.frameSize;
-  result := framesDone / framesMax;
-end;
-
 procedure musicUpdate(maxNewFrames: integer=4);
 var
-  framesDone, framesMax, framesAdded: integer;
-  sbSamples: int32;
+  framesProcessed: integer;
+  timer: tTimer;
 begin
-  if not musicReader.isLoaded then exit;
-
-  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
-  framesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div musicReader.frameSize;
-  framesDone := (mbWritePos - mbReadPos) div musicReader.frameSize;
-
-  {generate a few more frames as needed}
-  framesAdded := 0;
-  while (framesDone < framesMax-1) and (framesAdded < maxNewFrames) do begin
-    processNextMusicFrame();
-    inc(framesAdded);
-    inc(framesDone);
+  if not musicReader.isLoaded then begin
+    //decay timer to zero
+    musicTimer.avElapsed *= 0.90;
+    exit;
   end;
+  framesProcessed := 0;
+  musicTimer.start();
+  while (framesProcessed < maxNewFrames) and (getMusicStats().bufferFramesFree > 0) do begin
+    processNextMusicFrame();
+    inc(framesProcessed);
+  end;
+  musicTimer.stop(musicReader.frameSize * framesProcessed);
+end;
+
+function getMusicStats: tMusicStats;
+var
+  sbSamples: int32;
+  frameSize: int32;
+begin
+  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
+  frameSize := 1024; // hard code this for the moment.
+  result.bufferFramesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div frameSize;
+  result.bufferFramesFilled := (mbWritePos - mbReadPos) div frameSize;
+  result.bufferFramesFree := result.bufferFramesMax - result.bufferFramesFilled;
+  result.cpuUsage := musicTimer.avElapsed / (1 / 44100);
 end;
 
 {plays background music. Music must be a compressed A96 file stored on disk.
@@ -638,6 +648,8 @@ begin
 end;
 
 initialization
+
+  musicTimer := tTimer.create('music');
 
   {music buffer must no smaller than SB buffer, and if larger, be a multiple}
   assert((MUSIC_BUFFER_SAMPLES mod (BUFFER_SIZE div 4)) = 0);

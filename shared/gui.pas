@@ -30,7 +30,7 @@ begin
   if not assigned(panelSprite) or not assigned(frameSprite) then
     error('Tried to draw gui component before InitGUI called.');
 
-  FrameSprite.NineSlice(page, atX, atY, 300, 22);
+  FrameSprite.NineSlice(page, atX, atY, 320, 24);
   atX += panelSprite.border.left;
   atY += panelSprite.border.top;
   {Custom positioning}

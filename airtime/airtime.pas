@@ -167,10 +167,8 @@ procedure drawGUI();
 var
   fps, tpf: double;
   mixerCpuUsage: double;
+  musicStats: tMusicStats;
 begin
-
-  //stub
-  exit;
 
   if elapsed > 0 then fps := 1.0 / elapsed else fps := -1;
   tpf := VX_TRACE_COUNT;
@@ -180,8 +178,19 @@ begin
   else
     mixerCpuUsage := -1;
 
-  GUILabel(screen.canvas, 10, 10, format('FPS:%f Car:%fms SFX: %f%%', [fps,carDrawTime*1000,mixerCpuUsage]));
-  screen.markRegion(tRect.create(10, 10, 300, 22), FG_FLIP);
+  musicStats := getMusicStats();
+
+  GUILabel(screen.canvas, 10, 10,
+    format(
+      'Car:%fms SFX:%f%% MUS:%f%% [%d/%d]',
+      [
+        carDrawTime*1000,
+        mixerCpuUsage,
+        100*musicStats.cpuUsage,musicStats.bufferFramesFilled,musicStats.bufferFramesMax
+      ]
+    )
+  );
+  screen.markRegion(tRect.create(10, 10, 310, 24), FG_FLIP);
 end;
 
 procedure drawFPS();
@@ -318,9 +327,8 @@ begin
     if GUIButton(screen, 320-(150 div 2), 405, 'PLAY') then
       mainLoop();
 
-    //stub: show buffer status
-    GuiText(screen.canvas, 10, 10, format('%f%%', [100*musicBufferFilled]));
-    screen.markRegion(tRect.create(10,10,100,30));
+    if config.DEBUG then
+      drawGUI();
 
     endOfFrame();
 
@@ -487,7 +495,8 @@ begin
 
     {gui}
     startTimer('gui');
-    drawGUI();
+    if config.DEBUG then
+      drawGUI();
     drawFPS();
     stopTimer('gui');
 
@@ -515,6 +524,8 @@ begin
   textAttr := LightGray;
   clrscr;
 
+  info('Starting AIRTIME ');
+
   if cpuInfo.ram < 30*1024*1024 then
     error('Application required 30MB of ram.');
 
@@ -526,14 +537,6 @@ begin
   heaptrc.maxprintedblocklength := 64;
   {$endif}
 
-  runTestSuites();
-
-  logHeapStatus('Program start');
-
-  loadResources();
-
-  logHeapStatus('Resources loaded');
-
   enableVideoDriver(tVesaDriver.create());
 
   if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
@@ -541,8 +544,17 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 2*1024*1024 then
     error('Requires 2MB video card.');
 
+  runTestSuites();
+
+  logHeapStatus('Program start');
+
+  loadResources();
+
+  logHeapStatus('Resources loaded');
+  info('Done.');
+
   // Small delay so people can see the loading text.
-  delay(1000);
+  delay(1500);
 
   videoDriver.setMode(640,480,32);
 
