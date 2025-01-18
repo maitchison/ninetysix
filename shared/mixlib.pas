@@ -67,10 +67,10 @@ var
   mixer: tSoundMixer;
 
 const
-  {This is 64k of memory, or about ~ 0.5 seconds}
-  MUSIC_BUFFER_SAMPLES = 16*1024;
+  {This is 2M of memory, or ~10 seconds}
+  MUSIC_BUFFER_SAMPLES = 512*1024;
 
-function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
+function  mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 procedure musicPlay(filename: string);
 procedure musicStop();
 procedure musicUpdate(maxNewFrames: integer=4);
@@ -474,8 +474,9 @@ var
   framesDone, framesMax, framesAdded: integer;
   sbSamples: int32;
 begin
-  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
   if not musicReader.isLoaded then exit;
+
+  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
   framesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div musicReader.frameSize;
   framesDone := (mbWritePos - mbReadPos) div musicReader.frameSize;
 
@@ -497,8 +498,9 @@ begin
   mbReadPos := 0;
   mbWritePos := 0;
   musicReader.load(filename);
-  {fill the buffer a bit}
-  musicUpdate(16);
+  {since we read the whole thing off disk, we may as well load a fair bit}
+  {this should be ~10 seconds}
+  musicUpdate(256);
 end;
 
 procedure musicStop();

@@ -155,6 +155,14 @@ end;
 
 {-------------------------------------------------}
 
+procedure endOfFrame();
+begin
+  screen.flipAll();
+  startTimer('music');
+  musicUpdate();
+  stopTimer('music');
+end;
+
 procedure drawGUI();
 var
   fps, tpf: double;
@@ -310,12 +318,11 @@ begin
     if GUIButton(screen, 320-(150 div 2), 405, 'PLAY') then
       mainLoop();
 
-    //stub:
+    //stub: show buffer status
     GuiText(screen.canvas, 10, 10, format('%f%%', [100*musicBufferFilled]));
     screen.markRegion(tRect.create(10,10,100,30));
 
-    screen.flipAll();
-    musicUpdate();
+    endOfFrame();
 
     if keyDown(key_e) then begin
       {force an error}
@@ -489,7 +496,7 @@ begin
       videoDriver.waitVSync();
     stopTimer('vsync');
 
-    screen.flipAll();
+    endOfFrame();
 
     if keyDown(key_q) or keyDown(key_esc) then break;
 
