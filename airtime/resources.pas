@@ -74,7 +74,8 @@ begin
 
   srcPath := joinPath('res', tag+'.a96');
   if not fs.exists(srcPath) then error(format('Missing audio file "%s".', [srcPath]));
-  reader := tLA96Reader.create(srcPath);
+  reader := tLA96Reader.create();
+  reader.load(srcPath);
   result := reader.readSFX();
   reader.free;
 

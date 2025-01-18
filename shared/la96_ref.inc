@@ -35,13 +35,21 @@ begin
   mid := (mid shl frameSpec^.midShift) + frameSpec^.cMid;
   dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;
 
+  left := (mid + dif);
+  right := (mid - dif);
+
+  //stub:
+  note(intToStr(length(frameSpec^.midUTable^.table.data)));
+  note(intToStr(frameSpec^.midUTable^.table.data[0]));
+  note(intToStr(frameSpec^.midUTable^.table.data[1]));
+  note(intToStr(frameSpec^.midUTable^.table.data[2]));
+  note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midCode, difCode]));
+
   {keep track of centering}
   shift := frameSpec^.centerShift;
   frameSpec^.cMid := mid shr shift shl shift;
   frameSpec^.cDif := dif shr shift shl shift;
 
-  left := (mid + dif);
-  right := (mid - dif);
 
   {$ifdef DEBUG}
   if (left > high(int16)) then

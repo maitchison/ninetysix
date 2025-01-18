@@ -87,7 +87,7 @@ type
     procedure seek(aPos: dword; aMidByte: boolean=False);
 
     procedure writeToFile(fileName: string);
-    procedure readFromFile(fileName: string);
+    procedure readFromFile(fileName: string; blockSize: int32=4096);
 
     procedure reset();
     procedure softReset();
@@ -440,22 +440,33 @@ begin
 end;
 
 {loads memory stream from file, and resets position to start of stream.}
-procedure tStream.readFromFile(fileName: string);
+procedure tStream.readFromFile(fileName: string; blockSize: int32=4096);
 var
   f: file;
   bytesRead: dword;
+  bytesRemaining: dword;
+  bytesToRead: dword;
   ioError: word;
 begin
 
   {$i-}
   assignFile(f, fileName);
   system.reset(f,1);
-  ioError := IOResult; if ioError <> 0 then Error(format('Could not open file "%s" for reading, Error:%s', [filename, getIOErrorString(ioError)]));
+  ioError := IOResult; if ioError <> 0 then error(format('Could not open file "%s" for reading, Error:%s', [filename, getIOErrorString(ioError)]));
   {$+}
 
   setCapacity(fileSize(f));
+  bytesRemaining := filesize(f);
   bytesUsed := fileSize(f);
-  blockread(f, bytes^, bytesUsed, bytesRead);
+  fPos := 0;
+  while bytesRemaining > 0 do begin
+    bytesToRead := min(blockSize, bytesRemaining);
+    blockread(f, bytes[fPos], bytesToRead, bytesRead);
+    if bytesRead <> bytesToRead then
+      error(format('Error reading from file "%s", expected to read %d bytes but read %d', [bytesToRead, bytesRead]));
+    bytesRemaining -= bytesRead;
+    fPos += bytesRead;
+  end;
   close(f);
   seek(0);
   midByte := False;

@@ -111,8 +111,11 @@ type
 
   {todo: make a LA96Writer aswell (for progressive save)}
   tLA96Reader = class
+  private
     fs: tStream;
+    ownsStream: boolean;
     header: tLA96FileHeader;
+  protected
     ulawTable: array[1..8] of tULawLookup;
     midCodes, difCodes: tDwords;
     midSigns, difSigns: tDwords;
@@ -120,8 +123,11 @@ type
     cLeft, cRight: single; {used for EMA}
   protected
     function  getULAW(bits: byte): pULawLookup;
+    procedure loadHeader();
   public
-    constructor create(filename: string);
+    constructor create();
+    procedure load(filename: string); overload;
+    procedure load(aStream: tStream); overload;
     destructor destroy(); override;
     procedure close();
     function  readSfx(): tSoundEffect;
@@ -234,33 +240,50 @@ end;
 
 {-------------------------------------------------------}
 
-constructor tLA96Reader.create(filename: string);
+constructor tLA96Reader.create();
 var
-  f: file;
+  bits: int32;
+begin
+  {init vars}
+  fillchar(header, sizeof(header), 0);
+  fs := nil;
+end;
+
+procedure tLA96Reader.load(filename: string); overload;
+begin
+  if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
+  fs := tStream.create();
+  fs.readFromFile(filename);
+  ownsStream := true;
+  self.loadHeader();
+end;
+
+{loads from a stream. Stream is still owned by caller and so must
+ be freed by them}
+procedure tLA96Reader.load(aStream: tStream); overload;
+begin
+  fs := aStream;
+  ownsStream := false;
+  self.loadHeader();
+end;
+
+procedure tLA96Reader.loadHeader();
+var
+  startPos: int32;
   bits: integer;
 begin
-
-  if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
-
   {first read header, and make sure everything is ok}
-  system.assign(f, filename);
-  system.reset(f, 1);
-  system.blockread(f, header, sizeof(header));
-  system.close(f);
+  startPos := fs.pos;
+  fs.readBlock(header, sizeof(header));
 
-  if header.tag <> 'LA96' then raise ValueError.create('Not a LA96 file.');
+  log(header.tag);
+
+  if header.tag <> 'LA96' then raise ValueError.create(format('Not an LA96 file. Found "%s", expecting LA96', [header.tag]));
   if (header.versionSmall <> VER_SMALL) or (header.versionBig <> VER_BIG) then
     raise ValueError.create(format('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]));
   if header.format <> 0 then raise ValueError.create(format('Format type %d not supported', [header.format]));
   if header.compressionMode <> 0 then raise ValueError.create('Compression not supported');
   if header.frameSize <> 1024 then raise ValueError.create('Framesize must be 1024');
-
-  {load entire file into stream}
-  fs := tStream.create();
-  fs.readFromFile(filename);
-  fs.seek(128);
-
-  frameOn := 0;
 
   {setup our buffers}
   setLength(midCodes, header.frameSize-1);
@@ -271,6 +294,9 @@ begin
   {create ulaw tables}
   for bits := low(ulawTable) to high(ulawTable) do
     ulawTable[bits].initDecode(bits, header.log2mu);
+
+  fs.seek(128+startPos);
+  frameOn := 0;
 end;
 
 destructor tLA96Reader.destroy();
@@ -281,11 +307,10 @@ end;
 
 procedure tLA96Reader.close();
 begin
-  if assigned(fs) then begin
+  if assigned(fs) and ownsStream then begin
     fs.free;
     fs := nil;
   end;
-  fillchar(header, sizeof(header), 0);
 end;
 
 {read entire SFX out and return it uncompressed}
@@ -381,7 +406,7 @@ begin
   inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
-  process_ASM(
+  process_REF(
     sfxSamplePtr,
     midCode, difCode,
     midCodes, difCodes,
@@ -389,6 +414,11 @@ begin
     @frameSpec
   );
   stopTimer('LA96_DF_Process');
+
+  {stub: show values}
+  for i := 0 to 10 do begin
+    log(format('%d (%d,%d)', [sfxOffset, sfx[sfxOffset+i].left, sfx[sfxOffset+i].right]));
+  end;
 
   if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
     startTimer('LA96_DF_PostProcess');
@@ -578,9 +608,14 @@ end;
 {-------------------------------------------------------}
 
 function decodeLA96(s: tStream): tSoundEffect;
+var
+  reader: tLA96Reader;
 begin
-  result := tSoundEffect.create();
-  {todo: implement decode}
+  reader := tLA96Reader.create();
+  reader.load(s);
+  result := reader.readSFX();
+  reader.free;
+  s.free;
 end;
 
 function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
@@ -850,7 +885,6 @@ begin
       cDif := 0;
     end;
 
-
     {write frame header (one for each channel)}
     framePtr.append(fs.pos);
     fs.writeByte(profile.quantBits + profile.ulawBits*16);
@@ -1039,7 +1073,8 @@ var
   lutDecode: tULawLookup;
   i: int32;
   s: tStream;
-  sfx: tSoundEffect;
+  sfxIn, sfxOut: tSoundEffect;
+  sample: tAudioSample16S;
 const
   mu = 256;
   bits = 6;
@@ -1057,13 +1092,26 @@ begin
   end;
 
   {make sure that encoding a very short works correctly}
-  {
-  sfx := tSoundEffect(16, AF_16_STEREO);
-  fillchar(sfx.data^, 16*4, 0);
-  function decodeLA96(s: tStream): tSoundEffect;
-  function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile): tStream;
-  }
+  sfxIn := tSoundEffect.create(AF_16_STEREO, 3);
+  fillchar(sfxIn.data^, 3*4, 0);
+  sample.left := 1000;
+  sample.right := -300;
+  sfxIn[1] := sample;
+  s := tStream.create();
+  s := encodeLA96(sfxIn, ACP_VERYHIGH);
+  s.seek(0);
+  sfxOut := decodeLA96(s);
 
+  assertEqual(sfxOut.length, sfxIn.length);
+  for i := 0 to sfxOut.length-1 do begin
+    {we are compressing, so these just need to be roughtly correct}
+    assertClose(sfxOut[i].left, sfxIn[i].left, 16);
+    assertClose(sfxOut[i].right, sfxIn[i].right, 16);
+  end;
+
+  s.free;
+  sfxIn.free;
+  sfxOut.free;
 
 end;
 
