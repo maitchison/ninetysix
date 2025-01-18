@@ -136,7 +136,7 @@ type
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;printDots: boolean=false): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tStream;
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
@@ -671,7 +671,7 @@ begin
 end;
 
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;printDots: boolean=false): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tStream;
 const
   CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
   MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
@@ -834,7 +834,7 @@ begin
     penultimateValue := 1 - (1/(1 shl profile.ulawBits));
     ulawMaxError := uLawInv(1, profile.log2Mu) - uLawInv(penultimateValue, profile.log2Mu);
     clipGuard += ulawMaxError*2;
-    note(format('Adding %d to clip guard due to ulaw', [ulawMaxError]));
+    //note(format('Adding %d to clip guard due to ulaw', [ulawMaxError]));
   end;
 
   {write reserved header space}
@@ -1039,7 +1039,7 @@ begin
         difYStats.variance
       ]);
 
-    if printDots then write('.');
+    if verbose then write('.');
 
   end;
 
@@ -1056,7 +1056,8 @@ begin
 
   stopTimer('LA96');
 
-  note(format('Encoded size %fKB Original %fKB',[fs.len/1024, 4*sfx.length/1024]));
+  if verbose then
+    note(format('Encoded size %fKB Original %fKB',[fs.len/1024, 4*sfx.length/1024]));
 end;
 
 {--------------------------------------------------------}

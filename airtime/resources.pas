@@ -101,7 +101,6 @@ begin
 
   mixer.play(music, SCS_FIXED1);
   mixer.channels[1].looping := true;
-  warning(intToStr(music.length));
 
   if config.XMAS then
     titleBackground := tPage.Load('res\titleX.p96')

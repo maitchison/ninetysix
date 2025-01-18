@@ -220,7 +220,7 @@ end;
 
 procedure logHeapStatus(msg: string='Heap status');
 begin
-  note(pad(format('--- %s used:%skb free:%skb ',
+  debug.debug(pad(format('--- %s used:%skb free:%skb ',
     [
       msg,
       // total_physical_pages

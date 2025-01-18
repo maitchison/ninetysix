@@ -526,6 +526,9 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 2*1024*1024 then
     error('Requires 2MB video card.');
 
+  // Small delay so people can see the loading text.
+  delay(1000);
+
   videoDriver.setMode(640,480,32);
 
   screen := tScreen.create();

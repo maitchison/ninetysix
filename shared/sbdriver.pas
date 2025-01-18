@@ -382,7 +382,7 @@ var
 
 procedure install_ISR(irq: byte);
 begin
-  note('Installing music interupt on IRQ'+intToStr(irq));
+  note(' - Installing music interupt on IRQ'+intToStr(irq));
 
   case irq of
     0..7: SB_INT := $08+irq;
@@ -412,7 +412,7 @@ end;
 procedure uninstall_ISR;
 begin
   if not hasInstalledInt then exit;
-  note('Removing music interupt');
+  note(' - Removing music interupt');
   if SB_IRQ >= 8 then
     port[$A1] := port[$A1] or IRQStopMask
   else
@@ -503,7 +503,7 @@ begin
   if IS_DMA_ACTIVE then
     error('DMA transfer is already active');
 
-  note('Setting up DMA transfer.');
+  note(' - Setting up DMA transfer.');
   if not assigned(mixer) then
     error('A mixer has not yet been assigned.');
 
@@ -580,7 +580,7 @@ begin
   sbGood := DSPReset();
 
   if sbGood then
-    info(format('Detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
+    info(format(' - detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
   else
     warning('No SoundBlaster detected');
 
@@ -598,12 +598,12 @@ begin
 
   addr := (dosSegment shl 4);
   if getPage(addr) <> getPage(addr + BUFFER_SIZE) then begin
-    warning('SB Buffer allocation spanned a page, so I moved it.');
+    warning(' - SB Buffer allocation spanned a page, so I moved it.');
     dosOffset := BUFFER_SIZE;
   end else
     dosOffset := 0;
 
-  note(format('Successfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
+  note(format(' - successfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
   install_ISR(DSPIrq);
   initiateDMAPlayback();
@@ -620,7 +620,7 @@ end;
 procedure closeSound();
 begin
   note('[done] sound');
-  note(' -IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
+  note(' - IRQ was triggered '+intToStr(INTERRUPT_COUNTER)+' times.');
   if debug_dma_page_corrections > 0 then
     warning('Required '+intToStr(debug_dma_page_corrections)+' page corrections');
   DSPWrite($D3); // mute the speaker so we don't get crackle.

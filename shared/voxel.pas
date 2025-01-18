@@ -231,7 +231,7 @@ begin
   end;
   img.setTransparent(RGBA.create(255,255,255));
 
-  note(format('Voxel sprite is (%d, %d)', [img.width, img.height]));
+  note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
   result.setPage(img, height);
 
   if fs.exists(filename+'.sdf') then begin
