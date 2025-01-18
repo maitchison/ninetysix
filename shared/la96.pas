@@ -60,7 +60,7 @@ uses
   debug,
   test,
   utils,
-  types,
+  sysTypes,
   lz4,
   dos,
   go32,
@@ -919,7 +919,7 @@ begin
 
       if (clamp16(outLeft) <> outLeft) or (clamp16(outRight) <> outRight) then
         {indicate clipping}
-        warn(format('Clipping %d %d', [outLeft, outRight]));
+        warning(format('Clipping %d %d', [outLeft, outRight]));
 
       {xPrime is decoders quant(decoded-cMid)}
       if CENTERING_RESOLUTION > 0 then begin

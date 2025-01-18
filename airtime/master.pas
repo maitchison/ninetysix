@@ -8,13 +8,17 @@ uses
   test,
   debug,
   graph32,
+  stream,
   filesystem,
+  sound,
   crt,
   sysPNG,
+  la96,
   lc96;
 
 const
   MASTER_FOLDER = 'c:\dev\masters';
+  VERBOSE: boolean = true;
 
 {-----------------------------------------------}
 
@@ -39,6 +43,8 @@ type
     constructor CreateOrLoad(filename: string); overload;
     destructor Destroy;
 
+
+
     procedure serialize(fileName: string);
     procedure deserialize(fileName: string);
 
@@ -52,7 +58,6 @@ type
   tProcessProc = function(input: tPage): tPage;
 
 var
-  img: tPage;
   resourceLibrary: tResourceLibrary;
 
 {-----------------------------------------------}
@@ -194,59 +199,39 @@ begin
 end;
 
 {-----------------------------------------------}
+{ Helpers }
+{-----------------------------------------------}
 
-procedure copyFile(filename: string; srcPath:string); overload;
+procedure output(s: string=''; col: byte=LightGray);
 var
-  dstPath: string;
+  oldTextAttr: byte;
 begin
-  {only copy if needed.}
-  textAttr := LightGray;
-  write(pad(extractFilename(filename),14, ' '));
-
-  dstPath := joinPath('res', filename);
-
-  if not fs.exists(dstPath) or fs.wasModified(srcPath, dstPath) then begin
-    fs.copyFile(srcPath, dstPath);
-    textAttr := LightRed;
-    writeln('[copied]');
-    textAttr := LightGray;
-  end else begin
-    textAttr := Green;
-    writeln('[skip]');
-    textAttr := LightGray;
-  end;
+  if not VERBOSE then exit;
+  oldTextAttr := textAttr;
+  textAttr := col;
+  write(s);
+  textAttr := oldTextAttr;
 end;
 
-
-{e.g. copyFile('fonts\font.fnt')}
-procedure copyFile(filePath: string); overload;
+procedure outputLn(s: string=''; col: byte=LightGray);
 begin
-  copyFile(extractFilename(filePath), joinPath(MASTER_FOLDER, filePath));
+  output(s+#13#10, col);
 end;
 
-
-{e.g. convert('title', 'c:\dev\masters\airtime\title.bmp')}
-procedure convertImage(filename: string;srcPath:string;processProc: tProcessProc=nil); overload;
+{returns if a resource needs to be processed (with printing)}
+function preProcess(dstPath: string;srcPath:string): boolean;
 var
   res: tResource;
   id: int32;
-  dstPath: string;
+
 begin
 
-  dstPath := 'res\'+filename+'.p96';
-
-  textAttr := LightGray;
-  write(pad(filename,14, ' '));
+  output(pad(extractFilename(dstPath),14, ' '), LightGray);
 
   {make sure it exists}
   if not fs.exists(srcPath) then begin
-    //stub
-    writeln();
-    writeln(srcPath);
-    textAttr := LightRed;
-    writeln('[missing]');
-    textAttr := LightGray;
-    exit;
+    outputLn('[missing]', LightRed);
+    exit(false);
   end;
 
   {check if this is already done}
@@ -258,36 +243,114 @@ begin
       (res.modifiedTime = fs.getModified(res.srcFile)) and
       fs.exists(dstPath)
     then begin
-      textAttr := Green;
-      writeln('[skip]');
-      textAttr := LightGray;
-      exit;
+      outputLn('[skip]', LightGreen);
+      exit(false);
     end;
   end;
 
-  with res do begin
-    srcFile := srcPath;
-    dstFile := dstPath;
-    modifiedTime := fs.getModified(srcFile);
-    img := tPage.Load(srcFile);
-    if assigned(processProc) then
-      img := processProc(img);
-    saveLC96(dstFile, img);
-    textAttr := LightGreen;
-    writeln(format('[%dx%d]',[img.width, img.height]));
-    textAttr := LightGray;
-  end;
+  exit(true);
+end;
 
+
+{handle resource file update after processing (with printing)}
+function postProcess(dstPath: string;srcPath:string): boolean;
+var
+  res: tResource;
+begin
+  res.srcFile := srcPath;
+  res.dstFile := dstPath;
+  res.modifiedTime := fs.getModified(srcPath);
   resourceLibrary.updateResource(res);
   resourceLibrary.serialize('resources.ini');
 end;
 
+{-----------------------------------------------}
+
+procedure copyFile(filename: string; srcPath:string); overload;
+var
+  dstPath: string;
+begin
+
+  dstPath := joinPath('res', filename);
+
+  if preProcess(dstPath, srcPath) then begin
+    fs.copyFile(srcPath, dstPath);
+    outputln('[copied]', LightGreen);
+    postProcess(dstPath, srcPath);
+  end;
+end;
+
+{----------------------------------------------------}
+
+{e.g. convert('title', 'c:\dev\masters\airtime\title.bmp')}
+procedure convertImage(filename: string;srcPath:string;processProc: tProcessProc=nil); overload;
+var
+  dstPath: string;
+  img: tPage;
+begin
+  dstPath := 'res\'+filename+'.p96';
+  if preProcess(dstPath, srcPath) then begin
+    img := tPage.Load(srcPath);
+    if assigned(processProc) then
+      img := processProc(img);
+    saveLC96(dstPath, img);
+    outputLn(format('[%dx%d]',[img.width, img.height]), Green);
+    img.free;
+    postProcess(dstPath, srcPath);
+  end;
+end;
+
+{e.g. convert('title', 'c:\dev\masters\airtime\title.bmp')}
+procedure convertAudio(filename: string;srcPath:string); overload;
+var
+  dstPath: string;
+  sfx: tSoundEffect;
+  s: tStream;
+  ss,mm: word;
+begin
+
+  if extractExtension(srcPath).toLower() <> 'wav' then
+    error(format('Source file should be .wav file, but was %s', [srcPath]));
+
+  dstPath := 'res\'+filename+'.a96';
+
+  if preProcess(dstPath, srcPath) then begin
+    sfx := tSoundEffect.loadFromWave(srcPath);
+    ss := (sfx.length div 44100) mod 60;
+    mm := (sfx.length div 44100 div 60) mod 60;
+    s := encodeLA96(sfx, ACP_HIGH);
+    s.writeToFile(dstPath);
+    s.free;
+    sfx.free;
+    outputLn(format('[%s:%s]',[intToStr(mm, 2), intToStr(ss, 2)]), Green);
+    postProcess(dstPath, srcPath);
+  end;
+end;
+
+
+{-----------------------------------------------}
+{ These just make life a bit simpler }
+{-----------------------------------------------}
+
+{e.g. copyFile('fonts\font.fnt')}
+procedure copyFile(filePath: string); overload;
+begin
+  copyFile(extractFilename(filePath), joinPath(MASTER_FOLDER, filePath));
+end;
+
+{e.g. convert('music.wav')}
+procedure convertAudio(filename: string); overload;
+begin
+  convertAudio(removeExtension(filename), joinPath(MASTER_FOLDER, 'airtime', filename));
+end;
 
 {e.g. convert('title.bmp')}
 procedure convertImage(filename: string;processProc: tProcessProc=nil); overload;
 begin
   convertImage(removeExtension(filename), joinPath(MASTER_FOLDER, 'airtime', filename), processProc);
 end;
+
+{-------------------------------------------------------}
 
 function mapTerrainColors(page: tPage): tPage;
 var
@@ -335,7 +398,18 @@ begin
   convertImage('panel',   joinPath(MASTER_FOLDER, 'gui',    'panel.bmp'));
   convertImage('font',    joinPath(MASTER_FOLDER, 'fonts',  'font.bmp'));
 
-  {todo:...}
+  {sound stuff}
+  convertAudio('loop_0.wav');
+  //convertAudio('skid.wav');
+  convertAudio('slaybells.wav');
+  convertAudio('start.wav');
+  convertAudio('land.wav');
+  convertAudio('boost.wav');
+  convertAudio('bell.wav');
+  convertAudio('music1.wav');
+  convertAudio('music2.wav');
+
+  {other stuff}
   copyFile(joinPath('fonts', 'font.fnt'));
 end;
 

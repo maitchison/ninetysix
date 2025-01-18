@@ -45,13 +45,13 @@ begin
 
   {$ifdef DEBUG}
   if (left > high(int16)) then
-    warn(format('Clipping LO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warning(format('Clipping LO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   if (left < low(int16)) then
-    warn(format('Clipping LU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warning(format('Clipping LU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   if (right > high(int16)) then
-    warn(format('Clipping RO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warning(format('Clipping RO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   if (right < low(int16)) then
-    warn(format('Clipping RU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+    warning(format('Clipping RU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
   result.left := clamp16(left);
   result.right := clamp16(right);
   {$else}

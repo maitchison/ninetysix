@@ -365,7 +365,7 @@ begin
 
     IOError := IOResult;
     if IOError <> 0 then
-      error('Could not open file "'+FileName+'" '+GetIOError(IOError));
+      error('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
 
     blockread(f, fileHeader, sizeof(fileHeader));
 
@@ -442,7 +442,7 @@ begin
 
   IOError := IOResult;
   if IOError <> 0 then
-    error('Could not open file "'+FileName+'" for output.'+GetIOError(IOError));
+    error('Could not open file "'+FileName+'" for output.'+getIOErrorString(IOError));
 
   chunkBytes := length * 4;
 
