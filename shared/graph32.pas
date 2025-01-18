@@ -991,7 +991,7 @@ begin
   if assigned(proc) then begin
     startTime := getSec;
     result := proc(filename);
-    info(format(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]));
+    note(format(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]));
   end else
     error('No image loader for file "'+filename+'"');
 end;

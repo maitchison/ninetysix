@@ -113,12 +113,12 @@ procedure runTestSuites();
 var
   i: int32;
 begin
-  note('Running test cases...');
+  info('Running test cases...');
   for i := 0 to length(testSuites)-1 do begin
     note('  [test] '+testSuites[i].tag);
     testSuites[i].run();
   end;
-  note('Finished running test cases.');
+  note('   (finished running test cases)');
 end;
 
 

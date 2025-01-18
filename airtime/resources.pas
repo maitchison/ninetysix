@@ -79,14 +79,13 @@ begin
   result := reader.readSFX();
   reader.free;
 
-  note(format(' - loaded %s in %.2fs.', [tag, getSec - startTime]))
-  ;
+  note(format(' - loaded %s in %.2fs.', [tag, getSec - startTime]));
 end;
 
 procedure loadResources();
 begin
 
-  note('Loading Resources.');
+  info('Loading Resources...');
 
   {todo: store all resources in resource library, and address
    by a 'tag' (which is kind of like what i've started doing here}

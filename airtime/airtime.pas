@@ -2,7 +2,6 @@
 program airtime;
 
 uses
-  startup,
   {$i units.inc},
   {other stuff}
   lc96,
@@ -15,6 +14,7 @@ uses
   raceTrack,
   car,
   {fpc}
+  crt, {remove?}
   go32;
 
 var
@@ -499,6 +499,9 @@ end;
 begin
 
   watches.ENABLE_WATCHES := config.DEBUG;
+  debug.VERBOSE_SCREEN := llNote; // startup should have done this?
+
+  clrscr;
 
   if cpuInfo.ram < 30*1024*1024 then
     error('Application required 30MB of ram.');

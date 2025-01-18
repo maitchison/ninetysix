@@ -469,37 +469,6 @@ begin
 
 end;
 
-(*
-{create soundfile, optionally loading it from disk.}
-function tSoundEffect.loadFromFile(filename: string=''): t;
-var
-  extension: string;
-begin
-
-  sample := nil;
-  length := 0;
-
-  extension := toLowerCase(extractExtension(filename));
-  if extension = 'wav' then
-    loadFromWave(filename)
-  else if extension = 'la9' then
-    loadFromLA96(filename);
-end;
-
-
-procedure tSoundEffect.loadFromLA96(filename: string);
-begin
-end;
-
-procedure tSoundEffect.saveToLA96(filename: string);
-begin
-end;
-
-procedure tSoundEffect.saveToWave(filename: string);
-begin
-end;
-  *)
-
 {----------------------------------------------------------}
 
 procedure runTests();
