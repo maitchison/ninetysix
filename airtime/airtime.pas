@@ -310,7 +310,12 @@ begin
     if GUIButton(screen, 320-(150 div 2), 405, 'PLAY') then
       mainLoop();
 
+    //stub:
+    GuiText(screen.canvas, 10, 10, format('%f%%', [100*musicBufferFilled]));
+    screen.markRegion(tRect.create(10,10,100,30));
+
     screen.flipAll();
+    musicUpdate();
 
     if keyDown(key_e) then begin
       {force an error}
@@ -405,8 +410,7 @@ begin
   setTrackDisplay(track.background);
 
   // turn off music
-  if not config.XMAS then
-    mixer.channels[1].reset();
+  if not config.XMAS then musicStop();
 
   initCarSounds();
 
@@ -501,6 +505,7 @@ begin
   watches.ENABLE_WATCHES := config.DEBUG;
   debug.VERBOSE_SCREEN := llNote; // startup should have done this?
 
+  textAttr := LightGray;
   clrscr;
 
   if cpuInfo.ram < 30*1024*1024 then

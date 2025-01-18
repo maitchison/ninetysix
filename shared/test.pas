@@ -118,7 +118,7 @@ begin
     note('  [test] '+testSuites[i].tag);
     testSuites[i].run();
   end;
-  note('   (finished running test cases)');
+  note('  (finished running test cases)');
 end;
 
 

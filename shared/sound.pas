@@ -213,6 +213,7 @@ begin
   format := aFormat;
   tag := aTag;
   getMem(data, length * AF_SIZE[format]);
+  fillchar(data^, length * AF_SIZE[format], 0);
 end;
 
 destructor tSoundEffect.destroy();

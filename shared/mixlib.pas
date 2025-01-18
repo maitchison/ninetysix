@@ -64,21 +64,41 @@ type
 
 var
   {our global mixer}
-  mixer: tSoundMixer = nil;
+  mixer: tSoundMixer;
+
+const
+  {This is 64k of memory, or about ~ 0.5 seconds}
+  MUSIC_BUFFER_SAMPLES = 16*1024;
 
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
+procedure musicPlay(filename: string);
+procedure musicStop();
+procedure musicUpdate(maxNewFrames: integer=4);
+function  musicBufferFilled: single;
 
 implementation
 
 uses
   keyboard, {stub}
+  la96,
   sbdriver;
 
+const
+  MAX_MIXER_SAMPLES = 8*1024;
+
 var
-  scratchBuffer: array[0..8*1024-1] of tAudioSample;
-  scratchBufferF32: array[0..8*1024-1] of tAudioSampleF32;
-  scratchBufferI32: array[0..8*1024-1] of tAudioSampleI32; {$align 8}
+  {global buffers and stuff}
+  scratchBuffer: array[0..MAX_MIXER_SAMPLES-1] of tAudioSample;
+  scratchBufferF32: array[0..MAX_MIXER_SAMPLES-1] of tAudioSampleF32;
+  scratchBufferI32: array[0..MAX_MIXER_SAMPLES-1] of tAudioSampleI32; {$align 8}
   noiseCounter: dword;
+
+  {todo: maybe put this in mixer? or just keep them global... yeah global is the way}
+  {also, this need not be a sound effect, just a buffer as above?}
+  musicBuffer: tSoundEffect;
+  mbReadPos, mbWritePos: dword;
+  {handles reading music.}
+  musicReader: tLA96Reader;
 
   // debug registers, used to indicate errors during interupt.
   MIX_ERRORS: dword;
@@ -196,11 +216,27 @@ begin
     and 10% CPU to audio is probably ok on a P166}
 
   bufSamples := bufBytes div 4;
-  if bufSamples > (8*1024) then exit;
+  if bufSamples > (MAX_MIXER_SAMPLES) then exit;
   if bufSamples <= 0 then exit;
   if (mixer = nil) then exit;
 
-  filldword(scratchBufferI32, bufSamples * 2, 0);
+  {note: I'm in two minds about this,
+   maybe we just always use the music buffer, and 'no music'
+   just means zero it out}
+
+  {intialize buffer with currently playing music (if any)}
+  if musicReader.isLoaded then begin
+    {todo: make an asm one of these}
+    loadBuffer_REF(musicBuffer.data+(mbReadPos mod MUSIC_BUFFER_SAMPLES)*4, bufSamples);
+    {advance our position within music buffer. Since music buffer length
+     is a multiple of the SB buffer, we will never up straddling the
+     start/end of the buffer}
+    mbReadPos += bufSamples;
+  end else begin
+    {this was the old method of just clearing the buffer, could do this
+    if no music is playing I guess..?}
+    filldword(scratchBufferI32, bufSamples * 2, 0);
+  end;
 
   {process each active channel}
   for j := 1 to NUM_CHANNELS do begin
@@ -246,7 +282,7 @@ begin
 
       if remainingBufferSamples <= 0 then continue;
 
-      processAudio:= processAudio_ASM;
+      processAudio := processAudio_ASM;
 
       // break audio into chunks so that process need not handle looping
       DEBUG_CHUNK_COUNTER := 0;
@@ -409,6 +445,71 @@ begin
 end;
 
 {-----------------------------------------------------}
+{ Music stuff }
+{-----------------------------------------------------}
+
+{ maybe move this into mixer? }
+
+procedure processNextMusicFrame();
+begin
+  if not musicReader.isLoaded then exit;
+  musicReader.nextFrame(musicBuffer, mbWritePos mod MUSIC_BUFFER_SAMPLES);
+  mbWritePos += musicReader.frameSize;
+end;
+
+function musicBufferFilled: single;
+var
+  framesDone, framesMax: integer;
+  sbSamples: int32;
+begin
+  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
+  if not musicReader.isLoaded then exit(-1);
+  framesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div musicReader.frameSize;
+  framesDone := (mbWritePos - mbReadPos) div musicReader.frameSize;
+  result := framesDone / framesMax;
+end;
+
+procedure musicUpdate(maxNewFrames: integer=4);
+var
+  framesDone, framesMax, framesAdded: integer;
+  sbSamples: int32;
+begin
+  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
+  if not musicReader.isLoaded then exit;
+  framesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div musicReader.frameSize;
+  framesDone := (mbWritePos - mbReadPos) div musicReader.frameSize;
+
+  {generate a few more frames as needed}
+  framesAdded := 0;
+  while (framesDone < framesMax-1) and (framesAdded < maxNewFrames) do begin
+    processNextMusicFrame();
+    inc(framesAdded);
+    inc(framesDone);
+  end;
+end;
+
+{plays background music. Music must be a compressed A96 file stored on disk.
+ this involves reading the entire (compressed) file into memory and then
+ decompressing the first part.}
+procedure musicPlay(filename: string);
+begin
+  if musicReader.isLoaded() then musicReader.close();
+  mbReadPos := 0;
+  mbWritePos := 0;
+  musicReader.load(filename);
+  {fill the buffer a bit}
+  musicUpdate(16);
+end;
+
+procedure musicStop();
+begin
+  mbReadPos := 0;
+  mbWritePos := 0;
+  musicReader.close();
+  {todo: either fade out the buffer, or just cut it?}
+  fillchar(musicBuffer.data^, musicBuffer.length*4, 0);
+end;
+{-----------------------------------------------------}
 
 constructor tSoundMixer.create();
 var
@@ -521,7 +622,7 @@ begin
   if MIX_ERRORS > 0 then
     warning(format(' - %d errors occured, the last of which was: %s', [MIX_ERRORS, MIX_ERROR_STR]));
   if MIX_NOTE_STR <> '' then
-    note(' - Last note:' + MIX_NOTE_STR);
+    note(' - last note:' + MIX_NOTE_STR);
   note(' - DR1:' + intToStr(DR1));
   note(' - DR2:' + intToStr(DR2));
   note(' - DR3:' + intToStr(DR3));
@@ -529,10 +630,20 @@ begin
   unlock_data(scratchBuffer, sizeof(scratchBuffer));
   unlock_data(scratchBufferF32, sizeof(scratchBufferF32));
   unlock_data(scratchBufferI32, sizeof(scratchBufferI32));
+  {clean up}
+  mixer.free;
+  musicBuffer.free;
 end;
 
-begin
+initialization
+
+  {music buffer must no smaller than SB buffer, and if larger, be a multiple}
+  assert((MUSIC_BUFFER_SAMPLES mod (BUFFER_SIZE div 4)) = 0);
+  assert(MUSIC_BUFFER_SAMPLES >= (BUFFER_SIZE div 4));
+
   mixer := tSoundMixer.create();
+  musicBuffer := tSoundEffect.create(AF_16_STEREO, MUSIC_BUFFER_SAMPLES); // holds 64k of sound
+  musicReader := tLA96Reader.create();
   initMixer();
   addExitProc(closeMixer);
 end.

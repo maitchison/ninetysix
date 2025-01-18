@@ -126,6 +126,8 @@ type
     procedure loadHeader();
   public
     constructor create();
+    function  isLoaded: boolean;
+    function  frameSize: integer;
     procedure load(filename: string); overload;
     procedure load(aStream: tStream); overload;
     destructor destroy(); override;
@@ -309,6 +311,17 @@ begin
     fs.free;
     fs := nil;
   end;
+  fillchar(header, sizeof(header), 0);
+end;
+
+function tLA96Reader.isLoaded: boolean;
+begin
+  result := header.numFrames > 0;
+end;
+
+function tLA96Reader.frameSize: integer;
+begin
+  result := header.frameSize;
 end;
 
 {read entire SFX out and return it uncompressed}
@@ -334,6 +347,8 @@ end;
 
 {decodes the next frame into sfx at given sample position.
  can be used to stream music compressed in memory.}
+{todo: this should be just writing to a pointer}
+{todo: remove timers and other stuff unless verbose is on}
 procedure tLA96Reader.nextFrame(sfx: tSoundEffect;sfxOffset: dword);
 var
   frameType: byte;

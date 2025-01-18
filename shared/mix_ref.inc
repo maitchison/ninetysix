@@ -13,6 +13,19 @@ begin
   end;
 end;
 
+{Copies a 16S source directly into the 32bit buffer (e.g. for initialization)}
+procedure loadBuffer_REF(samplePtr: pAudioSample16S; bufSamples: int32);
+var
+  i: int32;
+  left,right: int32;
+begin
+  for i := 0 to bufSamples-1 do begin
+    scratchBufferI32[i].left := samplePtr^.left*256;
+    scratchBufferI32[i].right := samplePtr^.right*256;
+    inc(samplePtr);
+  end;
+end;
+
 type
   tProcessAudioProc = function(
     af: tAudioFormat;

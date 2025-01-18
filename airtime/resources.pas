@@ -26,7 +26,6 @@ var
 
   {global resources}
   titleBackground: tPage;
-  music: tSoundEffect;
   startSFX: tSoundEffect;
 
   {car resources}
@@ -87,19 +86,17 @@ begin
 
   info('Loading Resources...');
 
+  {start with music... because why not :) }
+  if config.XMAS then
+    musicPlay('res\music2.a96')
+  else
+    musicPlay
+    ('res\music1.a96');
+
   {todo: store all resources in resource library, and address
    by a 'tag' (which is kind of like what i've started doing here}
 
   rl := tResourceLibrary.CreateOrLoad('resources.ini');
-
-  {music first}
-  if config.XMAS then
-    music := loadSound('music2')
-  else
-    music := loadSound('music1');
-
-  mixer.play(music, SCS_FIXED1);
-  mixer.channels[1].looping := true;
 
   if config.XMAS then
     titleBackground := tPage.Load('res\titleX.p96')
