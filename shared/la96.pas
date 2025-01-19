@@ -107,6 +107,7 @@ type
     log2mu: byte;
     postFilter: byte; {requested post processing highpass filter in KHZ}
     centering: byte;  {0=off, 8=on with 256 resolution}
+    function verStr: string;
   end;
 
   {todo: make a LA96Writer aswell (for progressive save)}
@@ -119,6 +120,7 @@ type
     ulawTable: array[1..8] of tULawLookup;
     midCodes, difCodes: tDwords;
     midSigns, difSigns: tDwords;
+    framePtr: tInt32s; {will be filled with -1 if no frame pointers}
     frameOn: int32;
     cLeft, cRight: single; {used for EMA}
   protected
@@ -130,11 +132,12 @@ type
     constructor create();
     function  isLoaded: boolean;
     function  frameSize: integer;
+    procedure seek(frameNumber: integer);
     procedure load(filename: string); overload;
     procedure load(aStream: tStream); overload;
     destructor destroy(); override;
     procedure close();
-    function  readSfx(): tSoundEffect;
+    function  readSFX(): tSoundEffect;
 
     procedure nextFrame(sfx: tSoundEffect;sfxOffset: dword);
   end;
@@ -158,9 +161,16 @@ var
 implementation
 
 const
-  VER_SMALL = 1;
+  VER_SMALL = 2;
   VER_BIG = 0;
   FRAME_SIZE = 1024;
+
+  {
+  changes
+  ---------------
+  v0.1: initial file format
+  v0.2: framePtr moved from footer to header
+  }
 
 type
   tFrameSpec = record
@@ -219,6 +229,11 @@ type
 { helpers }
 {-------------------------------------------------------}
 
+function tLA96FileHeader.verStr(): string;
+begin
+  result := utils.format('%d.%d', [versionBig, versionSmall]);
+end;
+
 {convert from +=0, -=1 to +=$00.., -=$FF..}
 procedure convertSigns(signs: tDwords);
 var
@@ -272,21 +287,52 @@ begin
   self.loadHeader();
 end;
 
+{seek to given frame within the file
+ requires framePtrs (v0.2+) to seek except for seek(0) which
+ is always supported.
+}
+procedure tLA96Reader.seek(frameNumber: integer);
+begin
+  {stub:}
+  note(format('seeking to %d', [frameNumber]));
+  if not isLoaded then error('Can not seek on file, as it is not loaded');
+  if looping then frameNumber := frameNumber mod header.numFrames;
+  if (frameNumber < 0) or (frameNumber >= header.numFrames) then
+    error(format('Tried to seek to frame %d/%d', [frameNumber+1, header.numFrames]));
+  if framePtr[frameNumber] < 0 then
+    error(format('Can not seek to position %d, as file has no framePtrs.', [frameNumber]));
+  fs.seek(framePtr[frameNumber]);
+  frameOn := frameNumber;
+end;
+
 procedure tLA96Reader.loadHeader();
 var
   startPos: int32;
   bits: integer;
+  i: integer;
 begin
   {first read header, and make sure everything is ok}
   startPos := fs.pos;
   fs.readBlock(header, sizeof(header));
 
   if header.tag <> 'LA96' then raise ValueError.create(format('Not an LA96 file. Found "%s", expecting LA96', [header.tag]));
-  if (header.versionSmall <> VER_SMALL) or (header.versionBig <> VER_BIG) then
+  if (header.versionSmall > VER_SMALL) or (header.versionBig <> VER_BIG) then
     raise ValueError.create(format('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]));
   if header.format <> 0 then raise ValueError.create(format('Format type %d not supported', [header.format]));
   if header.compressionMode <> 0 then raise ValueError.create('Compression not supported');
   if header.frameSize <> 1024 then raise ValueError.create('Framesize must be 1024');
+
+  fs.seek(startPos+128);
+
+  {read frame headers}
+  setLength(framePtr, header.numFrames);
+  if header.versionSmall >= 2 then begin
+    fs.readBlock(framePtr[0], header.numFrames*4)
+  end else begin
+    fillchar(framePtr[0], header.numFrames*4, $ff);
+    {atleast we know the position of the first frame}
+    framePtr[0] := fs.pos;
+  end;
 
   {setup our buffers}
   setLength(midCodes, header.frameSize-1);
@@ -298,8 +344,8 @@ begin
   for bits := low(ulawTable) to high(ulawTable) do
     ulawTable[bits].initDecode(bits, header.log2mu);
 
-  fs.seek(128+startPos);
-  frameOn := 0;
+  seek(0);
+
 end;
 
 destructor tLA96Reader.destroy();
@@ -449,7 +495,7 @@ begin
 
   if (frameOn = header.numFrames) and looping then begin
     frameOn := 0;
-    fs.seek(128);
+    seek(0);
   end;
 
   stopTimer('LA96_DF');
@@ -715,6 +761,7 @@ var
   signBits: array[0..(FRAME_SIZE-1)-1] of dword;
 
   fs: tStream;  // our file stream
+  fsEndPos: dword;
 
   counter: int32;
   numFrames: int32;
@@ -820,7 +867,7 @@ begin
   cMid := 0; cDif := 0;
   leftError := 0; rightError := 0;
 
-  framePtr := nil;
+  setLength(framePtr, numFrames);
 
   if profile.ulawBits > 0 then begin
     aspMid := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
@@ -865,6 +912,10 @@ begin
   while fs.pos < 128 do
     fs.writeByte(0);
 
+  {allocate some space for frame pointers}
+  for i := 0 to numFrames-1 do
+    fs.writeDWord(0);
+
   // -------------------------
   // Write Frames
 
@@ -908,7 +959,7 @@ begin
     end;
 
     {write frame header (one for each channel)}
-    framePtr.append(fs.pos);
+    framePtr[i] := fs.pos;
     fs.writeByte(profile.quantBits + profile.ulawBits*16);
     fs.writeByte(profile.quantBits + profile.ulawBits*16);
     fs.writeVLC(negEncode(aspMid.y));
@@ -1066,9 +1117,12 @@ begin
 
   end;
 
-  // -------------------------
-  // Write Footer
-  fs.writeVLCSegment(framePtr, PACK_BEST);
+  {go back and write pointers}
+  fsEndPos := fs.pos;
+  fs.seek(128);
+  for i := 0 to numFrames-1 do
+    fs.writeDWord(framePtr[i]);
+  fs.seek(fsEndPos);
 
   {clean up}
   aspMid.free;

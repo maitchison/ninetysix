@@ -6,6 +6,7 @@ type
   tBytes = array of byte;
   tWords = array of word;
   tDWords = array of dword;
+  tInt32s = array of int32;
   tStrings = array of string;
 
 type tDwordsHelper = record helper for tDwords

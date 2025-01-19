@@ -524,7 +524,7 @@ procedure musicSet(reader: tLA96Reader);
 begin
   mbWritePos := mbReadPos;
   musicReader := reader;
-  reader.seek(mbWritePos);
+  reader.seek(mbWritePos div reader.frameSize);
   {just need one frame to keep us going}
   musicUpdate(1);
 end;
