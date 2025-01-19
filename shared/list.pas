@@ -4,7 +4,7 @@ interface
 
 uses
   test,
-  types,
+  sysTypes,
   debug;
 
 type

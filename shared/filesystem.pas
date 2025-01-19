@@ -8,7 +8,7 @@ uses
   test,
   utils,
   list,
-  types,
+  sysTypes,
   dos;
 
 type

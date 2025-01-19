@@ -147,8 +147,7 @@ implementation
 
 uses
   debug,
-  test,
-  cpu;
+  test;
 
 var
   SEED: byte;
