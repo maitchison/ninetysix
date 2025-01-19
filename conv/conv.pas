@@ -23,8 +23,10 @@ const
   {if true exports compressed audio and deltas to wave files for analysis}
   EXPORT_WAVE: boolean = false;
 
+{globals}
 var
   screen: tScreen;
+  music16: tSoundEffect;    // our original sound.
 
 {--------------------------------------------------------}
 
@@ -512,14 +514,35 @@ begin
     until keyDown(key_esc);
 end;
 
+procedure maybeDelta(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+var
+  i: int32;
+  srcPtr: pAudioSample16S;
+begin
+  if not keyDown(key_leftshift) then exit;
+  srcPtr := (music16.data + (frameOn * 1024 * 4));
+  for i := 0 to frameLength-1 do begin
+    samplePtr^ := samplePtr^ - srcPtr^;
+    inc(samplePtr);
+    inc(srcPtr);
+  end;
+end;
+
 {play sound with some graphics}
 procedure soundPlayer();
 var
   readers: array of tLA96Reader;
-  music16: tSoundEffect;
   profiles: array of tAudioCompressionProfile;
   i: integer;
   tag: string;
+  selected: integer;
+
+  procedure setSelected(newSelected: integer);
+  begin
+    selected := newSelected;
+    musicSet(readers[selected]);
+  end;
+
 begin
 
   writeln('--------------------------');
@@ -541,6 +564,8 @@ begin
     readers[i] := tLA96Reader.create();
     readers[i].load(profileToTagName(PROFILES[i])+'.a96');
     readers[i].looping := true;
+    readers[i].frameGenHook := maybeDelta;
+    {note sure why this is required...}
     if i = 0 then musicPlay(profileToTagName(PROFILES[i])+'.a96');
   end;
 
@@ -554,14 +579,23 @@ begin
   videoDriver.setMode(640,480,32);
   screen := tScreen.create();
 
+  setSelected(0);
+
   {main loop}
   repeat
-    if keyDown(key_1) then musicSet(readers[0]);
-    if keyDown(key_2) then musicSet(readers[1]);
-    if keyDown(key_3) then musicSet(readers[2]);
+    {this one is just needed so that the buffers get cleared when shift
+     is down}
+    if keyDown(key_leftShift) then setSelected(selected);
+    for i := 0 to length(readers)-1 do
+      if keyDown(key_1+i) then setSelected(i);
     musicUpdate();
     if not keyDown(key_space) then begin
       screen.pageClear();
+      {note: if we did this from music buffer we could sync as we'd have
+       more samples... but it'd be slightly delayed}
+      screen.canvas.hline(0, 240, 640-1, RGBA.create(128, 128, 255));
+      screen.canvas.hline(0, 240-128, 640-1, RGBA.create(64, 64, 128));
+      screen.canvas.hline(0, 240+128, 640-1, RGBA.create(64, 64, 128));
       displayAudio((640-512) div 2, 240, screen.canvas, mixLib.scratchBufferPtr, 512);
       screen.pageFlip();
     end;

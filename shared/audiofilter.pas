@@ -26,8 +26,6 @@ function afDelta(s1,s2: tSoundEffect;phase: integer=0): tSoundEffect;
 var
   i: int32;
   deltaSample: tAudioSample16S;
-  sample1, sample2: tAudioSample16S;
-  RMS: double;
 begin
   assert(s1.length = s2.length);
   result := tSoundEffect.create(AF_16_STEREO, s1.length);

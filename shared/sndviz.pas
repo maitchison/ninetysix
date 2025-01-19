@@ -22,8 +22,8 @@ var
   leftColor, rightColor: RGBA;
   samplesRemaining: int32;
 begin
-  leftColor.init(255,0,0,128);
-  rightColor.init(0,255,0,128);
+  leftColor.init(64,128,64);
+  rightColor.init(128,96,64);
   prevLeft := 0; prevRight := 0;
   samplesRemaining := samples;
   for xlp := 0 to 640-1 do begin
@@ -32,6 +32,8 @@ begin
     right := samplePtr^.right div 256;
     page.vLine(atX+xlp, atY+prevLeft, atY+left, leftColor);
     page.vLine(atX+xlp, atY+prevRight, atY+right, rightColor);
+    //page.vLine(atX+xlp, atY, atY+left, leftColor);
+    //page.vLine(atX+xlp, atY, atY+right, rightColor);
     prevLeft := left;
     prevRight := right;
     inc(samplePtr, scale);

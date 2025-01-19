@@ -110,6 +110,8 @@ type
     function verStr: string;
   end;
 
+  tFrameFrameGenProc = procedure(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+
   {todo: make a LA96Writer aswell (for progressive save)}
   tLA96Reader = class
   private
@@ -128,6 +130,7 @@ type
     procedure loadHeader();
   public
     looping: boolean;
+    frameGenHook: tFrameFrameGenProc;
   public
     constructor create();
     function  isLoaded: boolean;
@@ -138,7 +141,6 @@ type
     destructor destroy(); override;
     procedure close();
     function  readSFX(): tSoundEffect;
-
     procedure nextFrame(sfx: tSoundEffect;sfxOffset: dword);
   end;
 
@@ -463,11 +465,10 @@ begin
     frameSpec.length := ((header.numSamples-1) mod header.frameSize)+1;
 
   sfxSamplePtr^ := generateSample(midCode, difCode, @frameSpec);
-  inc(sfxSamplePtr);
 
   startTimer('LA96_DF_Process');
   process_ASM(
-    sfxSamplePtr,
+    pointer(sfxSamplePtr)+4,
     midCode, difCode,
     midCodes, difCodes,
     midSigns, difSigns,
@@ -482,12 +483,16 @@ begin
   end;
   }
 
+  {todo: implement this as a frameGenHook}
   if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
     startTimer('LA96_DF_PostProcess');
     alpha := exp((-2 * pi * header.postFilter * 1000) / 44100);
     postProcessEMA(sfxSamplePtr, cLeft, cRight, frameSpec.length, alpha);
     stopTimer('LA96_DF_PostProcess');
   end;
+
+  if assigned(frameGenHook) then
+    frameGenHook(frameOn, sfxSamplePtr, frameSpec.length);
 
   inc(frameOn);
 
@@ -497,6 +502,7 @@ begin
   end;
 
   stopTimer('LA96_DF');
+
 
 end;
 
