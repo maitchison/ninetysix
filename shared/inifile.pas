@@ -4,7 +4,7 @@ unit inifile;
 interface
 
 uses
-  typinfo,
+  typinfo, //typInfo imports sysUtils, so remove it.
   debug,
   list,
   utils;

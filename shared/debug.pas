@@ -356,13 +356,16 @@ begin
 
   if assigned(ExceptProc) then begin
     {
-    sysutils removes runerrors, making it so that I can not hook the errorProc.
-    I could try to support exceptions, but for the moment just exit.
-    Also, we don't really want sysutils because...
+    sysutils is actually ok to use now, previously the issue was that
+      sysutils removes runerrors, making it so that I can not hook
+      the errorProc.
+    supporting exceptions properly will fully resolve this.
+    However, I don't really like using sysutils anyway because
       1. It's really big
       2. It's not in the 'stuff from 1996' theme
+    However it's fine for utility functions like go.
     }
-    warning('Sysutils has been detected, but not not compatiable with the debug unit.');
+    note('FYI has been detected, and does not work well with debug unit.');
   end;
 
   // Open Log File
