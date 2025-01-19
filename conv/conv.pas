@@ -15,6 +15,7 @@ uses
   vga,
   vesa,
   graph32,
+  sndViz,
   {other stuff}
   crt;
 
@@ -559,6 +560,11 @@ begin
     if keyDown(key_2) then musicSet(readers[1]);
     if keyDown(key_3) then musicSet(readers[2]);
     musicUpdate();
+    if not keyDown(key_space) then begin
+      screen.pageClear();
+      displayAudio((640-512) div 2, 240, screen.canvas, mixLib.scratchBufferPtr, 512);
+      screen.pageFlip();
+    end;
   until keyDown(key_esc);
 
   musicRestoreDefaultReader();

@@ -76,7 +76,7 @@ type
     procedure clearRegion(rect: tRect);
 
     procedure pageFlip();
-    procedure clear();
+    procedure pageClear();
 
     {dirty handling}
     procedure flipAll();
@@ -466,7 +466,8 @@ begin
   copyRegion(tRect.create(canvas.width, canvas.height));
 end;
 
-procedure tScreen.clear();
+{clears the entire page}
+procedure tScreen.pageClear();
 begin
   clearRegion(tRect.create(canvas.width, canvas.height));
 end;

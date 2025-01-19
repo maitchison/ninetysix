@@ -88,6 +88,8 @@ procedure musicStop();
 function  getMusicStats(): tMusicStats;
 procedure musicUpdate(maxNewFrames: integer=4);
 
+function scratchBufferPtr: pAudioSample16S;
+
 implementation
 
 uses
@@ -99,7 +101,7 @@ const
 
 var
   {global buffers and stuff}
-  scratchBuffer: array[0..MAX_MIXER_SAMPLES-1] of tAudioSample;
+  scratchBuffer: array[0..MAX_MIXER_SAMPLES-1] of tAudioSample16S;
   scratchBufferF32: array[0..MAX_MIXER_SAMPLES-1] of tAudioSampleF32;
   scratchBufferI32: array[0..MAX_MIXER_SAMPLES-1] of tAudioSampleI32; {$align 8}
   noiseCounter: dword;
@@ -488,6 +490,12 @@ begin
   musicTimer.stop(musicReader.frameSize * framesProcessed);
 end;
 
+{returns pointer to scratch buffer. Use with caution}
+function scratchBufferPtr: pAudioSample16S;
+begin
+  result := @scratchBuffer[0];
+end;
+
 function getMusicStats: tMusicStats;
 var
   sbSamples: int32;
@@ -522,11 +530,11 @@ end;
  }
 procedure musicSet(reader: tLA96Reader);
 begin
-  mbWritePos := mbReadPos;
+  mbWritePos := mbReadPos + 1024;
   musicReader := reader;
   reader.seek(mbWritePos div reader.frameSize);
-  {just need one frame to keep us going}
-  musicUpdate(1);
+  {just need a few frames to keep us going}
+  musicUpdate(4);
 end;
 
 procedure musicRestoreDefaultReader();
