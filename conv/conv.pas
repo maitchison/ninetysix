@@ -399,6 +399,7 @@ begin
     ACP_Q10, ACP_Q12, ACP_Q16
   ];
 
+  writeln();
   writeln('--------------------------');
   writeln('Loading Source Music.');
   music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
@@ -409,7 +410,7 @@ begin
   setLength(deltaSfx, length(deltaSFX)+1);
   deltaSFX[length(deltaSFX)-1] := music16;
 
-  (*
+  writeln();
   writeln('--------------------------');
   writeln('Compressing....');
   LA96_ENABLE_STATS := false;
@@ -423,10 +424,10 @@ begin
       outStream.free;
     end;
   end;
-  *)
 
   music16.tag := 'original';
 
+  writeln();
   writeln('--------------------------');
   writeln('Reading compressed files...');
 
@@ -582,6 +583,7 @@ begin
   runTestSuites();
   initKeyboard();
 
+  //testCompression();
   soundPlayer();
 
   textAttr := LIGHTGRAY;

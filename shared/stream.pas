@@ -482,6 +482,8 @@ procedure tStream.seek(aPos: dword; aMidByte: boolean=False);
 begin
   fPos := aPos;
   midByte := aMidByte;
+  {note: we'll get an error if we seek beyond capacity}
+  if bytesUsed < fPos then bytesUsed := fPos;
 end;
 
 {write a variable length encoded token

@@ -293,8 +293,6 @@ end;
 }
 procedure tLA96Reader.seek(frameNumber: integer);
 begin
-  {stub:}
-  note(format('seeking to %d', [frameNumber]));
   if not isLoaded then error('Can not seek on file, as it is not loaded');
   if looping then frameNumber := frameNumber mod header.numFrames;
   if (frameNumber < 0) or (frameNumber >= header.numFrames) then
