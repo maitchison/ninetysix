@@ -352,6 +352,30 @@ var
   selection: integer;
   delta: boolean;
   tag: string;
+  star: string;
+
+  procedure redrawUI();
+  var
+    i: integer;
+  begin
+    clrscr;
+    writeln(format('Press [0..%d] to select audio file.', [length(outSFX)-1]));
+
+    for i := 0 to length(outSFX)-1 do begin
+      if selection = i then
+        star := ' * '
+      else
+        star := '   ';
+      writeln(format('%s[%d] %s',[star, i, outSFX[i].tag]));
+    end;
+  end;
+
+  procedure setSelection(newSelection: integer);
+  begin
+    if selection = newSelection then exit;
+    selection := newSelection;
+    redrawUI();
+  end;
 
 begin
 
@@ -364,18 +388,19 @@ begin
   ];
 
   writeln('--------------------------');
-  writeln('Loading music.');
+  writeln('Loading Source Music.');
   music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
-
-  writeln('--------------------------');
-  writeln('Compressing.');
-  LA96_ENABLE_STATS := false;
 
   setLength(outSfx, length(outSFX)+1);
   outSFX[length(outSFX)-1] := music16;
   setLength(deltaSfx, length(deltaSFX)+1);
   deltaSFX[length(deltaSFX)-1] := music16;
+
+  (*
+  writeln('--------------------------');
+  writeln('Compressing....');
+  LA96_ENABLE_STATS := false;
 
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
@@ -386,13 +411,15 @@ begin
       outStream.free;
     end;
   end;
+  *)
 
   music16.tag := 'original';
 
   writeln('--------------------------');
-  writeln('Read compressed file.');
+  writeln('Reading compressed files...');
 
   for profile in PROFILES do begin
+    startTimer('decode');
     tag := profileToTagName(profile);
     {read it}
     reader := tLA96Reader.create();
@@ -402,13 +429,15 @@ begin
     outSFX[length(outSFX)-1] := curSFX;
     curSFX.tag := tag; //shouldn't be needed. but is for some reason
     reader.free;
+    stopTimer('decode');
     {find delta}
-    errSFX := afDelta(outSFX[length(outSFX)-1], music16);
+    errSFX := afDelta(curSFX, music16);
     setLength(deltaSFX, length(deltaSFX)+1);
     deltaSFX[length(deltaSFX)-1] := errSFX;
     {rms}
     writeln(format('FILE RMS: %f',[curSFX.calculateRMS()]));
     writeln(format('ERROR RMS: %f',[errSFX.calculateRMS()]));
+    writeln(format('Decoded at %fx', [(curSFX.length/44100)/getTimer('decode').elapsed]));
     {export}
     if EXPORT_WAVE then begin
       curSFX.saveToWave(tag+'.wav');
@@ -421,22 +450,22 @@ begin
   {start playing sound}
   mixer.play(outSFX[0], SCS_FIXED1); writeln(outSFX[0].tag);
   mixer.channels[1].looping := true;
-  writeln('Done.');
+  writeln('All done.');
 
-  selection := 0;
   delta := false;
+  selection := 0;
+  redrawUI();
 
   repeat
-    if keyDown(key_0) then selection := 0;
+    if keyDown(key_0) then setSelection(0);
     delta := keyDown(key_leftshift);
-    for i := 1 to 8 do
-      if keyDown(key_1+i-1) then selection := i;
+    for i := 1 to length(outSFX)-1 do
+      if keyDown(key_1+i-1) then setSelection(i);
     if selection = 0 then
       mixer.channels[1].sfx := outSFX[0]
     else begin
       if delta then mixer.channels[1].sfx := deltaSFX[selection] else mixer.channels[1].sfx := outSFX[selection];
     end;
-
     until keyDown(key_esc);
 end;
 
@@ -444,6 +473,7 @@ end;
 procedure testADPCM();
 var
   music16, musicL, musicD: tSoundEffect;
+  i: integer;
 
 begin
 
@@ -461,6 +491,7 @@ begin
   mixer.channels[1].looping := true;
 
   repeat
+    writeln(mixer.channels[1].sfx.tag);
     if keyDown(key_1) then mixer.channels[1].sfx := musicL;
     if keyDown(key_2) then mixer.channels[1].sfx := music16;
     if keyDown(key_3) then mixer.channels[1].sfx := musicD;
