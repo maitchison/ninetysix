@@ -10,11 +10,22 @@ uses
   keyboard,
   timer,
   stream,
+  {graphics stuff}
+  screen,
+  vga,
+  vesa,
+  graph32,
+  {other stuff}
   crt;
 
 const
   {if true exports compressed audio and deltas to wave files for analysis}
   EXPORT_WAVE: boolean = false;
+
+var
+  screen: tScreen;
+
+{--------------------------------------------------------}
 
 function sign(x: integer): integer; overload;
 begin
@@ -496,8 +507,63 @@ begin
     if keyDown(key_1) then mixer.channels[1].sfx := musicL;
     if keyDown(key_2) then mixer.channels[1].sfx := music16;
     if keyDown(key_3) then mixer.channels[1].sfx := musicD;
-
     until keyDown(key_esc);
+end;
+
+{play sound with some graphics}
+procedure soundPlayer();
+var
+  readers: array of tLA96Reader;
+  music16: tSoundEffect;
+  profiles: array of tAudioCompressionProfile;
+  i: integer;
+  tag: string;
+begin
+
+  writeln('--------------------------');
+  writeln('Loading Source Music.');
+  music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
+  note(format('Source RMS: %f',[music16.calculateRMS()]));
+
+  writeln('--------------------------');
+  writeln('Reading compressed files...');
+
+  profiles := [
+    ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
+    ACP_Q10, ACP_Q12, ACP_Q16
+  ];
+
+  setLength(readers, length(PROFILES));
+
+  for i := 0 to length(PROFILES)-1 do begin
+    readers[i] := tLA96Reader.create();
+    readers[i].load(profileToTagName(PROFILES[i])+'.a96');
+    readers[i].looping := true;
+    if i = 0 then musicPlay(profileToTagName(PROFILES[i])+'.a96');
+  end;
+
+  {set video}
+  enableVideoDriver(tVesaDriver.create());
+  if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
+    error('Requires VESA 2.0 or greater.');
+  if (tVesaDriver(videoDriver).videoMemory) < 2*1024*1024 then
+    error('Requires 2MB video card.');
+
+  videoDriver.setMode(640,480,32);
+  screen := tScreen.create();
+
+  {main loop}
+  repeat
+    if keyDown(key_1) then musicSet(readers[0]);
+    if keyDown(key_2) then musicSet(readers[1]);
+    if keyDown(key_3) then musicSet(readers[2]);
+    musicUpdate();
+  until keyDown(key_esc);
+
+  musicRestoreDefaultReader();
+
+  videoDriver.setText();
+
 end;
 
 var
@@ -516,7 +582,7 @@ begin
   runTestSuites();
   initKeyboard();
 
-  testCompression();
+  soundPlayer();
 
   textAttr := LIGHTGRAY;
 

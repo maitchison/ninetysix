@@ -12,6 +12,7 @@ uses
   sound,
   timer,
   sysInfo,
+  la96,
   go32;
 
 CONST
@@ -81,6 +82,8 @@ const
 
 function  mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 procedure musicPlay(filename: string);
+procedure musicSet(reader: tLA96Reader);
+procedure musicRestoreDefaultReader();
 procedure musicStop();
 function  getMusicStats(): tMusicStats;
 procedure musicUpdate(maxNewFrames: integer=4);
@@ -89,7 +92,6 @@ implementation
 
 uses
   keyboard, {stub}
-  la96,
   sbdriver;
 
 const
@@ -107,7 +109,8 @@ var
   musicBuffer: tSoundEffect;
   mbReadPos, mbWritePos: dword;
   {handles reading music.}
-  musicReader: tLA96Reader;
+  musicReader: tLA96Reader; {the current one}
+  masterMusicReader: tLA96Reader; {another reference to musicReader (which might get modified)}
   musicTimer: tTimer;
 
   // debug registers, used to indicate errors during interupt.
@@ -512,6 +515,25 @@ begin
   musicUpdate(256);
 end;
 
+{This is a bit dodgy, but set the music reader directly.
+ This can be used to quickly switch between different compressed
+ sources (e.g. for AB testing)
+ Call musicRestoreDefaultReader() to restore the default one.
+ }
+procedure musicSet(reader: tLA96Reader);
+begin
+  mbWritePos := mbReadPos;
+  musicReader := reader;
+  reader.seek(mbWritePos);
+  {just need one frame to keep us going}
+  musicUpdate(1);
+end;
+
+procedure musicRestoreDefaultReader();
+begin
+  musicSet(masterMusicReader);
+end;
+
 procedure musicStop();
 begin
   mbReadPos := 0;
@@ -650,14 +672,18 @@ initialization
 
   musicTimer := tTimer.create('music');
 
+  mbReadPos := 0;
+  mbWritePos := 0;
+
   {music buffer must no smaller than SB buffer, and if larger, be a multiple}
   assert((MUSIC_BUFFER_SAMPLES mod (BUFFER_SIZE div 4)) = 0);
   assert(MUSIC_BUFFER_SAMPLES >= (BUFFER_SIZE div 4));
 
   mixer := tSoundMixer.create();
   musicBuffer := tSoundEffect.create(AF_16_STEREO, MUSIC_BUFFER_SAMPLES); // holds 64k of sound
-  musicReader := tLA96Reader.create();
-  musicReader.looping := true;
+  masterMusicReader := tLA96Reader.create();
+  masterMusicReader.looping := true;
+  musicReader := masterMusicReader;
   initMixer();
   addExitProc(closeMixer);
 
