@@ -169,7 +169,7 @@ end;
 {returns the default checkpoint path}
 function tCheckpoint.defaultCheckpointPath: string;
 begin
-  result := tMyDateTime(date).YYMMDD('')+'_'+tMyDateTime(date).HHMMSS('')+'.txt'
+  result := tMyDateTime(date).YYYYMMDD('')+'_'+tMyDateTime(date).HHMMSS('')+'.txt'
 end;
 
 {loads checkpoint from a standard folder.}

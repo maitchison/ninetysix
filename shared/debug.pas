@@ -119,7 +119,7 @@ begin
   LogEntries[LogCount] := entry;
   {Write to disk}
   If (level >= VERBOSE_LOG) and logFileOpen then begin
-    writeln(logFile, tMyDateTime(entry.time).YYMMDD + ' ' +tMyDateTime(entry.time).HHMMSS + ' ' + entry.toString);
+    writeln(logFile, tMyDateTime(entry.time).YYYYMMDD + ' ' +tMyDateTime(entry.time).HHMMSS + ' ' + entry.toString);
     flush(logFile);
   end;
 

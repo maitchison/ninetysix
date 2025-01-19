@@ -395,7 +395,8 @@ begin
   for profile in PROFILES do begin
     tag := profileToTagName(profile);
     {read it}
-    reader := tLA96Reader.create(tag+'.a96');
+    reader := tLA96Reader.create();
+    reader.load(tag+'.a96');
     curSFX := reader.readSFX();
     setLength(outSFX, length(outSFX)+1);
     outSFX[length(outSFX)-1] := curSFX;
@@ -476,7 +477,7 @@ begin
 
   clrscr;
   textAttr := WHITE;
-  debug.WRITE_TO_SCREEN := true;
+  debug.VERBOSE_SCREEN := llNote;
   logDPMIInfo();
 
   runTestSuites();

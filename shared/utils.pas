@@ -42,6 +42,7 @@ type
 
     class function FromDosTC(dosTime: dword): tMyDateTime; static;
 
+    function YYYYMMDD(sep: string='-'): string;
     function YYMMDD(sep: string='-'): string;
     function HHMMSS(sep: string=':'): string;
   end;
@@ -988,12 +989,21 @@ begin
   result := encodeDate(Year, Month, Day) + encodeTime(Hour, Minute, Second, 0);
 end;
 
+function TMyDateTime.YYYYMMDD(sep: string='-'): string;
+var
+  y,m,d: word;
+begin
+  DecodeDate(y,m,d);
+  result := IntToStr(y, 4, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(d, 2, '0');
+end;
+
+{ops.. old had a bug where it was yyyymmdd, will rename and fixup later}
 function TMyDateTime.YYMMDD(sep: string='-'): string;
 var
   y,m,d: word;
 begin
   DecodeDate(y,m,d);
-  result := IntToStr(y, 2, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(d, 2, '0');
+  result := IntToStr(y mod 100, 2, '0') + sep + IntToStr(m, 2, '0') + sep + IntToStr(d, 2, '0');
 end;
 
 function TMyDateTime.HHMMSS(sep: string=':'): string;

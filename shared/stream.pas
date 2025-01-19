@@ -453,7 +453,7 @@ begin
   assignFile(f, fileName);
   system.reset(f,1);
   ioError := IOResult; if ioError <> 0 then error(format('Could not open file "%s" for reading, Error:%s', [filename, getIOErrorString(ioError)]));
-  {$+}
+  {$i+}
 
   setCapacity(fileSize(f));
   bytesRemaining := filesize(f);
