@@ -20,6 +20,7 @@ fpc @fp.cfg -dNORMAL -B -v0 go.pas
 IF ERRORLEVEL 1 goto :buildError
 
 copy go.exe %BIN_DIR%\go.exe
+goto :end
 
 :buildError
 
