@@ -282,7 +282,7 @@ begin
   SAMPLE_LENGTH := 44100 * 60;
 
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing 320kbps.wav', SAMPLE_LENGTH);
+  music16 := tSoundEffect.loadFromWave('snd\sample.wav', SAMPLE_LENGTH);
   mixer.play(music16, SCS_FIXED1);
   mixer.channels[1].looping := true;
   writeln('Processing.');
@@ -333,7 +333,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'c:\dev\tmp\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  result := 'snd\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
 procedure testCompression();
@@ -358,6 +358,7 @@ var
   var
     i: integer;
   begin
+    textAttr := White + Blue*16;
     clrscr;
     writeln(format('Press [0..%d] to select audio file.', [length(outSFX)-1]));
 
@@ -389,7 +390,7 @@ begin
 
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
+  music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   setLength(outSfx, length(outSFX)+1);
@@ -479,9 +480,9 @@ begin
 
   writeln('--------------------------');
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample.wav', 10*44100);
+  music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
-  musicL := tSoundEffect.loadFromWave('c:\dev\masters\bearing sample (ADPCM).wav', 10*44100);
+  musicL := tSoundEffect.loadFromWave('snd\smample_ADPCM.wav', 10*44100);
   musicD := afDelta(music16, musicL);
   {rms}
   writeln(format('ERROR RMS: %f',[musicD.calculateRMS()]));
@@ -506,21 +507,17 @@ begin
 
   autoHeapSize();
 
+  textAttr := White + Blue*16;
   clrscr;
-  textAttr := WHITE;
+
   debug.VERBOSE_SCREEN := llNote;
   logDPMIInfo();
 
   runTestSuites();
   initKeyboard();
 
-  //testADPCM();
   testCompression();
-  //ABTest();
 
   textAttr := LIGHTGRAY;
-
-  {silly bug in dosbox not showing video}
-  for i := 0 to 25 do writeln();
 
 end.
