@@ -1,4 +1,4 @@
-{Test Video (and image) compression.}
+{(the old) Test Video (and image) compression.}
 program video;
 
 {scores:
@@ -43,7 +43,10 @@ uses
   font,
   gui,
   stream,
-  screen;
+  screen,
+  vga,
+  vesa
+  ;
 
 TYPE
   TColorSelectionMode = (MinMax, Iterative, Descent, AllPairs);
@@ -103,6 +106,7 @@ var
   x: double;
   y: integer;
   arr: Array of Integer;
+  i: integer;
 begin
   SetLength(arr, n);
   for i := 1 to n do begin
@@ -117,6 +121,8 @@ begin
 end;
 
 procedure TByteDeltaMapping.print();
+var
+  i: integer;
 begin
   for i := 0 to Length(Decode)-1 do begin
     WriteLn(Format('%d -> %d', [i, Decode[i]]));
@@ -182,35 +188,39 @@ begin
 
 end;
 
-
-procedure Draw(page: TPage; atX, atY: int32);
+{todo: remove this, and use screen}
+procedure draw(page: tPage; atX, atY: int32);
 var
   y: integer;
   ScreenOffset: dword;
   ImageOffset: dword;
+  lfbSeg: word;
+  pageWidth: word;
 begin
   {note: not very safe if clipping occurs}
-  ScreenOffset := (atX + (atY * SCREEN_WIDTH)) * 4;
+  ScreenOffset := (atX + (atY * videoDriver.width)) * 4;
   ImageOffset := dword(page.Pixels);
+  lfbSeg := videoDriver.LFB_SEG;
+  pageWidth := page.width;
   for y := 0 to page.Height-1 do begin
     asm
-      pusha
+      pushad
       push es
 
-      mov es,  [LFB_SEG]
+      mov es,  LFBSEG
       mov edi, ScreenOffset
       mov esi, ImageOffset
       xor ecx, ecx
-      mov cx,  page.Width
+      mov cx,  PAGEWIDTH
 
       rep movsd
 
       pop es
-      popa
+      popad
 
     end;
-    ScreenOffset += SCREEN_WIDTH*4;
-    ImageOffset += page.Width*4;
+    screenOffset += videoDriver.width*4;
+    imageOffset += page.width*4;
   end;
 end;
 
@@ -233,21 +243,24 @@ procedure Draw2X(src, dst: TPage; atX, atY: int32);
 var
   y: integer;
   srcOffset, dstOffset: dword;
+  srcWidth, dstWidth: word;
 begin
   {note: not very safe if clipping occurs}
   dstOffset := dword(dst.Pixels) + (atX + (atY * dst.width)) * 4;
   srcOffset := dword(src.Pixels);
+  srcWidth := src.width;
+  dstWidth := dst.width;
   for y := 0 to src.height-1 do begin
     asm
-      pusha
+      pushad
 
       mov esi, srcOffset
       mov edi, dstOffset
 
-      mov cx,  src.width
+      mov cx,  SRCWIDTH
 
       xor ebx, ebx
-      mov bx,  dst.width
+      mov bx,  DSTWIDTH
       shl ebx, 2
 
     @LOOP:
@@ -264,7 +277,7 @@ begin
       dec cx
       jnz @LOOP
 
-      popa
+      popad
 
     end;
     srcOffset += src.width*4;
@@ -424,7 +437,7 @@ const
   NUM_UPDATES = 100;
 begin
 
-  SetText();
+  videoDriver.setText();
 
   SelectPatchAt(100, 52);
   SelectedPatch.SolveMinMax();
@@ -507,9 +520,15 @@ begin
 end;
 
 procedure RunMainLoop();
+var
+  LFBSEG: word;
+  canvasPixels: pointer;
 begin
 
-  SetMode(640,480,32);
+  canvasPixels := canvas.pixels;
+
+  videoDriver.setMode(640,480,32);
+  LFBSEG := videoDriver.LFB_SEG;
 
   InitMouse();
 
@@ -574,15 +593,15 @@ begin
 
     {flip page}
     asm
-      pusha
+      pushad
       push es
-      mov es,  LFB_SEG
+      mov es,  LFBSEG
       mov edi,  0
-      mov esi, canvas.pixels
+      mov esi, CANVASPIXELS
       mov ecx, 640*480
       rep movsd
       pop es
-      popa
+      popad
       end;
 
     until keyDown(Key_Q) or keyDown(Key_ESC);
@@ -592,9 +611,9 @@ begin
   Info(Format('Compression took %fs', [totalCompressTime]));
   Info(Format('Decompression took %fs', [totalDecompressTime]));
 
-  outStream.writeToDisk('out.dat');
+  outStream.writeToFile('out.dat');
 
-  SetText();
+  videoDriver.setText();
 
   PrintLog();
 
