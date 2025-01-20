@@ -334,7 +334,7 @@ begin
 
   px := CurrentPatch mod 80;
   py := CurrentPatch div 80;
-  patch := TPatch.Create(imgOrg, px*4, py*4, PCD_24);
+  patch := TPatch.Create(imgOrg, px*4, py*4, PCD_VLC);
 
   startTime := getSec;
   patch.Map();

@@ -17,7 +17,7 @@ type
   TPatchColors = packed array[0..3] of RGBA;
   TPatchIndexes = packed array[0..3, 0..3] of byte;
 
-  TPatchColorDepth = (PCD_24,PCD_16);
+  TPatchColorDepth = (PCD_VLC, PCD_24,PCD_16);
 
   TPatch = record
 
@@ -66,13 +66,22 @@ end;
 procedure TPatch.writeBytes(dst: tStream);
 var
   i: integer;
+  data: array[0..5] of dword;
 begin
-  {note: patch bytes exclude type, as this it stored elsewher}
+  {note: patch bytes exclude type, as this it stored elsewhere}
 
   case ColorDepth of
+    PCD_VLC: begin
+      data[0] := color[0].r;
+      data[1] := color[0].g;
+      data[2] := color[0].b;
+      data[3] := color[1].r;
+      data[4] := color[1].g;
+      data[5] := color[1].b;
+      dst.writeVLCSegment(data);
+    end;
     PCD_24:
       for i := 0 to 1 do begin
-        {todo: try interleaving these}
         dst.writeByte(color[i].r);
         dst.writeByte(color[i].g);
         dst.writeByte(color[i].b);
@@ -86,7 +95,6 @@ begin
     dst.writeByte(idx[i,0] or (idx[i,1] shl 2) or (idx[i,2] shl 4) or (idx[i,3] shl 6));
 
 end;
-
 
 procedure TPatch.InterpolateColors();
 var
