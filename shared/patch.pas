@@ -595,6 +595,143 @@ begin
   writeTo(img, self.atX, self.atY);
 end;
 
+(*
+{just a bit of scratch space to work out how the decoder will look}
+procedure WritePatchAbs_ASM(pixelsPtr: pointer; pixelsStride: int32; patch: tPage);
+begin
+
+  {note: to get to this point we would need to decode the frame, which
+   if using VLC is slow... so maybe don't do that? Or simply it a lot}
+
+  {absolute decoder, this should be very fast}
+
+  {inputs:}
+  {BASECOLORS should be array of 2 dwords}
+  {ONETHIRD should be 65536/3 = 11855}
+
+  asm
+    pushad
+
+    {
+      ----------------------------
+      Color Interpolation
+      ----------------------------
+
+      Input is 2 RGB color values
+      output is 4 RGB color values
+
+      ESI
+      EDI
+
+      EAX
+      EBX
+      ECX
+      EDX
+
+      MM0   tmp
+      MM1   A
+      MM2   B
+      MM3   A*0.33
+      MM4   B*0.33
+      MM5   A*0.66
+      MM6   B*0.66
+      MM7   ONETHIRD
+
+
+    }
+
+      movd      mm0, BASECOLORS[0]
+      pxor      mm1, mm1
+      punpcklbw mm0, mm1                  // mm1 = [A] 0a0r0g0b
+
+      movd      mm0, BASECOLORS[4]
+      pxor      mm2, mm2
+      punpcklbw mm0, mm2                  // mm2 = [B] 0a0r0g0b
+
+      movq      mm7, ONETHIRD
+
+      movq      mm3, mm1
+      pmulhw    mm3, mm7                  // mm3 = 0.33 * A
+      movq      mm4, mm2
+      pmulhw    mm4, mm7                  // mm4 = 0.33 * B
+
+      psllw     mm7
+
+      movq      mm5, mm1
+      pmulhw    mm5, mm7                  // mm5 = 0.66 * A
+      movq      mm6, mm2
+      pmulhw    mm6, mm7                  // mm6 = 0.66 * B
+
+      {write out the values}
+      packuswb  mm1, mm1
+      movd      COLORS[0], mm1
+      paddw     mm5, mm4                  // mm5 = 0.66A+0.33B
+      packuswb  mm5, mm5
+      movd      COLORS[1], mm5
+      paddw     mm6, mm3                  // mm6 = 0.33A+0.66B
+      packuswb  mm6, mm6
+      movd      COLORS[2], mm6
+      packuswb  mm2, mm2
+      movd      COLORS[3], mm1
+
+      //mm1 = [A]rgba [B]rgba
+
+    {
+      ----------------------------
+      Write out values
+      ----------------------------
+
+      ESI   Color
+      EDI   PixelsPtr
+
+      EAX   tmp (used for pixel color)
+      EBX   used for index into color
+      ECX   loop
+      EDX   indices
+    }
+
+    mov esi, IDX
+    mov edx, [esi]
+    mov esi, COLOR
+    mov edi, PIXELS
+
+    mov ecx, 4
+
+    xor ebx, ebx
+
+    {I think I could interleave these to get close to 2x perfomance?
+     this would take a few registers though}
+  @ROW_LOOP:
+    mov bl, dl
+    and bl, $03
+    mov eax, [esi+ebx*4]
+    shr edx, 2
+    mov [edi+0], eax
+    mov bl, dl
+    and bl, $03
+    mov eax, [esi+ebx*4]
+    shr edx, 2
+    mov [edi+4], eax
+    mov bl, dl
+    and bl, $03
+    mov eax, [esi+ebx*4]
+    shr edx, 2
+    mov [edi+8], eax
+    mov bl, dl
+    and bl, $03
+    mov eax, [esi+ebx*4]
+    shr edx, 2
+    mov [edi+12], eax
+
+    add edi, PIXELSTRIDE
+    dec ecx
+    jnz @ROW_LOOP
+
+    popad
+  end;
+end;
+*)
+
 procedure TPatch.WriteTo(img: Tpage; atX, atY: integer); overload;
 var
   x,y: integer;
