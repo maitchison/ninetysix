@@ -49,7 +49,7 @@ uses
   ;
 
 TYPE
-  TColorSelectionMode = (MinMax, Iterative, Descent, AllPairs);
+  TColorSelectionMode = (CSM_MINMAX, CSM_ITERATIVE, CSM_DESCENT, CSM_ALLPAIRS);
 
 
 CONST
@@ -57,7 +57,7 @@ CONST
   ALPHA = 0.95;
   T0 = 100;
 
-  COLOR_SELECTION_MODE: TColorSelectionMode = Descent;
+  COLOR_SELECTION_MODE: TColorSelectionMode = CSM_DESCENT;
 
 var
   startTime: double;
@@ -340,19 +340,19 @@ begin
   patch.Map();
 
   case COLOR_SELECTION_MODE of
-    MinMax:
+    CSM_MINMAX:
       patch.SolveMinMax();
-    Iterative: begin
+    CSM_ITERATIVE: begin
       {an ok starting point}
       patch.SolveMinMax();
       for i := 1 to MAX_OPTIMIZATION_STEPS do
         patch.SolveIterative(T0*Power(ALPHA,i));
       end;
-    Descent: begin
+    CSM_DESCENT: begin
       patch.SolveMinMax();
       patch.SolveDescent(MAX_OPTIMIZATION_STEPS);
     end;
-    AllPairs:
+    CSM_ALLPAIRS:
       patch.SolveAllPairs();
   end;
 
@@ -533,14 +533,12 @@ begin
   InitMouse();
 
   asm
-    push es
-    pusha
-    mov edi, canvas.pixels
+    pushad
+    mov edi, CANVASPIXELS
     mov ecx, 640*480
     mov eax, $0007F00;
     rep stosd
-    popa
-    pop es
+    popad
     end;
 
   {set current selected patch}
