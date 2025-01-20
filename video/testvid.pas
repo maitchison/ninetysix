@@ -1,5 +1,5 @@
 {(the old) Test Video (and image) compression.}
-program video;
+program testvid;
 
 {scores:
 Start: 88.97 (0.25s to compress, 28.74 db)
@@ -502,7 +502,7 @@ begin
   MAP8BIT.init(GenerateEncodeTable(128));
 
   startTime := now;
-  imgOrg := LoadBMP('video\frames_0001.bmp');
+  imgOrg := LoadBMP('..\masters\video\frames_0001.bmp');
 
   imgCmp := TPage.Create(imgOrg.Width, imgOrg.Height);
   imgErr := TPage.Create(imgOrg.Width, imgOrg.Height);
@@ -516,7 +516,6 @@ begin
   Info(Format('Read file in %f seconds', [elapsed]));
   Info(Format('Source image is %dx%d', [imgOrg.width, imgOrg.height]));
 
-
 end;
 
 procedure RunMainLoop();
@@ -527,6 +526,7 @@ begin
 
   canvasPixels := canvas.pixels;
 
+  enableVideoDriver(tVesaDriver.create());
   videoDriver.setMode(640,480,32);
   LFBSEG := videoDriver.LFB_SEG;
 
