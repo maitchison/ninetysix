@@ -597,17 +597,22 @@ end;
 
 (*
 {just a bit of scratch space to work out how the decoder will look}
-procedure WritePatchAbs_ASM(pixelsPtr: pointer; pixelsStride: int32; patch: tPage);
+procedure WritePatchDelta_ASM(pixelsPtr: pointer; pixelsStride: int32; patch: tPage);
+var
+  {just to simplify transfer to asm}
+  COLORS: array[0..3] of dword;
+  COLORA, COLORB: dword;
+  IDX: dword;
+const
+  ONETHIRD: array[0..3] of word = [11855, 11855, 11855, 11855];
 begin
 
   {note: to get to this point we would need to decode the frame, which
    if using VLC is slow... so maybe don't do that? Or simply it a lot}
 
-  {absolute decoder, this should be very fast}
-
-  {inputs:}
-  {BASECOLORS should be array of 2 dwords}
-  {ONETHIRD should be 65536/3 = 11855}
+  //COLORA := ...
+  //COLORB := ...
+  //IDX := ...
 
   asm
     pushad
@@ -640,41 +645,41 @@ begin
 
     }
 
-      movd      mm0, BASECOLORS[0]
-      pxor      mm1, mm1
-      punpcklbw mm0, mm1                  // mm1 = [A] 0a0r0g0b
+    movd      mm0, BASECOLORS[0]
+    pxor      mm1, mm1
+    punpcklbw mm0, mm1                  // mm1 = [A] 0a0r0g0b
 
-      movd      mm0, BASECOLORS[4]
-      pxor      mm2, mm2
-      punpcklbw mm0, mm2                  // mm2 = [B] 0a0r0g0b
+    movd      mm0, BASECOLORS[4]
+    pxor      mm2, mm2
+    punpcklbw mm0, mm2                  // mm2 = [B] 0a0r0g0b
 
-      movq      mm7, ONETHIRD
+    movq      mm7, ONETHIRD
 
-      movq      mm3, mm1
-      pmulhw    mm3, mm7                  // mm3 = 0.33 * A
-      movq      mm4, mm2
-      pmulhw    mm4, mm7                  // mm4 = 0.33 * B
+    movq      mm3, mm1
+    pmulhw    mm3, mm7                  // mm3 = 0.33 * A
+    movq      mm4, mm2
+    pmulhw    mm4, mm7                  // mm4 = 0.33 * B
 
-      psllw     mm7
+    psllw     mm7
 
-      movq      mm5, mm1
-      pmulhw    mm5, mm7                  // mm5 = 0.66 * A
-      movq      mm6, mm2
-      pmulhw    mm6, mm7                  // mm6 = 0.66 * B
+    movq      mm5, mm1
+    pmulhw    mm5, mm7                  // mm5 = 0.66 * A
+    movq      mm6, mm2
+    pmulhw    mm6, mm7                  // mm6 = 0.66 * B
 
-      {write out the values}
-      packuswb  mm1, mm1
-      movd      COLORS[0], mm1
-      paddw     mm5, mm4                  // mm5 = 0.66A+0.33B
-      packuswb  mm5, mm5
-      movd      COLORS[1], mm5
-      paddw     mm6, mm3                  // mm6 = 0.33A+0.66B
-      packuswb  mm6, mm6
-      movd      COLORS[2], mm6
-      packuswb  mm2, mm2
-      movd      COLORS[3], mm1
+    {write out the values}
+    packuswb  mm1, mm1
+    movd      COLORS[0], mm1
+    paddw     mm5, mm4                  // mm5 = 0.66A+0.33B
+    packuswb  mm5, mm5
+    movd      COLORS[1], mm5
+    paddw     mm6, mm3                  // mm6 = 0.33A+0.66B
+    packuswb  mm6, mm6
+    movd      COLORS[2], mm6
+    packuswb  mm2, mm2
+    movd      COLORS[3], mm1
 
-      //mm1 = [A]rgba [B]rgba
+    //mm1 = [A]rgba [B]rgba
 
     {
       ----------------------------
@@ -690,38 +695,57 @@ begin
       EDX   indices
     }
 
-    mov esi, IDX
-    mov edx, [esi]
-    mov esi, COLOR
-    mov edi, PIXELS
+    mov   edx, EDX
+    mov   esi, COLOR
+    mov   edi, PIXELS
 
-    mov ecx, 4
+    mov   ecx, 4
 
-    xor ebx, ebx
+    xor   ebx, ebx
 
-    {I think I could interleave these to get close to 2x perfomance?
-     this would take a few registers though}
+    {
+    How this works:
+    ---------------
+      We want to add the decoded values to the prediction. This requires
+      wrap around at the byte level, so I'm using MMX to do that two pixels
+      at a time.
+    }
+
   @ROW_LOOP:
-    mov bl, dl
-    and bl, $03
-    mov eax, [esi+ebx*4]
-    shr edx, 2
-    mov [edi+0], eax
-    mov bl, dl
-    and bl, $03
-    mov eax, [esi+ebx*4]
-    shr edx, 2
-    mov [edi+4], eax
-    mov bl, dl
-    and bl, $03
-    mov eax, [esi+ebx*4]
-    shr edx, 2
-    mov [edi+8], eax
-    mov bl, dl
-    and bl, $03
-    mov eax, [esi+ebx*4]
-    shr edx, 2
-    mov [edi+12], eax
+
+    movq  mm0, [edi]
+  @PIXEL0:
+    mov   bl, dl
+    and   bl, $03
+    movd  mm1, [esi+ebx*4]
+    shr   edx, 2
+  @PIXEL1:
+    mov   bl, dl
+    and   bl, $03
+    movd  mm2, [esi+ebx*4]
+    shr   edx, 2
+  @WRITE01:
+    psllq mm2, 32
+    por   mm1, mm2
+    paddb mm0, mm1
+    movq  [edi], mm0
+
+    movq  mm0, [edi+8]
+  @PIXEL2:
+    mov   bl, dl
+    and   bl, $03
+    movd  mm1, [esi+ebx*4]
+    shr   edx, 2
+  @PIXEL3:
+    mov   bl, dl
+    and   bl, $03
+    movd  mm2, [esi+ebx*4]
+    shr   edx, 2
+  @WRITE23:
+    psllq mm2, 32
+    por   mm1, mm2
+    paddb mm0, mm1
+    movq  [edi+8], mm0
 
     add edi, PIXELSTRIDE
     dec ecx
