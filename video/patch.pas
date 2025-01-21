@@ -9,6 +9,7 @@ uses
   debug,
   utils,
   stream,
+  sysTypes,
   graph32;
 
 
@@ -17,9 +18,9 @@ type
   TPatchColors = packed array[0..3] of RGBA;
   TPatchIndexes = packed array[0..3, 0..3] of byte;
 
-  TPatchColorDepth = (PCD_VLC, PCD_24,PCD_16);
+  TPatchColorDepth = (PCD_VLC=1, PCD_24=2, PCD_16=3);
 
-  TPatch = record
+  tPatch = record
 
     ColorDepth: TPatchColorDepth;
 
@@ -52,9 +53,14 @@ type
     procedure SolveAllPairs();
 
     procedure writeBytes(dst: tStream);
+    procedure readBytes(src: tStream);
   end;
 
 implementation
+
+var
+  // globals used for efficently loading patches
+  patchData: tDWords;
 
 Constructor TPatch.Create(img: TPage; atX, aty: integer; AColorDepth: TPatchColorDepth=PCD_24);
 begin
@@ -63,22 +69,21 @@ begin
 end;
 
 {Outputs patch bytes.}
-procedure TPatch.writeBytes(dst: tStream);
+procedure tPatch.writeBytes(dst: tStream);
 var
   i: integer;
-  data: array[0..5] of dword;
 begin
   {note: patch bytes exclude type, as this it stored elsewhere}
 
   case ColorDepth of
     PCD_VLC: begin
-      data[0] := color[0].r;
-      data[1] := color[0].g;
-      data[2] := color[0].b;
-      data[3] := color[1].r;
-      data[4] := color[1].g;
-      data[5] := color[1].b;
-      dst.writeVLCSegment(data);
+      patchData[0] := color[0].r;
+      patchData[1] := color[0].g;
+      patchData[2] := color[0].b;
+      patchData[3] := color[1].r;
+      patchData[4] := color[1].g;
+      patchData[5] := color[1].b;
+      dst.writeVLCSegment(patchData);
     end;
     PCD_24:
       for i := 0 to 1 do begin
@@ -94,6 +99,49 @@ begin
   for i := 0 to 3 do
     dst.writeByte(idx[i,0] or (idx[i,1] shl 2) or (idx[i,2] shl 4) or (idx[i,3] shl 6));
 
+end;
+
+{load patch from bytes.}
+procedure tPatch.readBytes(src: tStream);
+var
+  i,x,y: integer;
+  idxCode: dword;
+begin
+  {note: patch bytes exclude type, as this it stored elsewhere}
+  case ColorDepth of
+    PCD_VLC: begin
+      src.readVLCSegment(6, patchData);
+      color[0].r := patchData[0];
+      color[0].g := patchData[1];
+      color[0].b := patchData[2];
+      color[0].a := 255;
+      color[1].r := patchData[3];
+      color[1].g := patchData[4];
+      color[1].b := patchData[5];
+      color[1].a := 255;
+    end;
+    PCD_24:
+      for i := 0 to 1 do begin
+        color[i].r := src.readByte();
+        color[i].g := src.readByte();
+        color[i].b := src.readByte();
+        color[i].a := 255;
+      end;
+    PCD_16:
+      for i := 0 to 1 do
+        color[i].from16(src.readWord())
+    else error('Invalid patch format');
+  end;
+
+  idxCode := src.readDWord();
+  for y := 0 to 3 do begin
+    for x := 0 to 3 do begin
+      idx[y,x] := idxCode and $3;
+      idxCode := idxCode shr 2;
+    end;
+  end;
+
+  self.interpolateColors();
 end;
 
 procedure TPatch.InterpolateColors();
@@ -762,7 +810,7 @@ var
 begin
   for y := 0 to 3 do
     for x := 0 to 3 do
-      img.PutPixel(atX + x,atY + y, color[idx[y,x]]);
+      img.setPixel(atX + x, atY + y, color[idx[y,x]]);
 end;
 
 procedure TPatch.WriteErrorTo(img: Tpage); overload;
@@ -830,5 +878,7 @@ begin
 end;
 
 begin
+  setLength(patchData, 6);
+  {todo: move to test system}
   runTests();
 end.

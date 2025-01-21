@@ -41,7 +41,7 @@ var
 
 procedure assertError(msg: string); overload;
 begin
-  error('Test case failed: '+msg);
+  error(msg);
 end;
 
 procedure assert(condition: boolean;msg: string); overload;

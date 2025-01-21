@@ -41,14 +41,16 @@ uses
   graph32,
   graph2d,
   patch,
+  screen,
   font,
   gui,
   stream,
-  screen,
+  sprite,
   timer,
   vga,
   vesa,
   crt,
+  filesystem,
   vc96;
 
 TYPE
@@ -65,6 +67,7 @@ CONST
 var
   startTime: double;
   elapsed: double;
+  screen: tScreen;
 
   imgOrg, imgCmp, imgErr: TPage;
 
@@ -622,23 +625,52 @@ end;
 procedure testCompression();
 var
   vw: tVideoWriter;
+  vr: tVideoReader;
   frame: tPage;
+  sprite: tSprite;
 begin
 
-  note('Performing compression');
-
-  vw := tVideoWriter.create();
-
-  vw.open('test.v96', 320, 180);
-
-  startTimer('frame');
   frame := LoadBMP('..\masters\video\frames_0001.bmp');
-  vw.writeFrame(frame);
-  stopTimer('frame');
 
-  vw.close();
+  if not fs.exists('test.v96') then begin
+    note('Performing compression');
 
-  note(format('Compression is %fX realtime', [getTimer('frame').elapsed/(1/25)]));
+    vw := tVideoWriter.create();
+
+    vw.open('test.v96', 320, 180);
+
+    startTimer('write');
+    vw.writeFrame(frame);
+    stopTimer('write');
+
+    vw.close();
+
+    note(format('Compression is %fX realtime', [getTimer('write').elapsed/(1/25)]));
+  end;
+
+  frame.clear(RGBA.create(255,0,255));
+
+  vr := tVideoReader.create();
+  vr.open('test.v96');
+  startTimer('read');
+  vr.readFrame(frame);
+  stopTimer('read');
+  vr.close();
+  note(format('Decompression is %fX realtime', [getTimer('read').elapsed/(1/25)]));
+
+  {just so I can see the compression speed}
+  delay(1000);
+
+  enableVideoDriver(tVesaDriver.create());
+  videoDriver.setMode(640,480,32);
+  screen := tScreen.create();
+
+  sprite := tSprite.create(frame);
+  sprite.blit(screen.canvas, (640-320) div 2, (480-180) div 2);
+  screen.pageFlip();
+
+  repeat
+  until keyDown(key_esc);
 
 end;
 
@@ -647,11 +679,11 @@ begin
   clrscr;
   debug.VERBOSE_SCREEN := llNote;
   test.runTestSuites();
+
   InitKeyboard();
   Init();
-  {RunBenchmark();}
-  //RunMainLoop();
-  {RunDescent();}
+
   testCompression();
-  delay(2000);
+  videoDriver.setText();
+  debug.printLog();
 end.

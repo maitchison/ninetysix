@@ -64,6 +64,7 @@ type
     procedure blend(other: RGBA; factor: single);
     procedure toLinear();
     procedure toSRGB();
+    procedure from16(value: uint16);
     function to32(): uint32;
     function to16(): uint16;
     function to16_(): uint16;
@@ -277,6 +278,14 @@ end;
 function RGBA.to32(): uint32;
 begin
   result := (a shl 24) + (r shl 16) + (g shl 8) + b;
+end;
+
+procedure RGBA.from16(value: uint16);
+begin
+  r := ((value shr 11) and $1f) shl 3;
+  g := ((value shr 5) and $3f) shl 2;
+  b := ((value shr 0) and $1f) shl 3;
+  a := 255;
 end;
 
 function RGBA.to16(): uint16;
@@ -1053,6 +1062,26 @@ begin
   end;
 end;
 
+{--------------------------------------------------------}
+
+type
+  tGraph32Test = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tGraph32Test.run();
+var
+  a,b: RGBA;
+begin
+  {test RGBA}
+  a.init(0, 64, 128);
+  b.from16(a.to16);
+  assertEqual(a,b);
+end;
+
+{--------------------------------------------------------}
+
 initialization
+  tGraph32Test.create('Graph32');
   registerImageLoader('bmp', @loadBMP);
 end.
