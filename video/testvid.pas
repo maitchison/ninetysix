@@ -34,6 +34,7 @@ over image in less than a second,}
 
 uses
   debug,
+  test,
   utils,
   mouse,
   keyboard,
@@ -44,9 +45,11 @@ uses
   gui,
   stream,
   screen,
+  timer,
   vga,
-  vesa
-  ;
+  vesa,
+  crt,
+  vc96;
 
 TYPE
   TColorSelectionMode = (CSM_MINMAX, CSM_ITERATIVE, CSM_DESCENT, CSM_ALLPAIRS);
@@ -513,8 +516,7 @@ begin
 
   elapsed := frac(now - startTime) * (24*60*60);
 
-  Info(Format('Read file in %f seconds', [elapsed]));
-  Info(Format('Source image is %dx%d', [imgOrg.width, imgOrg.height]));
+  //note(Format('Source image is %dx%d', [imgOrg.width, imgOrg.height]));
 
 end;
 
@@ -617,10 +619,39 @@ begin
 
 end;
 
+procedure testCompression();
+var
+  vw: tVideoWriter;
+  frame: tPage;
 begin
+
+  note('Performing compression');
+
+  vw := tVideoWriter.create();
+
+  vw.open('test.v96', 320, 180);
+
+  startTimer('frame');
+  frame := LoadBMP('..\masters\video\frames_0001.bmp');
+  vw.writeFrame(frame);
+  stopTimer('frame');
+
+  vw.close();
+
+  note(format('Compression is %fX realtime', [getTimer('frame').elapsed/(1/25)]));
+
+end;
+
+begin
+  textAttr := White + Blue*16;
+  clrscr;
+  debug.VERBOSE_SCREEN := llNote;
+  test.runTestSuites();
   InitKeyboard();
   Init();
   {RunBenchmark();}
-  RunMainLoop();
+  //RunMainLoop();
   {RunDescent();}
+  testCompression();
+  delay(2000);
 end.

@@ -89,6 +89,7 @@ type
     procedure writeToFile(fileName: string);
     procedure readFromFile(fileName: string; blockSize: int32=4096);
 
+    procedure flush();
     procedure reset();
     procedure softReset();
 
@@ -799,6 +800,11 @@ begin
       value := value shr 3;
     end;
   end;
+end;
+
+procedure tStream.flush();
+begin
+  {not used for memory stream}
 end;
 
 procedure tStream.reset();
