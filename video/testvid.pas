@@ -632,7 +632,7 @@ begin
 
   frame := LoadBMP('..\masters\video\frames_0001.bmp');
 
-  if not fs.exists('test.v96') then begin
+  if true or not fs.exists('test.v96') then begin
     note('Performing compression');
 
     vw := tVideoWriter.create();

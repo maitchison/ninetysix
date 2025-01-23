@@ -20,6 +20,7 @@ type
   end;
 
   tVideoFrameHeader = packed record
+    tag: array[1..4] of char; // FRAM (not really needed...)
     frameID: dword;
     format: byte;
   end;
@@ -108,7 +109,7 @@ begin
 
   outStream := tStream.create();
   outStream.writeBlock(fileHeader, sizeof(fileHeader));
-  for i := 0 to (128-sizeof(fileHeader))-1 do
+  for i := 1 to (128-sizeof(fileHeader)) do
     outStream.writeByte(0);
 
   {flush}
@@ -144,10 +145,11 @@ begin
   assertEqual(page.height, fileHeader.height);
 
   {header}
+  frameHeader.tag := 'FRAM';
   frameHeader.frameID := frameOn;
   frameHeader.format := 1; // I guess this means I-frame?
   outStream.writeBlock(frameHeader, sizeof(frameHeader));
-  for i := 0 to (32-sizeof(frameHeader))-1 do
+  for i := 1 to (32-sizeof(frameHeader)) do
     outStream.writeByte(0);
 
   {patches}
@@ -237,8 +239,9 @@ begin
 
   {header}
   inStream.readBlock(frameHeader, sizeof(frameHeader));
-  for i := 0 to 32-sizeof(frameHeader) do
+  for i := 1 to 32-sizeof(frameHeader) do
     inStream.readByte();
+  assertEqual(frameHeader.tag, 'FRAM');
 
   {patches}
   fillchar(patch, sizeof(patch), 0);
