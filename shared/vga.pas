@@ -66,15 +66,13 @@ type
 function videoDriver(): tVideoDriver;
 procedure enableVideoDriver(newVideoDriver: tVideoDriver);
 
+CONST
+  USE_80x50: boolean = True;
 
 implementation
 
 var
   fVideoDriver: tVideoDriver = nil;
-
-CONST
-  USE_80x50: boolean = True;
-
 
 var
   myLFB_SEG: word;
@@ -188,8 +186,15 @@ begin
       int $10
     end;
     fPhysicalHeight := 50;
-  end else
+  end else begin
+    asm
+      {switch to 16x8 font}
+      mov ax, $1114
+      mov bl, 0
+      int $10
+    end;
     fPhysicalHeight := 25;
+  end;
 
   fPhysicalWidth := 80;
   fLogicalWidth := fPhysicalWidth;
