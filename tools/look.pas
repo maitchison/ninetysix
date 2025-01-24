@@ -52,9 +52,18 @@ begin
   close(outT);
 end;
 
+function code(x: word): string;
+begin
+  setLength(result, 2);
+  result[1] := chr(x mod 256);
+  result[2] := chr(x div 256);
+end;
+
 procedure writeMessage(s: string);
 begin
   note(s);
+  write(outT, #0 + '' + #0);
+  write(outT, #1 + code(0) + code(0) + s + #0);
 end;
 
 procedure fatalMessage(error: byte;s: string);
@@ -63,13 +72,6 @@ begin
   writeMessage(s);
   closeFile();
   halt(error);
-end;
-
-function code(x: word): string;
-begin
-  setLength(result, 2);
-  result[1] := chr(x mod 256);
-  result[2] := chr(x div 256);
 end;
 
 {search all source files in root folder and report lines containing that string}
@@ -172,7 +174,10 @@ begin
   primary.reverse();
 
   {output results}
-  for ref in primary do write(outT, ref);
+  if primary.len > 0 then begin
+    for ref in primary do write(outT, ref);
+    writeMessage('---------------------------------------');
+  end;
   for ref in secondary do write(outT, ref);
 
   closeFile();
