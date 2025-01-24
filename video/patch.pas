@@ -26,21 +26,23 @@ type
 
     atX,atY: integer;
     LastSSE: int32;
-    color: TPatchColors;
+    color: tPatchColors;
+    refPixels: packed array[0..3, 0..3] of RGBA;
     pixels: packed array[0..3, 0..3] of RGBA;
-    idx: TPatchIndexes;
+    idx: tPatchIndexes;
     grad: array[0..3] of RGBA16;
     counts: array[0..3] of integer;
     proposedIdx: TPatchIndexes;
 
-    Constructor Create(img: TPage; atX, aty: integer; AColorDepth: TPatchColorDepth=PCD_24);
+    Constructor create(img: TPage; atX, aty: integer; AColorDepth: TPatchColorDepth=PCD_24);
 
-    procedure ReadFrom(img: TPage; atX, atY: integer);
+    procedure readFrom(img: TPage; atX, atY: integer);
+    procedure readDeltaFrom(img: TPage; atX, atY: integer);
 
-    procedure WriteTo(img: TPage; atX,atY: integer); overload;
-    procedure WriteErrorTo(img: Tpage; atX, atY: integer); overload;
-    procedure WriteTo(img: TPage); overload;
-    procedure WriteErrorTo(img: Tpage); overload;
+    procedure writeTo(img: TPage; atX,atY: integer); overload;
+    procedure writeErrorTo(img: Tpage; atX, atY: integer); overload;
+    procedure writeTo(img: TPage); overload;
+    procedure writeErrorTo(img: Tpage); overload;
 
     function  EvaluateSSE(newColors: TPatchColors): int32;
     procedure Map();
@@ -627,7 +629,8 @@ begin
 
 end;
 
-procedure TPatch.ReadFrom(img: Tpage; atX, atY: integer);
+{read patch pixels from page}
+procedure TPatch.readFrom(img: Tpage; atX, atY: integer);
 var
   x,y: integer;
 begin
@@ -636,6 +639,30 @@ begin
   for y := 0 to 3 do
     for x := 0 to 3 do
       pixels[y,x] := img.GetPixel(atX+x, atY+y);
+end;
+
+{set pixels to delta between at img location and previous pixels,
+ such that originalPixels+delta = newPixels
+
+ Note: delta is stored using negEncode, and with wraparound.
+ }
+procedure TPatch.readDeltaFrom(img: Tpage; atX, atY: integer);
+var
+  x,y: integer;
+  oldC, newC, deltaC: RGBA;
+begin
+  self.atX := atX;
+  self.atY := atY;
+  for y := 0 to 3 do
+    for x := 0 to 3 do begin
+      oldC := pixels[y,x];
+      newC := img.getPixel(atX+x, atY+y);
+      deltaC.r := encodeByteDelta(oldC.r, newC.r);
+      deltaC.g := encodeByteDelta(oldC.g, newC.g);
+      deltaC.b := encodeByteDelta(oldC.b, newC.b);
+      deltaC.a := encodeByteDelta(oldC.a, newC.a);
+      pixels[y,x] := deltaaC;
+    end;
 end;
 
 procedure TPatch.WriteTo(img: Tpage); overload;

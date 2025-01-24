@@ -38,7 +38,7 @@ type
 
     function isOpen: boolean;
     procedure open(aFilename: string;aWidth,aHeight: word);
-    procedure writeFrame(page: tPage);
+    procedure writeFrame(page: tPage;refPage: tPage=nil);
     procedure close();
 
   end;
@@ -127,13 +127,24 @@ begin
   outFilename := '';
 end;
 
-procedure tVideoWriter.writeFrame(page: tPage);
+{write a video frame to file. If refPage is given then all patches on
+ this reference frame can be used by the encoder to compress the new page.
+ Typically this is the previously decoded frame.
+ }
+procedure tVideoWriter.writeFrame(page: tPage;refPage: tPage=nil);
 var
   x,y: integer;
   patch: tPatch;
   frameHeader: tVideoFrameHeader;
   i: integer;
+  weOwnPage: boolean;
 begin
+
+  if not assigned(refPage) then begin
+    refPage := tPage.create(page.width, page.height);
+    weOwnPage := true;
+  end;
+    weOwnPage := false;
 
   {todo: we can easily handle pages being different sizes via cropping
    and padding (this happens already). Just need to create an offset
@@ -157,7 +168,8 @@ begin
   patch.colorDepth := fileHeader.format;
   for y := 0 to (page.height div 4)-1 do begin
     for x := 0 to (page.width div 4)-1 do begin
-        patch.readFrom(page, x*4, y*4);
+        patch.readFrom(refPage, x*4, y*4);
+        patch.readFrom(refPage, x*4, y*4);
         {todo: make this: readFrom, writeBytes (e.g. frame knows its method)}
         patch.solveMinMax();
         patch.map();
@@ -171,6 +183,8 @@ begin
   writeln();
 
   inc(frameOn);
+
+  if weOwnPage then page.free;
 
   {flush}
   outStream.flush();

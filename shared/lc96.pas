@@ -60,21 +60,6 @@ begin
   result := sqr(a.r-b.r) + sqr(a.g-b.g) + sqr(a.b-b.b) + sqr(a.a-b.a);
 end;
 
-{generates code representing delta to go from a to b}
-function encodeByteDelta(a,b: byte): byte; inline;
-var
-  delta: int32;
-begin
-  {take advantage of 256 wrap around on bytes}
-  delta := int32(b)-a;
-  if delta > 128 then
-    exit(negEncode(delta-256))
-  else if delta < -127 then
-    exit(negEncode(delta+256))
-  else
-    exit(negEncode(delta));
-end;
-
 function applyByteDelta(a, code: byte): byte; inline;
 var
   delta: integer;

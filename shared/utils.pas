@@ -113,6 +113,8 @@ function join(lines: array of string;seperator: string=#13#10): string;
 
 function  negDecode(x: dword): int32; inline;
 function  negEncode(x: int32): dword; inline;
+function  encodeByteDelta(a,b: byte): byte; inline;
+
 function  sign(x: int32): int32; overload;
 function  sign(x: single): single; overload;
 
@@ -809,6 +811,22 @@ begin
   result := abs(x)*2;
   if x > 0 then dec(result);
 end;
+
+{generates code representing delta to go from a to b}
+function encodeByteDelta(a,b: byte): byte; inline;
+var
+  delta: int32;
+begin
+  {take advantage of 256 wrap around on bytes}
+  delta := int32(b)-a;
+  if delta > 128 then
+    exit(negEncode(delta-256))
+  else if delta < -127 then
+    exit(negEncode(delta+256))
+  else
+    exit(negEncode(delta));
+end;
+
 
 function join(lines: array of string;seperator: string=#13#10): string;
 var
