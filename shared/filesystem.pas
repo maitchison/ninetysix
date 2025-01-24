@@ -59,6 +59,7 @@ function tFileSystem.exists(filename: string): boolean;
 var
   f: file;
 begin
+  IOResult; // just in case there was a previous error;
   assign(f, filename);
   {$I-}
   reset(f);
