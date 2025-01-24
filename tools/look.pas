@@ -189,10 +189,6 @@ begin
   if token = '' then
     fatalMessage(91, 'No token found.');
 
-  writeMessage('---------------------------------------');
-  writeMessage('Searching for "'+token+'"');
-  writeMessage('---------------------------------------');
-
   primary.clear();
   secondary.clear();
 
@@ -201,11 +197,15 @@ begin
   {typically we want the last reference in a file (not the header one)}
   primary.reverse();
 
-  {output results}
-  if primary.len > 0 then begin
+  {output what I think is probably the link to the definition}
+  if primary.len > 0 then
     for ref in primary do write(outT, ref);
-    writeMessage('---------------------------------------');
-  end;
+
+  writeMessage('---------------------------------------');
+  writeMessage('Matches for "'+token+'"');
+  writeMessage('---------------------------------------');
+
+  {output everything else}
   for ref in secondary do write(outT, ref);
 
   closeFile();
