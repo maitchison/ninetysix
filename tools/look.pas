@@ -1,15 +1,43 @@
 {a tool for FPC that allows for various insight like features}
 program look;
 
-{todo:
+{
+Todo
   [ ] match complete word only
-  [ ] edit IDE to clear messages for me
-  [ ] edit IDE to allow ctr-enter (might be done already?)
-  [ ] edit IDE to have first message selected not name of file
+  [ ] implement a 'does this file have this word' bloom filter.
 
-This idea here (eventualy) is to...
-  press ctrl-enter and jump to definition
+Improved IDE Support
 
+- What we want is alt enter to follow link. There's a few ways to do this
+
+1. Build this into the IDE (required symbols to be built I guess)
+2. Modify tools to make this work (I think I'll do this).
+
+Here's how we modify the tools.
+
+1. Remove the line that outputs the tool name and params to messages.
+  (block containing line 92 of fpmtools.inc).
+2. Add special "!follow" to follow previously added link
+3. Add special "!next" to increment currently selected message
+4. Add special "!clear" to clear messages
+5. Perhap find a way to get alt-enter to work.
+
+Config settings
+
+Title5="Find"
+Params5="$CAP_MSG(look $EDNAME $LINE $COL)"
+HotKey5=3840
+
+Where 3840 is shift-tab... see
+
+  fv/src/drivers.inc for alternatives.
+
+
+Future tools
+- [ ] Find - this one
+- [ ] Jump - auto jump to definition
+- [ ] Peek - show code in message window, useful for doc strings.
+- [ ] Rename - for bulk renamining of variables
 
 }
 
