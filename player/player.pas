@@ -1,5 +1,5 @@
 {audio conversion and testing tool}
-program aconv;
+program player;
 
 uses
   {$I baseunits.inc},
