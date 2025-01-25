@@ -1270,19 +1270,25 @@ begin
   s := 'The cat with 33 lives.';
   assert(nextWholeWord(s, i, n));
   assertEqual(i, 1); assertEqual(n, 3);
+  i+=n;
   assert(nextWholeWord(s, i, n));
   assertEqual(i, 5); assertEqual(n, 3);
+  i+=n;
   assert(nextWholeWord(s, i, n));
   assertEqual(i, 9); assertEqual(n, 4);
+  i+=n;
   assert(nextWholeWord(s, i, n));
   assertEqual(i, 14); assertEqual(n, 2);
+  i+=n;
   assert(nextWholeWord(s, i, n));
   assertEqual(i, 17); assertEqual(n, 5);
+  i+=n;
   assert(not nextWholeWord(s, i, n));
 
   {substring}
-  assert(subStringMatch(s, 1, 'the'));
-  assert(not subStringMatch(s, 2, 'the'));
+  assert(subStringMatch(s, 1, 'The'));
+  assert(not subStringMatch(s, 1, 'the'));
+  assert(not subStringMatch(s, 2, 'The'));
   assert(subStringMatch(s, 22, '.'));
   assert(subStringMatch(s, 1, s));
 
