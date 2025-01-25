@@ -48,6 +48,7 @@ uses
   list,
   utils,
   glob,
+  timer,
   fileSystem;
 
 const
@@ -109,6 +110,30 @@ begin
   writeMessage(s);
   closeFile();
   halt(error);
+end;
+
+function getWholeWords(s: string): tStringList;
+var
+  i,n: integer;
+begin
+  result.clear();
+  i := 1;
+  while nextWholeWord(s, i, n) do begin
+    result.append(copy(s, i, n));
+    i += n;
+  end;
+end;
+
+function containsWholeWord(s, substr: string): boolean;
+var
+  i,n: integer;
+begin
+  result := false;
+  i := 1;
+  while nextWholeWord(s, i, n) do begin
+    if copy(s, i, n) = substr then exit(true);
+    i += n;
+  end;
 end;
 
 {search all source files in root folder and report lines containing that string}
@@ -173,14 +198,16 @@ begin
   tokenChars := ['a'..'z', 'A'..'Z', '0'..'9'];
 
   {backtrack to just before token}
-  while (col > 0) and ((s[col+1] in tokenChars)) do dec(col);
-  inc(col);
+  while (col > 0) and (s[col] in tokenChars) do dec(col);
   {then get our token}
   while (col < length(s)) and (s[col+1] in tokenChars) do begin
     result += s[col+1];
     inc(col);
   end;
 end;
+
+var
+  s: string;
 
 begin
 
@@ -194,21 +221,20 @@ begin
   if token = '' then
     fatalMessage(91, 'No token found.');
 
-  writeln(token);
-
   primary.clear();
   secondary.clear();
 
+  startTimer('search');
   globalFind(token);
+  stopTimer('search');
 
   {output what I think is probably the link to the definition}
-
   if primary.len > 0 then begin
     write(outT, primary[primary.len-1]);
   end;
 
   writeMessage('---------------------------------------');
-  writeMessage('Matches lfor "'+token+'"');
+  writeMessage(format('Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
   writeMessage('---------------------------------------');
 
   for ref in primary do write(outT, ref);

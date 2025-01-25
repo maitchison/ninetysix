@@ -105,10 +105,14 @@ function bytesToSanStr(bytes: tBytes): string;
 function strToInt(s: string): int64;
 function strToFlt(s: string): double;
 function strToBool(s: string): boolean;
+
+{string functions}
 function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
 function lpad(s: string;len: int32;padding: char=' '): string;
 function split(s: string; c: char; var left: string; var right: string): boolean;
+function nextWholeWord(line: string;var pos:integer; out len:integer): boolean;
+function subStringMatch(s: string; sOfs: integer; subString: string): boolean;
 function join(lines: array of string;seperator: string=#13#10): string;
 
 function  negDecode(x: dword): int32; inline;
@@ -144,6 +148,10 @@ function  getMSCount(): int64;
 {heap stuff}
 procedure setFixedHeapSize(size: int64);
 procedure autoHeapSize();
+
+
+const
+  WORD_CHARS: set of char = ['a'..'z','A'..'Z','0'..'9'];
 
 
 implementation
@@ -827,6 +835,53 @@ begin
     exit(negEncode(delta));
 end;
 
+{-------------------------------------------------------}
+{ string functions }
+{-------------------------------------------------------}
+
+{returns start position of next whole word, returns false if none.}
+function nextWholeWord(line: string;var pos:integer; out len:integer): boolean;
+var
+  inWord, isWordChar: boolean;
+  initialPos, i: integer;
+  c: char;
+begin
+  {break line into words}
+  inWord := false;
+  len := 0;
+  initialPos := pos;
+  for i := initialPos to length(line) do begin
+    c := line[i];
+    isWordChar := c in WORD_CHARS;
+    if inWord then begin
+      if isWordChar then
+        inc(len)
+      else
+        exit(true);
+    end else begin
+      if isWordChar then begin
+        inWord := true;
+        pos := i;
+        len := 1;
+      end;
+    end;
+  end;
+  exit(false);
+end;
+
+{returns copy(s, i, n) = substr, but without a mem copy
+ sOfs: position of substring in s, 1 = first character }
+function subStringMatch(s: string; sOfs: integer; subString: string): boolean;
+var
+  i: integer;
+begin
+  if length(s)+sOfs-1 < length(subString) then exit(false);
+  for i := 0 to length(subString)-1 do begin
+    if s[i+sOfs] <> subString[i+1] then exit(false);
+  end;
+  exit(true);
+end;
+
 
 function join(lines: array of string;seperator: string=#13#10): string;
 var
@@ -1126,8 +1181,8 @@ type
 
 procedure tUtilsTest.run();
 var
-  a,b: string;
-  i: int32;
+  a,b,s: string;
+  i,n: int32;
 begin
   assertEqual(StrToFlt('123'), 123);
   assertClose(StrToFlt('-7.2'), -7.2);
@@ -1209,6 +1264,27 @@ begin
   assertEqual(roundUpToPowerOfTwo(3), 4);
   assertEqual(roundUpToPowerOfTwo(4), 4);
   assertEqual(roundUpToPowerOfTwo(5), 8);
+
+  {whole word}
+  i := 1;
+  s := 'The cat with 33 lives.';
+  assert(nextWholeWord(s, i, n));
+  assertEqual(i, 1); assertEqual(n, 3);
+  assert(nextWholeWord(s, i, n));
+  assertEqual(i, 5); assertEqual(n, 3);
+  assert(nextWholeWord(s, i, n));
+  assertEqual(i, 9); assertEqual(n, 4);
+  assert(nextWholeWord(s, i, n));
+  assertEqual(i, 14); assertEqual(n, 2);
+  assert(nextWholeWord(s, i, n));
+  assertEqual(i, 17); assertEqual(n, 5);
+  assert(not nextWholeWord(s, i, n));
+
+  {substring}
+  assert(subStringMatch(s, 1, 'the'));
+  assert(not subStringMatch(s, 2, 'the'));
+  assert(subStringMatch(s, 22, '.'));
+  assert(subStringMatch(s, 1, s));
 
 end;
 
