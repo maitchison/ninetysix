@@ -1,6 +1,8 @@
 {a tool for FPC that allows for various insight like features}
 program look;
 
+{$MODE Delphi}
+
 {
 Todo
   [ ] match complete word only
@@ -58,13 +60,29 @@ const
   SIGNATURE: string[10] = 'BI#PIP#OK'+#0;
 
 var
-  primary: tStringList;
-  secondary: tStringList;
+  mainList: tStringList;
+  auxList: tStringList;
 
 var
   outT: text;
   ref: string;
   token: string;
+
+type
+  tSearchOptions = record
+    detectDeclarations: boolean;  // put declarations in auxList
+    wholeWord: boolean;           // is does not match with fish
+    caseSensitive: boolean;       // if true search is case sensitive.
+    procedure init();
+  end;
+
+{defaults to a case insensitive standard search}
+procedure tSearchOptions.init();
+begin
+  detectDeclarations := false;
+  wholeWord := false;
+  caseSensitive := false;
+end;
 
 procedure openFile();
 begin
@@ -139,22 +157,30 @@ begin
   end;
 end;
 
-{search all source files in root folder and report lines containing that string}
-procedure globalFind(subStr: string);
+{search all source files in root folder and report lines containing that string
+if detectDeclarations is true then lines that looks like function or procedure
+declarations will be put into an auxilary list.
+}
+procedure globalFind(subStr: string;so: tSearchOptions);
 var
   files: tStringList;
   lines: tStringList;
   lineNo: int32;
   filePath: string;
   glob: tGlob;
-  line: string;
+  line,searchLine: string;
   ignoreFilename: string;
   first: boolean;
   msgString: string;
   filePart, refPart: string;
+  containsStr: boolean;
 begin
 
   subStr := subStr.toLower();
+
+  note('----------------------------------------');
+  note(format('Performing search for "%s"', [subStr]));
+  note('----------------------------------------');
 
   glob := tGlob.create();
   ignoreFilename := joinPath(ROOT, 'ignore.ini');
@@ -168,18 +194,33 @@ begin
     for line in lines do begin
       inc(lineNo);
       if length(line) < length(subStr) then continue;
-      if containsWholeWord(line.toLower(), subStr) then begin
+      if so.caseSensitive then
+        searchLine := line
+      else
+        searchLine := line.toLower();
+      if so.wholeWord then
+        containsStr := containsWholeWord(searchLine, subStr)
+      else
+        containsStr := searchLine.contains(subStr);
+      if containsStr then begin
         filePart := #0 + joinPath(ROOT, filePath) + #0;
         refPart := #1 + code(lineNo) + code(1) + line + #0;
         msgString := filePart + refPart;
-        if line.startsWith('procedure', true) or line.startsWith('function', true) then
-          primary.append(msgString)
-        else
-          secondary.append(msgString);
-        first := false;
+        if so.detectDeclarations then begin
+          if line.startsWith('procedure', true) or line.startsWith('function', true) then
+            auxList.append(msgString)
+          else
+            mainList.append(msgString);
+          first := false;
+        end else
+          mainList.append(msgString);
+        // maybe this slows things down too much?
+        note(line);
+
       end;
     end;
   end;
+  note('<done>');
   glob.free();
 end;
 
@@ -213,39 +254,86 @@ begin
   end;
 end;
 
+{-----------------------------------------------------}
+
+procedure processRefs();
 var
-  s: string;
+  so: tSearchOptions;
+begin
+  if paramCount <> 4 then
+    fatalMessage(55, 'Error, wrong number of parameters (found '+intToStr(paramCount)+', expected 4)');
+
+  token := getTokenAt(paramStr(2), strToInt(paramStr(3)), strToInt(paramStr(4)));
+
+  if token = '' then
+    fatalMessage(91, 'No token found.');
+
+  mainList.clear();
+  auxList.clear();
+
+  startTimer('search');
+  so.init();
+  so.detectDeclarations := true;
+  so.wholeWord := true;
+  globalFind(token, so);
+  stopTimer('search');
+
+  {output what I think is probably the link to the definition}
+  if auxList.len > 0 then begin
+    write(outT, auxList[auxList.len-1]);
+  end;
+
+  writeMessage('---------------------------------------');
+  writeMessage(format('[v0.3] Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
+  writeMessage('---------------------------------------');
+
+  for ref in auxList do write(outT, ref);
+  for ref in mainList do write(outT, ref);
+
+end;
+
+procedure processFind();
+var
+  so: tSearchOptions;
+begin
+  if paramCount <> 2 then
+    fatalMessage(55, 'Error, wrong number of parameters (found '+intToStr(paramCount)+', expected 2)');
+
+  token := paramStr(2);
+
+  mainList.clear();
+
+  startTimer('search');
+  so.init;
+  globalFind(token, so);
+  stopTimer('search');
+
+  writeMessage('---------------------------------------');
+  writeMessage(format('[v0.3] Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
+  writeMessage('---------------------------------------');
+
+  for ref in mainList do write(outT, ref);
+
+end;
+
+{-----------------------------------------------------}
+
+var
+  mode: string;
 
 begin
 
   openFile();
 
-  if paramCount <> 3 then
-    fatalMessage(55, 'Error, wrong number of parameters (found '+intToStr(paramCount)+', expected 3)');
+  if paramCount < 1 then fatalMessage(55, 'Usage: look.exe refs [filename] [line] [col]');
 
-  token := getTokenAt(paramStr(1), strToInt(paramStr(2)), strToInt(paramStr(3)));
-
-  if token = '' then
-    fatalMessage(91, 'No token found.');
-
-  primary.clear();
-  secondary.clear();
-
-  startTimer('search');
-  globalFind(token);
-  stopTimer('search');
-
-  {output what I think is probably the link to the definition}
-  if primary.len > 0 then begin
-    write(outT, primary[primary.len-1]);
-  end;
-
-  writeMessage('---------------------------------------');
-  writeMessage(format('[v0.2] Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
-  writeMessage('---------------------------------------');
-
-  for ref in primary do write(outT, ref);
-  for ref in secondary do write(outT, ref);
+  mode := paramStr(1).toLower();
+  if mode = 'refs' then
+    processRefs()
+  else if mode = 'find' then
+    processFind()
+  else
+    fatalMessage(66, 'Invalid mode '+mode);
 
   closeFile();
 
