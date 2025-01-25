@@ -350,6 +350,47 @@ begin
   result := 'snd\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
+{create compressed copies of master music tracks}
+procedure master();
+var
+  verbose: boolean;
+  sourceFiles: array of string = ['sunshine', 'clowns', 'crazy', 'blue'];
+  filename: string;
+  srcPath, dstPath: string;
+  srcMusic: tSoundEffect;
+  outStream: tStream;
+begin
+  writeln();
+  writeln('--------------------------');
+  writeln('Compressing');
+  writeln('--------------------------');
+  LA96_ENABLE_STATS := false;
+  verbose := true;
+
+  for filename in sourceFiles do begin
+    srcPath := joinPath('c:\dev\masters\player', filename+'.wav');
+    if not fs.exists(srcPath) then begin
+      warning('File not found '+srcPath);
+      continue;
+    end;
+
+    dstPath := joinPath('snd', filename+'.a96');
+    if fs.exists(dstPath) then begin
+      note('Skipping '+srcPath);
+      continue;
+    end;
+
+
+    {compress it}
+    writeln();
+    write(filename+': ');
+    srcMusic := tSoundEffect.loadFromWave(srcPath);
+    outStream := encodeLA96(srcMusic, ACP_HIGH, verbose);
+    outStream.writeToFile(dstPath);
+    outStream.free;
+  end;
+end;
+
 procedure testCompression();
 var
   music16, musicL, musicD: tSoundEffect;
@@ -405,7 +446,7 @@ begin
   writeln();
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
+  music16 := tSoundEffect.loadFromWave('snd\sample.wav');
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   setLength(outSfx, length(outSFX)+1);
@@ -623,8 +664,9 @@ begin
   runTestSuites();
   initKeyboard();
 
-  //testCompression();
-  soundPlayer();
+  master();
+  testCompression();
+  //soundPlayer();
 
   textAttr := LIGHTGRAY;
 
