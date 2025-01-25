@@ -346,7 +346,12 @@ begin
     write('                                                               ');
     gotoxy(atX+20, atY+1);
     token := readInput();
-    if token = '' then exit;
+    if token = '' then begin
+      {this way message box will not get focus (I hope!)}
+      closeFile();
+      deleteFile();
+      halt(0);
+    end;
   end else if paramCount = 2 then begin
     token := paramStr(2);
   end else
