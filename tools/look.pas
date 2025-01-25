@@ -26,14 +26,20 @@ Here's how we modify the tools.
 
 Config settings
 
-Title5="Find"
-Params5="$CAP_MSG(look $EDNAME $LINE $COL)"
+Title5="Refs"
+Params5="$CAP_MSG(look refs $EDNAME $LINE $COL)"
 HotKey5=3840
 
-Where 3840 is shift-tab... see
+Title6="Find"
+Params6="$CAP_MSG(look find $PROMPT(Text))"
+HotKey6=8454
 
+Where
+  3840=shift-tab
+  8454=ctrl-f
+
+see
   fv/src/drivers.inc for alternatives.
-
 
 Future tools
 - [ ] Find - this one
@@ -58,6 +64,7 @@ const
   ROOT = 'c:\dev';
   OUT_T = '_filter_.out';
   SIGNATURE: string[10] = 'BI#PIP#OK'+#0;
+  VERSION = 'v0.3';
 
 var
   mainList: tStringList;
@@ -82,6 +89,16 @@ begin
   detectDeclarations := false;
   wholeWord := false;
   caseSensitive := false;
+end;
+
+procedure deleteFile();
+begin
+  ioResult;
+  info('Delete file');
+
+  assign(outT, OUT_T);
+  {$i-} Erase(outT); {$i+}
+  ioResult;
 end;
 
 procedure openFile();
@@ -284,7 +301,7 @@ begin
   end;
 
   writeMessage('---------------------------------------');
-  writeMessage(format('[v0.3] Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
+  writeMessage(format('[%s] Matches for "%s" (in %.2fs)', [VERSION, token, getTimer('search').elapsed]));
   writeMessage('---------------------------------------');
 
   for ref in auxList do write(outT, ref);
@@ -292,14 +309,48 @@ begin
 
 end;
 
+function readInput(): string;
+var
+  ch: char;
+begin
+  result := '';
+  repeat
+    ch := readkey;
+    if ch = #27 then exit('');
+    if ch = #13 then exit;
+    if ch = #8 then begin
+      if result = '' then continue;
+      result := copy(result, 1, length(result)-1);
+      write(#8,' ',#8);
+      continue;
+    end;
+    result += ch;
+    write(ch);
+  until false;
+end;
+
 procedure processFind();
 var
   so: tSearchOptions;
+  atX,atY: integer;
 begin
-  if paramCount <> 2 then
+  {todo: search current file first}
+  if paramCount = 1 then begin
+    textAttr := LightGray*16 + White;
+    atX := 10; atY := 30;
+    gotoxy(atX, atY);
+    write('                                                               ');
+    gotoxy(atX, atY+1);
+    write(' Enter search text:                                            ');
+    gotoxy(atX, atY+2);
+    write('                                                               ');
+    gotoxy(atX+20, atY+1);
+    token := readInput();
+    if token = '' then exit;
+  end else if paramCount = 2 then begin
+    token := paramStr(2);
+  end else
     fatalMessage(55, 'Error, wrong number of parameters (found '+intToStr(paramCount)+', expected 2)');
-
-  token := paramStr(2);
 
   mainList.clear();
 
@@ -309,7 +360,7 @@ begin
   stopTimer('search');
 
   writeMessage('---------------------------------------');
-  writeMessage(format('[v0.3] Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
+  writeMessage(format('[%s] Matches for "%s" (in %.2fs)', [VERSION, token, getTimer('search').elapsed]));
   writeMessage('---------------------------------------');
 
   for ref in mainList do write(outT, ref);
