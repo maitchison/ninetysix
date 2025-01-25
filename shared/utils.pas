@@ -8,7 +8,7 @@ unit utils;
 interface
 
 uses
-  sysinfo,
+  sysInfo,
   dos,
   sysTypes,
   go32;
@@ -774,7 +774,7 @@ end;
 
 {Get seconds since program start.
 Can be used for very accurate timing measurement}
-function GetSec(): double;
+function getSec(): double;
 begin
   result := (getTSC()-programStartTSC) * CPUInfo.INV_CLOCK_FREQ;
 end;

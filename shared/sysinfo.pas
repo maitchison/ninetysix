@@ -76,7 +76,6 @@ var
   RDTSCrate: double;
 begin
   RDTSCRate := getRDTSCRate();
-
   result.mhz := RDTSCrate / 1000 / 1000;
   result.INV_CLOCK_FREQ := 1/RDTSCRate;
   result.hasMMX := getMMXSupport();
@@ -178,8 +177,6 @@ begin
   end;
   result := cpuName;
 end;
-
-
 
 {-------------------------------------------------------------}
 

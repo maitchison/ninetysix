@@ -128,10 +128,13 @@ function containsWholeWord(s, substr: string): boolean;
 var
   i,n: integer;
 begin
+  {s.contains is much faster, so use that to filter out strings
+   that can not match}
+  if not s.contains(substr) then exit(false);
   result := false;
   i := 1;
   while nextWholeWord(s, i, n) do begin
-    if copy(s, i, n) = substr then exit(true);
+    if (n = length(subStr)) and subStringMatch(s, i, substr) then exit(true);
     i += n;
   end;
 end;
@@ -150,6 +153,9 @@ var
   msgString: string;
   filePart, refPart: string;
 begin
+
+  subStr := subStr.toLower();
+
   glob := tGlob.create();
   ignoreFilename := joinPath(ROOT, 'ignore.ini');
   if fs.exists(ignoreFilename) then
@@ -161,7 +167,8 @@ begin
     first := true;
     for line in lines do begin
       inc(lineNo);
-      if line.contains(subStr, True) then begin
+      if length(line) < length(subStr) then continue;
+      if containsWholeWord(line.toLower(), subStr) then begin
         filePart := #0 + joinPath(ROOT, filePath) + #0;
         refPart := #1 + code(lineNo) + code(1) + line + #0;
         msgString := filePart + refPart;
@@ -234,7 +241,7 @@ begin
   end;
 
   writeMessage('---------------------------------------');
-  writeMessage(format('Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
+  writeMessage(format('[v0.2] Matches for "%s" (in %.2fs)', [token, getTimer('search').elapsed]));
   writeMessage('---------------------------------------');
 
   for ref in primary do write(outT, ref);
