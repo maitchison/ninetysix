@@ -17,6 +17,7 @@ var
   screenCharRows: byte;
 
 begin
+
   videoDriver.setText();
 
   textAttr := White;

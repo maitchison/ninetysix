@@ -67,7 +67,15 @@ var
 
 procedure openFile();
 begin
+  ioResult;
   info('Open file');
+
+  (*
+  assign(outT, OUT_T);
+  {$i-} Erase(outT); {$i+}
+  ioResult;
+  *)
+
   assign(outT, OUT_T);
   rewrite(outT);
   write(outT, SIGNATURE);
@@ -82,6 +90,7 @@ end;
 
 function code(x: word): string;
 begin
+  result := '';
   setLength(result, 2);
   result[1] := chr(x mod 256);
   result[2] := chr(x div 256);
@@ -155,11 +164,11 @@ begin
   result := '';
   dec(line);
   dec(col);
-  if not fs.exists(filename) then exit;
+  if not fs.exists(filename) then exit();
   lines := fs.readText(filename);
-  if not (line < lines.len) then exit;
+  if not (line < lines.len) then exit();
   s := lines[line];
-  if col > length(s) then exit;
+  if col > length(s) then exit();
 
   tokenChars := ['a'..'z', 'A'..'Z', '0'..'9'];
 
@@ -173,10 +182,6 @@ begin
   end;
 end;
 
-var
-  i: integer;
-  t: text;
-
 begin
 
   openFile();
@@ -189,23 +194,24 @@ begin
   if token = '' then
     fatalMessage(91, 'No token found.');
 
+  writeln(token);
+
   primary.clear();
   secondary.clear();
 
   globalFind(token);
 
-  {typically we want the last reference in a file (not the header one)}
-  primary.reverse();
-
   {output what I think is probably the link to the definition}
-  if primary.len > 0 then
-    for ref in primary do write(outT, ref);
+
+  if primary.len > 0 then begin
+    write(outT, primary[primary.len-1]);
+  end;
 
   writeMessage('---------------------------------------');
-  writeMessage('Matches for "'+token+'"');
+  writeMessage('Matches lfor "'+token+'"');
   writeMessage('---------------------------------------');
 
-  {output everything else}
+  for ref in primary do write(outT, ref);
   for ref in secondary do write(outT, ref);
 
   closeFile();
