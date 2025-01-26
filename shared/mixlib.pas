@@ -86,6 +86,7 @@ procedure musicPlay(reader: tLA96Reader); overload;
 procedure musicSet(reader: tLA96Reader);
 procedure musicRestoreDefaultReader();
 procedure musicStop();
+function  musicBufferPos(): dword;
 function  getMusicStats(): tMusicStats;
 procedure musicUpdate(maxNewFrames: integer=4);
 
@@ -548,6 +549,11 @@ begin
   reader.seek(mbWritePos div reader.frameSize);
   {just need a few frames to keep us going}
   musicUpdate(4);
+end;
+
+function musicBufferPos(): dword;
+begin
+  result := mbReadPos;
 end;
 
 procedure musicRestoreDefaultReader();

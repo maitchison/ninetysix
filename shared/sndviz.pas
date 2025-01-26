@@ -41,11 +41,10 @@ var
   y: integer;
 begin
   if y2 < y1 then begin tmp := y1; y1 := y2; y2 := tmp; end;
-  {todo: aa}
   for y := round(y1) to round(y2) do page.addValue(x, y, value);
 end;
 
-function getTracking(samplePtr: pAudioSample16S; midX, sampleLen, sampleMax: integer): integer;
+function getTracking(samplePtr: pAudioSample16S; sampleLen, sampleMax, midX: integer): integer;
 var
   pSample: pAudioSample16S;
   xlp: integer;
@@ -60,7 +59,7 @@ var
 
   function getSlope(idx: integer): single; inline;
   begin
-    result := (getSmooth(idx - 10).left - getSmooth(idx + 10).left) / 20;
+    result := (getSmooth(idx - 3).left - getSmooth(idx + 3).left) / 6;
   end;
 
   {tunes the tracking offset}
@@ -71,13 +70,13 @@ var
   begin
     bestScore := -99999;
     prevOffset := trackingOffset;
-    for xlp := -16 to +16 do begin
+    for xlp := -32 to +32 do begin
       pSample := getSmooth(midX + xlp*scale + prevOffset);
       slope := getSlope(midX + xlp*scale + prevOffset);
       score := 0;
       score -= 0.1 * abs(xlp*scale + prevOffset);             // drift loss
-      score -= abs(pSample^.left);
-      score += (slope * 10);
+      score -= 1 * abs(pSample^.left);
+      score -= 2 * (slope);
       if score > bestScore then begin
         bestScore := score;
         trackingOffset := xlp*scale + prevOffset;
@@ -99,9 +98,9 @@ begin
   end;
 
   {perform some sync}
-  trackingOffset := 16*4;
-  tuneTracking(4);
-  tuneTracking(1);
+  trackingOffset := 32*2;
+  tuneTracking(2);
+  //tuneTracking(1);
 
   result := trackingOffset;
 
@@ -159,6 +158,7 @@ var
   xScale, yScale: single;
   pSample: pAudioSample16S;
   trackingOffset: integer;
+  attenuation: single;
 
   function getSample(idx: integer): pAudioSample16S; inline;
   begin
@@ -177,8 +177,9 @@ begin
 
   prevMid := 0;
   for xlp := dstRect.left to dstRect.right do begin
-    pSample := getSample(trackingOffset + round((xlp - dstRect.left) * xScale));
-    mid := (pSample^.left+pSample^.right)*yScale;
+    attenuation := sqrt(1-(abs((dstRect.width/2)-(xlp-dstRect.x)) / (dstRect.width/2)));
+    pSample := getSample(trackingOffset + round((xlp - dstRect.x) * xScale));
+    mid := (pSample^.left+pSample^.right)*yScale*attenuation;
     vLineHDR(page, xlp, midY+prevMid, midY+mid, value);
     prevMid := mid;
   end;

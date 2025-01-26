@@ -543,6 +543,8 @@ var
   tag: string;
   selected: integer;
   background: tSprite;
+  rect: tRect;
+  oldBufferPos: dword;
 
   procedure setSelected(newSelected: integer);
   begin
@@ -552,6 +554,8 @@ var
   end;
 
 begin
+
+  oldBufferPos := 0;
 
   {get list of songs}
   {todo: stream these off disk rather than loading them in...}
@@ -572,44 +576,32 @@ begin
   screen := tScreen.create();
   screen.background := tPage.Load('res\background.p96');
 
-  hdrBuffer := tHDRPage.create(256,128);
+  hdrBuffer := tHDRPage.create(128,64);
+
+  screen.pageClear();
+  screen.pageFlip();
 
   {main loop}
   repeat
-    (*
-    {this one is just needed so that the buffers get cleared when shift
-     is down}
-    if keyDown(key_leftShift) then setSelected(selected);
-    for i := 0 to length(readers)-1 do
-      if keyDown(key_1+i) then setSelected(i);
-    musicUpdate();
-    if not keyDown(key_space) then begin
-      screen.pageClear();
-      {note: if we did this from music buffer we could sync as we'd have
-       more samples... but it'd be slightly delayed}
-      screen.canvas.hline(0, 240, 640-1, RGBA.create(128, 128, 255));
-      screen.canvas.hline(0, 240-128, 640-1, RGBA.create(64, 64, 128));
-      screen.canvas.hline(0, 240+128, 640-1, RGBA.create(64, 64, 128));
-      displayAudio((640-512) div 2, 240, screen.canvas, mixLib.scratchBufferPtr, 512);
-      screen.pageFlip();
-    end;
-    *)
 
-    if not keyDown(key_space) then begin
-      screen.pageClear();
+    {only update waveform if our music buffer has updated}
+    if (oldBufferPos <> musicBufferPos()) and (not keyDown(key_space)) then begin
 
-      displayWaveForm(screen.canvas, tRect.create(0, 0, 640, 480), mixLib.scratchBufferPtr, 512, 512, RGBA.create(64,128,64));
+      screen.clearAll();
 
-      hdrBuffer.fade();
-      displayWaveFormHDR(hdrBuffer, tRect.create(0, 0, 256, 128), mixLib.scratchBufferPtr, 256, 512, 1024);
-      hdrBuffer.blitTo(screen.canvas, 0, 0);
+      rect := tRect.create(640-hdrBuffer.width, 480-hdrBuffer.height, hdrBuffer.width, hdrBuffer.height);
+      hdrBuffer.fade(0.90);
+      displayWaveFormHDR(hdrBuffer, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 4*1024);
+      hdrBuffer.addTo(screen.canvas, rect.x, rect.y);
 
-      screen.pageFlip();
+      screen.markRegion(rect);
+
+      screen.flipAll();
+
+      oldBufferPos := musicBufferPos;
     end;
     musicUpdate();
   until keyDown(key_esc);
-
-  musicRestoreDefaultReader();
 
   videoDriver.setText();
 

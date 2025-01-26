@@ -17,7 +17,7 @@ type
   tHDRPage = class
   private
     data: pWord;
-    width,height: integer;
+    fWidth, fHeight: integer;
   public
     constructor create(aWidth, aHeight: integer);
     destructor destroy(); override;
@@ -25,7 +25,11 @@ type
     procedure setValue(x, y: int16;value: word);
     procedure addValue(x, y: int16;value: integer);
     procedure blitTo(page: tPage;atX, atY: int16);
-    procedure fade();
+    procedure addTo(page: tPage;atX, atY: int16);
+    procedure fade(factor: single=0.7);
+
+    property width: integer read fWidth;
+    property height: integer read fHeight;
   end;
 
 implementation
@@ -36,9 +40,10 @@ var
 constructor tHDRPage.create(aWidth, aHeight: integer);
 begin
   inherited create();
-  self.width := aWidth;
-  self.height := aHeight;
-  data := getMem(width*height*2);
+  fWidth := aWidth;
+  fHeight := aHeight;
+  data := getMem(fWidth*fHeight*2);
+  fillword(data^, fWidth*fHeight, 1024);
 end;
 
 destructor tHDRPage.destroy();
@@ -49,24 +54,24 @@ end;
 
 procedure tHDRPage.setValue(x, y: int16;value: word);
 begin
-  if (word(x) >= width) or (word(y) >= height) then exit;
-  data[x+y*width] := value;
+  if (word(x) >= fWidth) or (word(y) >= fHeight) then exit;
+  data[x+y*fWidth] := value;
 end;
 
 function tHDRPage.getRGB(x, y: int16): RGBA;
 var
   value: word;
 begin
-  if (word(x) >= width) or (word(y) >= height) then exit;
-  result := LUT[data[x+y*width] shr 4];
+  if (word(x) >= fWidth) or (word(y) >= fHeight) then exit;
+  result := LUT[data[x+y*fWidth] shr 4];
 end;
 
 procedure tHDRPage.addValue(x, y: int16;value: integer);
 var
   ofs: integer;
 begin
-  if (word(x) >= width) or (word(y) >= height) then exit;
-  ofs := x+y*width;
+  if (word(x) >= fWidth) or (word(y) >= fHeight) then exit;
+  ofs := x+y*fWidth;
   data[ofs] := clamp(data[ofs]+value, 0, 65535);
 end;
 
@@ -76,9 +81,9 @@ var
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
-  for y := 0 to height-1 do begin
-    count := width;
-    dataPtr := data + (y * width);
+  for y := 0 to fHeight-1 do begin
+    count := fWidth;
+    dataPtr := data + (y * fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
     lutPtr := @LUT;
     asm
@@ -101,16 +106,81 @@ begin
   end;
 end;
 
+procedure tHDRPage.addTo(page: tPage;atX, atY: int16);
+var
+  y: integer;
+  count: int32;
+  dataPtr, pixelsPtr, lutPtr: pointer;
+begin
+  for y := 0 to fHeight-1 do begin
+    count := fWidth;
+    dataPtr := data + (y * fWidth);
+    pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
+    lutPtr := @LUT;
+    {note: we could do this 2 pixels at a time if we wanted}
+    asm
+      pushad
+      mov esi, dataPtr
+      mov edi, pixelsPtr
+      mov ecx, count
+      mov ebp, lutPtr
+      xor eax, eax
+    @LOOP:
+      movzx eax, word ptr [esi]
+      shr eax, 4
+      mov eax, [ebp+eax*4]      // eax = color
+      movd  mm0, eax            // mm0 = 0000-rgba
+      movd  mm1, dword ptr [edi]
+      paddusb mm0, mm1
+      movd  [edi], mm0
+      add esi, 2
+      add edi, 4
+      loop @LOOP
+      popad
+    end;
+  end;
+
+  asm
+    emms;
+  end;
+end;
+
 {reduce intensity of page}
-procedure tHDRPage.fade();
+procedure tHDRPage.fade(factor: single=0.7);
 var
   ofs: integer;
   count: int32;
   dataPtr: pointer;
+  value: word;
 begin
-  count := width*height;
+  count := (fWidth*fHeight) div 4;
   dataPtr := data;
+  value := round(clamp(factor, 0, 1)*32767);
   {mmx would help somewhat here. Also we could do a substract if we wanted}
+  asm
+    pushad
+    mov   edi, dataPtr
+    mov   ecx, count
+
+    mov   ax,  value
+    shl   eax, 16
+    mov   ax,  value
+    pxor  mm1, mm1
+    movd  mm1, eax
+    punpckldq mm1, mm1
+
+  @LOOP:
+    movq   mm0, [edi]
+    pmulhw mm0, mm1
+    psllw  mm0, 1   // we loose 1 bit of precision doing this, but that's ok.
+
+    movq   [edi], mm0
+    add    edi, 8
+    loop @LOOP
+    popad
+    emms
+  end;
+  (*
   asm
     pushad
     mov edi, dataPtr
@@ -123,6 +193,7 @@ begin
     loop @LOOP
     popad
   end;
+  *)
 end;
 
 var
@@ -131,7 +202,12 @@ var
 
 begin
   for i := 0 to 4096-1 do begin
-    v := sqrt(i/4096);
-    LUT[i].init(round(256*v), 50+round(512*v), round(384*v), round(512*v));
+    v := (i/4096);
+    LUT[i].init(
+      round(power(v, 0.5)*256),
+      round(power(5*v, 0.7)*256),
+      round(power(v, 0.6)*256),
+      255);
+
   end;
 end.
