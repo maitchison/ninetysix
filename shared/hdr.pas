@@ -72,20 +72,57 @@ end;
 
 procedure tHDRPage.blitTo(page: tPage;atX, atY: int16);
 var
-  x, y: integer;
+  y: integer;
+  count: int32;
+  dataPtr, pixelsPtr, lutPtr: pointer;
 begin
-  for y := 0 to height-1 do
-    for x := 0 to width-1 do
-      page.setPixel(x+atX, y+atY, getRGB(x, y));
+  for y := 0 to height-1 do begin
+    count := width;
+    dataPtr := data + (y * width);
+    pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
+    lutPtr := @LUT;
+    asm
+      pushad
+      mov esi, dataPtr
+      mov edi, pixelsPtr
+      mov ecx, count
+      mov ebp, lutPtr
+      xor eax, eax
+    @LOOP:
+      movzx eax, word ptr [esi]
+      shr eax, 4
+      mov eax, [ebp+eax*4]
+      mov [edi], eax
+      add esi, 2
+      add edi, 4
+      loop @LOOP
+      popad
+    end;
+  end;
 end;
 
 {reduce intensity of page}
 procedure tHDRPage.fade();
 var
   ofs: integer;
+  count: int32;
+  dataPtr: pointer;
 begin
-  for ofs := 0 to (width*height)-1 do
-    data[ofs] := data[ofs] shr 1;
+  count := width*height;
+  dataPtr := data;
+  {mmx would help somewhat here. Also we could do a substract if we wanted}
+  asm
+    pushad
+    mov edi, dataPtr
+    mov ecx, count
+  @LOOP:
+    mov ax, [edi]
+    shr ax, 1
+    mov [edi], ax
+    add edi, 2
+    loop @LOOP
+    popad
+  end;
 end;
 
 var

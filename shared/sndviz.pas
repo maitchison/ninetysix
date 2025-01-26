@@ -93,13 +93,13 @@ begin
   mid := samplePtr^.left + samplePtr^.right;
   pSample := samplePtr;
   for xlp := 0 to sampleLen-1 do begin
-    mid := mid * 0.9 + (pSample^.left+pSample^.right) * 0.1;
+    mid := mid * 0.95 + (pSample^.mid) * 0.05;
     sampleBuffer[xlp].left := clamp16(mid);
     inc(pSample);
   end;
 
   {perform some sync}
-  trackingOffset := 0;
+  trackingOffset := 16*4;
   tuneTracking(4);
   tuneTracking(1);
 
