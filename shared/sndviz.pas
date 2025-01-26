@@ -15,6 +15,7 @@ uses
 
 procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; color: RGBA);
 procedure displayWaveFormHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; value: integer);
+procedure displayPhaseScopeHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, value: integer);
 
 implementation
 
@@ -182,6 +183,27 @@ begin
     mid := (pSample^.left+pSample^.right)*yScale*attenuation;
     vLineHDR(page, xlp, midY+prevMid, midY+mid, round(value*attenuation));
     prevMid := mid;
+  end;
+
+end;
+
+procedure displayPhaseScopeHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, value: integer);
+var
+  i: integer;
+  x,y: integer;
+  xScale, yScale: single;
+  midX, midY: integer;
+begin
+  midX := dstRect.mid.x;
+  midY := dstRect.mid.y;
+  xScale := dstRect.width / 65536;
+  yScale := dstRect.height / 65536;
+
+  for i := 0 to sampleLen-1 do begin
+    x := midX + round(samplePtr^.left * xScale);
+    y := midY - round(samplePtr^.right * yScale);
+    page.addValue(x, y, value);
+    inc(samplePtr);
   end;
 
 end;

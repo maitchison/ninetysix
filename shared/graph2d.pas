@@ -29,6 +29,7 @@ type
 
     procedure expandToInclude(p: tPoint);
     function  isInside(x,y: int32): boolean;
+    function  mid: tPoint;
     class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
     class operator Explicit(a: TRect): ShortString;
 
@@ -135,6 +136,12 @@ begin
   result.y := y1+Other.Y;
   result.width := x2-x1;
   result.height := y2-y1;
+end;
+
+function tRect.mid: tPoint;
+begin
+  result.x := x+(width div 2);
+  result.y := y+(height  div 2);
 end;
 
 {----------------------------------}

@@ -30,7 +30,8 @@ const
 {globals}
 var
   screen: tScreen;
-  hdrBuffer: tHDRPage;
+  hdrWave: tHDRPage;
+  hdrPhase: tHDRPage;
   music16: tSoundEffect;    // our original sound.
 
 {--------------------------------------------------------}
@@ -576,7 +577,11 @@ begin
   screen := tScreen.create();
   screen.background := tPage.Load('res\background.p96');
 
-  hdrBuffer := tHDRPage.create(128,64);
+  hdrWave := tHDRPage.create(128,64);
+  hdrPhase := tHDRPage.create(64,64);
+
+  hdrWave.clear(31*1024);
+  hdrPhase.clear(31*1024);
 
   screen.pageClear();
   screen.pageFlip();
@@ -584,23 +589,32 @@ begin
   {main loop}
   repeat
 
+    musicUpdate();
+
     {only update waveform if our music buffer has updated}
     if (oldBufferPos <> musicBufferPos()) and (not keyDown(key_space)) then begin
 
       screen.clearAll();
 
-      rect := tRect.create((640-hdrBuffer.width) div 2, 480-hdrBuffer.height, hdrBuffer.width, hdrBuffer.height);
-      hdrBuffer.fade(0.90);
-      displayWaveFormHDR(hdrBuffer, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 2*1024);
-      hdrBuffer.addTo(screen.canvas, rect.x, rect.y);
+      {waveform}
+      rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height, hdrWave.width, hdrWave.height);
+      hdrWave.fade(0.90);
+      displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 2*1024);
+      hdrWave.addTo(screen.canvas, rect.x, rect.y);
+      screen.markRegion(rect);
 
+      {phase}
+      rect := tRect.create((640-hdrPhase.width) div 2, (480-hdrPhase.height) div 4, hdrPhase.width, hdrPhase.height);
+      hdrPhase.fade(0.90);
+      displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 2*1024);
+      hdrPhase.addTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
 
       screen.flipAll();
 
       oldBufferPos := musicBufferPos;
     end;
-    musicUpdate();
+
   until keyDown(key_esc);
 
   videoDriver.setText();

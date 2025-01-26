@@ -27,6 +27,8 @@ type
     procedure blitTo(page: tPage;atX, atY: int16);
     procedure addTo(page: tPage;atX, atY: int16; shift: byte=0);
     procedure fade(factor: single=0.7);
+    procedure clear(value: word);
+
 
     property width: integer read fWidth;
     property height: integer read fHeight;
@@ -43,13 +45,18 @@ begin
   fWidth := aWidth;
   fHeight := aHeight;
   data := getMem(fWidth*fHeight*2);
-  fillword(data^, fWidth*fHeight, 1024);
+  clear(0);
 end;
 
 destructor tHDRPage.destroy();
 begin
   freemem(data);
   inherited destroy();
+end;
+
+procedure tHDRPage.clear(value: word);
+begin
+  fillword(data^, fWidth*fHeight, value);
 end;
 
 procedure tHDRPage.setValue(x, y: int16;value: word);
@@ -173,7 +180,7 @@ begin
     punpckldq mm1, mm1
 
   @LOOP:
-    movq   mm0, [edi]
+    movq   mm0, [edi]     // mm0 = HDR value
     pmulhw mm0, mm1
     psllw  mm0, 1   // we loose 1 bit of precision doing this, but that's ok.
 
