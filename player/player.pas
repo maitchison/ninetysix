@@ -19,6 +19,7 @@ uses
   sndViz,
   sprite,
   lc96,
+  hdr,
   {other stuff}
   crt;
 
@@ -29,6 +30,7 @@ const
 {globals}
 var
   screen: tScreen;
+  hdrBuffer: tHDRPage;
   music16: tSoundEffect;    // our original sound.
 
 {--------------------------------------------------------}
@@ -570,6 +572,8 @@ begin
   screen := tScreen.create();
   screen.background := tPage.Load('res\background.p96');
 
+  hdrBuffer := tHDRPage.create(256,128);
+
   {main loop}
   repeat
     (*
@@ -593,7 +597,13 @@ begin
 
     if not keyDown(key_space) then begin
       screen.pageClear();
+
       displayWaveForm(screen.canvas, tRect.create(0, 0, 640, 480), mixLib.scratchBufferPtr, 512, 512, RGBA.create(64,128,64));
+
+      hdrBuffer.fade();
+      displayWaveFormHDR(hdrBuffer, tRect.create(0, 0, 256, 128), mixLib.scratchBufferPtr, 256, 512, 1024);
+      hdrBuffer.blitTo(screen.canvas, 0, 0);
+
       screen.pageFlip();
     end;
     musicUpdate();

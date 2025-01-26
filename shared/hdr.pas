@@ -22,8 +22,8 @@ type
     constructor create(aWidth, aHeight: integer);
     destructor destroy(); override;
     function  getRGB(x, y: int16): RGBA;
-    procedure setPixel(x, y: int16;value: word);
-    procedure addPixel(x, y: int16;value: integer);
+    procedure setValue(x, y: int16;value: word);
+    procedure addValue(x, y: int16;value: integer);
     procedure blitTo(page: tPage;atX, atY: int16);
     procedure fade();
   end;
@@ -36,8 +36,8 @@ var
 constructor tHDRPage.create(aWidth, aHeight: integer);
 begin
   inherited create();
-  self.width := width;
-  self.height := height;
+  self.width := aWidth;
+  self.height := aHeight;
   data := getMem(width*height*2);
 end;
 
@@ -47,7 +47,7 @@ begin
   inherited destroy();
 end;
 
-procedure tHDRPage.setPixel(x, y: int16;value: word);
+procedure tHDRPage.setValue(x, y: int16;value: word);
 begin
   if (word(x) >= width) or (word(y) >= height) then exit;
   data[x+y*width] := value;
@@ -58,10 +58,10 @@ var
   value: word;
 begin
   if (word(x) >= width) or (word(y) >= height) then exit;
-  result := LUT[data[x+y*width] shr 16];
+  result := LUT[data[x+y*width] shr 4];
 end;
 
-procedure tHDRPage.addPixel(x, y: int16;value: integer);
+procedure tHDRPage.addValue(x, y: int16;value: integer);
 var
   ofs: integer;
 begin
@@ -76,7 +76,7 @@ var
 begin
   for y := 0 to height-1 do
     for x := 0 to width-1 do
-      page.putPixel(x+atX, y+atY, getRGB(x, y));
+      page.setPixel(x+atX, y+atY, getRGB(x, y));
 end;
 
 {reduce intensity of page}
@@ -95,6 +95,6 @@ var
 begin
   for i := 0 to 4096-1 do begin
     v := sqrt(i/4096);
-    LUT[i].init(round(v), round(v*2), round(v*1.5));
+    LUT[i].init(round(256*v), 50+round(512*v), round(384*v), round(512*v));
   end;
 end.
