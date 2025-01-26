@@ -27,6 +27,7 @@ type
     procedure blitTo(page: tPage;atX, atY: int16);
     procedure addTo(page: tPage;atX, atY: int16);
     procedure mulTo(page: tPage;atX, atY: int16);
+    procedure mixTo(page: tPage;atX, atY: int16);
     procedure fade(factor: single=0.7);
     procedure clear(value: word);
 
@@ -207,6 +208,69 @@ begin
       packuswb  mm1, mm1                // mm1 = rgba-rgba
 
       movd  [edi], mm1
+      add esi, 2
+      add edi, 4
+      loop @LOOP
+      popad
+      emms
+      sti
+    end;
+  end;
+end;
+
+{this is just mix+add}
+procedure tHDRPage.mixTo(page: tPage;atX, atY: int16);
+var
+  y: integer;
+  count: int32;
+  dataPtr, pixelsPtr, lutPtr: pointer;
+begin
+  for y := 0 to fHeight-1 do begin
+    count := fWidth;
+    dataPtr := pointer(data) + (y * 2*fWidth);
+    pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
+    lutPtr := @HDR_LUT;
+    {note: we could do this 2 pixels at a time if we wanted}
+    asm
+      cli
+      pushad
+      mov esi, dataPtr
+      mov edi, pixelsPtr
+      xor eax, eax
+      mov ecx, count
+      mov edx, lutPtr
+
+      pxor mm5, mm5
+
+    @LOOP:
+      {load our color}
+      movzx eax, word ptr [esi]
+      shr eax, LUT_SHIFT
+      mov ebx, [edx+eax*4]        // ebx = color
+
+      {multply the destination color}
+      mov       eax, ebx
+      bswap     eax
+      not       al
+      shl       ax, 8
+      shr       ax, 1                   // ax = alpha * 128
+
+      movd      mm0, eax
+      punpcklwd mm0, mm0
+      punpckldq mm0, mm0                // mm0 = value (0..32k)
+
+      movd      mm1, dword ptr [edi]    // mm1 = 0000-rgba (dst)
+      punpcklbw mm1, mm5                // mm1 = 0r0g-0b0a (dst)
+      psllw     mm1, 1                  // mm1 = 0r0g-0b0a (dst) (*2)
+      // note: to avoid signs we divide value by 2 and multiply dst by 2
+      pmulhw    mm1, mm0                // mm1 = 0r0g-0b0a (dst * value)
+      packuswb  mm1, mm1                // mm1 = rgba-rgba
+
+      {combine}
+      movd  mm0, ebx              // mm0 = 0000-rgba (src)
+      paddusb mm0, mm1
+
+      movd  [edi], mm0
       add esi, 2
       add edi, 4
       loop @LOOP

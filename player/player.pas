@@ -606,18 +606,16 @@ begin
       rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height, hdrWave.width, hdrWave.height);
       hdrWave.fade(0.90);
       displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 4*1024);
-      hdrWave.mulTo(screen.canvas, rect.x, rect.y);
-      hdrWave.addTo(screen.canvas, rect.x, rect.y);
+      hdrWave.mixTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
       stopTimer('waveform');
 
       {phase}
       startTimer('phase');
-      rect := tRect.create((640-hdrPhase.width) div 2, (480-hdrPhase.height) div 4, hdrPhase.width, hdrPhase.height);
+      rect := tRect.create((640-hdrPhase.width) div 2, (480-hdrPhase.height) div 2, hdrPhase.width, hdrPhase.height);
       hdrPhase.fade(0.95);
       displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 256);
       hdrPhase.mulTo(screen.canvas, rect.x, rect.y);
-      hdrPhase.addTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
       stopTimer('phase');
 
