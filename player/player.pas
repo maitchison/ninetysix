@@ -584,11 +584,6 @@ begin
   hdrPhase := tHDRPage.create(64,64);
 
   screen.pageClear();
-  {stub:}
-  for y := 0 to 100 do
-    for x := 0 to 255 do
-      screen.canvas.setPixel(x, y, HDR_LUT[x * 16]);
-
   screen.pageFlip();
 
 

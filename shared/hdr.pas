@@ -35,8 +35,13 @@ type
     property height: integer read fHeight;
   end;
 
+const
+  // lookup table will be 64k / (1 shl LUT_SHIFT)
+  // 0 = full 64 lookup, 2 = 16k lookup, 4 = 4k lookup etc...
+  LUT_SHIFT = 4;
+
 var
-  HDR_LUT: array[0..4096-1] of RGBA;
+  HDR_LUT: array[0..(65536 shr LUT_SHIFT)-1] of RGBA;
 
 implementation
 
@@ -72,7 +77,7 @@ var
   value: word;
 begin
   if (word(x) >= fWidth) or (word(y) >= fHeight) then exit;
-  result := HDR_LUT[data[x+y*fWidth] shr 4];
+  result := HDR_LUT[data[x+y*fWidth] shr 2];
 end;
 
 procedure tHDRPage.addValue(x, y: int16;value: integer);
@@ -92,7 +97,7 @@ var
 begin
   for y := 0 to fHeight-1 do begin
     count := fWidth;
-    dataPtr := data + (y * fWidth);
+    dataPtr := pointer(data) + (y * 2*fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
     lutPtr := @HDR_LUT;
     asm
@@ -104,7 +109,7 @@ begin
       xor eax, eax
     @LOOP:
       movzx eax, word ptr [esi]
-      shr eax, 4
+      shr eax, LUT_SHIFT
       mov eax, [ebp+eax*4]
       mov [edi], eax
       add esi, 2
@@ -121,16 +126,14 @@ var
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
-  asm
-    cli
-  end;
   for y := 0 to fHeight-1 do begin
     count := fWidth;
-    dataPtr := data + (y * fWidth);
+    dataPtr := pointer(data) + (y * 2*fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
     lutPtr := @HDR_LUT;
     {note: we could do this 2 pixels at a time if we wanted}
     asm
+      cli
       pushad
       mov esi, dataPtr
       mov edi, pixelsPtr
@@ -140,7 +143,7 @@ begin
       pxor mm5, mm5
     @LOOP:
       movzx eax, word ptr [esi]
-      shr eax, 4
+      shr eax, LUT_SHIFT
       mov eax, [edx+eax*4]        // eax = color
       movd  mm0, eax              // mm0 = 0000-rgba (src)
       movd  mm1, dword ptr [edi]  // mm1 = 0000-rgba (dst)
@@ -151,12 +154,9 @@ begin
       add edi, 4
       loop @LOOP
       popad
+      emms
+      sti
     end;
-  end;
-
-  asm
-    emms
-    sti
   end;
 end;
 
@@ -167,17 +167,15 @@ var
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
-  asm
-    cli
-  end;
   for y := 0 to fHeight-1 do begin
     count := fWidth;
-    dataPtr := data + (y * fWidth);
+    dataPtr := pointer(data) + (y * 2*fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
     lutPtr := @HDR_LUT;
     {note: we could do this 2 pixels at a time if we wanted}
     {note2: we could integrate add and mul together fairly easily...}
     asm
+      cli
       pushad
       mov esi, dataPtr
       mov edi, pixelsPtr
@@ -189,7 +187,7 @@ begin
 
     @LOOP:
       movzx     eax, word ptr [esi]
-      shr       eax, 4
+      shr       eax, LUT_SHIFT
       mov       eax, [edx+eax*4]        // eax = color
       bswap     eax
       not       al
@@ -213,12 +211,9 @@ begin
       add edi, 4
       loop @LOOP
       popad
+      emms
+      sti
     end;
-  end;
-
-  asm
-    emms
-    sti
   end;
 end;
 
@@ -226,62 +221,51 @@ end;
 {reduce intensity of page}
 procedure tHDRPage.fade(factor: single=0.7);
 var
-  ofs: integer;
   count: int32;
   dataPtr: pointer;
   value: word;
+  y: integer;
 begin
-  count := (fWidth*fHeight) div 4;
-  dataPtr := data;
   value := round(clamp(factor, 0, 1)*32767);
-  {mmx would help somewhat here. Also we could do a substract if we wanted}
-  asm
-    cli
-    pushad
-    mov   edi, dataPtr
-    mov   ecx, count
+  for y := 0 to fHeight-1 do begin
+    count := fWidth;
+    dataPtr := pointer(data) + (y * fWidth * 2);
+    asm
+      cli
+      pushad
+      mov   edi, dataPtr
+      mov   ecx, count
+      shr   ecx, 2          // we do 4 values at a time
 
-    mov   ax,  value
-    shl   eax, 16
-    mov   ax,  value
-    pxor  mm1, mm1
-    movd  mm1, eax
-    punpckldq mm1, mm1
+      mov   ax,  value
+      shl   eax, 16
+      mov   ax,  value
+      pxor  mm1, mm1
+      movd  mm1, eax
+      punpckldq mm1, mm1
 
-  @LOOP:
-    movq   mm0, [edi]     // mm0 = HDR value
+    @LOOP:
+      movq   mm0, [edi]     // mm0 = HDR value
 
-    // we only have a signed multiply... so divide both operands by
-    // two so that we're never negative. We loose some precision doing
-    // this, but I think it's ok.
-    // note: alternatively we could try and correct the signed multiply
-    // but it's a pain and requires conditionals. (if a < 0 then result +=a etc)
-    psrlw  mm0, 1
-    pmulhw mm0, mm1
-    // multipler was already /2 so we need to *4 to adjust for everything.
-    psllw  mm0, 2
+      // we only have a signed multiply... so divide both operands by
+      // two so that we're never negative. We loose some precision doing
+      // this, but I think it's ok.
+      // note: alternatively we could try and correct the signed multiply
+      // but it's a pain and requires conditionals. (if a < 0 then result +=a etc)
+      psrlw  mm0, 1
+      pmulhw mm0, mm1
+      // multipler was already /2 so we need to *4 to adjust for everything.
+      psllw  mm0, 2
 
-    movq   [edi], mm0
-    add    edi, 8
-    loop @LOOP
-    popad
-    emms
-    sti
+      movq   [edi], mm0
+      add    edi, 8
+      loop @LOOP
+
+      popad
+      emms
+      sti
+    end;
   end;
-  (*
-  asm
-    pushad
-    mov edi, dataPtr
-    mov ecx, count
-  @LOOP:
-    mov ax, [edi]
-    shr ax, 1
-    mov [edi], ax
-    add edi, 2
-    loop @LOOP
-    popad
-  end;
-  *)
 end;
 
 var
@@ -289,13 +273,13 @@ var
   v: single;
 
 begin
-  for i := 0 to 4096-1 do begin
-    v := (i/4096);
+  for i := 0 to (65536 shr LUT_SHIFT)-1 do begin
+    v := (i/(65536 shr LUT_SHIFT));
     HDR_LUT[i].init(
       round(power(v, 1.0)*255),
-      round(power(v, 0.3)*255),
+      round((v*100)+power(v, 0.5)*255),
       round(power(v, 0.7)*255),
-      round(power(v, 0.35)*255)
+      round(power(v, 0.5)*255)
     )
   end;
 end.
