@@ -81,8 +81,9 @@ procedure GetDate(var year, month, mday, wday: word);
 procedure GetTime(var hour, minute, second, sec100: word);
 
 {------------------------------------------------}
-{ crt replacements}
+{ time handling }
 procedure delay(ms: double);
+procedure idle();
 
 {------------------------------------------------}
 { My custom routines }
@@ -373,6 +374,15 @@ var
 begin
   targetSec := getSec + ms/1000;
   while getSec < targetSec do;
+end;
+
+{give up one time slice}
+procedure idle(); inline;
+asm
+  push ax
+  mov ax, $1680
+  int $2F
+  pop ax
 end;
 
 {Put CPU into idle for give number of ms}

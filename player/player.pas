@@ -634,6 +634,8 @@ begin
       stopTimer('main');
     end;
 
+    idle();
+
   until keyDown(key_esc);
 
   videoDriver.setText();
