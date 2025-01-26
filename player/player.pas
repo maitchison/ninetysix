@@ -541,7 +541,6 @@ var
   tag: string;
   selected: integer;
   background: tSprite;
-  syncData: tWaveFormSyncData;
 
   procedure setSelected(newSelected: integer);
   begin
@@ -571,8 +570,6 @@ begin
   screen := tScreen.create();
   screen.background := tPage.Load('res\background.p96');
 
-  fillchar(syncData, sizeof(syncData), 0);
-
   {main loop}
   repeat
     (*
@@ -596,7 +593,7 @@ begin
 
     if not keyDown(key_space) then begin
       screen.pageClear();
-      displayWaveForm(screen.canvas, tRect.create(0, 0, 640, 480), mixLib.scratchBufferPtr, 512, 512, syncData, RGBA.create(64,128,64));
+      displayWaveForm(screen.canvas, tRect.create(0, 0, 640, 480), mixLib.scratchBufferPtr, 512, 512, RGBA.create(64,128,64));
       screen.pageFlip();
     end;
     musicUpdate();

@@ -13,14 +13,7 @@ uses
   hdr,
   graph32;
 
-type
-  tWaveFormSyncData = record
-    prevOffset: integer;
-    prevValue: integer;
-    prevSlope: single;
-  end;
-
-procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; var syncData: tWaveFormSyncData;color: RGBA);
+procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; color: RGBA);
 
 implementation
 
@@ -48,7 +41,7 @@ sampleMax    how many samples the buffer contains
 syncData:    used to attempt to sync the waveform to the last call
 }
 {todo: we really want some kind of sampleBuffer, not just a pointer and length}
-procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; var syncData: tWaveFormSyncData;color: RGBA);
+procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; color: RGBA);
 var
   xlp: integer;
   mid: single;
@@ -131,10 +124,6 @@ begin
     prevMid := mid;
   end;
 
-  {update tracking}
-  syncData.prevOffset := trackingOffset;
-  syncData.prevValue := getSmooth(trackingOffset+midX).left;
-  syncData.prevSlope := getSlope(trackingOffset+midX);
 end;
 
 begin
