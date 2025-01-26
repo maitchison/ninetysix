@@ -17,6 +17,7 @@ type
 function degToRad(x: tFloat): tFloat;
 function radToDeg(x: tFloat): tFloat;
 function ceil(x: tFloat): int64;
+function floor(x: tFloat): int64;
 function arccos(x: tFloat): tFloat;
 function arctan2(y,x: tFloat): tFloat;
 
@@ -39,6 +40,13 @@ begin
     result := trunc(x) + 1
   else
     result := trunc(x);
+end;
+
+{weird that I have to implement this...}
+function floor(x: tFloat): int64;
+begin
+  result := trunc(x);
+  if (x < 0) and (frac(x) <> 0) then result -= 1;
 end;
 
 function arccos(x: tFloat): tFloat;
@@ -88,6 +96,12 @@ begin
   assertEqual(ceil(3.0), 3);
   assertEqual(ceil(-2.3), -2);
   assertEqual(ceil(-0.3), 0);
+
+  assertEqual(floor(3.2), 3);
+  assertEqual(floor(3.0), 3);
+  assertEqual(floor(-4), -4);
+  assertEqual(floor(-2.3), -3);
+  assertEqual(floor(-0.3), -1);
 end;
 
 initialization
