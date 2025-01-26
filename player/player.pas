@@ -20,6 +20,7 @@ uses
   sprite,
   lc96,
   hdr,
+  font,
   {other stuff}
   crt;
 
@@ -546,6 +547,7 @@ var
   background: tSprite;
   rect: tRect;
   oldBufferPos: dword;
+  elapsed: double;
 
   procedure setSelected(newSelected: integer);
   begin
@@ -586,32 +588,50 @@ begin
   {main loop}
   repeat
 
+    startTimer('music');
     musicUpdate();
+    stopTimer('music');
 
     {only update waveform if our music buffer has updated}
     if (oldBufferPos <> musicBufferPos()) and (not keyDown(key_space)) then begin
 
+      startTimer('main');
+
       screen.clearAll();
 
       {waveform}
+      startTimer('waveform');
       rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height, hdrWave.width, hdrWave.height);
       hdrWave.fade(0.90);
       displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 2*1024);
       hdrWave.mulTo(screen.canvas, rect.x, rect.y);
       hdrWave.addTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
+      stopTimer('waveform');
 
       {phase}
+      startTimer('phase');
       rect := tRect.create((640-hdrPhase.width) div 2, (480-hdrPhase.height) div 4, hdrPhase.width, hdrPhase.height);
       hdrPhase.fade(0.95);
       displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 128);
       hdrPhase.mulTo(screen.canvas, rect.x, rect.y);
       hdrPhase.addTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
+      stopTimer('phase');
+
+      {fps:}
+      if assigned(getTimer('main')) then
+        elapsed := getTimer('main').avElapsed
+      else
+        elapsed := -1;
+      textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGBA.create(250, 250, 250, 200));
+      screen.markRegion(tRect.create(6,3,40,30));
 
       screen.flipAll();
 
       oldBufferPos := musicBufferPos;
+
+      stopTimer('main');
     end;
 
   until keyDown(key_esc);

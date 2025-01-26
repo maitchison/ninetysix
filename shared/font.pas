@@ -30,7 +30,7 @@ type
     kerning: array[0..255, 0..255] of shortint;
   end;
 
-procedure textOut(page: TPage; atX, atY: integer; s: string;col: RGBA);
+procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
 function textExtents(s: string): tRect;
 
 implementation
