@@ -42,9 +42,6 @@ const
   // lookup table will be 64k / (1 shl LUT_SHIFT)
   // 0 = full 64 lookup, 2 = 16k lookup, 4 = 4k lookup etc...
   LUT_SHIFT = 4;
-  // this masks out the high bits after a shift, i.e. for LUT_SHIFT=2
-  // 00111111-11111111
-  LUT_MASK = (1 shl (16 - LUT_SHIFT))-1;
 
 var
   HDR_LUT: array[0..(65536 shr LUT_SHIFT)-1] of RGBA;
@@ -179,8 +176,6 @@ begin
     dataPtr := pointer(data) + (y * 2*fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
     lutPtr := @HDR_LUT;
-    {note: we could do this 2 pixels at a time if we wanted}
-    {note2: we could integrate add and mul together fairly easily...}
     asm
       cli
       pushad
@@ -239,7 +234,6 @@ begin
     dataPtr := pointer(data) + (y * 2*fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
     lutPtr := @HDR_LUT;
-    {note: we could do this 2 pixels at a time if we wanted}
     asm
       cli
       pushad
@@ -256,7 +250,6 @@ begin
       xor       ebx, ebx
       mov       bx,  word ptr [esi]
       shr       bx,  LUT_SHIFT
-      //and       bx,  LUT_MASK           // ebx = [value1] [value2] (shifted)
 
       test      bx, bx
       jz       @SKIP
