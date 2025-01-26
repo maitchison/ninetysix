@@ -180,7 +180,7 @@ begin
     attenuation := sqrt(1-(abs((dstRect.width/2)-(xlp-dstRect.x)) / (dstRect.width/2)));
     pSample := getSample(trackingOffset + round((xlp - dstRect.x) * xScale));
     mid := (pSample^.left+pSample^.right)*yScale*attenuation;
-    vLineHDR(page, xlp, midY+prevMid, midY+mid, value);
+    vLineHDR(page, xlp, midY+prevMid, midY+mid, round(value*attenuation));
     prevMid := mid;
   end;
 

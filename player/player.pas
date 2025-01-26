@@ -589,9 +589,9 @@ begin
 
       screen.clearAll();
 
-      rect := tRect.create(640-hdrBuffer.width, 480-hdrBuffer.height, hdrBuffer.width, hdrBuffer.height);
+      rect := tRect.create((640-hdrBuffer.width) div 2, 480-hdrBuffer.height, hdrBuffer.width, hdrBuffer.height);
       hdrBuffer.fade(0.90);
-      displayWaveFormHDR(hdrBuffer, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 4*1024);
+      displayWaveFormHDR(hdrBuffer, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 2*1024);
       hdrBuffer.addTo(screen.canvas, rect.x, rect.y);
 
       screen.markRegion(rect);

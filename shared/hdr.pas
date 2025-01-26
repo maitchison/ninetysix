@@ -25,7 +25,7 @@ type
     procedure setValue(x, y: int16;value: word);
     procedure addValue(x, y: int16;value: integer);
     procedure blitTo(page: tPage;atX, atY: int16);
-    procedure addTo(page: tPage;atX, atY: int16);
+    procedure addTo(page: tPage;atX, atY: int16; shift: byte=0);
     procedure fade(factor: single=0.7);
 
     property width: integer read fWidth;
@@ -106,12 +106,13 @@ begin
   end;
 end;
 
-procedure tHDRPage.addTo(page: tPage;atX, atY: int16);
+procedure tHDRPage.addTo(page: tPage;atX, atY: int16; shift: byte=0);
 var
   y: integer;
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
+  shift := 1;
   for y := 0 to fHeight-1 do begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
@@ -122,16 +123,18 @@ begin
       pushad
       mov esi, dataPtr
       mov edi, pixelsPtr
-      mov ecx, count
-      mov ebp, lutPtr
       xor eax, eax
+      mov ecx, count
+      mov edx, lutPtr
+      pxor mm5, mm5
     @LOOP:
       movzx eax, word ptr [esi]
       shr eax, 4
-      mov eax, [ebp+eax*4]      // eax = color
-      movd  mm0, eax            // mm0 = 0000-rgba
-      movd  mm1, dword ptr [edi]
+      mov eax, [edx+eax*4]        // eax = color
+      movd  mm0, eax              // mm0 = 0000-rgba (src)
+      movd  mm1, dword ptr [edi]  // mm1 = 0000-rgba (dst)
       paddusb mm0, mm1
+
       movd  [edi], mm0
       add esi, 2
       add edi, 4
