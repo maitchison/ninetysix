@@ -81,7 +81,8 @@ const
   MUSIC_BUFFER_SAMPLES = 512*1024;
 
 function  mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
-procedure musicPlay(filename: string);
+procedure musicPlay(filename: string); overload;
+procedure musicPlay(reader: tLA96Reader); overload;
 procedure musicSet(reader: tLA96Reader);
 procedure musicRestoreDefaultReader();
 procedure musicStop();
@@ -512,7 +513,7 @@ end;
 {plays background music. Music must be a compressed A96 file stored on disk.
  this involves reading the entire (compressed) file into memory and then
  decompressing the first part.}
-procedure musicPlay(filename: string);
+procedure musicPlay(filename: string); overload;
 begin
   if musicReader.isLoaded() then musicReader.close();
   mbReadPos := 0;
@@ -521,6 +522,18 @@ begin
   {since we read the whole thing off disk, we may as well load a fair bit}
   {this should be ~10 seconds}
   musicUpdate(256);
+end;
+
+{plays background music. Music must be a compressed A96 file stored on disk.
+ this involves reading the entire (compressed) file into memory and then
+ decompressing the first part.}
+procedure musicPlay(reader: tLA96Reader); overload;
+begin
+  mbReadPos := 0;
+  mbWritePos := 0;
+  musicSet(reader);
+  {since we read the whole thing off disk, we may as well load a fair bit}
+  {this should be ~10 seconds}
 end;
 
 {This is a bit dodgy, but set the music reader directly.

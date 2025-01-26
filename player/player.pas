@@ -16,6 +16,8 @@ uses
   vesa,
   graph32,
   sndViz,
+  sprite,
+  lc96,
   {other stuff}
   crt;
 
@@ -531,43 +533,30 @@ end;
 {play sound with some graphics}
 procedure soundPlayer();
 var
-  readers: array of tLA96Reader;
-  profiles: array of tAudioCompressionProfile;
+  files: tStringList;
+  reader: tLA96Reader;
+  filename: string;
   i: integer;
   tag: string;
   selected: integer;
+  background: tSprite;
 
   procedure setSelected(newSelected: integer);
   begin
+    if newSelected <> selected then
+      reader.load(joinPath('res', files[selected]));
     selected := newSelected;
-    musicSet(readers[selected]);
   end;
 
 begin
 
-  writeln('--------------------------');
-  writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave('res\sample.wav', 10*44100);
-  note(format('Source RMS: %f',[music16.calculateRMS()]));
+  {get list of songs}
+  {todo: stream these off disk rather than loading them in...}
+  files := fs.listFiles('res\*.a96');
 
-  writeln('--------------------------');
-  writeln('Reading compressed files...');
-
-  profiles := [
-    ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
-    ACP_Q10, ACP_Q12, ACP_Q16
-  ];
-
-  setLength(readers, length(PROFILES));
-
-  for i := 0 to length(PROFILES)-1 do begin
-    readers[i] := tLA96Reader.create();
-    readers[i].load(profileToTagName(PROFILES[i])+'.a96');
-    readers[i].looping := true;
-    readers[i].frameGenHook := maybeDelta;
-    {note sure why this is required...}
-    if i = 0 then musicPlay(profileToTagName(PROFILES[i])+'.a96');
-  end;
+  reader := tLA96Reader.Create();
+  reader.load(joinPath('res', files[0]));
+  musicPlay(reader);
 
   {set video}
   enableVideoDriver(tVesaDriver.create());
@@ -578,11 +567,11 @@ begin
 
   videoDriver.setMode(640,480,32);
   screen := tScreen.create();
-
-  setSelected(0);
+  screen.background := tPage.Load('res\background.p96');
 
   {main loop}
   repeat
+    (*
     {this one is just needed so that the buffers get cleared when shift
      is down}
     if keyDown(key_leftShift) then setSelected(selected);
@@ -599,6 +588,11 @@ begin
       displayAudio((640-512) div 2, 240, screen.canvas, mixLib.scratchBufferPtr, 512);
       screen.pageFlip();
     end;
+    *)
+    screen.pageClear();
+    displayAudio((640-512) div 2, 240, screen.canvas, mixLib.scratchBufferPtr, 512);
+    screen.pageFlip();
+    musicUpdate();
   until keyDown(key_esc);
 
   musicRestoreDefaultReader();
@@ -623,9 +617,7 @@ begin
   runTestSuites();
   initKeyboard();
 
-  master();
-  testCompression();
-  //soundPlayer();
+  soundPlayer();
 
   textAttr := LIGHTGRAY;
 

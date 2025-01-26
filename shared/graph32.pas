@@ -1002,7 +1002,7 @@ begin
     result := proc(filename);
     note(format(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]));
   end else
-    error('No image loader for file "'+filename+'"');
+    debug.error('No image loader for file "'+filename+'"');
 end;
 
 {-------------------------------------------------}
