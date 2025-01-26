@@ -26,7 +26,7 @@ type
     procedure addValue(x, y: int16;value: integer);
     procedure blitTo(page: tPage;atX, atY: int16);
     procedure addTo(page: tPage;atX, atY: int16);
-    procedure mulTo(page: tPage;atX, atY: int16; gain: byte=8);
+    procedure mulTo(page: tPage;atX, atY: int16);
     procedure fade(factor: single=0.7);
     procedure clear(value: word);
 
@@ -35,10 +35,11 @@ type
     property height: integer read fHeight;
   end;
 
+var
+  HDR_LUT: array[0..4096-1] of RGBA;
+
 implementation
 
-var
-  LUT: array[0..4096-1] of RGBA;
 
 constructor tHDRPage.create(aWidth, aHeight: integer);
 begin
@@ -71,7 +72,7 @@ var
   value: word;
 begin
   if (word(x) >= fWidth) or (word(y) >= fHeight) then exit;
-  result := LUT[data[x+y*fWidth] shr 4];
+  result := HDR_LUT[data[x+y*fWidth] shr 4];
 end;
 
 procedure tHDRPage.addValue(x, y: int16;value: integer);
@@ -93,7 +94,7 @@ begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
-    lutPtr := @LUT;
+    lutPtr := @HDR_LUT;
     asm
       pushad
       mov esi, dataPtr
@@ -127,7 +128,7 @@ begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
-    lutPtr := @LUT;
+    lutPtr := @HDR_LUT;
     {note: we could do this 2 pixels at a time if we wanted}
     asm
       pushad
@@ -159,8 +160,8 @@ begin
   end;
 end;
 
-{multiples destination by (1-(gain*value/65536))}
-procedure tHDRPage.mulTo(page: tPage;atX, atY: int16; gain: byte=8);
+{multiples destination by (1-(8*value/65536))}
+procedure tHDRPage.mulTo(page: tPage;atX, atY: int16);
 var
   y: integer;
   count: int32;
@@ -173,8 +174,9 @@ begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
     pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
-    lutPtr := @LUT;
+    lutPtr := @HDR_LUT;
     {note: we could do this 2 pixels at a time if we wanted}
+    {note2: we could integrate add and mul together fairly easily...}
     asm
       pushad
       mov esi, dataPtr
@@ -182,39 +184,27 @@ begin
       xor eax, eax
       mov ecx, count
       mov edx, lutPtr
+
       pxor mm5, mm5
 
-      xor   eax, eax
-      mov   ax, 32767
-      movd  mm6, eax
-      punpcklwd mm6, mm6
-      punpckldq mm6, mm6                // mm6 = max int16 as words)
-
-      xor   eax, eax
-      mov   al, gain
-      movd  mm7, eax
-      punpcklwd mm7, mm7
-      punpckldq mm7, mm7                // mm7 = gain as words)
-
-
     @LOOP:
-      movzx     eax, word ptr [esi]     // eax = value (0..65535)
+      movzx     eax, word ptr [esi]
+      shr       eax, 4
+      mov       eax, [edx+eax*4]        // eax = color
+      bswap     eax
+      not       al
+      shl       ax, 8
+      shr       ax, 1                   // ax = alpha * 128
 
       movd      mm0, eax
       punpcklwd mm0, mm0
-      punpckldq mm0, mm0                // mm0 = vvvv-vvvv
-
-      pmullw    mm0, mm7                // apply some gain
-      psrlw     mm0, 1                  // value is now from 0 to 32767
-
-      movq      mm4, mm6
-      psubsw    mm4, mm0                // mm4 = 32767 - clip(value*2, 0, 32767)
+      punpckldq mm0, mm0                // mm0 = value (0..32k)
 
       movd      mm1, dword ptr [edi]    // mm1 = 0000-rgba (dst)
       punpcklbw mm1, mm5                // mm1 = 0r0g-0b0a (dst)
       psllw     mm1, 1                  // mm1 = 0r0g-0b0a (dst) (*2)
       // note: to avoid signs we divide value by 2 and multiply dst by 2
-      pmulhw    mm1, mm4                // mm1 = 0r0g-0b0a (dst * value)
+      pmulhw    mm1, mm0                // mm1 = 0r0g-0b0a (dst * value)
 
       packuswb  mm1, mm1                // mm1 = rgba-rgba
 
@@ -301,11 +291,11 @@ var
 begin
   for i := 0 to 4096-1 do begin
     v := (i/4096);
-    LUT[i].init(
-      round(power(v, 0.5)*256),
-      round(power(5*v, 0.7)*256),
-      round(power(v, 0.6)*256),
-      255);
-
+    HDR_LUT[i].init(
+      round(power(v, 1.0)*255),
+      round(power(v, 0.3)*255),
+      round(power(v, 0.7)*255),
+      round(power(v, 0.35)*255)
+    )
   end;
 end.

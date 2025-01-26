@@ -548,6 +548,7 @@ var
   rect: tRect;
   oldBufferPos: dword;
   elapsed: double;
+  x,y: integer;
 
   procedure setSelected(newSelected: integer);
   begin
@@ -583,13 +584,19 @@ begin
   hdrPhase := tHDRPage.create(64,64);
 
   screen.pageClear();
+  {stub:}
+  for y := 0 to 100 do
+    for x := 0 to 255 do
+      screen.canvas.setPixel(x, y, HDR_LUT[x * 16]);
+
   screen.pageFlip();
+
 
   {main loop}
   repeat
 
     startTimer('music');
-    musicUpdate();
+    musicUpdate(1);
     stopTimer('music');
 
     {only update waveform if our music buffer has updated}
@@ -603,7 +610,7 @@ begin
       startTimer('waveform');
       rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height, hdrWave.width, hdrWave.height);
       hdrWave.fade(0.90);
-      displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 2*1024);
+      displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 4*1024);
       hdrWave.mulTo(screen.canvas, rect.x, rect.y);
       hdrWave.addTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
@@ -613,7 +620,7 @@ begin
       startTimer('phase');
       rect := tRect.create((640-hdrPhase.width) div 2, (480-hdrPhase.height) div 4, hdrPhase.width, hdrPhase.height);
       hdrPhase.fade(0.95);
-      displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 128);
+      displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 256);
       hdrPhase.mulTo(screen.canvas, rect.x, rect.y);
       hdrPhase.addTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
@@ -625,7 +632,7 @@ begin
       else
         elapsed := -1;
       textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGBA.create(250, 250, 250, 200));
-      screen.markRegion(tRect.create(6,3,40,30));
+      screen.markRegion(tRect.create(6,3,40,20));
 
       screen.flipAll();
 
