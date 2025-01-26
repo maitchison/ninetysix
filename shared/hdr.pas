@@ -10,6 +10,8 @@ linear space than to gamma space.
 interface
 
 uses
+  debug,
+  test,
   graph32,
   utils;
 
@@ -50,6 +52,7 @@ implementation
 constructor tHDRPage.create(aWidth, aHeight: integer);
 begin
   inherited create();
+  if aWidth mod 4 <> 0 then debug.error('Width must be a multiple of 4');
   fWidth := aWidth;
   fHeight := aHeight;
   data := getMem(fWidth*fHeight*2);
@@ -243,7 +246,7 @@ begin
       pxor mm5, mm5
 
     @LOOP:
-      {load our color}
+      {load our colors}
       movzx eax, word ptr [esi]
       shr eax, LUT_SHIFT
       mov ebx, [edx+eax*4]        // ebx = color

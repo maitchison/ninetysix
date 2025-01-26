@@ -379,10 +379,8 @@ end;
 {give up one time slice}
 procedure idle(); inline;
 asm
-  push ax
-  mov ax, $1680
-  int $2F
-  pop ax
+  // note: int $2F ax=$1680 causes keyboard to not work well
+  int $28
 end;
 
 {Put CPU into idle for give number of ms}
