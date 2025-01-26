@@ -25,7 +25,8 @@ type
     procedure setValue(x, y: int16;value: word);
     procedure addValue(x, y: int16;value: integer);
     procedure blitTo(page: tPage;atX, atY: int16);
-    procedure addTo(page: tPage;atX, atY: int16; shift: byte=0);
+    procedure addTo(page: tPage;atX, atY: int16);
+    procedure mulTo(page: tPage;atX, atY: int16; gain: byte=8);
     procedure fade(factor: single=0.7);
     procedure clear(value: word);
 
@@ -113,13 +114,12 @@ begin
   end;
 end;
 
-procedure tHDRPage.addTo(page: tPage;atX, atY: int16; shift: byte=0);
+procedure tHDRPage.addTo(page: tPage;atX, atY: int16);
 var
   y: integer;
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
-  shift := 1;
   for y := 0 to fHeight-1 do begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
@@ -155,6 +155,76 @@ begin
   end;
 end;
 
+{multiples destination by (1-(gain*value/65536))}
+procedure tHDRPage.mulTo(page: tPage;atX, atY: int16; gain: byte=8);
+var
+  y: integer;
+  count: int32;
+  dataPtr, pixelsPtr, lutPtr: pointer;
+begin
+  for y := 0 to fHeight-1 do begin
+    count := fWidth;
+    dataPtr := data + (y * fWidth);
+    pixelsPtr := page.pixels + (atX + ((atY+y) * page.width)) * 4;
+    lutPtr := @LUT;
+    {note: we could do this 2 pixels at a time if we wanted}
+    asm
+      pushad
+      mov esi, dataPtr
+      mov edi, pixelsPtr
+      xor eax, eax
+      mov ecx, count
+      mov edx, lutPtr
+      pxor mm5, mm5
+
+      xor   eax, eax
+      mov   ax, 32767
+      movd  mm6, eax
+      punpcklwd mm6, mm6
+      punpckldq mm6, mm6                // mm6 = max int16 as words)
+
+      xor   eax, eax
+      mov   al, gain
+      movd  mm7, eax
+      punpcklwd mm7, mm7
+      punpckldq mm7, mm7                // mm7 = gain as words)
+
+
+    @LOOP:
+      movzx     eax, word ptr [esi]     // eax = value (0..65535)
+
+      movd      mm0, eax
+      punpcklwd mm0, mm0
+      punpckldq mm0, mm0                // mm0 = vvvv-vvvv
+
+      pmullw    mm0, mm7                // apply some gain
+      psrlw     mm0, 1                  // value is now from 0 to 32767
+
+      movq      mm4, mm6
+      psubsw    mm4, mm0                // mm4 = 32767 - clip(value*2, 0, 32767)
+
+      movd      mm1, dword ptr [edi]    // mm1 = 0000-rgba (dst)
+      punpcklbw mm1, mm5                // mm1 = 0r0g-0b0a (dst)
+      psllw     mm1, 1                  // mm1 = 0r0g-0b0a (dst) (*2)
+      // note: to avoid signs we divide value by 2 and multiply dst by 2
+      pmulhw    mm1, mm4                // mm1 = 0r0g-0b0a (dst * value)
+
+      packuswb  mm1, mm1                // mm1 = rgba-rgba
+
+      movd  [edi], mm1
+      add esi, 2
+      add edi, 4
+      loop @LOOP
+      popad
+    end;
+  end;
+
+  asm
+    emms;
+  end;
+end;
+
+
 {reduce intensity of page}
 procedure tHDRPage.fade(factor: single=0.7);
 var
@@ -181,8 +251,16 @@ begin
 
   @LOOP:
     movq   mm0, [edi]     // mm0 = HDR value
+
+    // we only have a signed multiply... so divide both operands by
+    // two so that we're never negative. We loose some precision doing
+    // this, but I think it's ok.
+    // note: alternatively we could try and correct the signed multiply
+    // but it's a pain and requires conditionals. (if a < 0 then result +=a etc)
+    psrlw  mm0, 1
     pmulhw mm0, mm1
-    psllw  mm0, 1   // we loose 1 bit of precision doing this, but that's ok.
+    // multipler was already /2 so we need to *4 to adjust for everything.
+    psllw  mm0, 2
 
     movq   [edi], mm0
     add    edi, 8
