@@ -120,6 +120,9 @@ var
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
+  asm
+    cli
+  end;
   for y := 0 to fHeight-1 do begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
@@ -151,7 +154,8 @@ begin
   end;
 
   asm
-    emms;
+    emms
+    sti
   end;
 end;
 
@@ -162,6 +166,9 @@ var
   count: int32;
   dataPtr, pixelsPtr, lutPtr: pointer;
 begin
+  asm
+    cli
+  end;
   for y := 0 to fHeight-1 do begin
     count := fWidth;
     dataPtr := data + (y * fWidth);
@@ -220,7 +227,8 @@ begin
   end;
 
   asm
-    emms;
+    emms
+    sti
   end;
 end;
 
@@ -238,6 +246,7 @@ begin
   value := round(clamp(factor, 0, 1)*32767);
   {mmx would help somewhat here. Also we could do a substract if we wanted}
   asm
+    cli
     pushad
     mov   edi, dataPtr
     mov   ecx, count
@@ -267,6 +276,7 @@ begin
     loop @LOOP
     popad
     emms
+    sti
   end;
   (*
   asm
