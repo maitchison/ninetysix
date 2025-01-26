@@ -42,6 +42,9 @@ const
   // lookup table will be 64k / (1 shl LUT_SHIFT)
   // 0 = full 64 lookup, 2 = 16k lookup, 4 = 4k lookup etc...
   LUT_SHIFT = 4;
+  // this masks out the high bits after a shift, i.e. for LUT_SHIFT=2
+  // 00111111-11111111
+  LUT_MASK = (1 shl (16 - LUT_SHIFT))-1;
 
 var
   HDR_LUT: array[0..(65536 shr LUT_SHIFT)-1] of RGBA;
@@ -192,6 +195,8 @@ begin
     @LOOP:
       movzx     eax, word ptr [esi]
       shr       eax, LUT_SHIFT
+      test      eax, eax
+      jz       @SKIP
       mov       eax, [edx+eax*4]        // eax = color
       bswap     eax
       not       al
@@ -211,6 +216,7 @@ begin
       packuswb  mm1, mm1                // mm1 = rgba-rgba
 
       movd  [edi], mm1
+    @SKIP:
       add esi, 2
       add edi, 4
       loop @LOOP
@@ -247,9 +253,15 @@ begin
 
     @LOOP:
       {load our colors}
-      movzx eax, word ptr [esi]
-      shr eax, LUT_SHIFT
-      mov ebx, [edx+eax*4]        // ebx = color
+      xor       ebx, ebx
+      mov       bx,  word ptr [esi]
+      shr       bx,  LUT_SHIFT
+      //and       bx,  LUT_MASK           // ebx = [value1] [value2] (shifted)
+
+      test      bx, bx
+      jz       @SKIP
+
+      mov       ebx, dword ptr [edx + ebx*4]
 
       {multply the destination color}
       mov       eax, ebx
@@ -274,6 +286,8 @@ begin
       paddusb mm0, mm1
 
       movd  [edi], mm0
+
+    @SKIP:
       add esi, 2
       add edi, 4
       loop @LOOP
