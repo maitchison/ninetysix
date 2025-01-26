@@ -10,6 +10,7 @@ uses
   utils,
   graph2d,
   myMath,
+  hdr,
   graph32;
 
 type
