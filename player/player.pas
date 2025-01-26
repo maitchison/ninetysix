@@ -296,7 +296,7 @@ begin
   SAMPLE_LENGTH := 44100 * 60;
 
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('snd\sample.wav', SAMPLE_LENGTH);
+  music16 := tSoundEffect.loadFromWave('res\sample.wav', SAMPLE_LENGTH);
   mixer.play(music16, SCS_FIXED1);
   mixer.channels[1].looping := true;
   writeln('Processing.');
@@ -347,48 +347,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'snd\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
-end;
-
-{create compressed copies of master music tracks}
-procedure master();
-var
-  verbose: boolean;
-  sourceFiles: array of string = ['sunshine', 'clowns', 'crazy', 'blue'];
-  filename: string;
-  srcPath, dstPath: string;
-  srcMusic: tSoundEffect;
-  outStream: tStream;
-begin
-  writeln();
-  writeln('--------------------------');
-  writeln('Compressing');
-  writeln('--------------------------');
-  LA96_ENABLE_STATS := false;
-  verbose := true;
-
-  for filename in sourceFiles do begin
-    srcPath := joinPath('c:\dev\masters\player', filename+'.wav');
-    if not fs.exists(srcPath) then begin
-      warning('File not found '+srcPath);
-      continue;
-    end;
-
-    dstPath := joinPath('snd', filename+'.a96');
-    if fs.exists(dstPath) then begin
-      note('Skipping '+srcPath);
-      continue;
-    end;
-
-
-    {compress it}
-    writeln();
-    write(filename+': ');
-    srcMusic := tSoundEffect.loadFromWave(srcPath);
-    outStream := encodeLA96(srcMusic, ACP_HIGH, verbose);
-    outStream.writeToFile(dstPath);
-    outStream.free;
-  end;
+  result := 'res\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
 procedure testCompression();
@@ -446,7 +405,7 @@ begin
   writeln();
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave('snd\sample.wav');
+  music16 := tSoundEffect.loadFromWave('res\sample.wav');
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   setLength(outSfx, length(outSFX)+1);
@@ -536,9 +495,9 @@ begin
 
   writeln('--------------------------');
   writeln('Loading music.');
-  music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
+  music16 := tSoundEffect.loadFromWave('res\sample.wav', 10*44100);
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
-  musicL := tSoundEffect.loadFromWave('snd\smample_ADPCM.wav', 10*44100);
+  musicL := tSoundEffect.loadFromWave('res\smample_ADPCM.wav', 10*44100);
   musicD := afDelta(music16, musicL);
   {rms}
   writeln(format('ERROR RMS: %f',[musicD.calculateRMS()]));
@@ -588,7 +547,7 @@ begin
 
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave('snd\sample.wav', 10*44100);
+  music16 := tSoundEffect.loadFromWave('res\sample.wav', 10*44100);
   note(format('Source RMS: %f',[music16.calculateRMS()]));
 
   writeln('--------------------------');

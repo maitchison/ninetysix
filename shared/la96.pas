@@ -1117,7 +1117,7 @@ begin
         difYStats.variance
       ]);
 
-    if verbose then write('.');
+    if verbose and ((i mod 16) = 15) then write('.');
 
   end;
 
