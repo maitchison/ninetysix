@@ -19,6 +19,7 @@ uses
   sndViz,
   sprite,
   lc96,
+  vlc,
   hdr,
   font,
   {other stuff}
@@ -280,7 +281,7 @@ begin
     centerLeft := (1-centeringAlpha) * centerLeft + (centeringAlpha * sample.left);
     centerRight := (1-centeringAlpha) * centerRight + (centeringAlpha * sample.right);
 
-    estimatedBits += vlcBits(uLeft-prevULeft) + vlcBits(uRight-prevURight);
+    estimatedBits += VLCBits(2*abs(uLeft-prevULeft)) + VLCBits(2*abs(uRight-prevURight));
 
     prevULeft := uLeft;
     prevURight := uRight;

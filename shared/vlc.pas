@@ -43,12 +43,16 @@ const
 function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 
+function VLCBits(value: dword): word;
 
 implementation
 
 {vlc}
-procedure writeVLC1(stream: tStream; values: array of dword); forward;
-procedure writeVLC2(stream: tStream; values: array of dword); forward;
+procedure VLC1Write(stream: tStream; values: array of dword); forward;
+procedure VLC2Write(stream: tStream; values: array of dword); forward;
+function  VLC1Bits(value: dword): word; forward;
+function  VLC2Bits(value: dword): word; forward;
+
 
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
@@ -89,9 +93,7 @@ function writeSegment(stream: tStream; values: array of dword;segmentType:byte=S
 var
   i: int32;
   maxValue: int32;
-  //unpackedBytes, unpackedBits: int32;
-  packBitsRequired: byte;
-  packingBytes: int32;
+  packingBits, vlcBits: int32;
   n: int32;
   startPos: int32;
   value: dword;
@@ -99,47 +101,41 @@ begin
 
   startPos := stream.pos;
 
-  maxValue := 0;
-  //unpackedBits := 0;
-  for i := 0 to length(values)-1 do begin
-    maxValue := max(maxValue, values[i]);
-  end;
-  //unpackedBytes := bytesForBits(unpackedBits);
+  if segmentType = ST_AUTO then begin
 
-  //stream.byteAlign();
-
-  (*
-  if packing <> PACK_OFF then begin
-    {support up to 32 bits with packing}
-    packBitsRequired := ceil(log2(maxValue+1));
-    packingBytes := bytesForBits(length(values) * packBitsRequired)+1;
-    if (packingBytes <= unpackedBytes) or (packing = PACK_ALWAYS) then begin
-      stream.writeByte(ST_PACK+packBitsRequired);
-      packBits(values, packBitsRequired, stream);
-      result := stream.pos-startPos;
-      exit;
+    maxValue := 0;
+    vlcBits := 0;
+    for i := 0 to length(values)-1 do begin
+      maxValue := max(maxValue, values[i]);
+      vlcBits += VLC2Bits(values[i]);
     end;
-  end;*)
 
-  if segmentType = ST_AUTO then
-    segmentType := ST_VLC2;
+    packingBits := bitsToStoreMaxValue(maxValue) * length(values);
+
+    if bytesForBits(packingBits) <= bytesForBits(vlcBits) then
+      segmentType := ST_PACK0 + bitsToStoreMaxValue(maxValue)
+     else
+      segmentType := ST_VLC2;
+  end;
 
   if segmentType = ST_PACK then begin
+    maxValue := 0;
+    for i := 0 to length(values)-1 do
+      maxValue := max(maxValue, values[i]);
     segmentType := ST_PACK0 + bitsToStoreMaxValue(maxValue);
   end;
 
   {write out the data}
   stream.writeByte(segmentType);
   case segmentType of
-    ST_VLC1: writeVLC1(stream, values);
-    ST_VLC2: writeVLC2(stream, values);
+    ST_VLC1: VLC1Write(stream, values);
+    ST_VLC2: VLC2Write(stream, values);
     ST_PACK0..ST_PACK0+32: packBits(values, segmentType - ST_PACK0, stream);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
   result := stream.pos-startPos;
 
-  //stream.byteAlign();
 end;
 
 function readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
@@ -169,7 +165,23 @@ end;
 { VLCx strategy }
 {--------------------------------------------------------------}
 
-procedure writeVLC1(stream: tStream; values: array of dword);
+{returns size of variable length encoded token}
+function VLC1Bits(value: dword): word;
+begin
+  result := 0;
+  {this is the nibble aligned method}
+  while True do begin
+    if value <= 7 then begin
+      result += 4;
+      exit;
+    end else begin
+      result += 4;
+      value := value shr 3;
+    end;
+  end;
+end;
+
+procedure VLC1Write(stream: tStream; values: array of dword);
 var
   x, value: dword;
   midByte: boolean;
@@ -205,6 +217,9 @@ begin
   if midByte then writeNibble(0);
 end;
 
+
+{-------------------------}
+
 {returns number of nibbles required to store given value}
 function VLC2Length(d: dword): byte; inline;
 begin
@@ -217,7 +232,13 @@ begin
   error('Can not encode VLC value, too large.');
 end;
 
-procedure writeVLC2(stream: tStream; values: array of dword);
+{returns size of variable length encoded token}
+function VLC2Bits(value: dword): word; inline;
+begin
+  result := VLC2Length(value) * 4;
+end;
+
+procedure VLC2write(stream: tStream; values: array of dword);
 var
   value, encode: dword;
   midByte: boolean;
@@ -248,6 +269,15 @@ begin
   end;
   if midByte then stream.writeByte(buffer);
 end;
+
+{--------------------------------------}
+
+{returns size of variable length encoded token}
+function VLCBits(value: dword): word;
+begin
+  result := VLC2Bits(value);
+end;
+
 
 {--------------------------------------------------------------}
 { PACK strategy }
@@ -485,7 +515,7 @@ begin
 
   {run a bit of a benchmark on random bytes (0..127)}
   s := tStream.create(2*64*1024);
-  for segmentType in [ST_VLC1, ST_VLC2, ST_PACK7, ST_PACK8, ST_PACK9, ST_AUTO] do begin
+  for segmentType in [ST_VLC1, ST_VLC2, ST_PACK7, ST_PACK8, ST_PACK9, ST_AUTO, ST_PACK] do begin
     s.seek(0);
     startTime := getSec();
     bytes := writeSegment(s, inData, segmentType);
@@ -598,13 +628,10 @@ begin
 
   {check VLC2}
   s := tStream.create(10);
-  writeVLC2(s, testData5);
+  VLC2Write(s, testData5);
   setLength(data, length(testData5));
   s.seek(0);
   readVLC2Sequence_ASM(s, length(testData5), data);
-  //stub:
-  writeln(data.toString);
-  writeln(s.asBytes.toString);
   for i := 0 to length(testData5)-1 do
     assertEqual(data[i], testData5[i]);
   s.free;

@@ -56,7 +56,6 @@ type
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
     function  writeVLCSegment(values: array of dword;segmentType:byte=255): int32;
-    function  VLCbits(value: dword): word; inline;
 
     procedure setSize(newSize: int32);
 
@@ -504,22 +503,6 @@ end;
 function tStream.writeVLCSegment(values: array of dword;segmentType:byte=255): int32;
 begin
   result := vlc.writeSegment(self, values, segmentType);
-end;
-
-{returns size of variable length encoded token}
-function tStream.VLCbits(value: dword): word;
-begin
-  result := 0;
-  {this is the nibble aligned method}
-  while True do begin
-    if value <= 7 then begin
-      result += 4;
-      exit;
-    end else begin
-      result += 4;
-      value := value shr 3;
-    end;
-  end;
 end;
 
 procedure tStream.flush();
