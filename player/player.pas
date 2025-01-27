@@ -430,7 +430,7 @@ begin
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
-    if true or not fs.exists(music16.tag+'.a96') then begin
+    if not fs.exists(music16.tag+'.a96') then begin
       outStream := encodeLA96(music16, profile);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;

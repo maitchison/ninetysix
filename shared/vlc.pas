@@ -51,6 +51,8 @@ procedure SIGNWrite(stream: tStream; values: array of int8); overload;
 function  SIGNBits(values: array of dword): int32; overload;
 function  SIGNBits(values: array of int8): int32; overload;
 
+procedure SIGNReadMasked(stream: tStream; n: int32; outBuffer: pDword);
+
 implementation
 
 {vlc}
@@ -400,6 +402,25 @@ begin
     end;
     n -= counter;
     value := 1-value;
+  until n <= 0;
+  stream.byteAlign();
+end;
+
+{outputs 0 for non-signed, and -1 ($ffff...) for signed}
+procedure SIGNReadMasked(stream: tStream; n: int32; outBuffer: pDword);
+var
+  i: int32;
+  mask: int32;
+  counter: integer;
+begin
+  mask := 0;
+  repeat
+    counter := stream.readVLC();
+    if counter > 0 then
+      filldword(outBuffer^, counter, dword(mask));
+    outBuffer += counter;
+    n -= counter;
+    if mask = 0 then dec(mask) else inc(mask);
   until n <= 0;
   stream.byteAlign();
 end;

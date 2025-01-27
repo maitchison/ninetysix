@@ -420,9 +420,16 @@ var
     signsPtr: pointer;
   begin
     len := header.frameSize-1;
-    signsPtr := signs;
-    fs.readVLCSegment(len, signs);
-    convertSigns(signs);
+    if fs.peekByte = ST_SIGN then begin
+      {optimized path}
+      fs.readByte;
+      SIGNReadMasked(fs, len, @signs[0]);
+    end else begin
+      {this is a bit slower, but more efficent for complex sign paterns}
+      signsPtr := signs;
+      fs.readVLCSegment(len, signs);
+      convertSigns(signs);
+    end;
   end;
 
 begin
@@ -444,10 +451,11 @@ begin
   startTimer('LA96_DF_ReadSegments');
   fs.readVLCSegment(header.frameSize-1, midCodes);
   fs.readVLCSegment(header.frameSize-1, difCodes);
-
+  stopTimer('LA96_DF_ReadSegments');
+  startTimer('LA96_DF_ReadSigns');
   readSigns(midSigns);
   readSigns(difSigns);
-  stopTimer('LA96_DF_ReadSegments');
+  stopTimer('LA96_DF_ReadSigns');
 
   sfxSamplePtr := sfx.data + (sfxOffset * 4);
 
