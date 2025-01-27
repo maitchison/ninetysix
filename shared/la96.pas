@@ -149,7 +149,7 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
-  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:5;log2Mu:6;filter:0);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:7;log2Mu:6;filter:0);
   ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:8;log2Mu:7;filter:0);
   ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:8;log2Mu:8;filter:0);
   ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:2;ulawBits:8;log2Mu:8;filter:0);
