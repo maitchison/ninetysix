@@ -10,6 +10,12 @@ var
   i: integer;
 begin
 
+  if (frameSpec^.centerShift <> 16) then begin
+    {we don't support centering anymore}
+    process_REF(sfxSamplePtr, midCode, difCode, midCodes, difCodes, midSigns, difSigns, frameSpec);
+    exit;
+  end;
+
   maxCounter := frameSpec^.length-1;
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
   midCodePtr := @midCodes[0];
@@ -21,13 +27,6 @@ begin
   DC := difCode;
   if assigned(frameSpec^.difUTable) then difUTable := frameSpec^.difUTable^.tableCenterPtr else difUTable := nil;
   if assigned(frameSpec^.midUTable) then midUTable := frameSpec^.midUTable^.tableCenterPtr else midUTable := nil;
-
-  if (frameSpec^.centerShift <> 16) or (not assigned(difUTable)) or (not assigned(midUTable)) then begin
-    {we don't support centering anymore}
-    process_REF(sfxSamplePtr, midCode, difCode, midCodes,difCodes,midSigns,difSigns, frameSpec);
-    exit;
-  end;
-
 
   {not yet supported
     Clipping (encoder should insure this does not happen)
@@ -119,10 +118,14 @@ begin
 
     {------------------------}
     {ULAW}
+
     mov esi, MIDUTABLE
+    test esi, esi
+    jz @Skip
     mov eax, dword ptr [esi+eax*4]
     mov esi, DIFUTABLE
     mov ebx, dword ptr [esi+ebx*4]
+  @Skip:
 
     {at this point
       eax = mid

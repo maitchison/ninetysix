@@ -86,7 +86,7 @@ type
   {settings bits to 0 gives identity transform}
   tULawLookup = record
     maxValue: int32;
-    table2: tIntList;
+    table: tIntList;
     procedure initEncode(bits: byte; log2Mu: byte);
     procedure initDecode(bits: byte; log2Mu: byte);
     function tableCenterPtr: pointer; inline;
@@ -170,7 +170,7 @@ var
 implementation
 
 const
-  VER_SMALL = 2;
+  VER_SMALL = 5;
   VER_BIG = 0;
   FRAME_SIZE = 1024;
 
@@ -241,7 +241,7 @@ type
 {returns number of ulaw bits for mid channel. 0=off}
 function tAudioCompressionProfile.ulawDifBits: byte;
 begin
-  result := clamp(ulawBits-difReduce, 1, 255);
+  result := clamp(ulawBits-difReduce, 0, 255);
 end;
 
 function tLA96FileHeader.verStr(): string;
@@ -549,16 +549,16 @@ var
 begin
   mu := 1 shl log2Mu;
   maxValue := (1 shl bits);
-  table2 := tIntList.create(2*maxValue+1); {-codesize..codesize (inclusive)}
+  table := tIntList.create(2*maxValue+1); {-codesize..codesize (inclusive)}
   for i := -maxValue to maxValue do begin
-    table2[maxValue+i] := uLawInv(i / maxValue, mu);
+    table[maxValue+i] := uLawInv(i / maxValue, mu);
   end;
 end;
 
 {pointer to midpoint of table, i.e. f(0)}
 function tULawLookup.tableCenterPtr: pointer; inline;
 begin
-  result := @table2.data[maxValue];
+  result := @table.data[maxValue];
 end;
 
 procedure tULawLookup.initEncode(bits: byte; log2Mu: byte);
@@ -570,14 +570,14 @@ begin
   mu := 1 shl log2Mu;
   codeSize := (1 shl bits);
   maxValue := 32*1024;
-  table2 := tIntList.create(2*maxValue+1);
+  table := tIntList.create(2*maxValue+1);
   for i := -maxValue to maxValue do
-    table2[maxValue+i] := round(uLaw(i, mu) * codeSize);
+    table[maxValue+i] := round(uLaw(i, mu) * codeSize);
 end;
 
 function tULawLookup.lookup(x: int32): int32; inline;
 begin
-  result := table2.data[maxValue+x];
+  result := table.data[maxValue+x];
 end;
 
 {-------------------------------------------------------}

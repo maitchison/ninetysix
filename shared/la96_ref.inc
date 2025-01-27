@@ -30,8 +30,8 @@ begin
   mid := (mid shl frameSpec^.midShift) + frameSpec^.cMid;
   dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;
 
-  left := (mid + dif);
-  right := (mid - dif);
+  left := mid + dif;
+  right := mid - dif;
 
   //note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midCode, difCode]));
 
@@ -39,7 +39,6 @@ begin
   shift := frameSpec^.centerShift;
   frameSpec^.cMid := mid shr shift shl shift;
   frameSpec^.cDif := dif shr shift shl shift;
-
 
   {$ifdef DEBUG}
   if (left > high(int16)) then
@@ -62,10 +61,9 @@ procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; mi
 var
   i: int32;
 begin
-  // reference, 0.5ms
   for i := 0 to (frameSpec^.length-1)-1 do begin
-    if midSigns[i] > 0 then midCode -= midCodes[i] else midCode += midCodes[i];
-    if difSigns[i] > 0 then difCode -= difCodes[i] else difCode += difCodes[i];
+    if midSigns[i] = 0 then midCode += midCodes[i] else midCode -= midCodes[i];
+    if difSigns[i] = 0 then difCode += difCodes[i] else difCode -= difCodes[i];
     frameSpec^.idx := i+1;
     sfxSamplePtr^ := generateSample(midCode, difCode, frameSpec);
     inc(sfxSamplePtr);
