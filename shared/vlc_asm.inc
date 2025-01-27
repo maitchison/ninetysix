@@ -125,7 +125,6 @@ begin
     shr al, 4
 
   @Process:
-
     // write the value
     mov dl, al
     and dl, $07
@@ -136,6 +135,7 @@ begin
     jne @WriteValue
 
     // otherwise shift and repeat
+    inc ebx       // account for overlap
     shl ebx, 3
     jmp @VLC_LOOP
 

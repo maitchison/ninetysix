@@ -26,10 +26,11 @@ uses
 const
   {segment types}
   ST_AUTO = 255;
-  ST_AUTOPACK = 254;
+  ST_PACK = 254;
   ST_VLC1 = 0;  {this is the less efficent VLC method}
   ST_VLC2 = 1;  {this is the newer VLC method}
-  ST_PACK = 16; {packing bits - segmentType-16}
+  ST_PACK0 = 16;
+  ST_PACK1 = 17;
 
 function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
@@ -53,6 +54,11 @@ var
 
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
+
+function bitsToStoreMaxValue(maxValue: dWord): integer;
+begin
+  result := ceil(log2(maxValue+1));
+end;
 
 {
 Writes a series of variable length codes, with optional packing.
@@ -107,9 +113,16 @@ begin
   if segmentType = ST_AUTO then
     segmentType := ST_VLC1;
 
+  if segmentType = ST_PACK then begin
+    {todo: check this is correct}
+    segmentType := ST_PACK0 + bitsToStoreMaxValue(maxValue);
+  end;
+
   {just write out the data}
   stream.writeByte(segmentType);
   case segmentType of
+    ST_PACK0: ;
+    ST_PACK1: packBits(values, 1, stream);
     ST_VLC1: writeVLC1(stream, values);
     ST_VLC2: writeVLC2(stream, values);
     else error('Invalid segment type');
@@ -135,7 +148,7 @@ begin
   case segmentType of
     ST_VLC1: readVLC1Sequence_ASM(stream, n, outBuffer);
     ST_VLC2: readVLC2Sequence_ASM(stream, n, outBuffer);
-    ST_PACK..ST_PACK+64: unpackBits(stream, segmentType-16, n, outBuffer);
+    ST_PACK0..ST_PACK0+64: unpackBits(stream, segmentType-ST_PACK0, n, outBuffer);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -191,12 +204,11 @@ var
   i: integer;
 begin
   prevMax := 0;
-  //maxStore := 8;
+  maxStore := 8;
   for i := 1 to 12 do begin
-    maxStore := 1 shl (i*3);
     if d < maxStore then exit(i);
     prevMax := maxStore;
-    //maxStore += (8 shl (i*3));
+    maxStore += (8 shl (i*3));
   end;
 end;
 
@@ -226,8 +238,7 @@ begin
   midByte := false;
   for value in values do begin
     nibLen := VLC2Length(value, nibSub);
-    //encode := value - nibSub;
-    encode := value;
+    encode := value - nibSub;
     for i := 1 to nibLen-1 do begin
       shift := (nibLen-i)*3;
       writeNibble((encode shr shift) and $7);
@@ -541,19 +552,31 @@ begin
   setLength(data, length(testData5));
   s.seek(0);
   readVLC2Sequence_ASM(s, length(testData5), data);
+  //stub:
+  writeln(data.toString);
+  writeln(s.asBytes.toString);
   for i := 0 to length(testData5)-1 do
     assertEqual(data[i], testData5[i]);
   s.free;
+
+  {check bitsToStore}
+  assertEqual(bitsToStoreMaxValue(0), 0);
+  assertEqual(bitsToStoreMaxValue(1), 1);
+  assertEqual(bitsToStoreMaxValue(2), 2);
+  assertEqual(bitsToStoreMaxValue(3), 2);
+  assertEqual(bitsToStoreMaxValue(4), 3);
+  assertEqual(bitsToStoreMaxValue(255), 8);
+  assertEqual(bitsToStoreMaxValue(256), 9);
 
   {check nibble length}
   assertEqual(VLC2Length(0, prevMax), 1);
   assertEqual(VLC2Length(1, prevMax), 1);
   assertEqual(VLC2Length(7, prevMax), 1);
   assertEqual(VLC2Length(8, prevMax), 2);
-  assertEqual(VLC2Length(63, prevMax), 2);
-  assertEqual(VLC2Length(64, prevMax), 3);
-  assertEqual(VLC2Length(511, prevMax), 3);
-  assertEqual(VLC2Length(512, prevMax), 4);
+  assertEqual(VLC2Length(8+63, prevMax), 2);
+  assertEqual(VLC2Length(8+64, prevMax), 3);
+  assertEqual(VLC2Length(8+64+511, prevMax), 3);
+  assertEqual(VLC2Length(8+64+512, prevMax), 4);
 end;
 
 begin

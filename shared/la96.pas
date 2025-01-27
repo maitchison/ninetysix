@@ -819,7 +819,7 @@ var
     fillchar(signBits, sizeof(signBits), 0);
     for i := 0 to (FRAME_SIZE-1)-1 do
       if signs[i] < 0 then signBits[i] := 1;
-    bytesUsed := fs.writeVLCSegment(signBits);
+    bytesUsed := fs.writeVLCSegment(signBits, ST_PACK1);
     {also todo: move sign change detection here}
     {try writing these out as differences}
     //bytesUsed := fs.writeVLCSegment(difSignBits);
@@ -1080,14 +1080,8 @@ begin
 
     {write out frame}
     startTimer('LA96_segments');
-    {stub:}
-    if sfx.length > 2000 then begin
-      midFrameSize := fs.writeVLCSegment(midCodes, ST_VLC2);
-      difFrameSize := fs.writeVLCSegment(difCodes, ST_VLC2);
-    end else begin
-      midFrameSize := fs.writeVLCSegment(midCodes, ST_VLC1);
-      difFrameSize := fs.writeVLCSegment(difCodes, ST_VLC1);
-    end;
+    midFrameSize := fs.writeVLCSegment(midCodes, ST_VLC2);
+    difFrameSize := fs.writeVLCSegment(difCodes, ST_VLC2);
     stopTimer('LA96_segments');
 
     {write signs}
