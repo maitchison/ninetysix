@@ -1,3 +1,5 @@
+{$udef ALLOW_CENTERING}
+
 procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
 var
   maxCounter: dword;
@@ -180,6 +182,8 @@ begin
     shl eax, cl
     xchg cl, ch
     shl ebx, cl
+
+    {$ifdef ALLOW_CENTERING}
     add eax, MIDCENTER    // eax = mid shl midShift + cDif
     add ebx, DIFCENTER    // ebx = mid shl midShift + cMid
 
@@ -190,6 +194,7 @@ begin
     mov edx, ebx
     and edx, CENTERMASK
     mov DIFCENTER, edx
+    {$endif}
 
     mov edx, eax
     add edx, ebx
