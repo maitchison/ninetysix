@@ -69,6 +69,7 @@ function power(Base, Exponent: double): double; inline;
 function log10(x: double): double;
 function log2(x: double): double;
 function roundUpToPowerOfTwo(x: dword): dword;
+function shiftRight(x: int32; shift: byte): int32;
 
 {------------------------------------------------}
 { SysUtils replacements}
@@ -231,6 +232,16 @@ begin
   x := x or (x shr 16);
   inc(x);
   result := x;
+end;
+
+{returns x / (1 shl shift)}
+function shiftRight(x: int32; shift: byte): int32;
+asm
+  push cx
+  mov cl, shift
+  mov eax, x
+  sar eax, cl
+  pop cx
 end;
 
 {----------------------------------------------------------}
@@ -1300,6 +1311,10 @@ begin
   assert(subStringMatch(s, 22, '.'));
   assert(subStringMatch(s, 1, s));
 
+  {shift}
+  assertEqual(shiftRight(4, 1), 2);
+  assertEqual(shiftRight(-4, 1), -2);
+  assertEqual(shiftRight(-7, 0), -7);
 end;
 
 {--------------------------------------------------------}

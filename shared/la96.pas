@@ -99,7 +99,8 @@ type
     quantBits: byte; // number of bits to remove 0..15 (0=off)
     ulawBits: byte;  // number of ulaw bits, 0..15 (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
-    filter: byte;    // frequency of low pass filter (in khz) = (0 off).
+    difReduce: byte; // reduces quality of mid channel
+    function ulawDifBits: byte;
   end;
 
   tLA96FileHeader = packed record
@@ -154,13 +155,13 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
-  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:7;log2Mu:6;filter:0);
-  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:8;log2Mu:7;filter:0);
-  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:8;log2Mu:8;filter:0);
-  ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:2;ulawBits:8;log2Mu:8;filter:0);
-  ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:6;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:4;ulawBits:0;log2Mu:0;filter:0);
-  ACP_Q16: tAudioCompressionProfile      = (tag:'q16';     quantBits:0;ulawBits:0;log2Mu:0;filter:0);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:7;log2Mu:6;difReduce:4);
+  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:8;log2Mu:7;difReduce:2);
+  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:8;log2Mu:8;difReduce:1);
+  ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:2;ulawBits:8;log2Mu:8;difReduce:0);
+  ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:6;ulawBits:0;log2Mu:0;difReduce:0);
+  ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:4;ulawBits:0;log2Mu:0;difReduce:0);
+  ACP_Q16: tAudioCompressionProfile      = (tag:'q16';     quantBits:0;ulawBits:0;log2Mu:0;difReduce:0);
 
 var
   LA96_ENABLE_STATS: boolean = false;
@@ -235,6 +236,12 @@ type
 {-------------------------------------------------------}
 { helpers }
 {-------------------------------------------------------}
+
+{returns number of ulaw bits for mid channel. 0=off}
+function tAudioCompressionProfile.ulawDifBits: byte;
+begin
+  result := clamp(ulawBits-difReduce, 1, 255);
+end;
 
 function tLA96FileHeader.verStr(): string;
 begin
@@ -886,7 +893,7 @@ begin
 
   if profile.ulawBits > 0 then begin
     aspMid := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
-    aspDif := tASPULawDelta.create(profile.ulawBits, profile.log2mu);
+    aspDif := tASPULawDelta.create(profile.ulawDifBits, profile.log2mu);
   end else begin
     aspMid := tASPDelta.create();
     aspDif := tASPDelta.create();
@@ -903,12 +910,14 @@ begin
   header.numSamples := sfx.length;
   header.frameSize := FRAME_SIZE;
   header.log2mu := profile.log2mu;
-  header.postFilter := profile.filter;
+  header.postFilter := 0; // not used anymore
   header.centering := CENTERING_RESOLUTION;
 
   fs.writeBlock(header, sizeof(header));
 
   // guard against half a quantization step (otherwise rounding might cause clipping)}
+  {todo: remove clip guard and just let the decoder clamp (since it'll be MMX anyway)}
+  {alternatively, clamp on mid + dif, with different quant levels}
   if profile.quantBits = 0 then
     clipGuard := 0
   else
@@ -942,11 +951,23 @@ begin
   // 0.0 = off, 1 = full, 0.95 = strong
   noiseAlpha := 0;
 
+  {todo: have mid/dif as a preprocessing step, and do below entirely with
+   two channels. Also perform clipping checks in mid/dif space
+   (which means decodeer must clamp)}
+  {this also gives us mid/dif quantization levels}
+  {also, remove centering}
+
   for i := 0 to numFrames-1 do begin
 
-    {todo: noise shaping here might be a good idea?}
-    aspMid.reset(qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
-    aspDif.reset(qDif(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
+    {todo: noise shaping from previous frame here might be a good idea?}
+    {or atleast init error}
+    trueMid := samplePtr^.mid;
+    trueDif := shiftRight(samplePtr^.dif, profile.difReduce);
+    inLeft := inMid + inDif;
+    inRight := inMid - inDif;
+
+    aspMid.reset(qMid(inLeft, inRight, 0, profile.quantBits));
+    aspDif.reset(qDif(inLeft, inRight, 0, profile.quantBits));
     if samplePtr < maxSamplePtr then inc(samplePtr);
 
     midXStats.init(false);
@@ -965,7 +986,7 @@ begin
     {write frame header (one for each channel)}
     framePtr[i] := fs.pos;
     fs.writeByte(profile.quantBits + profile.ulawBits*16);
-    fs.writeByte(profile.quantBits + profile.ulawBits*16);
+    fs.writeByte(profile.quantBits + profile.ulawDifBits*16);
     fs.writeVLC(negEncode(aspMid.y));
     fs.writeVLC(negEncode(aspDif.y));
     fs.byteAlign();
@@ -974,7 +995,7 @@ begin
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
       trueMid := samplePtr^.mid;
-      trueDif := samplePtr^.dif;
+      trueDif := shiftRight(samplePtr^.dif, profile.difReduce);
       inMid := trueMid;
       inDif := trueDif;
       if samplePtr < maxSamplePtr then inc(samplePtr);
