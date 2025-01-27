@@ -811,16 +811,15 @@ var
     i: integer;
   begin
     startPos := fs.pos;
-    {todo: have SIGNWrite accept int8, and then optimize so 0 goes
-     whichever way is best}
-    fillchar(signBits, sizeof(signBits), 0);
-    for i := 0 to (FRAME_SIZE-1)-1 do
-      if signs[i] < 0 then signBits[i] := 1;
-    if vlc.SIGNBits(signs) < FRAME_SIZE then
-      fs.writeVLCSegment(signBits, ST_SIGN)
-    else
+    if vlc.SIGNBits(signs) < FRAME_SIZE then begin
+      fs.writeByte(ST_SIGN);
+      vlc.SIGNWrite(fs, signs)
+    end else begin
+      fillchar(signBits, sizeof(signBits), 0);
+      for i := 0 to (FRAME_SIZE-1)-1 do
+        if signs[i] < 0 then signBits[i] := 1;
       fs.writeVLCSegment(signBits, ST_PACK1);
-
+    end;
   end;
 
 begin

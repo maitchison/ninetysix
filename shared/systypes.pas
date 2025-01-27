@@ -4,6 +4,7 @@ interface
 
 type
   tBytes = array of byte;
+  tInt8s = array of int8;
   tWords = array of word;
   tDWords = array of dword;
   tInt32s = array of int32;

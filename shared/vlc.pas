@@ -45,7 +45,11 @@ function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=
 function  readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 
 function  VLCBits(value: dword): word;
-function  SIGNBits(values: array of dword): int32;
+
+procedure SIGNWrite(stream: tStream; values: array of dword); overload;
+procedure SIGNWrite(stream: tStream; values: array of int8); overload;
+function  SIGNBits(values: array of dword): int32; overload;
+function  SIGNBits(values: array of int8): int32; overload;
 
 implementation
 
@@ -57,7 +61,6 @@ procedure VLC2Write(stream: tStream; values: array of dword); forward;
 function  VLC1Bits(value: dword): word; forward;
 
 {sign}
-procedure SIGNWrite(stream: tStream; values: array of dword); forward;
 procedure SIGNRead(stream: tStream; n: int32; outBuffer: pDword); forward;
 
 {packing}
@@ -287,7 +290,7 @@ end;
 { SIGN strategy }
 {--------------------------------------------------------------}
 
-procedure SIGNWrite(stream: tStream; values: array of dword);
+procedure SIGNWrite(stream: tStream; values: array of dword); overload;
 var
   i: int32;
   value, prevValue: dword;
@@ -295,7 +298,6 @@ var
 begin
   prevValue := 0;
   counter := 0;
-
   for i := 0 to length(values)-1 do begin
     value := values[i];
     if prevValue = value then
@@ -310,7 +312,31 @@ begin
   stream.byteAlign();
 end;
 
-function SIGNBits(values: array of dword): int32;
+{special version for signs, i.e. -1, 0, and 1. We store the sign bit
+ for 0 as what ever compresses the best}
+procedure SIGNWrite(stream: tStream; values: array of int8); overload;
+var
+  i: int32;
+  value, prevValue: int8;
+  counter: integer;
+begin
+  prevValue := 1;
+  counter := 0;
+  for i := 0 to length(values)-1 do begin
+    value := values[i];
+    if prevValue * value < 0 then begin
+      {change of sign}
+      stream.writeVLC(counter);
+      counter := 1;
+      prevValue *= -1;
+    end else
+      inc(counter)
+  end;
+  stream.writeVLC(counter);
+  stream.byteAlign();
+end;
+
+function SIGNBits(values: array of dword): int32; overload;
 var
   i: int32;
   value, prevValue: dword;
@@ -334,15 +360,38 @@ begin
   result += VLC1Bits(counter);
 end;
 
+{special version for signs, i.e. -1, 0, and 1. We store the sign bit
+ for 0 as what ever compresses the best}
+function SIGNBits(values: array of int8): int32; overload;
+var
+  i: int32;
+  value, prevValue: int8;
+  counter: integer;
+begin
+  prevValue := 1;
+  counter := 0;
+  result := 0;
+  for i := 0 to length(values)-1 do begin
+    value := values[i];
+    if prevValue * value < 0 then begin
+      {change of sign}
+      result += VLC1Bits(counter);
+      counter := 1;
+      prevValue *= -1;
+    end else
+      inc(counter)
+  end;
+  result += VLC1Bits(counter);
+end;
+
+
 procedure SIGNRead(stream: tStream; n: int32; outBuffer: pDword);
 var
   i: int32;
   value: dword;
   counter: integer;
 begin
-
   value := 0;
-
   repeat
     counter := stream.readVLC();
     for i := 0 to counter-1 do begin
@@ -352,7 +401,6 @@ begin
     n -= counter;
     value := 1-value;
   until n <= 0;
-
   stream.byteAlign();
 end;
 
