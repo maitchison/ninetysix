@@ -354,7 +354,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'res\'+profile.tag+'_'+format('%d_%d_%d_ns', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  result := 'res\'+profile.tag+'_'+format('%d_%d_%d_v3', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
 procedure testCompression();
@@ -380,7 +380,7 @@ var
     i: integer;
   begin
     textAttr := White + Blue*16;
-    clrscr;
+    gotoxy(1,10);
     writeln(format('Press [0..%d] to select audio file.', [length(outSFX)-1]));
 
     for i := 0 to length(outSFX)-1 do begin
@@ -404,9 +404,15 @@ begin
   setLength(outSFX, 0);
   setLength(deltaSFX, 0);
 
+  {
   profiles := [
     ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
     ACP_Q10, ACP_Q12, ACP_Q16
+  ];
+  }
+
+  profiles := [
+    ACP_MEDIUM
   ];
 
   writeln();
@@ -478,6 +484,8 @@ begin
   delta := false;
   selection := 0;
   redrawUI();
+
+  setSelection(1);
 
   repeat
     if keyDown(key_0) then setSelection(0);

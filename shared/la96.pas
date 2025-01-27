@@ -928,8 +928,8 @@ begin
   midYStats.init();
   difYStats.init();
 
-  // doesn't work ,so turn off.
-  noiseAlpha := 1.0;
+  // 0.0 = off, 1 = full, 0.95 = good
+  noiseAlpha := 0.9;
 
   for i := 0 to numFrames-1 do begin
 
@@ -937,17 +937,6 @@ begin
     aspMid.reset(qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
     aspDif.reset(qDif(samplePtr^.left, samplePtr^.right, 0, profile.quantBits));
     if samplePtr < maxSamplePtr then inc(samplePtr);
-
-    {stub: double check no initial clipping}
-    (*
-    decMid := (aspMid.xPrime shl profile.quantBits);
-    decDif := (aspDif.xPrime shl profile.quantBits);
-    outLeft := (decMid + decDif) div 2;
-    outRight := (decMid - decDif) div 2;
-    if (clamp16(outLeft, clipGuard) <> outLeft) or (clamp16(outRight, clipGuard) <> outRight) then
-      {indicate clipping}
-      warn(format('Initial Clipping %d %d', [outLeft, outRight]));
-    *)
 
     midXStats.init(false);
     difXStats.init(false);
@@ -973,20 +962,14 @@ begin
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
-      {stub: show first few expected values}
-      {if (i = 0) and (j < 10) then begin
-        log(format('%d - x:%d y:%d expectedValue:%d trueValue:%d', [j, aspMid.x, aspMid.y, aspMid.xPrime shl profile.quantBits, inLeft+inRight]));
-        log(format('%d %d ', [profile.quantBits, qMid(samplePtr^.left, samplePtr^.right, 0, profile.quantBits)]));
-      end;}
-
       inLeft := samplePtr^.left; trueLeft := inLeft;
       inRight := samplePtr^.right; trueRight := inRight;
       if samplePtr < maxSamplePtr then inc(samplePtr);
 
       {noise shaping}
-      if noiseAlpha <> 1 then begin
-        inLeft -= round(leftError); leftError *= noiseAlpha;
-        inRight -= round(rightError); rightError *= noiseAlpha;
+      if noiseAlpha > 0 then begin
+        inLeft += round(noiseAlpha * leftError);
+        inRight += round(noiseAlpha * rightError);
       end;
 
       aspMid.save();
@@ -1063,9 +1046,9 @@ begin
       difSigns[j] := sign(aspDif.y);
 
       {keep track of noise}
-      if noiseAlpha <> 1 then begin
-        leftError += (1-noiseAlpha) * (trueLeft-outLeft);
-        rightError += (1-noiseAlpha) * (trueRight-outRight);
+      if noiseAlpha > 0 then begin
+        leftError := trueLeft-outLeft;
+        rightError := trueRight-outRight;
       end;
 
       if assigned(fullStats) then
