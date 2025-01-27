@@ -580,7 +580,7 @@ begin
   screen := tScreen.create();
   screen.background := tPage.Load('res\background.p96');
 
-  hdrWave := tHDRPage.create(256,64);
+  hdrWave := tHDRPage.create(64,32);
   hdrPhase := tHDRPage.create(64,64);
 
   screen.pageClear();
@@ -603,7 +603,7 @@ begin
 
       {waveform}
       startTimer('waveform');
-      rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height, hdrWave.width, hdrWave.height);
+      rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height-(hdrWave.height div 2), hdrWave.width, hdrWave.height);
       hdrWave.fade(0.90);
       displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 8*1024);
       hdrWave.mixTo(screen.canvas, rect.x, rect.y);

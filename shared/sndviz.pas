@@ -45,12 +45,17 @@ begin
   for y := round(y1) to round(y2) do page.addValue(x, y, value);
 end;
 
-function getTracking(samplePtr: pAudioSample16S; sampleLen, sampleMax, midX: integer): integer;
+{stub:}
+var
+  prevAmp, prevSlope: single;
+
+function getTracking(samplePtr: pAudioSample16S; sampleLen, sampleMax: integer): integer;
 var
   pSample: pAudioSample16S;
-  xlp: integer;
+  xlp, midX: integer;
   mid: single;
   trackingOffset: integer;
+  padding: integer;
 
   function getSmooth(idx: integer): pAudioSample16S; inline;
   begin
@@ -60,7 +65,7 @@ var
 
   function getSlope(idx: integer): single; inline;
   begin
-    result := (getSmooth(idx - 3).left - getSmooth(idx + 3).left) / 6;
+    result := (getSmooth(idx - 2).left - getSmooth(idx + 2).left) / 4;
   end;
 
   {tunes the tracking offset}
@@ -68,19 +73,21 @@ var
   var
     bestScore, score, slope: single;
     prevOffset, xlp: integer;
+    delta: integer;
   begin
     bestScore := -99999;
     prevOffset := trackingOffset;
-    for xlp := -32 to +32 do begin
-      pSample := getSmooth(midX + xlp*scale + prevOffset);
-      slope := getSlope(midX + xlp*scale + prevOffset);
+    for xlp := -64 to +64 do begin
+      delta := xlp*scale + prevOffset;
+      pSample := getSmooth(midX + delta);
+      slope := getSlope(midX + delta);
       score := 0;
-      score -= 0.1 * abs(xlp*scale + prevOffset);             // drift loss
-      score -= 1 * abs(pSample^.left);
-      score -= 2 * (slope);
+      score -= 0.1 * abs(delta);             // drift loss [-100..0]
+      score -= 1   * abs(pSample^.left);     // look for zero crossing [-6k..0]
+      score -= 10  * slope;                  // slope bonus [-100..100]
       if score > bestScore then begin
         bestScore := score;
-        trackingOffset := xlp*scale + prevOffset;
+        trackingOffset := delta;
       end;
     end;
   end;
@@ -89,19 +96,26 @@ begin
 
   if sampleLen > 16*1024 then error('Sorry buffers larger than 16K are not supported.');
 
+  {this is how far we can shift in each direction}
+  padding := (sampleMax - sampleLen) div 2;
+  if padding <= 0 then exit(0);
+
+  midX := sampleMax div 2;
+
   {smooth out the waveform for processing}
   mid := samplePtr^.left + samplePtr^.right;
   pSample := samplePtr;
   for xlp := 0 to sampleLen-1 do begin
-    mid := mid * 0.95 + (pSample^.mid) * 0.05;
+    // this roughly matches voice, which is 300 hz.
+    mid := mid * 0.92 + (pSample^.mid) * 0.08;
     sampleBuffer[xlp].left := clamp16(mid);
     inc(pSample);
   end;
 
   {perform some sync}
-  trackingOffset := 32*2;
+  trackingOffset := 0;
+//  tuneTracking(8);
   tuneTracking(2);
-  //tuneTracking(1);
 
   result := trackingOffset;
 
@@ -138,7 +152,7 @@ begin
   midX := round(dstRect.width/2*xScale);
   midY := (dstRect.top + dstRect.bottom) div 2;
 
-  trackingOffset := getTracking(samplePtr, sampleLen, sampleMax, midX);
+  trackingOffset := getTracking(samplePtr, sampleLen, sampleMax);
 
   prevMid := 0;
   for xlp := dstRect.left to dstRect.right do begin
@@ -152,10 +166,10 @@ end;
 
 procedure displayWaveFormHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; value: integer);
 var
-  prevMid: single;
-  mid: single;
-  xlp: integer;
-  midX, midY: integer;
+  prevSampleValue: single;
+  sampleValue: single;
+  i: integer;
+  midDrawY: integer;
   xScale, yScale: single;
   pSample: pAudioSample16S;
   trackingOffset: integer;
@@ -169,20 +183,19 @@ var
 
 begin
 
-  xScale := sampleLen / dstRect.width;
-  yScale := dstRect.height / 65536 / 2;
-  midX := round(dstRect.width/2*xScale);
-  midY := (dstRect.top + dstRect.bottom) div 2;
+  xScale := sampleLen / dstRect.width;    // converts pixel -> sample
+  yScale := dstRect.height / 65536;       // converts sample -> pixel
+  midDrawY := dstRect.mid.y;
 
-  trackingOffset := getTracking(samplePtr, sampleLen, sampleMax, midX);
+  trackingOffset := getTracking(samplePtr, sampleLen, sampleMax);
 
-  prevMid := 0;
-  for xlp := dstRect.left to dstRect.right do begin
-    attenuation := sqrt(1-(abs((dstRect.width/2)-(xlp-dstRect.x)) / (dstRect.width/2)));
-    pSample := getSample(trackingOffset + round((xlp - dstRect.x) * xScale));
-    mid := (pSample^.left+pSample^.right)*yScale*attenuation;
-    vLineHDR(page, xlp, midY+prevMid, midY+mid, round(value*attenuation));
-    prevMid := mid;
+  prevSampleValue := 0;
+  for i := 0 to dstRect.width-1 do begin
+    attenuation := sqrt(1-(abs((dstRect.width/2)-i) / (dstRect.width/2)));
+    pSample := getSample(trackingOffset + round(i * xScale));
+    sampleValue := (pSample^.left+pSample^.right)*yScale*attenuation;
+    vLineHDR(page, i+dstRect.x, midDrawY+prevSampleValue, midDrawY+sampleValue, round(value*attenuation));
+    prevSampleValue := sampleValue;
   end;
 
 end;
