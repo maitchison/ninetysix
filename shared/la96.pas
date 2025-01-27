@@ -419,7 +419,6 @@ var
     len: dword;
     signsPtr: pointer;
   begin
-    if fs.readByte() <> $00 then error('invalid sign format');
     len := header.frameSize-1;
     signsPtr := signs;
     fs.readVLCSegment(len, signs);
@@ -809,22 +808,19 @@ var
   procedure writeOutSigns(signs: array of int8);
   var
     startPos: int32;
-    bytesUsed: int32;
     i: integer;
   begin
     startPos := fs.pos;
-    fs.writeByte($00); // sign format
-    {todo: support writing these out as gaps between sign changes,
-     or even auto detect which is better}
+    {todo: have SIGNWrite accept int8, and then optimize so 0 goes
+     whichever way is best}
     fillchar(signBits, sizeof(signBits), 0);
     for i := 0 to (FRAME_SIZE-1)-1 do
       if signs[i] < 0 then signBits[i] := 1;
-    bytesUsed := fs.writeVLCSegment(signBits, ST_PACK);
-    {also todo: move sign change detection here}
-    {try writing these out as differences}
-    //bytesUsed := fs.writeVLCSegment(difSignBits);
-    {todo: detect when this doesn't work, and just write out the bits}
-    {also.. is this really worth it?}
+    if vlc.SIGNBits(signs) < FRAME_SIZE then
+      fs.writeVLCSegment(signBits, ST_SIGN)
+    else
+      fs.writeVLCSegment(signBits, ST_PACK1);
+
   end;
 
 begin

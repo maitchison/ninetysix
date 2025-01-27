@@ -29,6 +29,7 @@ const
   ST_PACK = 254;
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
+  ST_SIGN = 8;  {special encoding for sign bits}
   ST_PACK0 = 16;
   ST_PACK1 = 17;
   ST_PACK2 = 18;
@@ -40,19 +41,24 @@ const
   ST_PACK8 = 24;
   ST_PACK9 = 25;
 
-function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
-function readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
+function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
+function  readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 
-function VLCBits(value: dword): word;
+function  VLCBits(value: dword): word;
+function  SIGNBits(values: array of dword): int32;
 
 implementation
 
 {vlc}
 procedure VLC1Write(stream: tStream; values: array of dword); forward;
-procedure VLC2Write(stream: tStream; values: array of dword); forward;
-function  VLC1Bits(value: dword): word; forward;
 function  VLC2Bits(value: dword): word; forward;
 
+procedure VLC2Write(stream: tStream; values: array of dword); forward;
+function  VLC1Bits(value: dword): word; forward;
+
+{sign}
+procedure SIGNWrite(stream: tStream; values: array of dword); forward;
+procedure SIGNRead(stream: tStream; n: int32; outBuffer: pDword); forward;
 
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
@@ -130,6 +136,7 @@ begin
   case segmentType of
     ST_VLC1: VLC1Write(stream, values);
     ST_VLC2: VLC2Write(stream, values);
+    ST_SIGN: SIGNWrite(stream, values);
     ST_PACK0..ST_PACK0+32: packBits(values, segmentType - ST_PACK0, stream);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
@@ -146,18 +153,16 @@ begin
   if not assigned(outBuffer) then
     system.setLength(outBuffer, n);
 
-  stream.byteAlign();
-
   segmentType := stream.readByte();
 
   case segmentType of
     ST_VLC1: readVLC1Sequence_ASM(stream, n, outBuffer);
     ST_VLC2: readVLC2Sequence_ASM(stream, n, outBuffer);
+    ST_SIGN: SIGNRead(stream, n, @outBuffer[0]);
     ST_PACK0..ST_PACK0+32: unpackBits(stream, segmentType-ST_PACK0, n, outBuffer);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
-  stream.byteAlign();
   exit(outBuffer);
 end;
 
@@ -278,6 +283,78 @@ begin
   result := VLC2Bits(value);
 end;
 
+{--------------------------------------------------------------}
+{ SIGN strategy }
+{--------------------------------------------------------------}
+
+procedure SIGNWrite(stream: tStream; values: array of dword);
+var
+  i: int32;
+  value, prevValue: dword;
+  counter: integer;
+begin
+  prevValue := 0;
+  counter := 0;
+
+  for i := 0 to length(values)-1 do begin
+    value := values[i];
+    if prevValue = value then
+      inc(counter)
+    else begin
+      stream.writeVLC(counter);
+      counter := 1;
+      prevValue := value;
+    end;
+  end;
+  stream.writeVLC(counter);
+  stream.byteAlign();
+end;
+
+function SIGNBits(values: array of dword): int32;
+var
+  i: int32;
+  value, prevValue: dword;
+  counter: integer;
+begin
+  prevValue := 0;
+  counter := 0;
+
+  result := 0;
+
+  for i := 0 to length(values)-1 do begin
+    value := values[i];
+    if prevValue = value then
+      inc(counter)
+    else begin
+      result += VLC1Bits(counter);
+      counter := 1;
+      prevValue := value;
+    end;
+  end;
+  result += VLC1Bits(counter);
+end;
+
+procedure SIGNRead(stream: tStream; n: int32; outBuffer: pDword);
+var
+  i: int32;
+  value: dword;
+  counter: integer;
+begin
+
+  value := 0;
+
+  repeat
+    counter := stream.readVLC();
+    for i := 0 to counter-1 do begin
+      outBuffer^ := value;
+      inc(outBuffer);
+    end;
+    n -= counter;
+    value := 1-value;
+  until n <= 0;
+
+  stream.byteAlign();
+end;
 
 {--------------------------------------------------------------}
 { PACK strategy }
@@ -567,6 +644,7 @@ var
   data: tDWords;
   bits: byte;
   prevMax: dword;
+  testSign: array of dword;
 const
   testData1: array of dword = [1000, 0, 1000, 32, 15, 16, 17];
   testData2: array of dword = [100, 0, 127, 32, 15, 16, 17];
@@ -576,7 +654,24 @@ const
   testData4: array of dword = [31, 31, 31, 31, 31, 31, 31];
   {for VLC testing}
   testData5: array of dword = [14, 12, 1, 2, 100];
+  {for sign testing}
+  testSign1: array of dword = [1,1,1,0,1,1,1];
+  testSign2: array of dword = [0,0,0];
+  testSign3: array of dword = [1,1,1];
+  testSign4: array of dword = [1,1,0];
 begin
+
+  {test sign}
+  for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
+    s := tStream.create();
+    s.writeVLCSegment(testSign, ST_SIGN);
+    s.seek(0);
+    setLength(data, length(testSign));
+    data := s.readVLCSegment(length(testSign), data);
+    s.free;
+    for i := 0 to length(testSign)-1 do
+      assertEqual(data[i], testSign[i]);
+  end;
 
   {check pack and unpack}
   for bits := 7 to 15 do begin
@@ -591,7 +686,7 @@ begin
   testUnpack();
 
   {check vlcsegment standard}
-  s := tStream.create;
+  s := tStream.create();
   s.writeVLCSegment(testData1);
   s.seek(0);
   data := s.readVLCSegment(length(testData1));
