@@ -18,11 +18,11 @@ unit la96;
   TODO: update these...
 
   Profile   Quality   Ratio
-  LOSSLESS  5         1.2x
-  VERY_LOW  2         5x
-  MEDIUM    4         4x
-  HIGH      5         3x
-  Q10       5         2.7x  (10bit audio)
+  LOSSLESS  5         1.4x
+  LOW       2.5       11x
+  MEDIUM    4         5x
+  HIGH      5         3.6x
+  Q10       5         2.9x  (10bit audio)
 
 
   Decompression speed is very fast. Currently at 20x realtime on P166 MMX
@@ -34,10 +34,9 @@ unit la96;
 
   Pending features
   -------------------------------------------------
-  Sign bit compression (should be +5% or so)
-  ASM Decoder (should be 25x realtime)
+  [done] Sign bit compression (should be +5% or so)
+  [done] ASM Decoder (should be 25x realtime)
   MMX Decoder (should be 35x realtime)
-  lowpass post filter - to help with VERY_LOW quality setting.
   variable bit-rate (hoping for medium level with 5x compression)
 
   -------------------------------------------------
@@ -170,7 +169,7 @@ var
 implementation
 
 const
-  VER_SMALL = 5;
+  VER_SMALL = 3;
   VER_BIG = 0;
   FRAME_SIZE = 1024;
 
@@ -179,6 +178,11 @@ const
   ---------------
   v0.1: initial file format
   v0.2: framePtr moved from footer to header
+  v0.3:
+    switch to VCL2
+    no more centering
+    support for midReduction
+    sign bit compression
   }
 
 type

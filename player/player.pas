@@ -565,7 +565,7 @@ var
 begin
 
   oldBufferPos := 0;
-  textColor := RGBA.create(250, 180, 200, 230)
+  textColor := RGBA.create(250, 250, 250, 230)
 
   ;
 
@@ -632,8 +632,8 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
-      textOut(screen.canvas, 640-40, 3, format('%f', [1/elapsed]), textColor);
-      screen.markRegion(tRect.create(640-40,3,40,20));
+      textOut(screen.canvas, 640-45, 3, format('%f', [1/elapsed]), textColor);
+      screen.markRegion(tRect.create(640-45,3,40,20));
 
       {debug info}
       {

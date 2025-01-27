@@ -72,6 +72,7 @@ end;
 procedure masterGFX();
 begin
   convertPNG('background');
+  convertPNG('font');
 end;
 
 begin

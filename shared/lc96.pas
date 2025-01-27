@@ -13,7 +13,7 @@ unit LC96;
 
   v0.1 - first version
   v0.2 - support for larger images (numPatchs now dword)
-
+  v0.3 - Switch to VLC2 (faster loading, and slightly (~1%) more efficent).
 }
 
 interface
@@ -40,7 +40,7 @@ uses
 
 const
   VER_BIG = 0;
-  VER_SMALL = 2;
+  VER_SMALL = 3;
 
 var
   {stores byte(negDecode(x))}
