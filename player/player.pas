@@ -657,6 +657,7 @@ end;
 
 var
   i: integer;
+  mode: string;
 
 begin
 
@@ -671,7 +672,17 @@ begin
   runTestSuites();
   initKeyboard();
 
-  soundPlayer();
+  if paramCount = 0 then
+    mode := 'play'
+  else
+    mode := paramStr(1).toLower();
+
+  if mode = 'play' then
+    soundPlayer()
+  else if mode = 'test' then
+    testCompression()
+  else
+    error('Invalid mode '+mode);
 
   textAttr := LIGHTGRAY;
 
