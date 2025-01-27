@@ -45,6 +45,7 @@ type
     left, right: int16;
     class operator subtract(a,b: tAudioSample16S): tAudioSample16S;
     function mid: int16;
+    function dif: int16;
   end;
   tAudioSample8S = packed record
     left, right: uint8;
@@ -166,6 +167,11 @@ end;
 function tAudioSample16S.mid: int16;
 begin
   result := (int32(left)+int32(right)) div 2;
+end;
+
+function tAudioSample16S.dif: int16;
+begin
+  result := (int32(left)-int32(right)) div 2;
 end;
 
 class operator tAudioSampleF32.implicit(a: tAudioSample16S): tAudioSampleF32;

@@ -787,9 +787,14 @@ var
   midXStats, difXStats,
   midYStats, difYStats: tStats;
 
-  trueLeft, trueRight: int32;
-  outLeft, outRight: int32;
+  {for noise shaping}
+  trueMid, trueDif: int32;
+  outMid, outDif: int32;
+  inMid, inDif: int32;
   inLeft, inRight: int32;
+  outLeft, outRight: int32;
+  midError, difError: single;
+  noiseAlpha: single;
 
   clipGuard: int32; {padding for clipping}
   centerShift: byte;
@@ -798,9 +803,6 @@ var
   penultimateValue: single;
   ulawMaxError: int32;
   clipAdjustment: int32;
-
-  leftError, rightError: single;
-  noiseAlpha: single;
 
   procedure writeOutSigns(signs: array of int8);
   var
@@ -869,7 +871,7 @@ begin
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
   centerShift := 16-CENTERING_RESOLUTION;
   cMid := 0; cDif := 0;
-  leftError := 0; rightError := 0;
+  midError := 0; difError := 0;
 
   setLength(framePtr, numFrames);
 
@@ -962,15 +964,22 @@ begin
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
-      inLeft := samplePtr^.left; trueLeft := inLeft;
-      inRight := samplePtr^.right; trueRight := inRight;
+      trueMid := samplePtr^.mid;
+      trueDif := samplePtr^.dif;
+      inMid := trueMid;
+      inDif := trueDif;
       if samplePtr < maxSamplePtr then inc(samplePtr);
 
       {noise shaping}
       if noiseAlpha > 0 then begin
-        inLeft += round(noiseAlpha * leftError);
-        inRight += round(noiseAlpha * rightError);
+        inMid += round(noiseAlpha * midError);
+        //inDif += round(noiseAlpha * difError);
+        midError *= (1-noiseAlpha);
+        difError *= (1-noiseAlpha);
       end;
+
+      inLeft := inMid + inDif;
+      inRight := inMid - inDif;
 
       aspMid.save();
       aspDif.save();
@@ -1047,8 +1056,8 @@ begin
 
       {keep track of noise}
       if noiseAlpha > 0 then begin
-        leftError := trueLeft-outLeft;
-        rightError := trueRight-outRight;
+        midError += trueMid-decMid;
+        difError += trueDif-decDif;
       end;
 
       if assigned(fullStats) then
