@@ -632,8 +632,8 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
-      textOut(screen.canvas, 640-45, 3, format('%f', [1/elapsed]), textColor);
-      screen.markRegion(tRect.create(640-45,3,40,20));
+      textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), textColor);
+      screen.markRegion(tRect.create(6,3,40,20));
 
       {debug info}
       {
