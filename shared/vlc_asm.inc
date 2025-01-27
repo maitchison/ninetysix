@@ -183,7 +183,7 @@ begin
     {
       eax = temp
       ebx = remaining dwords
-      ecx = [bitsRemaining] [bitsPerCode] 0 0
+      ecx = 0 0 [bitsPerCode] [bitsRemaining]
       edx = bitBuffer
 
       esi = inBuffer
@@ -206,7 +206,6 @@ begin
 
     @LOOP_START:
 
-      {note: could be faster if we read 32 bits at a time.. just need padding bits}
       cmp cl, ch
       jae @SKIP_READ_VALUE
 

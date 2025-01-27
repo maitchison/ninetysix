@@ -1,37 +1,23 @@
-{$udef ALLOW_CENTERING}
-
 procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
 var
   maxCounter: dword;
   shiftCode: word;
-  centerShift: byte;
-  centerMask: dword;
   left, right: word;
   midCodePtr, midSignPtr: pointer;
   difCodePtr, difSignPtr: pointer;
   midUTable,difUTable: pointer;
   MC,DC: int32;
-  midCenter, difCenter: int32;
   i: integer;
 begin
-  maxCounter := frameSpec^.length-1;
-  shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
-  {we get a range check error if we use pascal to do this}
-  //centerMask := not ((1 shl frameSpec^.centerShift)-1);
-  centerShift := frameSpec^.centerShift;
-  asm
-    push cx
-    push eax
-    mov cl, centerShift
-    mov eax, 1
-    shl eax, cl
-    dec eax
-    not eax
-    mov centerMask, eax
-    pop eax
-    pop cx
+
+  if frameSpec^.centerShift <> 16 then begin
+    {we don't support centering anymore}
+    process_REF(sfxSamplePtr, midCode, difCode, midCodes,difCodes,midSigns,difSigns, frameSpec);
+    exit;
   end;
 
+  maxCounter := frameSpec^.length-1;
+  shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
   midCodePtr := @midCodes[0];
   midSignPtr := @midSigns[0];
   difCodePtr := @difCodes[0];
@@ -39,10 +25,8 @@ begin
   left := 0; right := 0; // make compiler happy
   MC := midCode;
   DC := difCode;
-  midCenter := frameSpec^.cMid;
-  difCenter := frameSpec^.cDif;
-  if assigned(frameSpec^.difUTable) then difUTable := @frameSpec^.difUTable^.table.data[0] else difUTable := nil;
-  if assigned(frameSpec^.midUTable) then midUTable := @frameSpec^.midUTable^.table.data[0] else midUTable := nil;
+  if assigned(frameSpec^.difUTable) then difUTable := frameSpec^.difUTable^.tableCenterPtr else difUTable := nil;
+  if assigned(frameSpec^.midUTable) then midUTable := frameSpec^.midUTable^.tableCenterPtr else midUTable := nil;
 
   {not yet supported
     Clipping (encoder should insure this does not happen)
@@ -183,19 +167,6 @@ begin
     xchg cl, ch
     shl ebx, cl
 
-    {$ifdef ALLOW_CENTERING}
-    add eax, MIDCENTER    // eax = mid shl midShift + cDif
-    add ebx, DIFCENTER    // ebx = mid shl midShift + cMid
-
-    {update to new center}
-    mov edx, eax
-    and edx, CENTERMASK
-    mov MIDCENTER, edx
-    mov edx, ebx
-    and edx, CENTERMASK
-    mov DIFCENTER, edx
-    {$endif}
-
     mov edx, eax
     add edx, ebx
     mov LEFT, dx
@@ -222,9 +193,5 @@ begin
 
     popad
   end;
-
-  {write back out our centering positions}
-  frameSpec^.cMid := midCenter;
-  frameSpec^.cDif := difCenter;
 
 end;

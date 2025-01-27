@@ -22,15 +22,10 @@ begin
   mid := midCode;
   dif := difCode;
 
-  {we inline these as it's a bit faster}
-  if assigned(frameSpec^.midUTable) then begin
-    mid := frameSpec^.midUTable^.table.data[abs(mid)];
-    if midCode < 0 then mid := - mid;
-  end;
-  if assigned(frameSpec^.difUTable) then begin
-    dif := frameSpec^.difUTable^.table.data[abs(dif)];
-    if difCode < 0 then dif := - dif;
-  end;
+  if assigned(frameSpec^.midUTable) then
+    mid := frameSpec^.midUTable^.lookup(mid);
+  if assigned(frameSpec^.difUTable) then
+    dif := frameSpec^.difUTable^.lookup(dif);
 
   mid := (mid shl frameSpec^.midShift) + frameSpec^.cMid;
   dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;

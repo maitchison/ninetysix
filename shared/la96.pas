@@ -15,6 +15,8 @@ unit la96;
    2 = Difference is annoying.
    1 = Difference is very annoying.
 
+  TODO: update these...
+
   Profile   Quality   Ratio
   LOSSLESS  5         1.2x
   VERY_LOW  2         5x
@@ -83,9 +85,11 @@ type
   {fast uLaw calculations via a lookup table}
   {settings bits to 0 gives identity transform}
   tULawLookup = record
-    table: tIntList;
+    maxValue: int32;
+    table2: tIntList;
     procedure initEncode(bits: byte; log2Mu: byte);
     procedure initDecode(bits: byte; log2Mu: byte);
+    function tableCenterPtr: pointer; inline;
     function lookup(x: int32): int32; inline;
   end;
   pULawLookup = ^tULawLookup;
@@ -425,7 +429,7 @@ var
       fs.readByte;
       SIGNReadMasked(fs, len, @signs[0]);
     end else begin
-      {this is a bit slower, but more efficent for complex sign paterns}
+      {this is a bit slower, but more efficent for complex sign patterns}
       signsPtr := signs;
       fs.readVLCSegment(len, signs);
       convertSigns(signs);
@@ -533,14 +537,20 @@ end;
 procedure tULawLookup.initDecode(bits: byte; log2Mu: byte);
 var
   i: int32;
-  codeSize: int32;
   mu: int32;
 begin
   mu := 1 shl log2Mu;
-  codeSize := (1 shl bits);
-  table := tIntList.create(codeSize+1); {0..codesize (inclusive)}
-  for i := 0 to codeSize do
-    table[i] := uLawInv(i / codeSize, mu);
+  maxValue := (1 shl bits);
+  table2 := tIntList.create(2*maxValue+1); {-codesize..codesize (inclusive)}
+  for i := -maxValue to maxValue do begin
+    table2[maxValue+i] := uLawInv(i / maxValue, mu);
+  end;
+end;
+
+{pointer to midpoint of table, i.e. f(0)}
+function tULawLookup.tableCenterPtr: pointer; inline;
+begin
+  result := @table2.data[maxValue];
 end;
 
 procedure tULawLookup.initEncode(bits: byte; log2Mu: byte);
@@ -551,15 +561,15 @@ var
 begin
   mu := 1 shl log2Mu;
   codeSize := (1 shl bits);
-  table := tIntList.create(32*1024+1);
-  for i := 0 to 32*1024 do
-    table[i] := round(uLaw(i, mu) * codeSize);
+  maxValue := 32*1024;
+  table2 := tIntList.create(2*maxValue+1);
+  for i := -maxValue to maxValue do
+    table2[maxValue+i] := round(uLaw(i, mu) * codeSize);
 end;
 
 function tULawLookup.lookup(x: int32): int32; inline;
 begin
-  result := table[abs(x)];
-  if x < 0 then result := -result;
+  result := table2.data[maxValue+x];
 end;
 
 {-------------------------------------------------------}
@@ -660,22 +670,16 @@ end;
 procedure tASPULawDelta.encode(newX: int32);
 var
   thisU: int32;
-  ax: int32;
 begin
   prevX := x;
   prevY := y;
-  //thisU := lut.encode(newX);
-  //self inline... :(
-  ax := abs(newX);
-  if ax > 32*1024 then ax := 32*1024;
-  thisU := uLawEncode.table.data[ax];
-  if newX < 0 then thisU := -thisU;
+  newX := clamp(newX, -32*1024, 32*1024);
+  thisU := uLawEncode.lookup(newX);
 
   y := thisU - prevU;
   x := newX;
   prevU := thisU;
-  xPrime := uLawDecode.table.data[abs(thisU)];
-  if thisU < 0 then xPrime := -xPrime;
+  xPrime := uLawDecode.lookup(thisU);
 end;
 
 procedure tASPULawDelta.reset(initialValue: int32=0);

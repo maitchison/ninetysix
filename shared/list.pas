@@ -35,7 +35,7 @@ type
     class operator add(a: tIntList;b: int32): tIntList;
 
   private
-    function deref(index: int32): int32;
+    function deref(index: int32): int32; inline;
 
   end;
 
@@ -84,7 +84,7 @@ type
     function getEnumerator(): tEnumerator;
 
   private
-    function deref(index: int32): int32;
+    function deref(index: int32): int32; inline;
 
   end;
 
@@ -147,7 +147,7 @@ begin
   error('String missing ]');
 end;
 
-function tIntList.deref(index: int32): int32;
+function tIntList.deref(index: int32): int32; inline;
 begin
   if index < 0 then index += endPos else index += startPos;
   result := index;
@@ -169,7 +169,7 @@ begin
   result.append(b);
 end;
 
-function tIntList.getItem(index: int32): int32;
+function tIntList.getItem(index: int32): int32; inline;
 begin
   result := data[deref(index)];
 end;
