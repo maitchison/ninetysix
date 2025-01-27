@@ -74,18 +74,16 @@ end;
 procedure readVLC2Sequence_ASM(stream: tStream; n: int32;outBuffer: tDwords);
 var
   inPtr, outPtr: pointer;
-  nibblesRead: dword;
   bytesRead: dword;
 begin
   inPtr := stream.getCurrentBytesPtr;
   outPtr := @outBuffer[0];
-  nibblesRead := 0;
   bytesRead := 0;
 
   {
   optimized read VLC
 
-  EAX - 0|0|midbyte|current byte
+  EAX - 0|0|0|current byte
   EBX - current value
   ECX - loop (n)
   EDX - 0|0|stream byte|tmp
@@ -93,8 +91,6 @@ begin
   ESI - stream in
   EDI - stream out
   }
-
-  //note: we can skip the jumps if we do a lookup table.
 
   asm
     pushad
@@ -106,46 +102,41 @@ begin
     mov edi, outPtr
 
   @VLC_LOOP:
-    inc nibblesRead
-    cmp ah, 0                 //       i.e. when esi changes
-    je @notMidByte
 
-  @MidByte:
-    mov al, dh
+    mov al, byte ptr [esi]
     inc esi
-    and al, $0f
-    xor ah, ah
-    jmp @Process
 
-  @NotMidByte:
-    mov dh, byte ptr [esi]
-    inc bytesRead
-    mov al, dh
-    inc ah
-    shr al, 4
-
-  @Process:
-    // write the value
-    mov dl, al
-    and dl, $07
-    or  bl, dl
-
-    // check if this was the last nibble
-    cmp dl, al
-    jne @WriteValue
-
-    // otherwise shift and repeat
+  @DoNibble1:
+    mov ah, al
+    and ah, $07
+    or  bl, ah
+    test al, $08
+    jnz @WriteValue
     inc ebx       // account for overlap
     shl ebx, 3
+
+  @DoNibble2:
+    shr al, 4
+    mov ah, al
+    and al, $07
+    or  bl, al
+    test ah, $08
+    jnz @WriteValue
+    inc ebx       // account for overlap
+    shl ebx, 3
+
     jmp @VLC_LOOP
 
   @WriteValue:
     mov [edi], ebx
     add edi, 4
     xor ebx, ebx
-    mov nibblesRead, ebx  // reset nibbles counter
     loop @VLC_LOOP
   @Done:
+
+    sub esi, inPtr
+    mov bytesRead, esi
+
     popad
   end;
   stream.advance(bytesRead);

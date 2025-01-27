@@ -31,6 +31,14 @@ const
   ST_VLC2 = 1;  {this is the newer VLC method}
   ST_PACK0 = 16;
   ST_PACK1 = 17;
+  ST_PACK2 = 18;
+  ST_PACK3 = 19;
+  ST_PACK4 = 20;
+  ST_PACK5 = 21;
+  ST_PACK6 = 22;
+  ST_PACK7 = 23;
+  ST_PACK8 = 24;
+  ST_PACK9 = 25;
 
 function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
@@ -114,18 +122,16 @@ begin
     segmentType := ST_VLC1;
 
   if segmentType = ST_PACK then begin
-    {todo: check this is correct}
     segmentType := ST_PACK0 + bitsToStoreMaxValue(maxValue);
   end;
 
-  {just write out the data}
+  {write out the data}
   stream.writeByte(segmentType);
   case segmentType of
-    ST_PACK0: ;
-    ST_PACK1: packBits(values, 1, stream);
+    ST_PACK0..ST_PACK0+32: packBits(values, segmentType - ST_PACK0, stream);
     ST_VLC1: writeVLC1(stream, values);
     ST_VLC2: writeVLC2(stream, values);
-    else error('Invalid segment type');
+    else error('Invalid segment type '+intToStr(segmentType));
   end;
 
   result := stream.pos-startPos;
@@ -148,7 +154,7 @@ begin
   case segmentType of
     ST_VLC1: readVLC1Sequence_ASM(stream, n, outBuffer);
     ST_VLC2: readVLC2Sequence_ASM(stream, n, outBuffer);
-    ST_PACK0..ST_PACK0+64: unpackBits(stream, segmentType-ST_PACK0, n, outBuffer);
+    ST_PACK0..ST_PACK0+32: unpackBits(stream, segmentType-ST_PACK0, n, outBuffer);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -453,6 +459,41 @@ end;
 
 {----------------------------------------------------}
 
+procedure benchmark();
+var
+  inData, outData: tDwords;
+  i: integer;
+  s: tStream;
+  startTime, encodeElapsed, decodeElapsed: double;
+  segmentType: byte;
+  bytes: int32;
+begin
+  setLength(inData, 64000);
+  setLength(outData, 64000);
+  for i := 0 to length(inData)-1 do
+    inData[i] := rnd div 2;
+
+  {run a bit of a benchmark on random bytes (0..127)}
+  s := tStream.create(2*64*1024);
+
+  for segmentType in [ST_AUTO, ST_PACK7, ST_PACK8, ST_PACK9, ST_VLC1, ST_VLC2] do begin
+    s.seek(0);
+    startTime := getSec();
+    bytes := writeSegment(s, inData, segmentType);
+    encodeElapsed := getSec() - startTime;
+
+    s.seek(0);
+    startTime := getSec();
+    readSegment(s, length(inData), outData);
+    decodeElapsed := getSec() - startTime;
+
+    info(format('mode:%d - %d bytes (encode:%fms decode:%fms)', [segmentType, bytes, 1000*encodeElapsed, 1000*decodeElapsed]));
+  end;
+
+end;
+
+{----------------------------------------------------}
+
 type
   tVLCTest = class(tTestSuite)
     procedure run; override;
@@ -582,4 +623,6 @@ end;
 begin
   buildUnpackingTables();
   tVLCTest.create('VLC');
+  benchmark();
+  halt;
 end.
