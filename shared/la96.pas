@@ -71,6 +71,7 @@ uses
   list,
   sound,
   csv,
+  vlc,
   audioFilter,
   stream;
 
@@ -1079,8 +1080,14 @@ begin
 
     {write out frame}
     startTimer('LA96_segments');
-    midFrameSize := fs.writeVLCSegment(midCodes, PACK_BEST);
-    difFrameSize := fs.writeVLCSegment(difCodes, PACK_BEST);
+    {stub:}
+    if sfx.length > 2000 then begin
+      midFrameSize := fs.writeVLCSegment(midCodes, ST_VLC2);
+      difFrameSize := fs.writeVLCSegment(difCodes, ST_VLC2);
+    end else begin
+      midFrameSize := fs.writeVLCSegment(midCodes, ST_VLC1);
+      difFrameSize := fs.writeVLCSegment(difCodes, ST_VLC1);
+    end;
     stopTimer('LA96_segments');
 
     {write signs}

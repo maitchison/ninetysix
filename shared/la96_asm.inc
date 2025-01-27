@@ -2,6 +2,7 @@ procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; mi
 var
   maxCounter: dword;
   shiftCode: word;
+  centerShift: byte;
   centerMask: dword;
   left, right: word;
   midCodePtr, midSignPtr: pointer;
@@ -13,7 +14,22 @@ var
 begin
   maxCounter := frameSpec^.length-1;
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
-  centerMask := not ((1 shl frameSpec^.centerShift)-1);
+  {we get a range check error if we use pascal to do this}
+  //centerMask := not ((1 shl frameSpec^.centerShift)-1);
+  centerShift := frameSpec^.centerShift;
+  asm
+    push cx
+    push eax
+    mov cl, centerShift
+    mov eax, 1
+    shl eax, cl
+    dec eax
+    not eax
+    mov centerMask, eax
+    pop eax
+    pop cx
+  end;
+
   midCodePtr := @midCodes[0];
   midSignPtr := @midSigns[0];
   difCodePtr := @difCodes[0];

@@ -2,7 +2,7 @@
 program player;
 
 uses
-  {$I baseunits.inc},
+  {$i baseunits.inc},
   sound,
   audioFilter,
   mixLib,
@@ -460,6 +460,7 @@ begin
     deltaSFX[length(deltaSFX)-1] := errSFX;
     {rms}
     writeln(format('FILE RMS: %f',[curSFX.calculateRMS()]));
+    writeln(format('FILE Size: %fkb',[fs.getFileSize(tag+'.a96')/1024]));
     writeln(format('ERROR RMS: %f',[errSFX.calculateRMS()]));
     writeln(format('Decoded at %fx', [(curSFX.length/44100)/getTimer('decode').elapsed]));
     {export}

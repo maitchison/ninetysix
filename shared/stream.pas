@@ -16,12 +16,6 @@ uses
 
 type
 
-  tPackingMethod = (
-    PACK_OFF,    // do not use packing
-    PACK_BEST,   // use packing on any bitlength, but only if it's smaller.
-    PACK_ALWAYS  // always use packing even if it's less efficent.
-  );
-
   tStream = class
 
     {
@@ -61,7 +55,7 @@ type
     procedure writeWord(w: word); inline;
     procedure writeDWord(d: dword); inline;
     procedure writeVLC(value: dword); inline;
-    function  writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_BEST): int32;
+    function  writeVLCSegment(values: array of dword;segmentType:byte=255): int32;
     function  VLCbits(value: dword): word; inline;
 
     procedure setSize(newSize: int32);
@@ -507,9 +501,9 @@ begin
   result := vlc.readSegment(self, n, outBuffer);
 end;
 
-function tStream.writeVLCSegment(values: array of dword;packing:tPackingMethod=PACK_BEST): int32;
+function tStream.writeVLCSegment(values: array of dword;segmentType:byte=255): int32;
 begin
-  result := vlc.writeSegment(self, values, packing);
+  result := vlc.writeSegment(self, values, segmentType);
 end;
 
 {returns size of variable length encoded token}

@@ -1,4 +1,4 @@
-function readVLCSequence_REF(stream: tStream; n: int32;outBuffer: tDwords): tDWords;
+function readVLC1Sequence_REF(stream: tStream; n: int32;outBuffer: tDwords): tDWords;
 var
   i: integer;
 begin

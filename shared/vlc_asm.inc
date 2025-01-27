@@ -1,4 +1,4 @@
-function readVLCSequence_ASM(stream: tStream; n: int32;outBuffer: tDwords): tDWords;
+procedure readVLC1Sequence_ASM(stream: tStream; n: int32;outBuffer: tDwords);
 var
   inPtr, outPtr: pointer;
   nibblesRead: dword;
@@ -20,9 +20,6 @@ begin
   }
 
   //note: we can skip the jumps if we do a lookup table.
-  //note: it's a shame we don't store these in the opposite order
-  //      I might fix that later on (e.g. so we always just shift the
-  //      value, rather than shifting the new bits and adding
 
   asm
     pushad
@@ -68,15 +65,90 @@ begin
     xor ebx, ebx
     dec n
     jnz @VLC_LOOP
-
   @Done:
-
     popad
-
   end;
-
   stream.advance((nibblesRead + 1) div 2);
+end;
 
+procedure readVLC2Sequence_ASM(stream: tStream; n: int32;outBuffer: tDwords);
+var
+  inPtr, outPtr: pointer;
+  nibblesRead: dword;
+  bytesRead: dword;
+begin
+  inPtr := stream.getCurrentBytesPtr;
+  outPtr := @outBuffer[0];
+  nibblesRead := 0;
+  bytesRead := 0;
+
+  {
+  optimized read VLC
+
+  EAX - 0|0|midbyte|current byte
+  EBX - current value
+  ECX - loop (n)
+  EDX - 0|0|stream byte|tmp
+
+  ESI - stream in
+  EDI - stream out
+  }
+
+  //note: we can skip the jumps if we do a lookup table.
+
+  asm
+    pushad
+
+    xor eax, eax
+    xor ebx, ebx
+    mov ecx, n
+    mov esi, inPtr
+    mov edi, outPtr
+
+  @VLC_LOOP:
+    inc nibblesRead
+    cmp ah, 0                 //       i.e. when esi changes
+    je @notMidByte
+
+  @MidByte:
+    mov al, dh
+    inc esi
+    and al, $0f
+    xor ah, ah
+    jmp @Process
+
+  @NotMidByte:
+    mov dh, byte ptr [esi]
+    inc bytesRead
+    mov al, dh
+    inc ah
+    shr al, 4
+
+  @Process:
+
+    // write the value
+    mov dl, al
+    and dl, $07
+    or  bl, dl
+
+    // check if this was the last nibble
+    cmp dl, al
+    jne @WriteValue
+
+    // otherwise shift and repeat
+    shl ebx, 3
+    jmp @VLC_LOOP
+
+  @WriteValue:
+    mov [edi], ebx
+    add edi, 4
+    xor ebx, ebx
+    mov nibblesRead, ebx  // reset nibbles counter
+    loop @VLC_LOOP
+  @Done:
+    popad
+  end;
+  stream.advance(bytesRead);
 end;
 
 procedure unpack_ASM(inBuffer: pByte;outBuffer: pDWord; n: dword;bitsPerCode: byte);
