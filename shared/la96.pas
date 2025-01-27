@@ -149,9 +149,9 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
-  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:5;ulawBits:5;log2Mu:6;filter:16);
-  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:6;log2Mu:7;filter:0);
-  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:7;log2Mu:7;filter:0);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:5;log2Mu:6;filter:0);
+  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:6;ulawBits:8;log2Mu:7;filter:0);
+  ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:8;log2Mu:8;filter:0);
   ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:2;ulawBits:8;log2Mu:8;filter:0);
   ACP_Q10: tAudioCompressionProfile      = (tag:'q10';     quantBits:6;ulawBits:0;log2Mu:0;filter:0);
   ACP_Q12: tAudioCompressionProfile      = (tag:'q12';     quantBits:4;ulawBits:0;log2Mu:0;filter:0);
@@ -746,7 +746,8 @@ end;
 
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tStream;
 const
-  CENTERING_RESOLUTION = 8; {16=perfect, 0=off}
+  {note: we don't use centering anymore as it adds too much noise}
+  CENTERING_RESOLUTION = 0; {16=perfect, 0=off}
   MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
 var
   i,j,k: int32;
@@ -930,8 +931,8 @@ begin
   midYStats.init();
   difYStats.init();
 
-  // 0.0 = off, 1 = full, 0.95 = good
-  noiseAlpha := 0.9;
+  // 0.0 = off, 1 = full, 0.95 = strong
+  noiseAlpha := 0;
 
   for i := 0 to numFrames-1 do begin
 
@@ -975,7 +976,7 @@ begin
         inMid += round(noiseAlpha * midError);
         //inDif += round(noiseAlpha * difError);
         midError *= (1-noiseAlpha);
-        difError *= (1-noiseAlpha);
+        //difError *= (1-noiseAlpha);
       end;
 
       inLeft := inMid + inDif;

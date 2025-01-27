@@ -2,6 +2,7 @@ procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; mi
 var
   maxCounter: dword;
   shiftCode: word;
+  centerMask: dword;
   left, right: word;
   midCodePtr, midSignPtr: pointer;
   difCodePtr, difSignPtr: pointer;
@@ -12,6 +13,7 @@ var
 begin
   maxCounter := frameSpec^.length-1;
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
+  centerMask := not ((1 shl frameSpec^.centerShift)-1);
   midCodePtr := @midCodes[0];
   midSignPtr := @midSigns[0];
   difCodePtr := @difCodes[0];
@@ -25,8 +27,6 @@ begin
   if assigned(frameSpec^.midUTable) then midUTable := @frameSpec^.midUTable^.table.data[0] else midUTable := nil;
 
   {not yet supported
-    ULAW
-    Centering
     Clipping (encoder should insure this does not happen)
   }
 
@@ -169,12 +169,10 @@ begin
 
     {update to new center}
     mov edx, eax
-    shr edx, 8
-    shl edx, 8              // todo: have this be configured
+    and edx, CENTERMASK
     mov MIDCENTER, edx
     mov edx, ebx
-    shr edx, 8
-    shl edx, 8              // todo: have this be configured
+    and edx, CENTERMASK
     mov DIFCENTER, edx
 
     mov edx, eax
