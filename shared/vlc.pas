@@ -60,6 +60,9 @@ var
   packing2: array[0..255] of array[0..3] of dword;
   packing4: array[0..255] of array[0..1] of dword;
 
+var
+  OFFSET_TABLE: array[0..8] of dword;
+
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
 
@@ -184,7 +187,6 @@ var
     end;
   end;
 
-
 begin
   midByte := false;
   for x in values do begin
@@ -204,19 +206,15 @@ begin
 end;
 
 {returns number of nibbles required to store given value}
-{todo: make faster}
-function VLC2Length(d: dword; out prevMax: dword): byte;
-var
-  maxStore: dword;
-  i: integer;
+function VLC2Length(d: dword): byte; inline;
 begin
-  prevMax := 0;
-  maxStore := 8;
-  for i := 1 to 12 do begin
-    if d < maxStore then exit(i);
-    prevMax := maxStore;
-    maxStore += (8 shl (i*3));
-  end;
+  if d < 8 then exit(1);
+  if d < 64+8 then exit(2);
+  if d < 512+64+8 then exit(3);
+  if d < 4096+512+64+8 then exit(4);
+  if d < 32768+4096+512+64+8 then exit(5);
+  if d < 262144+32768+4096+512+64+8 then exit(6);
+  error('Can not encode VLC value, too large.');
 end;
 
 procedure writeVLC2(stream: tStream; values: array of dword);
@@ -225,16 +223,14 @@ var
   midByte: boolean;
   buffer: byte;
   nibLen: byte;
-  nibSub: dword;
   i: integer;
   shift: byte;
   nib: byte;
-
 begin
   midByte := false;
   for value in values do begin
-    nibLen := VLC2Length(value, nibSub);
-    encode := value - nibSub;
+    nibLen := VLC2Length(value);
+    encode := value - OFFSET_TABLE[nibLen-1];
     shift := nibLen*3;
     for i := 1 to nibLen do begin
       shift -= 3;
@@ -440,6 +436,21 @@ begin
   exit(outBuffer);
 end;
 
+procedure buildOffsetTable();
+var
+  i: integer;
+  value: dword;
+  factor: dword;
+begin
+  value := 0;
+  factor := 1;
+  for i := low(OFFSET_TABLE) to high(OFFSET_TABLE) do begin
+    OFFSET_TABLE[i] := value;
+    factor *= 8;
+    value += factor;
+  end;
+end;
+
 {builds lookup tables used to accelerate unpacking.}
 procedure buildUnpackingTables();
 var
@@ -608,17 +619,18 @@ begin
   assertEqual(bitsToStoreMaxValue(256), 9);
 
   {check nibble length}
-  assertEqual(VLC2Length(0, prevMax), 1);
-  assertEqual(VLC2Length(1, prevMax), 1);
-  assertEqual(VLC2Length(7, prevMax), 1);
-  assertEqual(VLC2Length(8, prevMax), 2);
-  assertEqual(VLC2Length(8+63, prevMax), 2);
-  assertEqual(VLC2Length(8+64, prevMax), 3);
-  assertEqual(VLC2Length(8+64+511, prevMax), 3);
-  assertEqual(VLC2Length(8+64+512, prevMax), 4);
+  assertEqual(VLC2Length(0), 1);
+  assertEqual(VLC2Length(1), 1);
+  assertEqual(VLC2Length(7), 1);
+  assertEqual(VLC2Length(8), 2);
+  assertEqual(VLC2Length(8+63), 2);
+  assertEqual(VLC2Length(8+64), 3);
+  assertEqual(VLC2Length(8+64+511), 3);
+  assertEqual(VLC2Length(8+64+512), 4);
 end;
 
 begin
+  buildOffsetTable();
   buildUnpackingTables();
   tVLCTest.create('VLC');
   benchmark();
