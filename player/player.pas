@@ -549,6 +549,7 @@ var
   oldBufferPos: dword;
   elapsed: double;
   x,y: integer;
+  textColor: RGBA;
 
   procedure setSelected(newSelected: integer);
   begin
@@ -560,6 +561,9 @@ var
 begin
 
   oldBufferPos := 0;
+  textColor := RGBA.create(250, 180, 200, 230)
+
+  ;
 
   {get list of songs}
   {todo: stream these off disk rather than loading them in...}
@@ -604,7 +608,7 @@ begin
       {waveform}
       startTimer('waveform');
       rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height-(hdrWave.height div 2), hdrWave.width, hdrWave.height);
-      hdrWave.fade(0.90);
+      hdrWave.fade(0.92);
       displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 8*1024);
       hdrWave.mixTo(screen.canvas, rect.x, rect.y);
       screen.markRegion(rect);
@@ -624,8 +628,17 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
-      textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGBA.create(250, 250, 250, 200));
-      screen.markRegion(tRect.create(6,3,40,20));
+      textOut(screen.canvas, 640-40, 3, format('%f', [1/elapsed]), textColor);
+      screen.markRegion(tRect.create(640-40,3,40,20));
+
+      {debug info}
+      {
+      screen.markRegion(tRect.create(0,0,200,200));
+      textOut(screen.canvas, 10, 10, format('Offset:%d', [prevSync.offset]), textColor);
+      textOut(screen.canvas, 10, 30, format('Value:%d', [prevSync.value]), textColor);
+      textOut(screen.canvas, 10, 50, format('Slope:%d', [prevSync.slope]), textColor);
+      textOut(screen.canvas, 10, 70, format('Debug:%s', [prevSync.debugStr]), textColor);
+      }
 
       screen.flipAll();
 

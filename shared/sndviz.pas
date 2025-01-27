@@ -17,10 +17,25 @@ procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16
 procedure displayWaveFormHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; value: integer);
 procedure displayPhaseScopeHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, value: integer);
 
+{stub: pass in}
+type
+  tSyncInfo = record
+    offset: integer;
+    value: integer;
+    slope: single;
+    debugStr: string;
+    procedure clear();
+  end;
+
+var
+  prevSync: tSyncInfo;
+
 implementation
 
 var
   sampleBuffer: array[0..16*1024-1] of tAudioSample16S;
+
+
 
 {draw a vertical line with AA on the edges}
 procedure vLineAA(page: tPage; x: integer;y1,y2: single; col: RGBA);
@@ -45,10 +60,6 @@ begin
   for y := round(y1) to round(y2) do page.addValue(x, y, value);
 end;
 
-{stub:}
-var
-  prevAmp, prevSlope: single;
-
 function getTracking(samplePtr: pAudioSample16S; sampleLen, sampleMax: integer): integer;
 var
   pSample: pAudioSample16S;
@@ -56,22 +67,25 @@ var
   mid: single;
   trackingOffset: integer;
   padding: integer;
+  debugStr: string;
+  deltaValue: integer;
 
-  function getSmooth(idx: integer): pAudioSample16S; inline;
+  function getSmooth(idx: integer): integer; inline;
   begin
     idx := clamp(idx, 0, sampleMax-1);
-    result := @sampleBuffer[idx];
+    result := sampleBuffer[idx].left;
   end;
 
   function getSlope(idx: integer): single; inline;
   begin
-    result := (getSmooth(idx - 2).left - getSmooth(idx + 2).left) / 4;
+    result := (getSmooth(idx - 2) - getSmooth(idx + 2)) / 4;
   end;
 
   {tunes the tracking offset}
   procedure tuneTracking(scale: integer);
   var
     bestScore, score, slope: single;
+    scoreDelta, scoreValue, scoreSlope: single;
     prevOffset, xlp: integer;
     delta: integer;
   begin
@@ -79,22 +93,21 @@ var
     prevOffset := trackingOffset;
     for xlp := -64 to +64 do begin
       delta := xlp*scale + prevOffset;
-      pSample := getSmooth(midX + delta);
-      slope := getSlope(midX + delta);
-      score := 0;
-      score -= 0.1 * abs(delta);             // drift loss [-100..0]
-      score -= 1   * abs(pSample^.left);     // look for zero crossing [-6k..0]
-      score -= 10  * slope;                  // slope bonus [-100..100]
+      scoreDelta := -1   * abs(delta);
+      scoreValue := -10  * abs(getSmooth(midX + delta));
+      scoreSlope := -5   * getSlope(midX + delta);
+      score := scoreDelta + scoreValue + scoreSlope;
       if score > bestScore then begin
         bestScore := score;
         trackingOffset := delta;
+        //debugStr := format('%d %d %d %d', [score, scoreDelta, scoreValue, scoreSlope]);
       end;
     end;
   end;
 
 begin
 
-  if sampleLen > 16*1024 then error('Sorry buffers larger than 16K are not supported.');
+  if sampleMax > 16*1024 then error('Buffers larger than 16K are not supported.');
 
   {this is how far we can shift in each direction}
   padding := (sampleMax - sampleLen) div 2;
@@ -105,17 +118,28 @@ begin
   {smooth out the waveform for processing}
   mid := samplePtr^.left + samplePtr^.right;
   pSample := samplePtr;
-  for xlp := 0 to sampleLen-1 do begin
+  for xlp := 0 to sampleMax-1 do begin
     // this roughly matches voice, which is 300 hz.
     mid := mid * 0.92 + (pSample^.mid) * 0.08;
     sampleBuffer[xlp].left := clamp16(mid);
     inc(pSample);
   end;
 
-  {perform some sync}
+  debugStr := '';
+
+  {perform tracking}
   trackingOffset := 0;
-//  tuneTracking(8);
   tuneTracking(2);
+
+  {best guess at how many samples we moved}
+  deltaValue := (trackingOffset - prevSync.offset);
+
+  prevSync.offset := trackingOffset;
+  prevSync.value := getSmooth(midX + trackingOffset);
+  prevSync.slope := getSlope(midX + trackingOffset);
+  prevSync.debugStr := debugStr;
+
+  note(prevSync.debugStr);
 
   result := trackingOffset;
 
@@ -221,5 +245,18 @@ begin
 
 end;
 
+{--------------------------------------------}
+
+procedure tSyncInfo.clear();
 begin
+  offset := 0;
+  value := 0;
+  slope := 0;
+  debugStr := '';
+end;
+
+{--------------------------------------------}
+
+begin
+  prevSync.clear();
 end.
