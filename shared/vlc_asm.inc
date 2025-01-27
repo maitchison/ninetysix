@@ -106,32 +106,44 @@ begin
     mov al, byte ptr [esi]
     inc esi
 
-  @DoNibble1:
-    mov ah, al
-    and ah, $07
-    or  bl, ah
-    test al, $08
-    jnz @WriteValue
-    inc ebx       // account for overlap
-    shl ebx, 3
+  @DoNibble1:             // this one > 0xxx-0xxx
+    mov ah, al            // al = ah = 0f
+    shr ah, 4             // ah = 0
+    and ah, $07           // ah = 0
+    or  bl, ah            // bl = 0
+    test al, $80          // 0
+    jnz @WriteValue1      // sjup
 
-  @DoNibble2:
-    shr al, 4
+    inc ebx               // ebx=1
+    shl ebx, 3            // ebx=8
+    jmp @DoNibble2        // jump
+
+  @WriteValue1:
+    mov [edi], ebx
+    add edi, 4
+    xor ebx, ebx
+    dec ecx
+    jz @Done
+
+  @DoNibble2:             //            0xxx-0xxx < this one
+    and  al, $0f
     mov ah, al
     and al, $07
     or  bl, al
     test ah, $08
-    jnz @WriteValue
-    inc ebx       // account for overlap
-    shl ebx, 3
+    jnz @WriteValue2
 
+    inc ebx
+    shl ebx, 3
     jmp @VLC_LOOP
 
-  @WriteValue:
+  @WriteValue2:
     mov [edi], ebx
     add edi, 4
     xor ebx, ebx
-    loop @VLC_LOOP
+    dec ecx
+    jnz @VLC_LOOP
+
   @Done:
 
     sub esi, inPtr
