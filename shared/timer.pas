@@ -134,7 +134,7 @@ end;
 
 function tTimer.toString(): string;
 begin
-  result := format('%s: %f (%f) [total:%f]', [tag, elapsed, maxElapsed, totalElapsed]);
+  result := format('%s: %f (%f) [total:%.2f]', [tag, elapsed, maxElapsed, totalElapsed]);
 end;
 
 begin

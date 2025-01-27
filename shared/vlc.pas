@@ -742,6 +742,17 @@ begin
       assertEqual(data[i], testSign[i]);
   end;
 
+  for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
+    s := tStream.create();
+    SIGNWrite(s, testSign);
+    s.seek(0);
+    setLength(data, length(testSign));
+    SIGNReadMasked(s, length(testSign), @data[0]);
+    s.free;
+    for i := 0 to length(testSign)-1 do
+      assertEqual(int32(data[i]), -testSign[i]);
+  end;
+
   {check pack and unpack}
   for bits := 7 to 15 do begin
     bitsStream := packBits(testData2, bits);
