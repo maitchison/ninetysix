@@ -9,6 +9,7 @@ uses
   utils,
   sysTypes,
   myMath,
+  bits,
   stream;
 
 {
@@ -50,8 +51,10 @@ procedure SIGNWrite(stream: tStream; values: array of dword); overload;
 procedure SIGNWrite(stream: tStream; values: array of int8); overload;
 function  SIGNBits(values: array of dword): int32; overload;
 function  SIGNBits(values: array of int8): int32; overload;
-
 procedure SIGNReadMasked(stream: tStream; n: int32; outBuffer: pDword);
+
+procedure RICEWrite(stream: tStream; values: array of dword);
+procedure RICERead(stream: tStream; n: int32; outBuffer: pDword);
 
 implementation
 
@@ -426,32 +429,33 @@ begin
 end;
 
 {--------------------------------------------------------------}
+{ RICE strategy }
+{--------------------------------------------------------------}
+
+procedure RICEWrite(stream: tStream; values: array of dword);
+begin
+end;
+
+procedure RICERead(stream: tStream; n: int32; outBuffer: pDword);
+begin
+end;
+
+
+{--------------------------------------------------------------}
 { PACK strategy }
 {--------------------------------------------------------------}
 
+
 function packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream;
 var
-  bitBuffer: dword;
-  bitPos: integer;
-  s: tStream;
-  i,j: int32;
-
-  procedure writeBit(b: byte);
-  begin
-    bitBuffer += b shl bitPos;
-    inc(bitPos);
-    if bitPos = 8 then begin
-      s.writeByte(bitBuffer);
-      bitBuffer := 0;
-      bitPos := 0;
-    end;
-  end;
-
+  bs: tBitStream;
+  value: dword;
 begin
-  s := outStream;
-  if not assigned(s) then
-    s := tStream.create();
-  result := s;
+
+  if not assigned(outStream) then
+    outStream := tStream.create();
+  result := outStream;
+  bs.init(outStream);
 
   {$IFDEF Debug}
   for i := 0 to length(values)-1 do
@@ -459,26 +463,12 @@ begin
       Error(format('Value %d in segment exceeds expected bound of %d', [values[i], 1 shl bits]));
   {$ENDIF}
 
-  {special cases}
-  case bits of
-    0: begin
-      {do nothing}
-      exit;
-    end;
-    else begin
-      {generic bit packing}
-      bitBuffer := 0;
-      bitPos := 0;
+  if bits = 0 then exit;
 
-      for i := 0 to length(values)-1 do
-        for j := 0 to bits-1 do
-          writeBit((values[i] shr j) and $1);
+  for value in values do
+    bs.writeBits(value, bits);
 
-      {pad with 0s to write final byte}
-      while bitPos <> 0 do
-        writeBit(0);
-    end;
-  end;
+  bs.flush();
 end;
 
 procedure unpack0(inBuf: pByte; outBuf: pDWord;n: dWord);
