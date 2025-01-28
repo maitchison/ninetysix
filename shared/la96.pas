@@ -3,6 +3,25 @@ unit la96;
 
 {$MODE delphi}
 
+(*
+  changes
+  ---------------
+  v0.1: initial file format
+  v0.2: framePtr moved from footer to header
+  v0.3:
+    - switch to VCL2
+    - no more centering
+    - support for midReduction
+    - sign bit compression
+  [pending] v0.4:
+    - added rice codes
+  [future] v0.5:
+    - remove VLC
+    - linear prediction
+    - integrated sign bits
+*)
+
+
 {
 
   LA96 supports the following formats
@@ -172,18 +191,6 @@ const
   VER_SMALL = 3;
   VER_BIG = 0;
   FRAME_SIZE = 1024;
-
-  {
-  changes
-  ---------------
-  v0.1: initial file format
-  v0.2: framePtr moved from footer to header
-  v0.3:
-    switch to VCL2
-    no more centering
-    support for midReduction
-    sign bit compression
-  }
 
 type
   tFrameSpec = record

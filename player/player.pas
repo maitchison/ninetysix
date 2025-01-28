@@ -355,7 +355,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'res\'+profile.tag+'_'+format('%d_%d_%d_v5', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  result := 'res\'+profile.tag+'_'+format('%d_%d_%d_xv4', [profile.quantBits, profile.ulawBits, profile.log2mu]);
 end;
 
 procedure testCompression();
@@ -430,7 +430,7 @@ begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if not fs.exists(music16.tag+'.a96') then begin
-      outStream := encodeLA96(music16, profile);
+      outStream := encodeLA96(music16, profile, true);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
     end;

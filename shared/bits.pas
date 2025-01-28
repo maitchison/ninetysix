@@ -34,8 +34,8 @@ end;
 procedure tBitStream.writeBits(value: word; bits: byte);
 begin
   {$IFDEF debug}
-  if value >= (1 shl bits) then
-    error(format('Value %d in segment exceeds expected bound of %d', [value, 1 shl bits]));
+  if value >= (dword(1) shl bits) then
+    error(format('Value %d in segment exceeds expected bound of %d', [value, dword(1) shl bits]));
   {$ENDIF}
   buffer := buffer or (dword(value) shl pos);
   pos += bits;
@@ -95,7 +95,6 @@ begin
   bs.writeBits(6, 11);
   bs.writeBits(1, 3); // 19 bits = 3 bytes
   bs.flush();
-  writeln(s.asBytes.toString);
   assertEqual(s.pos, 3);
   s.seek(0);
   assertEqual(bs.readBits(4), 7);

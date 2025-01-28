@@ -28,7 +28,8 @@ const
   {segment types}
   ST_AUTO = 255;  {use rice, pack, or vlc, whichever is best}
   ST_PACK = 254;  {select best pack}
-  ST_RICE = 253;  {select best rice}
+  ST_RICE = 253;  {guess a good rice}
+  ST_RICE_SLOW = 252; {select best rice}
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
   ST_SIGN = 8;  {special encoding for sign bits}
@@ -91,6 +92,18 @@ begin
   result := ceil(log2(maxValue+1));
 end;
 
+function getSegmentTypeName(segmentType: byte): string;
+begin
+  case segmentType of
+    ST_VLC1: result := 'VLC1';
+    ST_VLC2: result := 'VLC2';
+    ST_SIGN: result := 'SIGN';
+    ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
+    ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
+    else result := 'INVALID';
+  end;
+end;
+
 {
 Writes a series of variable length codes, with optional packing.
 Generaly this just writes out a list of VLC codes.
@@ -108,9 +121,11 @@ returns the number of bytes used
 function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 var
   i: int32;
-  maxValue: int32;
+  valueMax: int32;
+  valueSum: double;
   packingBits, vlcBits, riceBits: int32;
-  thisBits: int32;
+  riceK: integer;
+  thisBits, bestBits: int32;
   n: int32;
   startPos: int32;
   value: dword;
@@ -118,33 +133,64 @@ begin
 
   startPos := stream.pos;
 
-  if segmentType = ST_AUTO then begin
+  if length(values) = 0 then exit;
 
-    maxValue := 0;
+  if segmentType = ST_AUTO then begin
+    valueSum := 0;
+    valueMax := 0;
     vlcBits := 0;
-    for i := 0 to length(values)-1 do begin
-      maxValue := max(maxValue, values[i]);
-      vlcBits += VLC2_Bits(values[i]);
+    for value in values do begin
+      valueMax := max(valueMax, value);
+      valueSum += value;
+      vlcBits += VLC2_Bits(value);
     end;
 
-    packingBits := bitsToStoreMaxValue(maxValue) * length(values);
+    {start with packing}
+    packingBits := bitsToStoreMaxValue(valueMax) * length(values);
+    segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
+    bestBits := packingBits;
 
-    if bytesForBits(packingBits) <= bytesForBits(vlcBits) then
-      segmentType := ST_PACK0 + bitsToStoreMaxValue(maxValue)
-     else
+    {see if VLC2 is an upgrade}
+    {todo: maybe just never use this?}
+    if vlcBits < bestBits then begin
       segmentType := ST_VLC2;
+      bestBits := vlcBits;
+    end;
+
+    {see if RICE is an upgrade}
+    riceK := floor(log2(1+(valueSum / length(values))));
+    riceBits := RICE_Bits(values, riceK);
+    if riceBits < bestBits then begin
+      segmentType := ST_RICE0 + riceK;
+      bestBits := riceBits;
+    end;
+
+    {
+    note(format(
+      'Selecting %s with scores %d %d %d (max:%d mean:%f)',
+      [
+        getSegmentTypeName(segmentType),
+        packingBits, VLCBits, riceBits,
+        valueMax, valueSum/length(values)
+      ]
+    ));
+    }
   end;
 
   if segmentType = ST_PACK then begin
-    maxValue := 0;
-    for i := 0 to length(values)-1 do
-      maxValue := max(maxValue, values[i]);
-    segmentType := ST_PACK0 + bitsToStoreMaxValue(maxValue);
+    valueMax := 0;
+    for value in values do valueMax := max(valueMax, value);
+    segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
   end;
 
   if segmentType = ST_RICE then begin
-    {todo: maybe just use log2 mean(x), or perhaps search around those values}
-    for i := 0 to 7 do begin
+    valueSum := 0;
+    for value in values do valueSum += value;
+    segmentType := ST_RICE0+floor(log2(1+(valueSum / length(values))));
+  end;
+
+  if segmentType = ST_RICE_SLOW then begin
+    for i := 0 to 15 do begin
       thisBits := RICE_Bits(values, i);
       if (i = 0) or (thisBits < riceBits) then begin
         riceBits := thisBits;
@@ -472,6 +518,7 @@ begin
   bs.flush();
 end;
 
+{todo: we need this to be super fast asm}
 procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 var
   quotient, remainder: dword;
@@ -492,7 +539,7 @@ end;
 function RICE_Bits(values: array of dword; k: integer): int32;
 var
   quotient, remainder: dword;
-  value: word;
+  value: dword;
 begin
   result := 0;
   for value in values do
@@ -518,8 +565,8 @@ begin
 
   {$IFDEF Debug}
   for i := 0 to length(values)-1 do
-    if values[i] >= (1 shl bits) then
-      Error(format('Value %d in segment exceeds expected bound of %d', [values[i], 1 shl bits]));
+    if values[i] >= (dword(1) shl bits) then
+      Error(format('Value %d in segment exceeds expected bound of %d', [values[i], dword(1) shl bits]));
   {$ENDIF}
 
   if bits = 0 then exit;
