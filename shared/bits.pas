@@ -7,6 +7,7 @@ uses
   test,
   debug,
   stream,
+  sysTypes,
   utils;
 
 {object so that we can create without mem alloc}
@@ -16,6 +17,7 @@ type tBitStream = object
   pos: integer;
   constructor init(aStream: tStream);
   procedure writeBits(value: word; bits: byte);
+  function readBits(bits: byte): word;
   procedure flush();
   procedure clear();
 end;
@@ -33,7 +35,7 @@ procedure tBitStream.writeBits(value: word; bits: byte);
 begin
   {$IFDEF debug}
   if value >= (1 shl bits) then
-    error(format('Value %d in segment exceeds expected bound of %d', [values[i], 1 shl bits]));
+    error(format('Value %d in segment exceeds expected bound of %d', [value, 1 shl bits]));
   {$ENDIF}
   buffer := buffer or (dword(value) shl pos);
   pos += bits;
@@ -44,6 +46,20 @@ begin
   end;
 end;
 
+{shared buffer with writeBits...}
+function tBitStream.readBits(bits: byte): word;
+begin
+  {pos here means number of valid bits}
+  while pos < 16 do begin
+    buffer := buffer or (dword(stream.readWord()) shl pos);
+    pos += 16;
+  end;
+  writeln(buffer);
+  result := buffer and ((1 shl bits)-1);
+  buffer := buffer shr bits;
+  pos -= bits;
+end;
+
 procedure tBitStream.flush();
 begin
   while (pos > 0) do begin
@@ -51,8 +67,7 @@ begin
     buffer := buffer shr 8;
     pos -= 8;
   end;
-  pos := 0;
-  buffer := 0;
+  clear();
 end;
 
 procedure tBitStream.clear();
@@ -61,5 +76,36 @@ begin
   pos := 0;
 end;
 
+{-------------------------------------------}
+
+type
+  tBitsTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tBitsTest.run();
+var
+  s: tStream;
+  bs: tBitStream;
 begin
+
+  s := tStream.create();
+  bs.init(s);
+  bs.writeBits(7, 4);
+  bs.writeBits(6, 11);
+  bs.writeBits(1, 3); // 19 bits = 3 bytes
+  bs.flush();
+  writeln(s.asBytes.toString);
+  assertEqual(s.pos, 3);
+  s.seek(0);
+  assertEqual(bs.readBits(4), 7);
+  assertEqual(bs.readBits(11), 6);
+  assertEqual(bs.readBits(3), 1);
+  s.free;
+end;
+
+{--------------------------------------------------}
+
+initialization
+  tBitsTest.create('Bits');
 end.
