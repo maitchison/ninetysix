@@ -439,7 +439,7 @@ var
     if fs.peekByte = ST_SIGN then begin
       {optimized path}
       fs.readByte;
-      SIGNReadMasked(fs, len, @signs[0]);
+      SIGN_ReadMasked(fs, len, @signs[0]);
     end else begin
       {this is a bit slower, but more efficent for complex sign patterns}
       signsPtr := signs;
@@ -835,9 +835,9 @@ var
     i: integer;
   begin
     startPos := fs.pos;
-    if vlc.SIGNBits(signs) < FRAME_SIZE then begin
+    if vlc.SIGN_Bits(signs) < FRAME_SIZE then begin
       fs.writeByte(ST_SIGN);
-      vlc.SIGNWrite(fs, signs)
+      vlc.SIGN_Write(fs, signs)
     end else begin
       fillchar(signBits, sizeof(signBits), 0);
       for i := 0 to (FRAME_SIZE-1)-1 do

@@ -50,11 +50,11 @@ end;
 function tBitStream.readBits(bits: byte): word;
 begin
   {pos here means number of valid bits}
-  while pos < 16 do begin
-    buffer := buffer or (dword(stream.readWord()) shl pos);
-    pos += 16;
+  {note: we read a byte at a time so as to not read too many bytes}
+  while pos < bits do begin
+    buffer := buffer or (dword(stream.readByte) shl pos);
+    pos += 8;
   end;
-  writeln(buffer);
   result := buffer and ((1 shl bits)-1);
   buffer := buffer shr bits;
   pos -= bits;

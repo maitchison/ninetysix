@@ -139,8 +139,6 @@ begin
   prevSync.slope := getSlope(midX + trackingOffset);
   prevSync.debugStr := debugStr;
 
-  note(prevSync.debugStr);
-
   result := trackingOffset;
 
 end;
