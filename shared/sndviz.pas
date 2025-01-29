@@ -215,7 +215,7 @@ begin
   for i := 0 to dstRect.width-1 do begin
     attenuation := sqrt(1-(abs((dstRect.width/2)-i) / (dstRect.width/2)));
     pSample := getSample(trackingOffset + round(i * xScale));
-    sampleValue := (pSample^.left+pSample^.right)*yScale*attenuation;
+    sampleValue := ((pSample^.left+pSample^.right)*0.5)*yScale*attenuation;
     vLineHDR(page, i+dstRect.x, midDrawY+prevSampleValue, midDrawY+sampleValue, round(value*attenuation));
     prevSampleValue := sampleValue;
   end;

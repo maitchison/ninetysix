@@ -565,9 +565,7 @@ var
 begin
 
   oldBufferPos := 0;
-  textColor := RGBA.create(250, 250, 250, 230)
-
-  ;
+  textColor := RGBA.create(250, 250, 250, 230);
 
   {get list of songs}
   {todo: stream these off disk rather than loading them in...}
