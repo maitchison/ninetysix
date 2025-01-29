@@ -537,82 +537,120 @@ begin
   bs.flush();
 end;
 
-(*
-{todo: we won't support faults}
+{fast inline asm rice code reader.
+This function can only use the lookup table, which is 16bit, which means
+ rice codes longer than this can not be used. For data where that matters
+ we'd need to either use VLC2, or to (more likely) just pack the bits.
+ the k divisor 15 = 32k, so max code representable would be 32k.
+ Reading > 16bits is non-trival as it requires shifting a 64bit integer
+ (so we can load 32bits at a time). Although maybe there would be a 20-bit
+ hack I could do.
+ I think for my case I'm fine as I'm really just using 8-but ulaw anyway.
+
+ Hmm... maybe I should just implement the falt adjustment in asm...
+ it's not that hard.
+}
 procedure ReadRice_ASM(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 var
-  mask: dword;
-  tablePtr, outPtr: pointer;
-  bs: tBitStream;
+  tablePtr, outPtr, streamPtr: pointer;
+  bufferValue: dword;
+  bufferPos: byte;
+  bytesRead: integer;
 begin
-  mask := (1 shl RICE_TABLE_BITS)-1;
-  tablePtr := @RICE_TABLE[k,0];
+  if n >= 65536 then error('Max rice block length is 64k');
+  tablePtr := @RICE_TABLE[k, 0];
   outPtr := outBuffer;
-  bs.init(stream);
+  // I think I need to store the length and load it here all at once.
+  streamPtr := stream.getCurrentBytesPtr(); // dodgy...
   asm
 
     pushad
 
+    {
+      eax   tmp
+      ebx   bufferValue
+      ecx   loop          || tmp | bufferPos
+      edx   tmp
+
+      esi   streamPtr
+      edi   outPtr
+      ebp   tablePtr
+    }
+
+    xor ebx, ebx
     mov ecx, N
-    mov esi, TABLEPTR
+    ror ecx, 16       // store counter in high word
+    xor cx,  cx
+
+    mov esi, STREAMPTR
     mov edi, OUTPTR
+
+    push ebp
+    mov ebp, TABLEPTR
 
   @Loop:
 
-    // todo: inline this
-    mov eax, BS
-    call BS.PEEKWORD        // eax = new word
-    and eax, MASK
-    mov eax, [esi+eax*2]    // eax = rice code
+    {read word}
+    cmp cl, 16
+    jge @SkipRead
+  @Read:
+    {this is the correct way to do it...}
+    // todo: change to ebp
+    //mov eax, STREAM
+    // note: could make this faster if we could somehow read all the bytes in first...
+    //call tStream.readWord     // eax = readword
+    {this is the dodgy way}
+    movzx eax, word ptr [esi]
+    add esi, 2
 
-    test ax, ax
+    shl eax, cl
+    or  ebx, eax
+    add cl, 16
 
-    {write value}
-    mov ebx, eax
-    shr ebx, 4
-    shl ebx, 4
-    mov word ptr [edi], ebx
+  @SkipRead:
+    movzx edx, bx                  // edx = next 16 bits
+    mov eax, dword ptr [ebp+edx*4] // eax = 0 | len || rice code
+    mov edx, eax
+    shr edx, 16                 // edx = 0 | 0 | bits to consume
+    and eax, $ffff              // eax = 0 | 0 | rice code
 
     {consume bits}
-    {todo: inline}
-    mov ebx, eax
-    shr ebx, 12
-    mov eax, BS
-    call BS.CONSUMEBITS
+    mov ch, cl                  // ch = old buf len
+    mov cl, dl                  // cl = bits to burn
+    shr ebx, cl                 // burn bits from buffer
+    neg cl
+    add cl, ch                  // ch = pos - bitsRead
 
-  @EndLoop:
+    {write value}
+    mov dword ptr [edi], eax    // outBuffer^ = code
+
+    {end loop}
     add edi, 4
-    dec ecx
+    ror ecx, 16
+    dec cx
+    ror ecx, 16
     jnz @Loop
 
+    pop ebp
+
+    {
+      calculate how many bytes we just read, which is
+      bytes read - bytes remaining in buffer
+    }
+    mov eax, esi
+    sub eax, STREAMPTR
+    and ecx, $ff
+    shr cl, 3
+    sub eax, ecx
+    mov BYTESREAD, eax
+
     popad
+
   end;
-
-{
-
-    for i := 0 to n-1 do begin
-      decoded := RICE_TABLE[k, bs.peekWord and mask];
-      if decoded = 0 then begin
-        // ah... a fault... do this the old way
-        //writeln('fault on k:', k,' b:', bs.peakWord);
-        quotient := 0;
-        while bs.readBits(1) <> 0 do inc(quotient);
-        remainder := bs.readBits(k);
-        outBuffer^ := (quotient shl k) + remainder;
-        inc(outBuffer);
-      end else begin
-        bs.consumeBits(decoded shr 12);
-        outBuffer^ := decoded and $fff;
-        inc(outBuffer);
-      end;
-    end;
-}
-
+  stream.seek(stream.pos+bytesRead);
 end;
-*)
 
-{todo: we need this to be super fast asm}
-procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+procedure ReadRice_REF(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 var
   quotient, remainder: dword;
   value: word;
@@ -621,8 +659,8 @@ var
   decoded: dword;
   mask: word;
 begin
+  {table lookup method}
   bs.init(stream);
-  {lookup table method}
   mask := (1 shl RICE_TABLE_BITS)-1;
   for i := 0 to n-1 do begin
     decoded := RICE_TABLE[k, bs.peekWord and mask];
@@ -632,6 +670,14 @@ begin
   end;
   bs.giveBack();
 end;
+
+{todo: we need this to be super fast asm}
+procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+begin
+  //ReadRice_REF(stream, n, outBUffer, k);
+  ReadRice_ASM(stream, n, outBUffer, k);
+end;
+
 
 function RICE_Bits(values: array of dword; k: integer): int32;
 var
