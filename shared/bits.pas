@@ -68,7 +68,6 @@ end;
 procedure tBitStream.consumeBits(bits: byte); inline;
 begin
   {pos here means number of valid bits}
-  {note: we read a byte at a time so as to not read too many bytes}
   if pos < bits then begin
     buffer := buffer or (dword(stream.readWord) shl pos);
     pos += 16;
@@ -81,24 +80,48 @@ end;
 function tBitStream.peekByte(): byte; inline;
 begin
   {pos here means number of valid bits}
-  {note: we read a byte at a time so as to not read too many bytes}
-  if pos < 8 then begin
-    buffer := buffer or (dword(stream.readByte) shl pos);
-    pos += 8;
-  end;
-  result := buffer and $ff;
-end;
-
-{peak at the next 16 bits}
-function tBitStream.peekWord(): word; inline;
-begin
-  {pos here means number of valid bits}
-  {note: we read a byte at a time so as to not read too many bytes}
   if pos < 16 then begin
     buffer := buffer or (dword(stream.readWord) shl pos);
     pos += 16;
   end;
-  result := buffer and $ffff;
+  result := byte(buffer);
+end;
+
+     (*
+{peak at the next 16 bits}
+{somehow this is slower than the pascal... maybe it doesn't get inlined?}
+function tBitStream.peekWord(): word; inline;
+asm
+  {assume eax = self}
+  cmp [eax+pos], 16
+  jge @SkipRead
+@Read:
+  push ebp
+  push cx
+  mov ebp, eax
+  mov eax, [ebp+stream]
+  call tStream.readWord     // eax = readword
+  mov cl, byte ptr [ebp+pos]
+  shl eax, cl
+  or  [ebp+buffer], eax
+  add [ebp+pos], 16
+  mov ax, word ptr [ebp+buffer]
+  pop cx
+  pop ebp
+  ret
+@SkipRead:
+  mov ax, word ptr [eax+buffer]
+end;
+*)
+
+function tBitStream.peekWord(): word; inline;
+begin
+  {pos here means number of valid bits}
+  if pos < 16 then begin
+    buffer := buffer or (dword(stream.readWord) shl pos);
+    pos += 16;
+  end;
+  result := word(buffer);
 end;
 
 {we read ahead a bit, this function will give back the bytes already
