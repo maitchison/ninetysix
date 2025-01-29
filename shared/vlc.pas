@@ -81,9 +81,12 @@ var
   packing2: array[0..255] of array[0..3] of dword;
   packing4: array[0..255] of array[0..1] of dword;
 
+const
+  RICE_TABLE_BITS = 12;
+
 var
   {used for VLC2 codes. This allows for the 'overlapping' optimization}
-  OFFSET_TABLE: array[0..8] of dword;
+  VLC2_OFFSET_TABLE: array[0..8] of dword;
 
   {
     stores rice decodes for common values of k, given some input byte
@@ -93,7 +96,7 @@ var
     todo: see if we can garintee in the encoder that this will not happen.
     (one way to do this is to set length for long codes to very high)
   }
-  RICE_TABLE: array[0..7, 0..255] of word;
+  RICE_TABLE: array[0..15, 0..(1 shl RICE_TABLE_BITS)-1] of word;
 
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
@@ -343,7 +346,7 @@ begin
   midByte := false;
   for value in values do begin
     nibLen := VLC2_Length(value);
-    encode := value - OFFSET_TABLE[nibLen-1];
+    encode := value - VLC2_OFFSET_TABLE[nibLen-1];
     shift := nibLen*3;
     for i := 1 to nibLen do begin
       shift -= 3;
@@ -536,9 +539,10 @@ var
   bs: tBitStream;
   i: integer;
   decoded: word;
+  mask: word;
 begin
   bs.init(stream);
-  if k > 7 then begin
+  if k > high(RICE_TABLE) then begin
     {slow method}
     for i := 0 to n-1 do begin
       quotient := 0;
@@ -549,19 +553,20 @@ begin
     end;
   end else begin
     {lookup table method}
+    mask := (1 shl RICE_TABLE_BITS)-1;
     for i := 0 to n-1 do begin
-      decoded := RICE_TABLE[k, bs.peakByte];
+      decoded := RICE_TABLE[k, bs.peekWord and mask];
       if decoded = 0 then begin
         // ah... a fault... do this the old way
-        //writeln('fault on k:', k,' b:', bs.peakByte);
+        //writeln('fault on k:', k,' b:', bs.peakWord);
         quotient := 0;
         while bs.readBits(1) <> 0 do inc(quotient);
         remainder := bs.readBits(k);
         outBuffer^ := (quotient shl k) + remainder;
         inc(outBuffer);
       end else begin
-        bs.readBits(decoded shr 8);
-        outBuffer^ := decoded and $ff;
+        bs.consumeBits(decoded shr 12);
+        outBuffer^ := decoded and $fff;
         inc(outBuffer);
       end;
     end;
@@ -744,8 +749,8 @@ var
 begin
   value := 0;
   factor := 1;
-  for i := low(OFFSET_TABLE) to high(OFFSET_TABLE) do begin
-    OFFSET_TABLE[i] := value;
+  for i := low(VLC2_OFFSET_TABLE) to high(VLC2_OFFSET_TABLE) do begin
+    VLC2_OFFSET_TABLE[i] := value;
     factor *= 8;
     value += factor;
   end;
@@ -765,27 +770,24 @@ var
 begin
   {stores 1+index into first zero within a byte (starting at the right}
   {0 indicates all 1s}
+  if RICE_TABLE_BITS > 12 then error('RICE_TABLE_BITS is limited to 12 due to how we encode value + length');
   fillchar(RICE_TABLE, sizeof(RICE_TABLE), 0);
-  for k := 0 to 7 do begin
-    for value := 0 to 255 do begin
+  for k := 0 to high(RICE_TABLE) do begin
+    for value := 0 to (1 shl RICE_TABLE_BITS)-1 do begin
       q := value shr k;
       codeLength := k + q + 1;
-      {unfortunately table can not handle these yet}
-      if codeLength > 8 then continue;
+      if codeLength > RICE_TABLE_BITS then continue;
 
       r := value - (q shl k);
       qPart := (1 shl q)-1; //e.g. q=3 -> 0111
       code := qPart or (r shl (q+1));
-      fluffBits := 8-codeLength;
+      fluffBits := RICE_TABLE_BITS-codeLength;
       { write out each byte where this code would appear }
-      output := value or (codeLength shl 8);
+      output := value or (codeLength shl 12);
       for fluff := 0 to (dword(1) shl fluffBits)-1 do begin
         input := code or (fluff shl codeLength);
-        //note(format('k:%d Writing %d:%d to %d', [k, value, codelength, input]));
-        //writeln(k, ' idx:',tableIdx, ' c:', code, ' cl:', codeLength, ' cp:', copies, ' v:',value or (codeLength shl 8));
-        if RICE_TABLE[k, input] <> 0 then begin
-          error(format('Overlap at %d %d->%d', [input, output and $ff, RICE_TABLE[k, input] and $ff]));
-        end;
+        if RICE_TABLE[k, input] <> 0 then
+          error(format('Overlap at %d %d->%d', [input, output and $fff, RICE_TABLE[k, input] and $fff]));
         RICE_TABLE[k, input] := output;
       end;
     end;

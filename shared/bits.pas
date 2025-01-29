@@ -16,7 +16,9 @@ type tBitStream = object
   buffer: dword;
   pos: integer;
   constructor init(aStream: tStream);
-  function peakByte(): byte; inline;
+  function peekByte(): byte; inline;
+  function peekWord(): word; inline;
+  procedure consumeBits(bits: byte); inline;
   procedure writeBits(value: word; bits: byte); inline;
   function readBits(bits: byte): word; inline;
   procedure giveBack();
@@ -53,25 +55,50 @@ function tBitStream.readBits(bits: byte): word; inline;
 begin
   {pos here means number of valid bits}
   {note: we read a byte at a time so as to not read too many bytes}
-  while pos < bits do begin
-    buffer := buffer or (dword(stream.readByte) shl pos);
-    pos += 8;
+  if pos < bits then begin
+    buffer := buffer or (dword(stream.readWord) shl pos);
+    pos += 16;
   end;
   result := buffer and ((1 shl bits)-1);
   buffer := buffer shr bits;
   pos -= bits;
 end;
 
-{peak at the next 8 bits}
-function tBitStream.peakByte(): byte; inline;
+{consumes this many bits}
+procedure tBitStream.consumeBits(bits: byte); inline;
 begin
   {pos here means number of valid bits}
   {note: we read a byte at a time so as to not read too many bytes}
-  while pos < 8 do begin
+  if pos < bits then begin
+    buffer := buffer or (dword(stream.readWord) shl pos);
+    pos += 16;
+  end;
+  buffer := buffer shr bits;
+  pos -= bits;
+end;
+
+{peak at the next 8 bits}
+function tBitStream.peekByte(): byte; inline;
+begin
+  {pos here means number of valid bits}
+  {note: we read a byte at a time so as to not read too many bytes}
+  if pos < 8 then begin
     buffer := buffer or (dword(stream.readByte) shl pos);
     pos += 8;
   end;
   result := buffer and $ff;
+end;
+
+{peak at the next 16 bits}
+function tBitStream.peekWord(): word; inline;
+begin
+  {pos here means number of valid bits}
+  {note: we read a byte at a time so as to not read too many bytes}
+  if pos < 16 then begin
+    buffer := buffer or (dword(stream.readWord) shl pos);
+    pos += 16;
+  end;
+  result := buffer and $ffff;
 end;
 
 {we read ahead a bit, this function will give back the bytes already
