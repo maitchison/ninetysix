@@ -164,9 +164,10 @@ begin
 
     {see if RICE is an upgrade}
     deltaK := 0;
-    guessK := floor(log2(1+(valueSum / length(values))));
+    guessK := clamp(floor(log2(1+(valueSum / length(values)))), 0, 15);
     for k := (guessK - 1) to (guessK + 1) do begin
       if k < 0 then continue;
+      if k > 15 then continue;
       riceBits := RICE_Bits(values, k);
       if riceBits < bestBits then begin
         segmentType := ST_RICE0 + k;
@@ -621,24 +622,13 @@ var
   mask: word;
 begin
   bs.init(stream);
-  if k > high(RICE_TABLE) then begin
-    {slow method}
-    for i := 0 to n-1 do begin
-      quotient := 0;
-      while bs.readBits(1) <> 0 do inc(quotient);
-      remainder := bs.readBits(k);
-      outBuffer^ := (quotient shl k) + remainder;
-      inc(outBuffer);
-    end;
-  end else begin
-    {lookup table method}
-    mask := (1 shl RICE_TABLE_BITS)-1;
-    for i := 0 to n-1 do begin
-      decoded := RICE_TABLE[k, bs.peekWord and mask];
-      bs.consumeBits(decoded shr 16);
-      outBuffer^ := decoded and $ffff;
-      inc(outBuffer);
-    end;
+  {lookup table method}
+  mask := (1 shl RICE_TABLE_BITS)-1;
+  for i := 0 to n-1 do begin
+    decoded := RICE_TABLE[k, bs.peekWord and mask];
+    bs.consumeBits(decoded shr 16);
+    outBuffer^ := decoded and $ffff;
+    inc(outBuffer);
   end;
   bs.giveBack();
 end;
