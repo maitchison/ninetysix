@@ -31,7 +31,8 @@ type
   end;
 
 procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
-function textExtents(s: string): tRect;
+function textExtents(s: string; p: tPoint): tRect; overload;
+function textExtents(s: string): tRect; overload;
 
 implementation
 
@@ -143,14 +144,14 @@ begin
   end;
 end;
 
-function TextExtents(s: string): TRect;
+function textExtents(s: string; p: tPoint): tRect;
 var
   i: integer;
   c: TChar;
 begin
   {note: note quite right for characters that have offsets?}
-  result.x := 0;
-  result.y := 0;
+  result.x := p.x;
+  result.y := p.y;
   result.width := 0;
   result.height := 16;
   for i := 1 to length(s) do begin
@@ -158,6 +159,11 @@ begin
     if i > 1 then
       result.width += font1.kerning[ord(s[i-1]), ord(s[i])];
   end;
+end;
+
+function textExtents(s: string): tRect;
+begin
+  result := textExtents(s, point(0,0));
 end;
 
 

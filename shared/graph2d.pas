@@ -14,7 +14,7 @@ type
   tPoint = record
     x, y: int32;
     class operator add(a,b: TPoint): tPoint;
-    constructor Create(x, y: int32);
+    constructor create(x, y: int32);
   end;
 
   tRect = record
@@ -52,10 +52,23 @@ type
 
   end;
 
+function rect(left, top, width, height: int32): tRect; inline;
+function point(x, y: int32): tPoint; inline;
+
 
 implementation
 
 uses debug, utils;
+
+function rect(left, top, width, height: int32): tRect; inline;
+begin
+  result := tRect.create(left, top, width, height);
+end;
+
+function point(x, y: int32): tPoint; inline;
+begin
+  result := tPoint.create(x, y);
+end;
 
 {--------------------------------------------------------}
 

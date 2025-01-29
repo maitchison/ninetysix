@@ -136,6 +136,7 @@ type
   tImageLoaderProc = function(filename: string): tPage;
 
 
+function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
 function loadBMP(const FileName: string): tPage;
 procedure makePageRandom(page: tPage);
 
@@ -154,6 +155,11 @@ type
 
 var
   imageLoaderRegistery: array of tImageLoaderEntry;
+
+function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
+begin
+  result := RGBA.create(r,g,b,a);
+end;
 
 function getImageLoader(aExtension: string): tImageLoaderProc; forward;
 

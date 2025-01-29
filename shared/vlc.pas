@@ -621,7 +621,7 @@ begin
 
     {write value}
     shr eax, 16                 // eax = 0 || value
-    mov dword ptr [edi], ax    // outBuffer^ = code
+    mov dword ptr [edi], eax    // outBuffer^ = code
 
     {end loop}
     add edi, 4

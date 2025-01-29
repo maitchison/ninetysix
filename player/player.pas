@@ -51,19 +51,143 @@ type
 
   tTracks = array of tTrack;
 
+  tGuiComponent = class
+    pos: tPoint;
+    alpha: single;
+    targetAlpha: single;
+    showForSeconds: single;
+    procedure draw(screen: tScreen); virtual; abstract;
+    procedure update(elapsed: single); virtual;
+    constructor create(aPos: tPoint);
+  end;
+
+  tGuiComponents = array of tGuiComponent;
+
+  tGuiLabel = class(tGuiComponent)
+    textColor: RGBA;
+    text: string;
+    centered: boolean;
+    procedure draw(screen: tScreen); override;
+    constructor create(aPos: tPoint);
+
+  end;
+
 type
   tTracksHelper = record helper for tTracks
     procedure append(x: tTrack);
   end;
 
+  tGuiComponentsHelper = record helper for tGuiComponents
+    procedure append(x: tGuiComponent);
+    procedure draw(screen: tScreen);
+    procedure update(elapsed: single);
+  end;
+
+
 var
   tracks: tTracks;
+  guiComponets: tGuiComponents;
   selectedTrackIndex: integer;
+  {todo: these would be good as some kind of UI component}
   uiAlpha: single;
   uiTargetAlpha: single;
   uiShowForSeconds: single;
   inputDelay: single; // hack to do keyboard input
   isFirstPress: boolean;
+
+  musicReader: tLA96Reader;
+
+  {gui stuff}
+  guiTitle: tGUILabel;
+
+{--------------------------------------------------------}
+{ Helpers }
+
+procedure tGuiComponentsHelper.append(x: tGuiComponent);
+begin
+  setLength(self, length(self)+1);
+  self[length(self)-1] := x;
+end;
+
+procedure tGuiComponentsHelper.draw(screen: tScreen);
+var
+  c: tGuiComponent;
+begin
+  for c in self do c.draw(screen);
+end;
+
+procedure tGuiComponentsHelper.update(elapsed: single);
+var
+  c: tGuiComponent;
+begin
+  for c in self do c.update(elapsed);
+end;
+
+{----------------}
+
+procedure tTracksHelper.append(x: tTrack);
+begin
+  setLength(self, length(self)+1);
+  self[length(self)-1] := x;
+end;
+
+{--------------------------------------------------------}
+{ UI Components }
+
+constructor tGuiComponent.create(aPos: tPoint);
+begin
+  inherited create();
+  self.pos := aPos;
+end;
+
+procedure tGuiComponent.update(elapsed: single);
+const
+  FADE_IN = 0.08;
+  FADE_OUT = 0.04;
+var
+  delta: single;
+begin
+  if showForSeconds > 0 then
+    targetAlpha := 1.0
+  else
+    targetAlpha := 0.0;
+  showForSeconds -= elapsed;
+  // todo: respect elapsed
+  delta := targetAlpha - alpha;
+  if delta < 0 then
+    alpha += delta * FADE_OUT
+  else
+    alpha += delta * FADE_IN
+end;
+
+{-----------------------}
+
+constructor tGuiLabel.create(aPos: tPoint);
+begin
+  inherited create(aPos);
+  self.centered := false;
+  self.textColor := RGB(250, 250, 250);
+  self.text := '';
+end;
+
+procedure tGuiLabel.draw(screen: tScreen);
+var
+  bounds: tRect;
+  c: RGBA;
+begin
+  c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
+  if c.a = 0 then exit;
+  if centered then begin
+    bounds := textExtents(text, pos);
+    bounds.x -= bounds.width div 2;
+    textOut(screen.canvas, bounds.x, bounds.y, text, c);
+    screen.markRegion(bounds);
+  end else begin
+    bounds := textExtents(text, pos);
+    textOut(screen.canvas, bounds.x, bounds.y, text, c);
+    screen.markRegion(bounds);
+  end;
+end;
 
 {--------------------------------------------------------}
 
@@ -78,7 +202,7 @@ begin
   {this is a hack until we get metadata going}
   title := extractFilename(aFilename);
   if title = 'blue.a96' then
-    title := 'Out of the Blue'
+    title := 'Out of The Blue'
   else if title = 'clowns.a96' then
     title := 'Send In The Clowns'
   else if title = 'crazy.a96' then
@@ -98,12 +222,6 @@ end;
 function tTrack.seconds(): integer;
 begin
   result := floor(duration) mod 60;
-end;
-
-procedure tTracksHelper.append(x: tTrack);
-begin
-  setLength(self, length(self)+1);
-  self[length(self)-1] := x;
 end;
 
 {--------------------------------------------------------}
@@ -636,6 +754,20 @@ begin
   end;
 end;
 
+procedure makeSelection();
+var
+  track: tTrack;
+begin
+  track := tracks[selectedTrackIndex];
+  guiTitle.text := track.title;
+  guiTitle.showForSeconds := 3;
+
+  inputDelay := 0.250;
+
+  musicReader.load(track.filename);
+  musicPlay(musicReader);
+end;
+
 procedure moveTrackSelection(delta: integer);
 begin
   selectedTrackIndex := clamp(selectedTrackIndex + delta, 0, length(tracks)-1);
@@ -651,7 +783,6 @@ end;
 procedure soundPlayer();
 var
   files: tStringList;
-  reader: tLA96Reader;
   filename: string;
   i: integer;
   tag: string;
@@ -662,32 +793,9 @@ var
   elapsed: double;
   x,y: integer;
   textColor: RGBA;
-
-  procedure setSelected(newSelected: integer);
-  begin
-    if newSelected <> selected then
-      reader.load(joinPath('res', files[selected]));
-    selected := newSelected;
-  end;
+  gui: tGuiComponents;
 
 begin
-
-  oldBufferPos := 0;
-  textColor := RGBA.create(250, 250, 250, 230);
-
-  {load tracks}
-  files := fs.listFiles('music\*.a96');
-
-  setLength(tracks, 0);
-  for filename in files do begin
-    tracks.append(tTrack.init(joinPath('music', filename)));
-  end;
-
-  if length(tracks) = 0 then error('No music found');
-
-  reader := tLA96Reader.Create();
-  reader.load(tracks[0].filename);
-  musicPlay(reader);
 
   {set video}
   enableVideoDriver(tVesaDriver.create());
@@ -695,21 +803,45 @@ begin
     error('Requires VESA 2.0 or greater.');
   if (tVesaDriver(videoDriver).videoMemory) < 2*1024*1024 then
     error('Requires 2MB video card.');
-
   videoDriver.setMode(640,480,32);
   screen := tScreen.create();
-  screen.background := tPage.Load('res\background.p96');
+
+  {init vars}
+  oldBufferPos := 0;
+
+  {setup gui}
+  setLength(gui, 0);
+  guiTitle := tGuiLabel.create(point(screen.width div 2, 20));
+  guiTitle.centered := true;
+  gui.append(guiTitle);
+
+  {load tracks}
+  files := fs.listFiles('music\*.a96');
+  setLength(tracks, 0);
+  for filename in files do begin
+    tracks.append(tTrack.init(joinPath('music', filename)));
+  end;
+  if length(tracks) = 0 then error('No music found');
+
+  {start playing}
+  musicReader := tLA96Reader.Create();
+  selectedTrackIndex := 0;
+  makeSelection();
+
 
   hdrWave := tHDRPage.create(64,32);
   hdrPhase := tHDRPage.create(64,64);
 
+  {load background and refresh screen}
+  screen.background := tPage.Load('res\background.p96');
+
   screen.pageClear();
   screen.pageFlip();
 
+  {todo: remove}
   uiAlpha := 1;
   uiTargetAlpha := 0;
   uiShowForSeconds := 0.5;
-  selectedTrackIndex := 0;
   inputDelay := 0;
 
   {main loop}
@@ -767,10 +899,13 @@ begin
       end;
 
       if inputDelay <= 0 then begin
+        {todo: write proper keyboard input with repeat and delay}
         if keyDown(key_up) then
           moveTrackSelection(-1);
         if keyDown(key_down) then
           moveTrackSelection(+1);
+        if keyDown(key_enter) then
+          makeSelection();
       end else
         inputDelay -= elapsed;
 
@@ -782,6 +917,10 @@ begin
       uiShowForSeconds -= elapsed;
       uiAlpha += (uiTargetAlpha - uiAlpha) * 0.08;
       drawTrackUI(uiAlpha);
+
+      {gui stuff}
+      gui.update(elapsed);
+      gui.draw(screen);
 
       screen.flipAll();
 
