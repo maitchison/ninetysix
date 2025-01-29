@@ -87,33 +87,6 @@ begin
   result := byte(buffer);
 end;
 
-     (*
-{peak at the next 16 bits}
-{somehow this is slower than the pascal... maybe it doesn't get inlined?}
-function tBitStream.peekWord(): word; inline;
-asm
-  {assume eax = self}
-  cmp [eax+pos], 16
-  jge @SkipRead
-@Read:
-  push ebp
-  push cx
-  mov ebp, eax
-  mov eax, [ebp+stream]
-  call tStream.readWord     // eax = readword
-  mov cl, byte ptr [ebp+pos]
-  shl eax, cl
-  or  [ebp+buffer], eax
-  add [ebp+pos], 16
-  mov ax, word ptr [ebp+buffer]
-  pop cx
-  pop ebp
-  ret
-@SkipRead:
-  mov ax, word ptr [eax+buffer]
-end;
-*)
-
 function tBitStream.peekWord(): word; inline;
 begin
   {pos here means number of valid bits}

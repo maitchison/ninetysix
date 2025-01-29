@@ -557,7 +557,6 @@ var
   bufferPos: byte;
   bytesRead: integer;
 begin
-  if n >= 65536 then error('Max rice block length is 64k');
   tablePtr := @RICE_TABLE[k, 0];
   outPtr := outBuffer;
   // I think I need to store the length and load it here all at once.
@@ -569,18 +568,19 @@ begin
     {
       eax   tmp
       ebx   bufferValue
-      ecx   loop          || tmp | bufferPos
-      edx   tmp
+      ecx   0  || tmp | bufferPos
+      edx   loop
 
       esi   streamPtr
       edi   outPtr
       ebp   tablePtr
     }
 
+    xor eax, eax
     xor ebx, ebx
-    mov ecx, N
-    ror ecx, 16       // store counter in high word
-    xor cx,  cx
+    xor ecx, ecx
+
+    mov edx, N
 
     mov esi, STREAMPTR
     mov edi, OUTPTR
@@ -608,27 +608,24 @@ begin
     add cl, 16
 
   @SkipRead:
-    movzx edx, bx                  // edx = next 16 bits
-    mov eax, dword ptr [ebp+edx*4] // eax = 0 | len || rice code
-    mov edx, eax
-    shr edx, 16                 // edx = 0 | 0 | bits to consume
-    and eax, $ffff              // eax = 0 | 0 | rice code
+    movzx eax, bx                  // eax = 0  || next 16 buffer bits
+    mov eax, dword ptr [ebp+eax*4] // eax = 0 | len || value
 
     {consume bits}
     mov ch, cl                  // ch = old buf len
-    mov cl, dl                  // cl = bits to burn
+    ror eax, 16                 // eax = value || 0 | len
+    mov cl, al                  // cl = bits to burn
     shr ebx, cl                 // burn bits from buffer
     neg cl
     add cl, ch                  // ch = pos - bitsRead
 
     {write value}
-    mov dword ptr [edi], eax    // outBuffer^ = code
+    shr eax, 16                 // eax = 0 || value
+    mov dword ptr [edi], ax    // outBuffer^ = code
 
     {end loop}
     add edi, 4
-    ror ecx, 16
-    dec cx
-    ror ecx, 16
+    dec edx
     jnz @Loop
 
     pop ebp

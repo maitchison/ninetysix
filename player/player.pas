@@ -405,17 +405,10 @@ begin
   setLength(outSFX, 0);
   setLength(deltaSFX, 0);
 
-  {
   profiles := [
     ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
     ACP_Q8, ACP_Q10, ACP_Q12, ACP_Q16
   ];
-  }
-
-  profiles := [
-    ACP_MEDIUM
-  ];
-
 
   writeln();
   writeln('--------------------------');
