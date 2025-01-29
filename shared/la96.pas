@@ -141,8 +141,8 @@ type
   private
     fs: tStream;
     ownsStream: boolean;
-    header: tLA96FileHeader;
   protected
+    header: tLA96FileHeader;
     ulawTable: array[1..8] of tULawLookup;
     midCodes, difCodes: tDwords;
     midSigns, difSigns: tDwords;
@@ -158,6 +158,7 @@ type
   public
     constructor create();
     function  isLoaded: boolean;
+    function  duration: single;
     function  frameSize: integer;
     procedure seek(frameNumber: integer);
     procedure load(filename: string); overload;
@@ -390,6 +391,11 @@ end;
 function tLA96Reader.isLoaded: boolean;
 begin
   result := header.numFrames > 0;
+end;
+
+function tLA96Reader.duration: single;
+begin
+  result := header.numSamples / 44100;
 end;
 
 function tLA96Reader.frameSize: integer;

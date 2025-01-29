@@ -101,6 +101,7 @@ type
 
     function bytesPerSample: int32; inline;
     function calculateRMS: double;
+    function duration: double;
 
     function asFormat(af: tAudioFormat): tSoundEffect;
     function clone(): tSoundEffect;
@@ -308,6 +309,11 @@ begin
   result := sqrt(result);
 end;
 
+{returns duration in seconds}
+function tSoundEffect.duration: double;
+begin
+  result := length / 44100;
+end;
 
 procedure tSoundEffect.setSample(pos: int32; sample: tAudioSample);
 begin

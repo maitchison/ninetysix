@@ -23,6 +23,7 @@ uses
   hdr,
   font,
   {other stuff}
+  myMath,
   crt;
 
 const
@@ -35,6 +36,69 @@ var
   hdrWave: tHDRPage;
   hdrPhase: tHDRPage;
   music16: tSoundEffect;    // our original sound.
+
+{--------------------------------------------------------}
+
+type
+  tTrack = record
+    title: string;
+    filename: string;
+    duration: single;
+    constructor init(aFilename: string);
+    function minutes: integer;
+    function seconds: integer;
+  end;
+
+  tTracks = array of tTrack;
+
+type
+  tTracksHelper = record helper for tTracks
+    procedure append(x: tTrack);
+  end;
+
+var
+  tracks: tTracks;
+
+{--------------------------------------------------------}
+
+constructor tTrack.init(aFilename: string);
+var
+  reader: tLA96Reader;
+begin
+  filename := aFilename;
+  reader := tLA96Reader.create();
+  reader.load(filename);
+
+  {this is a hack until we get metadata going}
+  title := extractFilename(aFilename);
+  if title = 'blue.a96' then
+    title := 'Out of the Blue'
+  else if title = 'clowns.a96' then
+    title := 'Send In The Clowns'
+  else if title = 'crazy.a96' then
+    title := 'Crazy'
+  else if title = 'sunshine.a96' then
+    title := 'You Are My Sunshine';
+
+  duration := reader.duration;
+  reader.close();
+end;
+
+function tTrack.minutes(): integer;
+begin
+  result := floor(duration) div 60;
+end;
+
+function tTrack.seconds(): integer;
+begin
+  result := floor(duration) mod 60;
+end;
+
+procedure tTracksHelper.append(x: tTrack);
+begin
+  setLength(self, length(self)+1);
+  self[length(self)-1] := x;
+end;
 
 {--------------------------------------------------------}
 
@@ -539,6 +603,28 @@ begin
   end;
 end;
 
+{draw track selection UI}
+procedure drawUI();
+var
+  atX, atY: integer;
+  width, height: integer;
+  mm,ss: integer;
+  i: integer;
+  textColor: RGBA;
+begin
+  textColor.init(250,250,250,240);
+  atX := 10;
+  atY := 10;
+  width := 300;
+  height := length(tracks) * 20 + 10;
+  screen.markRegion(tRect.create(atX,atY,width,height), FG_FLIP);
+  screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,128));
+  for i := 0 to length(tracks)-1 do begin
+    textOut(screen.canvas, atX+5, atY+5+i*20, tracks[i].title, textColor);
+    textOut(screen.canvas, atX+width-5-50, atY+5+i*20, format('(%s:%s)', [intToStr(tracks[i].minutes), intToStr(tracks[i].seconds,2)]), textColor);
+  end;
+end;
+
 {play sound with some graphics}
 procedure soundPlayer();
 var
@@ -567,12 +653,18 @@ begin
   oldBufferPos := 0;
   textColor := RGBA.create(250, 250, 250, 230);
 
-  {get list of songs}
-  {todo: stream these off disk rather than loading them in...}
-  files := fs.listFiles('res\*.a96');
+  {load tracks}
+  files := fs.listFiles('music\*.a96');
+
+  setLength(tracks, 0);
+  for filename in files do begin
+    tracks.append(tTrack.init(joinPath('music', filename)));
+  end;
+
+  if length(tracks) = 0 then error('No music found');
 
   reader := tLA96Reader.Create();
-  reader.load(joinPath('res', files[0]));
+  reader.load(tracks[0].filename);
   musicPlay(reader);
 
   {set video}
@@ -592,6 +684,7 @@ begin
   screen.pageClear();
   screen.pageFlip();
 
+  drawUI();
 
   {main loop}
   repeat

@@ -36,7 +36,7 @@ begin
       continue;
     end;
 
-    dstPath := joinPath('res', filename+'.a96');
+    dstPath := joinPath('music', filename+'.a96');
     if fs.exists(dstPath) then begin
       note('Skipping '+srcPath);
       continue;
