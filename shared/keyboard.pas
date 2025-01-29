@@ -124,6 +124,7 @@ function keyDown(code: byte): boolean;
 function keyDownNoCheck(code: byte): boolean; inline;
 function readkey: char;
 procedure waitkey();
+function anyKeyDown:boolean;
 function keyPressed: boolean;
 
 implementation
@@ -328,10 +329,20 @@ begin
   key_hasbeenpressed := false;
 end;
 
+{returns if any key is down}
+function anyKeyDown:boolean;
+var
+  i: integer;
+begin
+  for i := low(keyPress) to high(keyPress) do if keyPress[i] then exit(true);
+  exit(false);
+end;
+
 function keyPressed : boolean;
 begin
   if dosKey then
-    keyPressed := crt.keyPressed else
+    keyPressed := crt.keyPressed
+  else
     keyPressed := key_pressed;
 end;
 

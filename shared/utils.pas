@@ -60,11 +60,13 @@ type
 { Math replacements}
 
 function min(a,b: int32): int32; overload;
-function min(a,b: single): single; overload;
-function min(a,b,c: single): single; overload;
+function minf(a,b: single): single; overload;
+function minf(a,b,c: single): single; overload;
 function max(a,b: int32): int32; inline; overload;
+function max(a,b: dword): dword; inline; overload;
+function maxf(a,b: single): single; inline; overload;
 function max(a,b,c: int32): int32; overload;
-function max(a,b,c: single): single; overload;
+function maxf(a,b,c: single): single; overload;
 function power(Base, Exponent: double): double; inline;
 function log10(x: double): double;
 function log2(x: double): double;
@@ -174,12 +176,24 @@ begin
   exit(b);
 end;
 
+function max(a,b: dword): dword; inline; overload;
+begin
+  if a > b then exit(a);
+  exit(b);
+end;
+
 function max(a,b,c: int32): int32; overload;
 begin
   result := max(max(a,b), c);
 end;
 
-function max(a,b,c: single): single; overload;
+function maxf(a,b: single): single; inline; overload;
+begin
+  if a > b then exit(a);
+  exit(b);
+end;
+
+function maxf(a,b,c: single): single; overload;
 begin
   if (a > b) and (a > c) then exit(a);
   if (b > a) and (b > c) then exit(b);
@@ -192,19 +206,18 @@ begin
   exit(b);
 end;
 
-function min(a,b: single): single; inline; overload;
+function minf(a,b: single): single; inline; overload;
 begin
   if a < b then exit(a);
   exit(b);
 end;
 
-function min(a,b,c: single): single; overload;
+function minf(a,b,c: single): single; overload;
 begin
   if (a < b) and (a < c) then exit(a);
   if (b < a) and (b < c) then exit(b);
   exit(c);
 end;
-
 
 function Power(Base, Exponent: double): double; inline;
 begin
@@ -391,7 +404,9 @@ end;
 procedure idle(); inline;
 asm
   // note: int $2F ax=$1680 causes keyboard to not work well
+  cli
   int $28
+  sti
 end;
 
 {Put CPU into idle for give number of ms}

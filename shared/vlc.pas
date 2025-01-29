@@ -135,7 +135,7 @@ returns the number of bytes used
 function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 var
   i: int32;
-  valueMax: int32;
+  valueMax: dword;
   valueSum: double;
   packingBits, riceBits: int32;
   k, bestK, guessK, deltaK: integer;

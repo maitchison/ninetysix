@@ -58,6 +58,12 @@ type
 
 var
   tracks: tTracks;
+  selectedTrackIndex: integer;
+  uiAlpha: single;
+  uiTargetAlpha: single;
+  uiShowForSeconds: single;
+  inputDelay: single; // hack to do keyboard input
+  isFirstPress: boolean;
 
 {--------------------------------------------------------}
 
@@ -604,7 +610,7 @@ begin
 end;
 
 {draw track selection UI}
-procedure drawUI();
+procedure drawTrackUI(alpha: single);
 var
   atX, atY: integer;
   width, height: integer;
@@ -612,17 +618,33 @@ var
   i: integer;
   textColor: RGBA;
 begin
-  textColor.init(250,250,250,240);
-  atX := 10;
-  atY := 10;
+  if alpha < (1/255) then exit;
+  alpha := clamp(alpha, 0, 1);
+  textColor.init(250,250,250,round(240*alpha));
   width := 300;
-  height := length(tracks) * 20 + 10;
-  screen.markRegion(tRect.create(atX,atY,width,height), FG_FLIP);
-  screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,128));
+  height := length(tracks) * 20 + 7;
+  atX := (screen.width-width) div 2;
+  atY := (screen.height-height) div 2;
+  screen.markRegion(tRect.create(atX,atY,width,height));
+  screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*128)));
+  screen.canvas.drawRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*64)));
   for i := 0 to length(tracks)-1 do begin
+    if (i = selectedTrackIndex) then
+      screen.canvas.fillRect(tRect.create(atX+1,atY+5+i*20, width-2, 18), RGBA.create(16,16,128,round(alpha*128)));
     textOut(screen.canvas, atX+5, atY+5+i*20, tracks[i].title, textColor);
     textOut(screen.canvas, atX+width-5-50, atY+5+i*20, format('(%s:%s)', [intToStr(tracks[i].minutes), intToStr(tracks[i].seconds,2)]), textColor);
   end;
+end;
+
+procedure moveTrackSelection(delta: integer);
+begin
+  selectedTrackIndex := clamp(selectedTrackIndex + delta, 0, length(tracks)-1);
+  uiShowForSeconds := 3.0;
+  if isFirstPress then
+    inputDelay := 0.250
+  else
+    inputDelay := maxf(1/30, inputDelay);
+  isFirstPress := false;
 end;
 
 {play sound with some graphics}
@@ -684,7 +706,11 @@ begin
   screen.pageClear();
   screen.pageFlip();
 
-  drawUI();
+  uiAlpha := 1;
+  uiTargetAlpha := 0;
+  uiShowForSeconds := 0.5;
+  selectedTrackIndex := 0;
+  inputDelay := 0;
 
   {main loop}
   repeat
@@ -734,6 +760,28 @@ begin
       textOut(screen.canvas, 10, 50, format('Slope:%d', [prevSync.slope]), textColor);
       textOut(screen.canvas, 10, 70, format('Debug:%s', [prevSync.debugStr]), textColor);
       }
+
+      if not anyKeyDown() then begin
+        inputDelay := 0;
+        isFirstPress := true;
+      end;
+
+      if inputDelay <= 0 then begin
+        if keyDown(key_up) then
+          moveTrackSelection(-1);
+        if keyDown(key_down) then
+          moveTrackSelection(+1);
+      end else
+        inputDelay -= elapsed;
+
+      {fade change at 1 per s}
+      if uiShowForSeconds > 0 then
+        uiTargetAlpha := 1.0
+      else
+        uiTargetAlpha := 0.0;
+      uiShowForSeconds -= elapsed;
+      uiAlpha += (uiTargetAlpha - uiAlpha) * 0.08;
+      drawTrackUI(uiAlpha);
 
       screen.flipAll();
 
