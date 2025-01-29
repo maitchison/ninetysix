@@ -82,7 +82,7 @@ var
   packing4: array[0..255] of array[0..1] of dword;
 
 const
-  RICE_TABLE_BITS = 12;
+  RICE_TABLE_BITS = 16;
 
 var
   {used for VLC2 codes. This allows for the 'overlapping' optimization}
@@ -93,10 +93,10 @@ var
     stored as decodedValue + (codeLength * 256)
     a codelenght of 0 indicates input not suffcent for decoding, and we must
     regress to another method
-    todo: see if we can garintee in the encoder that this will not happen.
+    todo: see if we can make sure in the encoder that this will not happen.
     (one way to do this is to set length for long codes to very high)
   }
-  RICE_TABLE: array[0..15, 0..(1 shl RICE_TABLE_BITS)-1] of word;
+  RICE_TABLE: array[0..15, 0..(1 shl RICE_TABLE_BITS)-1] of dword;
 
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
@@ -513,14 +513,19 @@ var
   quotient, remainder: dword;
   value: word;
   bs: tBitStream;
+  bits: integer;
   i: integer;
 begin
   bs.init(stream);
   for value in values do begin
+
     quotient := value shr k;
     remainder := value - (quotient shl k);
+    bits := k+quotient+1;
+    if bits > 16 then error(format('Fault when writing RICE code, we do not support rice codes longer than 16 bits (value=%d, k=%d, bits=%d)', [value, k, bits]));
 
     {the slower method that supports long quotients}
+    {todo: remove this and do the fast method, which I think should work now}
     for i := 1 to quotient do bs.writeBits(1, 1);
     bs.writeBits(0, 1);
     {this is faster, but does not work with quotents with > 16 bits}
@@ -531,6 +536,80 @@ begin
   bs.flush();
 end;
 
+(*
+{todo: we won't support faults}
+procedure ReadRice_ASM(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+var
+  mask: dword;
+  tablePtr, outPtr: pointer;
+  bs: tBitStream;
+begin
+  mask := (1 shl RICE_TABLE_BITS)-1;
+  tablePtr := @RICE_TABLE[k,0];
+  outPtr := outBuffer;
+  bs.init(stream);
+  asm
+
+    pushad
+
+    mov ecx, N
+    mov esi, TABLEPTR
+    mov edi, OUTPTR
+
+  @Loop:
+
+    // todo: inline this
+    mov eax, BS
+    call BS.PEEKWORD        // eax = new word
+    and eax, MASK
+    mov eax, [esi+eax*2]    // eax = rice code
+
+    test ax, ax
+
+    {write value}
+    mov ebx, eax
+    shr ebx, 4
+    shl ebx, 4
+    mov word ptr [edi], ebx
+
+    {consume bits}
+    {todo: inline}
+    mov ebx, eax
+    shr ebx, 12
+    mov eax, BS
+    call BS.CONSUMEBITS
+
+  @EndLoop:
+    add edi, 4
+    dec ecx
+    jnz @Loop
+
+    popad
+  end;
+
+{
+
+    for i := 0 to n-1 do begin
+      decoded := RICE_TABLE[k, bs.peekWord and mask];
+      if decoded = 0 then begin
+        // ah... a fault... do this the old way
+        //writeln('fault on k:', k,' b:', bs.peakWord);
+        quotient := 0;
+        while bs.readBits(1) <> 0 do inc(quotient);
+        remainder := bs.readBits(k);
+        outBuffer^ := (quotient shl k) + remainder;
+        inc(outBuffer);
+      end else begin
+        bs.consumeBits(decoded shr 12);
+        outBuffer^ := decoded and $fff;
+        inc(outBuffer);
+      end;
+    end;
+}
+
+end;
+*)
+
 {todo: we need this to be super fast asm}
 procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 var
@@ -538,7 +617,7 @@ var
   value: word;
   bs: tBitStream;
   i: integer;
-  decoded: word;
+  decoded: dword;
   mask: word;
 begin
   bs.init(stream);
@@ -556,19 +635,9 @@ begin
     mask := (1 shl RICE_TABLE_BITS)-1;
     for i := 0 to n-1 do begin
       decoded := RICE_TABLE[k, bs.peekWord and mask];
-      if decoded = 0 then begin
-        // ah... a fault... do this the old way
-        //writeln('fault on k:', k,' b:', bs.peakWord);
-        quotient := 0;
-        while bs.readBits(1) <> 0 do inc(quotient);
-        remainder := bs.readBits(k);
-        outBuffer^ := (quotient shl k) + remainder;
-        inc(outBuffer);
-      end else begin
-        bs.consumeBits(decoded shr 12);
-        outBuffer^ := decoded and $fff;
-        inc(outBuffer);
-      end;
+      bs.consumeBits(decoded shr 16);
+      outBuffer^ := decoded and $ffff;
+      inc(outBuffer);
     end;
   end;
   bs.giveBack();
@@ -578,10 +647,15 @@ function RICE_Bits(values: array of dword; k: integer): int32;
 var
   quotient, remainder: dword;
   value: dword;
+  bitsNeeded: integer;
 begin
   result := 0;
-  for value in values do
-    result += (value shr k) + 1 + k;
+  for value in values do begin
+    bitsNeeded := (value shr k) + 1 + k;
+    { this is just a method of discouraging the use of long rice codes }
+    if bitsNeeded > 16 then exit(high(int32));
+    result += bitsNeeded;
+  end;
 end;
 
 {--------------------------------------------------------------}
@@ -768,9 +842,7 @@ var
   copies: int32;
   input, output: int32;
 begin
-  {stores 1+index into first zero within a byte (starting at the right}
-  {0 indicates all 1s}
-  if RICE_TABLE_BITS > 12 then error('RICE_TABLE_BITS is limited to 12 due to how we encode value + length');
+  if RICE_TABLE_BITS > 16 then error('RICE_TABLE_BITS is limited to 16 due to how we read bitStreams');
   fillchar(RICE_TABLE, sizeof(RICE_TABLE), 0);
   for k := 0 to high(RICE_TABLE) do begin
     for value := 0 to (1 shl RICE_TABLE_BITS)-1 do begin
@@ -783,11 +855,11 @@ begin
       code := qPart or (r shl (q+1));
       fluffBits := RICE_TABLE_BITS-codeLength;
       { write out each byte where this code would appear }
-      output := value or (codeLength shl 12);
+      output := value or (codeLength shl 16);
       for fluff := 0 to (dword(1) shl fluffBits)-1 do begin
         input := code or (fluff shl codeLength);
         if RICE_TABLE[k, input] <> 0 then
-          error(format('Overlap at %d %d->%d', [input, output and $fff, RICE_TABLE[k, input] and $fff]));
+          error(format('Overlap at %d %d->%d', [input, output and $ffff, RICE_TABLE[k, input] and $ffff]));
         RICE_TABLE[k, input] := output;
       end;
     end;
@@ -896,7 +968,9 @@ var
   outData: tDwords;
 begin
   s := tStream.create();
-  for k := 0 to 8 do begin
+  {lower values of k will not work due to long code length no longer
+   being supported}
+  for k := 4 to 8 do begin
     s.reset();
     RICE_Write(s, testData, k);
     s.seek(0);
