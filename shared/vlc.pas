@@ -82,7 +82,18 @@ var
   packing4: array[0..255] of array[0..1] of dword;
 
 var
+  {used for VLC2 codes. This allows for the 'overlapping' optimization}
   OFFSET_TABLE: array[0..8] of dword;
+
+  {
+    stores rice decodes for common values of k, given some input byte
+    stored as decodedValue + (codeLength * 256)
+    a codelenght of 0 indicates input not suffcent for decoding, and we must
+    regress to another method
+    todo: see if we can garintee in the encoder that this will not happen.
+    (one way to do this is to set length for long codes to very high)
+  }
+  RICE_TABLE: array[0..7, 0..255] of word;
 
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
@@ -123,8 +134,8 @@ var
   i: int32;
   valueMax: int32;
   valueSum: double;
-  packingBits, vlcBits, riceBits: int32;
-  riceK: integer;
+  packingBits, riceBits: int32;
+  k, bestK, guessK, deltaK: integer;
   thisBits, bestBits: int32;
   n: int32;
   startPos: int32;
@@ -138,11 +149,9 @@ begin
   if segmentType = ST_AUTO then begin
     valueSum := 0;
     valueMax := 0;
-    vlcBits := 0;
     for value in values do begin
       valueMax := max(valueMax, value);
       valueSum += value;
-      vlcBits += VLC2_Bits(value);
     end;
 
     {start with packing}
@@ -150,31 +159,31 @@ begin
     segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
     bestBits := packingBits;
 
-    {see if VLC2 is an upgrade}
-    {todo: maybe just never use this?}
-    if vlcBits < bestBits then begin
-      segmentType := ST_VLC2;
-      bestBits := vlcBits;
-    end;
-
     {see if RICE is an upgrade}
-    riceK := floor(log2(1+(valueSum / length(values))));
-    riceBits := RICE_Bits(values, riceK);
-    if riceBits < bestBits then begin
-      segmentType := ST_RICE0 + riceK;
-      bestBits := riceBits;
+    deltaK := 0;
+    guessK := floor(log2(1+(valueSum / length(values))));
+    for k := (guessK - 1) to (guessK + 1) do begin
+      if k < 0 then continue;
+      riceBits := RICE_Bits(values, k);
+      if riceBits < bestBits then begin
+        segmentType := ST_RICE0 + k;
+        bestBits := riceBits;
+        bestK := k;
+        deltaK := bestK - guessK;
+      end;
     end;
 
     {
     note(format(
-      'Selecting %s with scores %d %d %d (max:%d mean:%f)',
+      'Selecting %s (%d) with scores %d %d (max:%d mean:%f)',
       [
-        getSegmentTypeName(segmentType),
-        packingBits, VLCBits, riceBits,
+        getSegmentTypeName(segmentType), deltaK,
+        packingBits, riceBits,
         valueMax, valueSum/length(values)
       ]
     ));
     }
+
   end;
 
   if segmentType = ST_PACK then begin
@@ -512,6 +521,7 @@ begin
     for i := 1 to quotient do bs.writeBits(1, 1);
     bs.writeBits(0, 1);
     {this is faster, but does not work with quotents with > 16 bits}
+    //oh... this is wrong, the zero should be a the other end...
     //bs.writeBits((1 shl (quotient+1)) - 2, quotient+1); {e.g. 4 = 11110}
     bs.writeBits(remainder, k);
   end;
@@ -525,15 +535,38 @@ var
   value: word;
   bs: tBitStream;
   i: integer;
+  decoded: word;
 begin
   bs.init(stream);
-  for i := 0 to n-1 do begin
-    quotient := 0;
-    while bs.readBits(1) <> 0 do inc(quotient);
-    remainder := bs.readBits(k);
-    outBuffer^ := (quotient shl k) + remainder;
-    inc(outBuffer);
+  if k > 7 then begin
+    {slow method}
+    for i := 0 to n-1 do begin
+      quotient := 0;
+      while bs.readBits(1) <> 0 do inc(quotient);
+      remainder := bs.readBits(k);
+      outBuffer^ := (quotient shl k) + remainder;
+      inc(outBuffer);
+    end;
+  end else begin
+    {lookup table method}
+    for i := 0 to n-1 do begin
+      decoded := RICE_TABLE[k, bs.peakByte];
+      if decoded = 0 then begin
+        // ah... a fault... do this the old way
+        //writeln('fault on k:', k,' b:', bs.peakByte);
+        quotient := 0;
+        while bs.readBits(1) <> 0 do inc(quotient);
+        remainder := bs.readBits(k);
+        outBuffer^ := (quotient shl k) + remainder;
+        inc(outBuffer);
+      end else begin
+        bs.readBits(decoded shr 8);
+        outBuffer^ := decoded and $ff;
+        inc(outBuffer);
+      end;
+    end;
   end;
+  bs.giveBack();
 end;
 
 function RICE_Bits(values: array of dword; k: integer): int32;
@@ -718,6 +751,47 @@ begin
   end;
 end;
 
+procedure buildRiceTables();
+var
+  i, j, k: int32;
+  fluff: int32;
+  fluffBits: int32;
+  value: int32;
+  qCode, code: int32;
+  codeLength: int32;
+  q, qPart,r: int32;
+  copies: int32;
+  input, output: int32;
+begin
+  {stores 1+index into first zero within a byte (starting at the right}
+  {0 indicates all 1s}
+  fillchar(RICE_TABLE, sizeof(RICE_TABLE), 0);
+  for k := 0 to 7 do begin
+    for value := 0 to 255 do begin
+      q := value shr k;
+      codeLength := k + q + 1;
+      {unfortunately table can not handle these yet}
+      if codeLength > 8 then continue;
+
+      r := value - (q shl k);
+      qPart := (1 shl q)-1; //e.g. q=3 -> 0111
+      code := qPart or (r shl (q+1));
+      fluffBits := 8-codeLength;
+      { write out each byte where this code would appear }
+      output := value or (codeLength shl 8);
+      for fluff := 0 to (dword(1) shl fluffBits)-1 do begin
+        input := code or (fluff shl codeLength);
+        //note(format('k:%d Writing %d:%d to %d', [k, value, codelength, input]));
+        //writeln(k, ' idx:',tableIdx, ' c:', code, ' cl:', codeLength, ' cp:', copies, ' v:',value or (codeLength shl 8));
+        if RICE_TABLE[k, input] <> 0 then begin
+          error(format('Overlap at %d %d->%d', [input, output and $ff, RICE_TABLE[k, input] and $ff]));
+        end;
+        RICE_TABLE[k, input] := output;
+      end;
+    end;
+  end;
+end;
+
 {builds lookup tables used to accelerate unpacking.}
 procedure buildUnpackingTables();
 var
@@ -732,6 +806,13 @@ begin
     for j := 0 to 1 do
       packing4[i][j] := (i shr (j*4)) and $f;
   end;
+end;
+
+procedure buildTables();
+begin
+  buildRiceTables();
+  buildOffsetTable();
+  buildUnpackingTables();
 end;
 
 {----------------------------------------------------}
@@ -819,7 +900,7 @@ begin
     s.seek(0);
     setLength(outData, length(testData));
     RICE_Read(s, length(testData), @outData[0], k);
-    assertEqual(toBytes(outData), toBytes(testData));
+    assertEqual(toBytes(outData).toString, toBytes(testData).toString);
     assertEqual(s.pos, bytesForBits(RICE_bits(testData, k)));
   end;
   s.free;
@@ -955,8 +1036,7 @@ begin
 end;
 
 begin
-  buildOffsetTable();
-  buildUnpackingTables();
+  buildTables();
   tVLCTest.create('VLC');
   benchmark();
 end.

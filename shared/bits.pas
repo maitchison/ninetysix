@@ -16,8 +16,10 @@ type tBitStream = object
   buffer: dword;
   pos: integer;
   constructor init(aStream: tStream);
-  procedure writeBits(value: word; bits: byte);
-  function readBits(bits: byte): word;
+  function peakByte(): byte; inline;
+  procedure writeBits(value: word; bits: byte); inline;
+  function readBits(bits: byte): word; inline;
+  procedure giveBack();
   procedure flush();
   procedure clear();
 end;
@@ -31,7 +33,7 @@ begin
 end;
 
 {max supported is 16bits}
-procedure tBitStream.writeBits(value: word; bits: byte);
+procedure tBitStream.writeBits(value: word; bits: byte); inline;
 begin
   {$IFDEF debug}
   if value >= (dword(1) shl bits) then
@@ -47,7 +49,7 @@ begin
 end;
 
 {shared buffer with writeBits...}
-function tBitStream.readBits(bits: byte): word;
+function tBitStream.readBits(bits: byte): word; inline;
 begin
   {pos here means number of valid bits}
   {note: we read a byte at a time so as to not read too many bytes}
@@ -58,6 +60,30 @@ begin
   result := buffer and ((1 shl bits)-1);
   buffer := buffer shr bits;
   pos -= bits;
+end;
+
+{peak at the next 8 bits}
+function tBitStream.peakByte(): byte; inline;
+begin
+  {pos here means number of valid bits}
+  {note: we read a byte at a time so as to not read too many bytes}
+  while pos < 8 do begin
+    buffer := buffer or (dword(stream.readByte) shl pos);
+    pos += 8;
+  end;
+  result := buffer and $ff;
+end;
+
+{we read ahead a bit, this function will give back the bytes already
+ loaded into buffer, and clear the buffer}
+procedure tBitStream.giveBack();
+var
+  bytesAhead: integer;
+begin
+  bytesAhead := pos div 8;
+  if bytesAhead > 0 then
+    stream.seek(stream.pos-bytesAhead);
+  clear();
 end;
 
 procedure tBitStream.flush();
