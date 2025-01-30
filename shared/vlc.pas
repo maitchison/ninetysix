@@ -1147,5 +1147,4 @@ end;
 begin
   buildTables();
   tVLCTest.create('VLC');
-  benchmark();
 end.

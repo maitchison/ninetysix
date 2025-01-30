@@ -872,7 +872,7 @@ begin
     musicUpdate(1);
 
     {only update waveform if our music buffer has updated}
-    if (oldBufferPos <> musicBufferPos()) and (not keyDown(key_space)) then begin
+    if (oldBufferPos <> musicBufferReadPos()) and (not keyDown(key_space)) then begin
 
       startTimer('main');
 
@@ -931,7 +931,7 @@ begin
 
       screen.flipAll();
 
-      oldBufferPos := musicBufferPos;
+      oldBufferPos := musicBufferReadPos;
 
       stopTimer('main');
     end;

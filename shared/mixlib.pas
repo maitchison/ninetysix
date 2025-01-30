@@ -86,7 +86,8 @@ procedure musicPlay(reader: tLA96Reader); overload;
 procedure musicSet(reader: tLA96Reader);
 procedure musicRestoreDefaultReader();
 procedure musicStop();
-function  musicBufferPos(): dword;
+function  musicBufferReadPos(): dword;
+function  musicBufferWritePos(): dword;
 function  getMusicStats(): tMusicStats;
 procedure musicUpdate(maxNewFrames: integer=4);
 
@@ -529,18 +530,45 @@ end;
  this involves reading the entire (compressed) file into memory and then
  decompressing the first part.}
 procedure musicPlay(reader: tLA96Reader); overload;
+var
+  currentFrame: dword;
+  i: integer;
+  factor: single;
+  offset: dword;
+  samplePtr: pAudioSample16S;
+const
+  FADE_SAMPLES = 16*1024;
 begin
-  mbReadPos := 0;
-  mbWritePos := 0;
-  musicSet(reader);
-  {since we read the whole thing off disk, we may as well load a fair bit}
-  {this should be ~10 seconds}
+  {allow the current frame to keep, player,
+   use the next frame as a fade down,
+   and the one after we will start writing into}
+  assert(FADE_SAMPLES mod 1024 = 0, 'Fade samples must be a multiple of 1024');
+  assert(reader.frameSize = 1024, 'Only framesize=1024 supported now');
+
+  {make sure music doesn't try to update while we do this next part}
+  asm cli end;
+  currentFrame := mbReadPos div 1024;
+  {perform the fade out.. a little dodgy now}
+  offset := (currentFrame+1)*1024;
+  samplePtr := musicBuffer.data + (offset mod MUSIC_BUFFER_SAMPLES) * 4;
+  for i := 0 to FADE_SAMPLES-1 do begin
+    factor := (FADE_SAMPLES-i)/FADE_SAMPLES;
+    samplePtr^.left := round(samplePtr^.left * factor);
+    samplePtr^.right := round(samplePtr^.right * factor);
+    inc(samplePtr);
+  end;
+  mbWritePos := ((currentFrame+1) * 1024) + FADE_SAMPLES;
+  musicReader := reader;
+  asm sti end;
+  musicUpdate(16);
 end;
 
 {This is a bit dodgy, but set the music reader directly.
  This can be used to quickly switch between different compressed
  sources (e.g. for AB testing)
  Call musicRestoreDefaultReader() to restore the default one.
+ Note: this keeps all readers in sync, so good for switching between
+ sources to check audio differences
  }
 procedure musicSet(reader: tLA96Reader);
 begin
@@ -551,9 +579,14 @@ begin
   musicUpdate(4);
 end;
 
-function musicBufferPos(): dword;
+function musicBufferReadPos(): dword;
 begin
-  result := mbReadPos;
+  result := mbReadPos mod MUSIC_BUFFER_SAMPLES;
+end;
+
+function musicBufferWritePos(): dword;
+begin
+  result := mbWritePos mod MUSIC_BUFFER_SAMPLES;
 end;
 
 procedure musicRestoreDefaultReader();
