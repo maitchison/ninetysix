@@ -74,6 +74,65 @@ begin
   end;
 end;
 
+{returns max(abs(prev-current))}
+function clickDetection_ASM(prevSample: tAudioSample16S;samplePtr: pAudioSample16S; bufSamples:dword): int32;
+var
+  best: dword;
+begin
+  best := 0;
+  asm
+    pushad
+
+    mov ecx, bufSamples
+    mov esi, samplePtr
+
+    movsx ebx, word ptr [prevSample.left]
+    movsx ecx, word ptr [prevSample.right]
+
+  @SampleLoop:
+
+    {
+      eax = mp
+      ebx = current left
+      ecx = current right
+      edx = tmp
+    }
+
+  @Left:
+    movsx edx, word ptr [esi]
+    mov eax, edx
+    sub eax, ebx      {eax = this-prev}
+    mov ebx, edx
+    cdq
+    xor eax, edx
+    sub eax, edx      {eax=abs(this-prev)}
+    cmp eax, best
+    jbe @SkipLeft
+    mov best, eax
+  @SkipLeft:
+
+  @Right:
+    movsx edx, word ptr [esi+2]
+    mov eax, edx
+    sub eax, ecx
+    mov ecx, edx
+    cdq
+    xor eax, edx
+    sub eax, edx      {eax=abs(eax)}
+    cmp eax, best
+    jbe @SkipRight
+    mov best, eax
+  @SkipRight:
+
+    add esi, 4
+    dec bufSamples   // just dec directly?
+    jnz @SampleLoop
+
+    popad
+  end;
+  result := best;
+end;
+
 
 procedure direct16S(count: int32; srcPtr, dstPtr: pointer);
 begin

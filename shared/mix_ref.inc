@@ -13,6 +13,25 @@ begin
   end;
 end;
 
+{outputs largest delta between samples}
+function clickDetection_REF(prevSample: tAudioSample16S;samplePtr: pAudioSample16S; bufSamples:dword): int32;
+var
+  i : integer;
+  best: int32;
+  delta: int32;
+begin
+  best := 0;
+  for i := 0 to bufSamples-1 do begin
+    delta := abs(samplePtr^.left-prevSample.left);
+    if delta > best then best := delta;
+    delta := abs(samplePtr^.right-prevSample.right);
+    if delta > best then best := delta;
+    prevSample := samplePtr^;
+    inc(samplePtr);
+  end;
+  result := best;
+end;
+
 {Copies a 16S source directly into the 32bit buffer (e.g. for initialization)}
 procedure initializeBuffer_REF(samplePtr: pAudioSample16S; bufSamples: int32);
 var

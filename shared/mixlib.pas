@@ -91,6 +91,8 @@ function  musicBufferWritePos(): dword;
 function  getMusicStats(): tMusicStats;
 procedure musicUpdate(maxNewFrames: integer=4);
 
+function  mixClickDetection(): dword;
+
 function scratchBufferPtr: pAudioSample16S;
 
 implementation
@@ -129,6 +131,7 @@ var
   DR2: int64 = 0;
   DR3: int64 = 0;
   DR4: int64 = 0;
+  MIX_CLICK_DETECTION: dword;
 
 {Mixer is called during interupt, so stack might be invalid,
  also, make sure to not throw any errors. These will get turned
@@ -220,6 +223,9 @@ var
   chunkSourceTicks, sampleTicksRemaining: int32;
   volumeChunkStart, volumeChunkEnd: single;
   channel: tSoundChannel;
+  prevSample: tAudioSample16S;
+  clickStrength: int32;
+  sfxTicks: int64;
 
   processAudio: tProcessAudioProc;
 
@@ -268,6 +274,7 @@ begin
       sfx := channel.sfx;
       ticksPerSample := trunc(channel.pitch*256);
       sampleTick := channel.sampleTick;
+      sfxTicks := int64(sfx.length)*256;
 
       if sfx.length = 0 then continue; // should not happen
       if channel.volume = 0 then continue;
@@ -287,10 +294,10 @@ begin
       end;
 
       // should not be needed, but just in case.
-      if sampleTick >= (sfx.length * 256) then begin
-        mixWarn('Sample tick was out of bounds');
+      if sampleTick >= sfxTicks then begin
+        mixWarn('Sample tick was out of bounds '+intToStr(sampleTick)+'/'+intToStr(sfxTicks));
         if channel.looping then
-          sampleTick := sampleTick mod (sfx.length * 256)
+          sampleTick := sampleTick mod sfxTicks
         else begin
           channel.reset();
           continue;
@@ -318,11 +325,11 @@ begin
         chunkBufferSamples := remainingBufferSamples;
         chunkSourceTicks := remainingBufferSamples * ticksPerSample;
 
-        if (sampleTick + chunkSourceTicks) >= (sfx.length*256) then begin
+        if (sampleTick + chunkSourceTicks) >= sfxTicks then begin
           // this means audio ends early within the buffer
           // so make sure this chunk ends at the boundary,
           // then we handle loop or stop later on.
-          sampleTicksRemaining := (sfx.length*256) - sampleTick;
+          sampleTicksRemaining := sfxTicks - sampleTick;
           // round up
           chunkBufferSamples := (sampleTicksRemaining+(ticksPerSample-1)) div ticksPerSample;
         end;
@@ -339,19 +346,6 @@ begin
         DR1 := chunkBufferSamples;
         DR2 := sampleTick;
 
-        // these assertion checks sometimes cause bugs, I think due
-        // to how strings are handled. I'd need to use codewords instead.
-        (*
-        if not mixAssertGreaterOrEqual(sampleTick, 0, 'invalid sample tick') then
-          break;
-        if not mixAssertLess(sampleTick + (chunkBufferSamples-1)*ticksPerSample, sfx.length*256, 'invalid sample tick') then
-          break;
-        if not mixAssertGreaterOrEqual(bufPos, 0, 'invalid bufPos') then
-          break;
-        if not mixAssertLess(bufPos + (chunkBufferSamples-1), bufSamples, 'invalid bufSamples') then
-          break;
-        *)
-
         volumeChunkStart := channel.lastUpdateVolume + (bufPos / bufSamples) * (channel.volume - channel.lastUpdateVolume);
         volumeChunkEnd := channel.lastUpdateVolume + ((bufPos + chunkBufferSamples) / bufSamples) * (channel.volume - channel.lastUpdateVolume);
 
@@ -365,9 +359,9 @@ begin
         sampleTick += (chunkBufferSamples * ticksPerSample);
 
         // handle looping
-        if sampleTick >= (sfx.length * 256) then begin
+        if sampleTick >= sfxTicks then begin
           if channel.looping then begin
-            sampleTick := sampleTick mod (sfx.length * 256);
+            sampleTick := sampleTick mod sfxTicks;
           end else begin
             // reset channel
             channel.sfx := nil;
@@ -405,6 +399,8 @@ begin
       scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
     end;
 
+  prevSample := scratchBuffer[bufSamples-1];
+
   {mix down}
   if mixer.mute then begin
     filldword(scratchBuffer, bufSamples, 0);
@@ -421,12 +417,28 @@ begin
       clipAndConvert_ASM(bufSamples);
   end;
 
+  {$ifdef DEBUG}
+  {STUB:}
+  prevSample := scratchBuffer[0];
+  clickStrength := clickDetection_ASM(prevSample, @scratchBuffer[0], bufSamples-2);
+  if clickStrength > MIX_CLICK_DETECTION then
+    MIX_CLICK_DETECTION := clickStrength
+  else
+    MIX_CLICK_DETECTION := (MIX_CLICK_DETECTION * 255) div 256;
+
+  {$endif}
+
   result := @scratchBuffer[0];
 end;
 
 {$S+,R+,Q+}
 
 {-----------------------------------------------------}
+
+function mixClickDetection(): dword;
+begin
+  result := MIX_CLICK_DETECTION;
+end;
 
 {converts from seconds since app launch, to timestamp code}
 function secToTC(s: double): tTimeCode;
@@ -537,7 +549,7 @@ var
   offset: dword;
   samplePtr: pAudioSample16S;
 const
-  FADE_SAMPLES = 16*1024;
+  FADE_SAMPLES = 8*1024;
 begin
   {allow the current frame to keep, player,
    use the next frame as a fade down,
@@ -734,6 +746,8 @@ initialization
 
   mbReadPos := 0;
   mbWritePos := 0;
+
+  MIX_CLICK_DETECTION := 0;
 
   {music buffer must no smaller than SB buffer, and if larger, be a multiple}
   assert((MUSIC_BUFFER_SAMPLES mod (BUFFER_SIZE div 4)) = 0);

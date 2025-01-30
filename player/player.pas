@@ -152,8 +152,8 @@ end;
 
 procedure tGuiComponent.update(elapsed: single);
 const
-  FADE_IN = 0.08;
-  FADE_OUT = 0.04;
+  FADE_IN = 0.04;
+  FADE_OUT = 0.03;
 var
   delta: single;
 begin
@@ -810,6 +810,8 @@ var
   decodeSpeed: single;
   exitFlag: boolean;
   cpuUsage: single;
+  statsString: string;
+  refMusic: tSoundEffect;
 
 begin
 
@@ -872,7 +874,7 @@ begin
     musicUpdate(1);
 
     {only update waveform if our music buffer has updated}
-    if (oldBufferPos <> musicBufferReadPos()) and (not keyDown(key_space)) then begin
+    if keyDown(key_z) or (oldBufferPos <> musicBufferReadPos()) and (not keyDown(key_space)) then begin
 
       startTimer('main');
 
@@ -906,6 +908,8 @@ begin
 
       {stats}
       guiStats.text := format('CPU: %f%% RAM:%f/%f', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024, getTotalMemory/1024/1024]);
+      if mixClickDetection > 0 then
+        guiStats.text += ' click:'+intToStr(mixClickDetection);
 
       key := getKey();
       if key.code <> 0 then case key.code of
