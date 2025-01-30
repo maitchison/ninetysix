@@ -1,9 +1,9 @@
 @echo off
 
 set VERSION=01
-set BUILD_DIR=c:\dev\build\conv\%VERSION%
-set LATEST_DIR=c:\dev\build\conv\latest
-set MAIN=conv
+set BUILD_DIR=c:\dev\build\player\%VERSION%
+set LATEST_DIR=c:\dev\build\player\latest
+set MAIN=player
 
 echo Build dir is '%BUILD_DIR%'
 
@@ -47,7 +47,9 @@ deltree /y _tmp
 :: ---------------------------------
 
 mkdir %BUILD_DIR%\snd
-copy snd\*.* %BUILD_DIR%\snd
+copy res\*.* %BUILD_DIR%\res
+copy music\*.* %BUILD_DIR%\music
+copy sample\*.* %BUILD_DIR%\sample
 
 :: ---------------------------------
 :: Update Latest and date_coded

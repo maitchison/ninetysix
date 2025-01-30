@@ -360,7 +360,7 @@ begin
   if midByte then
     error('Unaligned readBytes');
   if n > (len-fPos) then
-    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [n,  (len - fpos)]));
+    error(Format('Read over end of stream, requested, %d bytes but %d remain.', [n,  len - fpos]));
 
   system.setLength(result, n);
   move(bytes[fPos], result[0], n);
@@ -373,7 +373,7 @@ begin
   if numBytes = 0 then exit;
   if midByte then error('Unaligned readBlock');
   if numBytes > (len-fPos) then
-    error(Format('Read over end of stream, requested, %d bytes but only %d remain.', [numBytes,  (fPos + numBytes)]));
+    error(Format('Read over end of stream, requested, %d bytes but %d remain.', [numBytes,  len-fPos]));
   move(bytes[fPos], x, numBytes);
   fPos += numBytes;
 end;

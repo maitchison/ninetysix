@@ -246,7 +246,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := 'res\'+profile.tag+'_'+format('%d_%d_%d_xv4', [profile.quantBits, profile.ulawBits, profile.log2mu]);
+  result := joinPath('sample', profile.tag+'_'+format('%d_%d_%d_xv4', [profile.quantBits, profile.ulawBits, profile.log2mu]));
 end;
 
 {allow user to switch between compression samples}
@@ -305,7 +305,7 @@ begin
   writeln();
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave('res\sample.wav');
+  music16 := tSoundEffect.loadFromWave(joinPath('sample','sample.wav'));
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   setLength(outSfx, length(outSFX)+1);
@@ -418,19 +418,25 @@ begin
   end;
 end;
 
-procedure makeSelection();
+procedure applySelection();
 var
   track: tTrack;
 begin
+  note('Applying selection song');
+
   track := tracks[selectedTrackIndex];
   guiTitle.text := track.title;
   guiTitle.showForSeconds := 3.5;
 
   {buffer 0.5 seconds, enough time to read the next file}
-  musicUpdate(20);
+  if musicReader.isLoaded then begin
+    note('Prebuffering before load');
+    musicUpdate(20);
+  end;
 
-  musicReader.close();
+  note('Loading new track');
   musicReader.load(track.filename);
+  note('Starting playback');
   musicPlay(musicReader);
 end;
 
@@ -438,6 +444,21 @@ procedure moveTrackSelection(delta: integer);
 begin
   selectedTrackIndex := clamp(selectedTrackIndex + delta, 0, length(tracks)-1);
   uiShowForSeconds := 2.0;
+end;
+
+procedure nextSong();
+var
+  track: tTrack;
+begin
+  note('Moving to next song');
+  selectedTrackIndex := (selectedTrackIndex + 1) mod length(tracks);
+  {we need todo a soft reset here, a previous is still playing...}
+  track := tracks[selectedTrackIndex];
+  guiTitle.text := track.title;
+  guiTitle.showForSeconds := 3.5;
+  musicReader.close();
+  musicReader.load(track.filename);
+  musicPlay(musicReader);
 end;
 
 {play sound with some graphics}
@@ -453,7 +474,6 @@ var
   oldBufferPos: dword;
   elapsed: double;
   x,y: integer;
-  textColor: RGBA;
   gui: tGuiComponents;
   key: tKeyPair;
   decodeSpeed: single;
@@ -482,6 +502,7 @@ begin
   guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-60));
   guiTitle.centered := true;
   guiTitle.autoFade := true;
+  guiTitle.alpha := 0;
   gui.append(guiTitle);
 
   guiStats := tGuiLabel.create(point(10, screen.height-30));
@@ -499,8 +520,9 @@ begin
 
   {start playing}
   musicReader := tLA96Reader.Create();
+  musicReader.playbackFinishedHook := nextSong();
   selectedTrackIndex := rnd mod length(tracks);
-  makeSelection();
+  applySelection();
 
   hdrWave := tHDRPage.create(64,32);
   hdrPhase := tHDRPage.create(64,64);
@@ -521,7 +543,7 @@ begin
   {main loop}
   repeat
 
-    musicUpdate(1);
+    musicUpdate();
 
     {only update waveform if our music buffer has updated}
     if keyDown(key_z) or (oldBufferPos <> musicBufferReadPos()) and (not keyDown(key_space)) then begin
@@ -541,7 +563,7 @@ begin
 
       {phase}
       startTimer('phase');
-      rect := tRect.create((640-hdrPhase.width) div 2, (480-hdrPhase.height) div 2, hdrPhase.width, hdrPhase.height);
+      rect := tRect.create((640-hdrPhase.width) div 2-10, (480-hdrPhase.height) div 2-74, hdrPhase.width, hdrPhase.height);
       hdrPhase.fade(0.95);
       displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 256);
       hdrPhase.mulTo(screen.canvas, rect.x, rect.y);
@@ -553,11 +575,11 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
-      textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), textColor);
+      textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGB(250,250,250,240));
       screen.markRegion(tRect.create(6,3,40,20));
 
       {stats}
-      guiStats.text := format('CPU: %f%% RAM:%f/%f', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024, getTotalMemory/1024/1024]);
+      guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024]);
       if mixClickDetection > 0 then
         guiStats.text += ' click:'+intToStr(mixClickDetection);
 
@@ -565,7 +587,7 @@ begin
       if key.code <> 0 then case key.code of
         key_up: moveTrackSelection(-1);
         key_down: moveTrackSelection(+1);
-        key_enter: makeSelection();
+        key_enter: applySelection();
         key_esc: exitFlag := true;
         key_s: guiStats.visible := not guiStats.visible;
       end;

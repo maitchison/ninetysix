@@ -13,12 +13,13 @@ unit la96;
     - no more centering
     - support for midReduction
     - sign bit compression
-  [pending] v0.4:
+  v0.4
     - added rice codes
   [future] v0.5:
     - remove VLC
-    - linear prediction
     - integrated sign bits
+  [future] v0.6:
+    - linear prediction
 *)
 
 
@@ -135,6 +136,7 @@ type
   end;
 
   tFrameFrameGenProc = procedure(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+  tPlaybackFinishedProc = procedure();
 
   {todo: make a LA96Writer aswell (for progressive save)}
   tLA96Reader = class
@@ -153,15 +155,17 @@ type
     function  getULAW(bits: byte): pULawLookup;
     procedure loadHeader();
   public
+    filename: string;
     looping: boolean;
     frameGenHook: tFrameFrameGenProc;
+    playbackFinishedHook: tPlaybackFinishedProc;
   public
     constructor create();
     function  isLoaded: boolean;
     function  duration: single;
     function  frameSize: integer;
     procedure seek(frameNumber: integer);
-    procedure load(filename: string); overload;
+    procedure load(aFilename: string); overload;
     procedure load(aStream: tStream); overload;
     destructor destroy(); override;
     procedure close();
@@ -296,12 +300,26 @@ begin
   looping := false;
 end;
 
-procedure tLA96Reader.load(filename: string); overload;
+procedure tLA96Reader.load(aFilename: string); overload;
 begin
+  note('Loading A96 from '+aFilename);
+  if isLoaded then begin
+    note('Looks like we''re already loaded');
+    if self.filename = aFilename then begin
+      note('We alreay have this file so just seek');
+      self.fs.seek(0);
+      self.loadHeader();
+      exit;
+    end else
+      self.close();
+  end;
+  note('Loading the file');
   if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
-  fs := tStream.create();
-  fs.readFromFile(filename);
-  ownsStream := true;
+  self.fs := tStream.create();
+  self.fs.readFromFile(aFilename);
+  note('fs='+intToStr(self.fs.len));
+  self.ownsStream := true;
+  self.filename := aFilename;
   self.loadHeader();
 end;
 
@@ -309,6 +327,7 @@ end;
  be freed by them}
 procedure tLA96Reader.load(aStream: tStream); overload;
 begin
+  note('Loading A96 from stream');
   fs := aStream;
   ownsStream := false;
   self.loadHeader();
@@ -465,6 +484,13 @@ begin
 
   if sfx.format <> AF_16_STEREO then error('Can only decompress to 16bit stereo');
 
+  if (frameOn >= header.numFrames) then begin
+    {if we reached the end, then just output silence}
+    sfxSamplePtr := sfx.data + (sfxOffset * 4);
+    filldword(sfxSamplePtr^, header.frameSize, 0);
+    exit;
+  end;
+
   //writeln('processing frame ',frameOn);
 
   startTimer('LA96_DF');
@@ -533,9 +559,16 @@ begin
 
   inc(frameOn);
 
-  if (frameOn = header.numFrames) and looping then begin
-    frameOn := 0;
-    seek(0);
+  if (frameOn = header.numFrames) then begin
+    if looping then begin
+      frameOn := 0;
+      seek(0);
+    end else begin
+      {hmm if hook loads another file, and we read all of it, we get
+       here again?}
+      if assigned(playbackFinishedHook) then
+        playbackFinishedHook();
+    end;
   end;
 
   stopTimer('LA96_DF');

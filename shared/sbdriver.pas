@@ -74,6 +74,10 @@ implementation
 uses
   mixLib,
   sound;
+
+procedure speakerOff(); forward;
+procedure speakerOn(); forward;
+
 {-----------------------------------------------------}
 
 var
@@ -442,12 +446,12 @@ var
   x: word;
 begin
   timeLimit := getSec + s;
-  DSPWrite($D1); // turn on speaker
+  speakerOn();
   while getSec < timeLimit do begin
     DSPWrite($10); // direct 8bit mino 'pc speaker'
     DSPWrite(rnd);
   end;
-  DSPWrite($D3); // end playback
+  speakerOff();
 end;
 
 {play PCM audio using direct writes.
@@ -607,6 +611,7 @@ begin
 
   install_ISR(DSPIrq);
   initiateDMAPlayback();
+  speakerOn();
 end;
 
 procedure freeBuffer();
@@ -615,6 +620,16 @@ begin
   dosSegment := 0;
   dosOffset := 0;
   dosSelector := 0;
+end;
+
+procedure speakerOff();
+begin
+  DSPWrite($D3);
+end;
+
+procedure speakerOn();
+begin
+  DSPWrite($D1);
 end;
 
 procedure closeSound();
@@ -638,6 +653,8 @@ end;
 {----------------------------------------------------------}
 
 begin
+  // mute the speaker so we don't get crackle.
+  speakerOn();
   backupDS := get_ds();
   runTests();
   initSound();

@@ -77,8 +77,12 @@ var
   mixer: tSoundMixer;
 
 const
-  {This is 2M of memory, or ~10 seconds}
-  MUSIC_BUFFER_SAMPLES = 512*1024;
+  {This is 1M of memory, or ~6 seconds
+   but is now only around 2 seconds}
+  {todo: make this something we can configure}
+  MB_LOG2SAMPLES = 18;
+  MB_SAMPLES = 1 shl MB_LOG2SAMPLES;
+  MB_MASK: dword = MB_SAMPLES-1;
 
 function  mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 procedure musicPlay(filename: string); overload;
@@ -121,6 +125,7 @@ var
   musicTimer: tTimer;
 
   // debug registers, used to indicate errors during interupt.
+  MIX_COUNTER: dword;
   MIX_ERRORS: dword;
   MIX_ERROR_STR: shortstring;
   MIX_WARNINGS: dword;
@@ -244,13 +249,15 @@ begin
   if bufSamples <= 0 then exit;
   if (mixer = nil) then exit;
 
+  inc(MIX_COUNTER);
+
   {note: I'm in two minds about this,
    maybe we just always use the music buffer, and 'no music'
    just means zero it out}
 
   {intialize buffer with currently playing music (if any)}
   if musicReader.isLoaded then begin
-    initializeBuffer_ASM(musicBuffer.data+(mbReadPos mod MUSIC_BUFFER_SAMPLES)*4, bufSamples);
+    initializeBuffer_ASM(musicBuffer.data+(mbReadPos and MB_MASK)*4, bufSamples);
     {advance our position within music buffer. Since music buffer length
      is a multiple of the SB buffer, we will never up straddling the
      start/end of the buffer}
@@ -295,7 +302,7 @@ begin
 
       // should not be needed, but just in case.
       if sampleTick >= sfxTicks then begin
-        mixWarn('Sample tick was out of bounds '+intToStr(sampleTick)+'/'+intToStr(sfxTicks));
+        mixWarn('Sample tick was out of bounds ');
         if channel.looping then
           sampleTick := sampleTick mod sfxTicks
         else begin
@@ -399,7 +406,7 @@ begin
       scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
     end;
 
-  prevSample := scratchBuffer[bufSamples-1];
+  //prevSample := scratchBuffer[bufSamples-1];
 
   {mix down}
   if mixer.mute then begin
@@ -418,14 +425,14 @@ begin
   end;
 
   {$ifdef DEBUG}
-  {STUB:}
-  prevSample := scratchBuffer[0];
-  clickStrength := clickDetection_ASM(prevSample, @scratchBuffer[0], bufSamples-2);
+  {might be buggy? (202 error)}
+  {
+  clickStrength := clickDetection_ASM(prevSample, @scratchBuffer[0], bufSamples);
   if clickStrength > MIX_CLICK_DETECTION then
     MIX_CLICK_DETECTION := clickStrength
   else
     MIX_CLICK_DETECTION := (MIX_CLICK_DETECTION * 255) div 256;
-
+  }
   {$endif}
 
   result := @scratchBuffer[0];
@@ -481,9 +488,14 @@ end;
 
 procedure processNextMusicFrame();
 begin
+  if mbReadPos >= mbWritePos then
+    warning(format('Buffer underflow read:%d write:%d', [mbReadPos div 1024, mbWritePos div 1024]));
+  assert(mbWritePos mod 1024 = 0, 'WritePos must be a multiple of frameSize');
   if not musicReader.isLoaded then exit;
-  musicReader.nextFrame(musicBuffer, mbWritePos mod MUSIC_BUFFER_SAMPLES);
+  musicReader.nextFrame(musicBuffer, mbWritePos and MB_MASK);
   mbWritePos += musicReader.frameSize;
+  //stub:
+  note(format('Processing r:%d w:%d', [mbReadPos div 1024, mbWritePos div 1024]));
 end;
 
 procedure musicUpdate(maxNewFrames: integer=4);
@@ -518,8 +530,8 @@ var
 begin
   sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
   frameSize := 1024; // hard code this for the moment.
-  result.bufferFramesMax := (MUSIC_BUFFER_SAMPLES - sbSamples) div frameSize;
-  result.bufferFramesFilled := (mbWritePos - mbReadPos) div frameSize;
+  result.bufferFramesMax := (MB_SAMPLES - sbSamples) div frameSize;
+  result.bufferFramesFilled := (int64(mbWritePos) - mbReadPos) div frameSize;
   result.bufferFramesFree := result.bufferFramesMax - result.bufferFramesFilled;
   result.cpuUsage := musicTimer.avElapsed / (1 / 44100);
 end;
@@ -529,6 +541,7 @@ end;
  decompressing the first part.}
 procedure musicPlay(filename: string); overload;
 begin
+  info('Music play called on '+filename);
   if musicReader.isLoaded() then musicReader.close();
   mbReadPos := 0;
   mbWritePos := 0;
@@ -546,33 +559,81 @@ var
   currentFrame: dword;
   i: integer;
   factor: single;
-  offset: dword;
+  baseOffset: dword;
   samplePtr: pAudioSample16S;
+  mixerID: dword;
 const
-  FADE_SAMPLES = 8*1024;
+  FADE_FRAMES = 4;
+  WAIT_FRAMES = 12;
+
+  function enoughHeadroomForFade(): boolean;
+  begin
+    if not musicReader.isLoaded then exit(false);
+    result := ((currentFrame+WAIT_FRAMES+FADE_FRAMES)*1024) <= mbWritePos;
+  end;
+
 begin
   {allow the current frame to keep, player,
    use the next frame as a fade down,
    and the one after we will start writing into}
-  assert(FADE_SAMPLES mod 1024 = 0, 'Fade samples must be a multiple of 1024');
   assert(reader.frameSize = 1024, 'Only framesize=1024 supported now');
 
-  {make sure music doesn't try to update while we do this next part}
-  asm cli end;
+  mixerID := MIX_COUNTER;
   currentFrame := mbReadPos div 1024;
-  {perform the fade out.. a little dodgy now}
-  offset := (currentFrame+1)*1024;
-  samplePtr := musicBuffer.data + (offset mod MUSIC_BUFFER_SAMPLES) * 4;
-  for i := 0 to FADE_SAMPLES-1 do begin
-    factor := (FADE_SAMPLES-i)/FADE_SAMPLES;
-    samplePtr^.left := round(samplePtr^.left * factor);
-    samplePtr^.right := round(samplePtr^.right * factor);
-    inc(samplePtr);
+
+  {if we have something already playing, it would be nice to fade it out
+   this means we need to get a little bit ahead...}
+  if musicReader.isLoaded and not enoughHeadroomForFade() then
+    musicUpdate(FADE_FRAMES+WAIT_FRAMES);
+
+  {apply fadeout if we can}
+  if musicReader.isLoaded and enoughHeadroomForFade then begin
+    note(format('Applying fade-out at frame %d (writePos=%d)', [currentFrame+WAIT_FRAMES, mbWritePos div 1024]));
+    baseOffset := (currentFrame+WAIT_FRAMES)*1024;
+    for i := 0 to (FADE_FRAMES*1024)-1 do begin
+      factor := 1-(i/(FADE_FRAMES*1024));
+      samplePtr := musicBuffer.data + ((baseOffset+i) and MB_MASK) * 4;
+      samplePtr^.left := round(samplePtr^.left * factor);
+      samplePtr^.right := round(samplePtr^.right * factor);
+      inc(samplePtr);
+    end;
+    mbWritePos := (currentFrame+WAIT_FRAMES+FADE_FRAMES) * 1024;
+    note(format('Setting writePos to frame %d', [mbWritePos div 1024]));
+  end else begin
+    if musicReader.isLoaded then
+      warning(format('Not enough buffer for fade out (read: %d write %d), performing hard cut', [currentFrame, mbWritePos div 1024]))
+    else
+      note('performing hard cut as there was no previous track');
+    mbWritePos := (currentFrame + 1) * 1024;
   end;
-  mbWritePos := ((currentFrame+1) * 1024) + FADE_SAMPLES;
+
   musicReader := reader;
-  asm sti end;
-  musicUpdate(16);
+  {quickly get a sample (incase interupt fires on next line}
+  note(format('about to generate samples %d %d/%d', [mbWritePos div 1024, getMusicStats().bufferFramesFilled, getMusicStats().bufferFramesFree]));
+  musicUpdate(4);
+  note(format('done generating samples %d %d/%d', [mbWritePos div 1024, getMusicStats().bufferFramesFilled, getMusicStats().bufferFramesFree]));
+
+  {fade up... so silly, does music have a click or something?}
+  if true then begin
+    note(format('Applying fade-in at frame %d (writePos=%d)', [currentFrame+WAIT_FRAMES+FADE_FRAMES, mbWritePos div 1024]));
+    baseOffset := (currentFrame+WAIT_FRAMES+FADE_FRAMES)*1024;
+    for i := 0 to (1*1024)-1 do begin
+      factor := i/(1*1024);
+      samplePtr := musicBuffer.data + ((baseOffset+i) and MB_MASK) * 4;
+      samplePtr^.left := round(samplePtr^.left * factor);
+      samplePtr^.right := round(samplePtr^.right * factor);
+      inc(samplePtr);
+    end;
+  end;
+
+  if MIX_COUNTER <> mixerID then warning(format('Warning, looks like IRQ was fired during this update, %d <> %d', [mixerID, MIX_COUNTER]));
+
+  {then get a few to keep us going}
+  musicUpdate(40);
+
+  //stub: lets have a look
+  //musicBuffer.saveToWave('temp.wav');
+
 end;
 
 {This is a bit dodgy, but set the music reader directly.
@@ -593,12 +654,12 @@ end;
 
 function musicBufferReadPos(): dword;
 begin
-  result := mbReadPos mod MUSIC_BUFFER_SAMPLES;
+  result := mbReadPos and MB_MASK;
 end;
 
 function musicBufferWritePos(): dword;
 begin
-  result := mbWritePos mod MUSIC_BUFFER_SAMPLES;
+  result := mbWritePos and MB_MASK;
 end;
 
 procedure musicRestoreDefaultReader();
@@ -608,6 +669,7 @@ end;
 
 procedure musicStop();
 begin
+  info('Music stop called.');
   mbReadPos := 0;
   mbWritePos := 0;
   musicReader.close();
@@ -748,13 +810,14 @@ initialization
   mbWritePos := 0;
 
   MIX_CLICK_DETECTION := 0;
+  MIX_COUNTER := 0;
 
   {music buffer must no smaller than SB buffer, and if larger, be a multiple}
-  assert((MUSIC_BUFFER_SAMPLES mod (BUFFER_SIZE div 4)) = 0);
-  assert(MUSIC_BUFFER_SAMPLES >= (BUFFER_SIZE div 4));
+  assert((MB_SAMPLES mod (BUFFER_SIZE div 4)) = 0);
+  assert(MB_SAMPLES >= (BUFFER_SIZE div 4));
 
   mixer := tSoundMixer.create();
-  musicBuffer := tSoundEffect.create(AF_16_STEREO, MUSIC_BUFFER_SAMPLES); // holds 64k of sound
+  musicBuffer := tSoundEffect.create(AF_16_STEREO, MB_SAMPLES);
   masterMusicReader := tLA96Reader.create();
   masterMusicReader.looping := true;
   musicReader := masterMusicReader;
