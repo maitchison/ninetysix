@@ -10,12 +10,6 @@ var
   i: integer;
 begin
 
-  if (frameSpec^.centerShift <> 16) then begin
-    {we don't support centering anymore}
-    process_REF(sfxSamplePtr, midCode, difCode, midCodes, difCodes, midSigns, difSigns, frameSpec);
-    exit;
-  end;
-
   maxCounter := frameSpec^.length-1;
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
   midCodePtr := @midCodes[0];

@@ -206,8 +206,6 @@ type
     idx: int32; {might be -1}
     midShift, difShift:byte;
     midUTable, difUTable: ^tULawLookup;
-    centerShift: byte;
-    cMid, cDif: int32;
   end;
 
   pFrameSpec = ^tFrameSpec;
@@ -528,8 +526,6 @@ begin
   frameSpec.midUTable := getULAW(midULaw);
   frameSpec.difUTable := getULAW(difULaw);
   frameSpec.idx := 0;
-  frameSpec.centerShift := 16-header.centering;
-  frameSpec.cMid := 0; frameSpec.cDif := 0;
 
   {final frame support}
   if frameOn = header.numFrames-1 then
@@ -825,7 +821,6 @@ end;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tStream;
 const
   {note: we don't use centering anymore as it adds too much noise}
-  CENTERING_RESOLUTION = 0; {16=perfect, 0=off}
   MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
 var
   i,j,k: int32;
@@ -854,7 +849,6 @@ var
   aspMid, aspDif: tAudioStreamProcessor;
   decMid, decDif: int32; {what the decoder will output}
 
-  cMid, cDif: int32; {centers}
   tmp: int32;
   header: tLA96FileHeader;
   attempt: int32;
@@ -872,11 +866,8 @@ var
   inMid, inDif: int32;
   inLeft, inRight: int32;
   outLeft, outRight: int32;
-  midError, difError: single;
-  noiseAlpha: single;
 
   clipGuard: int32; {padding for clipping}
-  centerShift: byte;
 
   neededChange: boolean;
   penultimateValue: single;
@@ -944,9 +935,6 @@ begin
   samplePtr := sfx.data;
   maxSamplePtr := pointer(dword(samplePtr) + (sfx.length * 4));
   numFrames := (sfx.length + (FRAME_SIZE-1)) div FRAME_SIZE;
-  centerShift := 16-CENTERING_RESOLUTION;
-  cMid := 0; cDif := 0;
-  midError := 0; difError := 0;
 
   setLength(framePtr, numFrames);
 
@@ -970,7 +958,6 @@ begin
   header.frameSize := FRAME_SIZE;
   header.log2mu := profile.log2mu;
   header.postFilter := 0; // not used anymore
-  header.centering := CENTERING_RESOLUTION;
 
   fs.writeBlock(header, sizeof(header));
 
@@ -1007,9 +994,6 @@ begin
   midYStats.init();
   difYStats.init();
 
-  // 0.0 = off, 1 = full, 0.95 = strong
-  noiseAlpha := 0;
-
   {todo: have mid/dif as a preprocessing step, and do below entirely with
    two channels. Also perform clipping checks in mid/dif space
    (which means decodeer must clamp)}
@@ -1034,14 +1018,6 @@ begin
     midYStats.init(false);
     difYStats.init(false);
 
-    if CENTERING_RESOLUTION > 0 then begin
-      cMid := (aspMid.xPrime shl profile.midShift) shr centerShift shl centerShift;
-      cDif := (aspDif.xPrime shl profile.difShift) shr centerShift shl centerShift;
-    end else begin
-      cMid := 0;
-      cDif := 0;
-    end;
-
     {write frame header (one for each channel)}
     framePtr[i] := fs.pos;
     fs.writeByte(profile.midShift + profile.ulawBits*16);
@@ -1059,30 +1035,23 @@ begin
       inDif := trueDif;
       if samplePtr < maxSamplePtr then inc(samplePtr);
 
-      {noise shaping}
-      if noiseAlpha > 0 then begin
-        inMid += round(noiseAlpha * midError);
-        //inDif += round(noiseAlpha * difError);
-        midError *= (1-noiseAlpha);
-        //difError *= (1-noiseAlpha);
-      end;
-
       inLeft := inMid + inDif;
       inRight := inMid - inDif;
 
       aspMid.save();
       aspDif.save();
 
-      aspMid.encode(qMid(inLeft, inRight, cMid, profile.midShift));
-      aspDif.encode(qDif(inLeft, inRight, cDif, profile.difShift));
+      aspMid.encode(qMid(inLeft, inRight, 0, profile.midShift));
+      aspDif.encode(qDif(inLeft, inRight, 0, profile.difShift));
 
       {calculate the decoder's output}
-      decMid := (aspMid.xPrime shl profile.midShift) + cMid;
-      decDif := (aspDif.xPrime shl profile.difShift) + cDif;
+      decMid := aspMid.xPrime shl profile.midShift;
+      decDif := aspDif.xPrime shl profile.difShift;
       outLeft := decMid + decDif;
       outRight := decMid - decDif;
 
       {see if we have clipping and fix it}
+      {todo: remove this}
       for attempt := 1 to MAX_ATTEMPTS do begin
 
         {not an efficent solution at handling clipping, but it'll get the
@@ -1125,12 +1094,6 @@ begin
         {indicate clipping}
         warning(format('Clipping %d %d', [outLeft, outRight]));
 
-      {xPrime is decoders quant(decoded-cMid)}
-      if CENTERING_RESOLUTION > 0 then begin
-        cMid := decMid shr centerShift shl centerShift;
-        cDif := decDif shr centerShift shl centerShift;
-      end;
-
       {stats}
       midXStats.addValue(aspMid.x);
       difXStats.addValue(aspDif.x);
@@ -1142,12 +1105,6 @@ begin
 
       midSigns[j] := sign(aspMid.y);
       difSigns[j] := sign(aspDif.y);
-
-      {keep track of noise}
-      if noiseAlpha > 0 then begin
-        midError += trueMid-decMid;
-        difError += trueDif-decDif;
-      end;
 
       if assigned(fullStats) then
         fullStats.writeRow([
