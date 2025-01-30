@@ -333,7 +333,6 @@ end;
  be freed by them}
 procedure tLA96Reader.load(aStream: tStream); overload;
 begin
-  note('Loading A96 from stream');
   fs := aStream;
   ownsStream := false;
   self.loadHeader();
@@ -1002,9 +1001,10 @@ begin
 
   for i := 0 to numFrames-1 do begin
 
-    {or atleast init error}
     trueMid := samplePtr^.mid;
     trueDif := samplePtr^.dif;
+    inMid := trueMid;
+    inDif := trueDif;
     inLeft := inMid + inDif;
     inRight := inMid - inDif;
 

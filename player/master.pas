@@ -1,3 +1,4 @@
+
 program master;
 
 uses
@@ -61,6 +62,7 @@ var
 begin
   srcPath := joinPath('c:\dev\masters\player', filename+'.png');
   dstPath := 'res\'+filename+'.p96';
+  if fs.exists(dstPath) then exit;
   img := tPage.Load(srcPath);
   saveLC96(dstPath, img);
   textAttr := Green;
