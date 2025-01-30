@@ -11,7 +11,7 @@ unit la96;
   v0.3:
     - switch to VCL2
     - no more centering
-    - support for midReduction
+    - support for difReduction
     - sign bit compression
   v0.4
     - added rice codes
@@ -115,10 +115,13 @@ type
 
   tAudioCompressionProfile = record
     tag: string;
+    {todo: remove quant bits and just use mid/dif?}
     quantBits: byte; // number of bits to remove 0..15 (0=off)
     ulawBits: byte;  // number of ulaw bits, 0..15 (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
     difReduce: byte; // reduces quality of mid channel
+    function midShift: byte; // reduces quality of mid channel
+    function difShift: byte; // reduces quality of dif channel
     function ulawDifBits: byte;
   end;
 
@@ -193,7 +196,7 @@ var
 implementation
 
 const
-  VER_SMALL = 3;
+  VER_SMALL = 4;
   VER_BIG = 0;
   FRAME_SIZE = 1024;
 
@@ -260,6 +263,16 @@ begin
   result := clamp(ulawBits-difReduce, 0, 255);
 end;
 
+function tAudioCompressionProfile.difShift: byte;
+begin
+  result := clamp(quantBits, 0, 15);
+end;
+
+function tAudioCompressionProfile.midShift: byte;
+begin
+  result := clamp(quantBits, 0, 15);
+end;
+
 function tLA96FileHeader.verStr(): string;
 begin
   result := utils.format('%d.%d', [versionBig, versionSmall]);
@@ -302,22 +315,17 @@ end;
 
 procedure tLA96Reader.load(aFilename: string); overload;
 begin
-  note('Loading A96 from '+aFilename);
   if isLoaded then begin
-    note('Looks like we''re already loaded');
     if self.filename = aFilename then begin
-      note('We alreay have this file so just seek');
       self.fs.seek(0);
       self.loadHeader();
       exit;
     end else
       self.close();
   end;
-  note('Loading the file');
   if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
   self.fs := tStream.create();
   self.fs.readFromFile(aFilename);
-  note('fs='+intToStr(self.fs.len));
   self.ownsStream := true;
   self.filename := aFilename;
   self.loadHeader();
@@ -1013,12 +1021,12 @@ begin
     {todo: noise shaping from previous frame here might be a good idea?}
     {or atleast init error}
     trueMid := samplePtr^.mid;
-    trueDif := shiftRight(samplePtr^.dif, profile.difReduce);
+    trueDif := samplePtr^.dif;
     inLeft := inMid + inDif;
     inRight := inMid - inDif;
 
-    aspMid.reset(qMid(inLeft, inRight, 0, profile.quantBits));
-    aspDif.reset(qDif(inLeft, inRight, 0, profile.quantBits));
+    aspMid.reset(qMid(inLeft, inRight, 0, profile.midShift));
+    aspDif.reset(qDif(inLeft, inRight, 0, profile.difShift));
     if samplePtr < maxSamplePtr then inc(samplePtr);
 
     midXStats.init(false);
@@ -1027,8 +1035,8 @@ begin
     difYStats.init(false);
 
     if CENTERING_RESOLUTION > 0 then begin
-      cMid := (aspMid.xPrime shl profile.quantBits) shr centerShift shl centerShift;
-      cDif := (aspDif.xPrime shl profile.quantBits) shr centerShift shl centerShift;
+      cMid := (aspMid.xPrime shl profile.midShift) shr centerShift shl centerShift;
+      cDif := (aspDif.xPrime shl profile.difShift) shr centerShift shl centerShift;
     end else begin
       cMid := 0;
       cDif := 0;
@@ -1036,8 +1044,8 @@ begin
 
     {write frame header (one for each channel)}
     framePtr[i] := fs.pos;
-    fs.writeByte(profile.quantBits + profile.ulawBits*16);
-    fs.writeByte(profile.quantBits + profile.ulawDifBits*16);
+    fs.writeByte(profile.midShift + profile.ulawBits*16);
+    fs.writeByte(profile.difShift + profile.ulawDifBits*16);
     fs.writeVLC(negEncode(aspMid.y));
     fs.writeVLC(negEncode(aspDif.y));
     fs.byteAlign();
@@ -1046,7 +1054,7 @@ begin
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
       trueMid := samplePtr^.mid;
-      trueDif := shiftRight(samplePtr^.dif, profile.difReduce);
+      trueDif := samplePtr^.dif;
       inMid := trueMid;
       inDif := trueDif;
       if samplePtr < maxSamplePtr then inc(samplePtr);
@@ -1065,12 +1073,12 @@ begin
       aspMid.save();
       aspDif.save();
 
-      aspMid.encode(qMid(inLeft, inRight, cMid, profile.quantBits));
-      aspDif.encode(qDif(inLeft, inRight, cDif, profile.quantBits));
+      aspMid.encode(qMid(inLeft, inRight, cMid, profile.midShift));
+      aspDif.encode(qDif(inLeft, inRight, cDif, profile.difShift));
 
       {calculate the decoder's output}
-      decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
-      decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
+      decMid := (aspMid.xPrime shl profile.midShift) + cMid;
+      decDif := (aspDif.xPrime shl profile.difShift) + cDif;
       outLeft := decMid + decDif;
       outRight := decMid - decDif;
 
@@ -1105,10 +1113,10 @@ begin
         {try again..}
         aspMid.restore;
         aspDif.restore;
-        aspMid.encode(qMid(inLeft, inRight, cMid, profile.quantBits));
-        aspDif.encode(qDif(inLeft, inRight, cDif, profile.quantBits));
-        decMid := (aspMid.xPrime shl profile.quantBits) + cMid;
-        decDif := (aspDif.xPrime shl profile.quantBits) + cDif;
+        aspMid.encode(qMid(inLeft, inRight, cMid, profile.midShift));
+        aspDif.encode(qDif(inLeft, inRight, cDif, profile.difShift));
+        decMid := (aspMid.xPrime shl profile.midShift) + cMid;
+        decDif := (aspDif.xPrime shl profile.difShift) + cDif;
         outLeft := decMid + decDif;
         outRight := decMid - decDif;
       end;

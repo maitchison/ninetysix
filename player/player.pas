@@ -246,7 +246,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := joinPath('sample', profile.tag+'_'+format('%d_%d_%d_xv4', [profile.quantBits, profile.ulawBits, profile.log2mu]));
+  result := joinPath('sample', profile.tag+'_'+format('%d_%d_%d_v4', [profile.quantBits, profile.ulawBits, profile.log2mu]));
 end;
 
 {allow user to switch between compression samples}
@@ -297,10 +297,11 @@ begin
   setLength(outSFX, 0);
   setLength(deltaSFX, 0);
 
-  profiles := [
+{  profiles := [
     ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
     ACP_Q8, ACP_Q10, ACP_Q12, ACP_Q16
-  ];
+  ];}
+  profiles := [ACP_Q16];
 
   writeln();
   writeln('--------------------------');

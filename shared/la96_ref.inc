@@ -27,8 +27,12 @@ begin
   if assigned(frameSpec^.difUTable) then
     dif := frameSpec^.difUTable^.lookup(dif);
 
+    {
   mid := (mid shl frameSpec^.midShift) + frameSpec^.cMid;
   dif := (dif shl frameSpec^.difShift) + frameSpec^.cDif;
+  }
+  mid := mid shl frameSpec^.midShift;
+  dif := dif shl frameSpec^.difShift;
 
   left := mid + dif;
   right := mid - dif;
@@ -36,9 +40,10 @@ begin
   //note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midCode, difCode]));
 
   {keep track of centering}
-  shift := frameSpec^.centerShift;
+{  shift := frameSpec^.centerShift;
   frameSpec^.cMid := mid shr shift shl shift;
   frameSpec^.cDif := dif shr shift shl shift;
+  }
 
   {$ifdef DEBUG}
   if (left > high(int16)) then
