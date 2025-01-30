@@ -117,6 +117,7 @@ const
   Key_F12  = 88;
   Key_pause  = 126;
 
+type tKeyPair = packed record asci, code: byte; end;
 
 procedure initKeyboard;
 procedure closeKeyboard;
@@ -126,6 +127,7 @@ function readkey: char;
 procedure waitkey();
 function anyKeyDown:boolean;
 function keyPressed: boolean;
+function getKey: tKeyPair;
 
 implementation
 
@@ -143,7 +145,7 @@ const BIOS_CONTROL = #255;
     BIOS_ALT = #255;
 
 const PORT2BIOS: array[1..126] of char = {converts what the port returns to
-  bois scan codes}
+  bios scan codes}
   (
   {1: Key_ESC} #27,
   {2: Key_1} '1','2','3','4','5','6','7','8','9','0',
@@ -230,7 +232,6 @@ asm
     cmp al, 0
     je @skipterminate
 
-
     {todo: soft close via flag, or ctrl-c}
     {todo: 'console' button (print a log or something maybe)}
 
@@ -249,7 +250,7 @@ asm
 
     // Best to call old handler I guess?
     {todo: check if I should be calling the old handler...}
-    //jmp @callOld
+    jmp @callOld
 @standardReturn:
     pop edi
     pop ebx
@@ -260,7 +261,7 @@ asm
     pop edi
     pop ebx
     pop eax
-    jmp cs:oldint9h
+    ljmp [cs:oldint9h]
 end;
 {$F-}
 
@@ -344,6 +345,28 @@ begin
     keyPressed := crt.keyPressed
   else
     keyPressed := key_pressed;
+end;
+
+{standard dos readkey, returns asci value, or 0 if no key}
+function getKey: tKeyPair; register;
+var resultValue: tKeyPair;
+begin
+  {ok.. actually just use dos}
+  asm
+    xor ax, ax
+    mov ah, 1
+    int $16
+    jnz @KeyReady
+  @NoKey:
+    xor ax, ax
+    jmp @Done
+  @KeyReady:
+    mov ah, 0
+    int $16     // al = asci, ah = scan
+  @Done:
+    mov resultValue, ax
+  end;
+  getKey := resultValue;
 end;
 
 begin

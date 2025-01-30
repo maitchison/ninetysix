@@ -92,8 +92,6 @@ var
   uiAlpha: single;
   uiTargetAlpha: single;
   uiShowForSeconds: single;
-  inputDelay: single; // hack to do keyboard input
-  isFirstPress: boolean;
 
   musicReader: tLA96Reader;
 
@@ -742,10 +740,10 @@ begin
   width := 300;
   height := length(tracks) * 20 + 7;
   atX := (screen.width-width) div 2;
-  atY := (screen.height-height) div 2;
+  atY := (screen.height-height) div 2 + 100;
   screen.markRegion(tRect.create(atX,atY,width,height));
-  screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*128)));
-  screen.canvas.drawRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*64)));
+  screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(20,20,20,round(alpha*200)));
+  screen.canvas.drawRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*128)));
   for i := 0 to length(tracks)-1 do begin
     if (i = selectedTrackIndex) then
       screen.canvas.fillRect(tRect.create(atX+1,atY+5+i*20, width-2, 18), RGBA.create(16,16,128,round(alpha*128)));
@@ -760,9 +758,8 @@ var
 begin
   track := tracks[selectedTrackIndex];
   guiTitle.text := track.title;
-  guiTitle.showForSeconds := 3;
-
-  inputDelay := 0.250;
+  guiTitle.showForSeconds := 4.5;
+  uiShowForSeconds := 1.0;
 
   musicReader.load(track.filename);
   musicPlay(musicReader);
@@ -771,12 +768,7 @@ end;
 procedure moveTrackSelection(delta: integer);
 begin
   selectedTrackIndex := clamp(selectedTrackIndex + delta, 0, length(tracks)-1);
-  uiShowForSeconds := 3.0;
-  if isFirstPress then
-    inputDelay := 0.250
-  else
-    inputDelay := maxf(1/30, inputDelay);
-  isFirstPress := false;
+  uiShowForSeconds := 2.0;
 end;
 
 {play sound with some graphics}
@@ -794,6 +786,7 @@ var
   x,y: integer;
   textColor: RGBA;
   gui: tGuiComponents;
+  key: tKeyPair;
 
 begin
 
@@ -811,7 +804,7 @@ begin
 
   {setup gui}
   setLength(gui, 0);
-  guiTitle := tGuiLabel.create(point(screen.width div 2, 20));
+  guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-40));
   guiTitle.centered := true;
   gui.append(guiTitle);
 
@@ -838,11 +831,10 @@ begin
   screen.pageClear();
   screen.pageFlip();
 
-  {todo: remove}
-  uiAlpha := 1;
+  {todo: remove and use new gui system}
+  uiAlpha := 0;
   uiTargetAlpha := 0;
-  uiShowForSeconds := 0.5;
-  inputDelay := 0;
+  uiShowForSeconds := 0;
 
   {main loop}
   repeat
@@ -893,21 +885,13 @@ begin
       textOut(screen.canvas, 10, 70, format('Debug:%s', [prevSync.debugStr]), textColor);
       }
 
-      if not anyKeyDown() then begin
-        inputDelay := 0;
-        isFirstPress := true;
+      key := getKey();
+      if key.code <> 0 then case key.code of
+        key_up: moveTrackSelection(-1);
+        key_down: moveTrackSelection(+1);
+        key_enter: makeSelection();
+        else note(format('Key %d %d', [key.asci, key.code]));
       end;
-
-      if inputDelay <= 0 then begin
-        {todo: write proper keyboard input with repeat and delay}
-        if keyDown(key_up) then
-          moveTrackSelection(-1);
-        if keyDown(key_down) then
-          moveTrackSelection(+1);
-        if keyDown(key_enter) then
-          makeSelection();
-      end else
-        inputDelay -= elapsed;
 
       {fade change at 1 per s}
       if uiShowForSeconds > 0 then
