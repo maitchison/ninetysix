@@ -148,6 +148,7 @@ begin
   self.targetAlpha := 1;
   self.showForSeconds := 0;
   self.autoFade := false;
+  self.visible := true;
 end;
 
 procedure tGuiComponent.update(elapsed: single);
@@ -398,7 +399,7 @@ var
 begin
   if alpha < (1/255) then exit;
   alpha := clamp(alpha, 0, 1);
-  textColor.init(250,250,250,round(240*alpha));
+
   width := 300;
   height := length(tracks) * 20 + 7;
   atX := (screen.width-width) div 2;
@@ -407,8 +408,11 @@ begin
   screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(20,20,20,round(alpha*200)));
   screen.canvas.drawRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*128)));
   for i := 0 to length(tracks)-1 do begin
-    if (i = selectedTrackIndex) then
-      screen.canvas.fillRect(tRect.create(atX+1,atY+5+i*20, width-2, 18), RGBA.create(16,16,128,round(alpha*128)));
+    if (i = selectedTrackIndex) then begin
+      screen.canvas.fillRect(tRect.create(atX+1,atY+5+i*20, width-2, 18), RGBA.create(15,20,250,round(alpha*128)));
+      textColor.init(255,255,0,round(255*alpha));
+    end else
+      textColor.init(250,250,250,round(240*alpha));
     textOut(screen.canvas, atX+5, atY+5+i*20, tracks[i].title, textColor);
     textOut(screen.canvas, atX+width-5-50, atY+5+i*20, format('(%s:%s)', [intToStr(tracks[i].minutes), intToStr(tracks[i].seconds,2)]), textColor);
   end;
@@ -420,8 +424,10 @@ var
 begin
   track := tracks[selectedTrackIndex];
   guiTitle.text := track.title;
-  guiTitle.showForSeconds := 4.5;
-  uiShowForSeconds := 1.0;
+  guiTitle.showForSeconds := 3.5;
+
+  {buffer 0.5 seconds, enough time to read the next file}
+  musicUpdate(20);
 
   musicReader.close();
   musicReader.load(track.filename);
@@ -473,7 +479,7 @@ begin
   {setup gui}
   setLength(gui, 0);
 
-  guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-40));
+  guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-60));
   guiTitle.centered := true;
   guiTitle.autoFade := true;
   gui.append(guiTitle);
@@ -484,6 +490,7 @@ begin
 
   {load tracks}
   files := fs.listFiles('music\*.a96');
+  files.sort();
   setLength(tracks, 0);
   for filename in files do begin
     tracks.append(tTrack.init(joinPath('music', filename)));
@@ -492,7 +499,7 @@ begin
 
   {start playing}
   musicReader := tLA96Reader.Create();
-  selectedTrackIndex := 0;
+  selectedTrackIndex := rnd mod length(tracks);
   makeSelection();
 
   hdrWave := tHDRPage.create(64,32);
@@ -569,7 +576,7 @@ begin
       else
         uiTargetAlpha := 0.0;
       uiShowForSeconds -= elapsed;
-      uiAlpha += (uiTargetAlpha - uiAlpha) * 0.08;
+      uiAlpha += (uiTargetAlpha - uiAlpha) * 0.12;
       drawTrackUI(uiAlpha);
 
       {gui stuff}
