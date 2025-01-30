@@ -28,7 +28,7 @@ uses
 
 const
   {if true exports compressed audio and deltas to wave files for analysis}
-  EXPORT_WAVE: boolean = false;
+  EXPORT_WAVE: boolean = true;
 
 {globals}
 var

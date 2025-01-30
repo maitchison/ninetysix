@@ -378,6 +378,7 @@ var
   value, prevValue: dword;
   counter: integer;
 begin
+  {todo: update to rice codes}
   prevValue := 0;
   counter := 0;
   for i := 0 to length(values)-1 do begin
@@ -402,6 +403,7 @@ var
   value, prevValue: int8;
   counter: integer;
 begin
+  {todo: update to rice codes}
   prevValue := 1;
   counter := 0;
   for i := 0 to length(values)-1 do begin

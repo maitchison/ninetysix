@@ -494,8 +494,7 @@ begin
   if not musicReader.isLoaded then exit;
   musicReader.nextFrame(musicBuffer, mbWritePos and MB_MASK);
   mbWritePos += musicReader.frameSize;
-  //stub:
-  note(format('Processing r:%d w:%d', [mbReadPos div 1024, mbWritePos div 1024]));
+  //note(format('Processing r:%d w:%d', [mbReadPos div 1024, mbWritePos div 1024]));
 end;
 
 procedure musicUpdate(maxNewFrames: integer=4);
@@ -631,7 +630,6 @@ begin
   {then get a few to keep us going}
   musicUpdate(40);
 
-  //stub: lets have a look
   //musicBuffer.saveToWave('temp.wav');
 
 end;

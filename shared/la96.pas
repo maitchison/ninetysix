@@ -1002,7 +1002,6 @@ begin
 
   for i := 0 to numFrames-1 do begin
 
-    {todo: noise shaping from previous frame here might be a good idea?}
     {or atleast init error}
     trueMid := samplePtr^.mid;
     trueDif := samplePtr^.dif;
@@ -1082,10 +1081,10 @@ begin
         {try again..}
         aspMid.restore;
         aspDif.restore;
-        aspMid.encode(qMid(inLeft, inRight, cMid, profile.midShift));
-        aspDif.encode(qDif(inLeft, inRight, cDif, profile.difShift));
-        decMid := (aspMid.xPrime shl profile.midShift) + cMid;
-        decDif := (aspDif.xPrime shl profile.difShift) + cDif;
+        aspMid.encode(qMid(inLeft, inRight, 0, profile.midShift));
+        aspDif.encode(qDif(inLeft, inRight, 0, profile.difShift));
+        decMid := aspMid.xPrime shl profile.midShift;
+        decDif := aspDif.xPrime shl profile.difShift;
         outLeft := decMid + decDif;
         outRight := decMid - decDif;
       end;
