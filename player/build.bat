@@ -47,6 +47,7 @@ deltree /y _tmp
 :: ---------------------------------
 
 mkdir %BUILD_DIR%\snd
+copy readme.txt %BUILD_DIR%
 copy res\*.* %BUILD_DIR%\res
 copy music\*.* %BUILD_DIR%\music
 copy sample\*.* %BUILD_DIR%\sample

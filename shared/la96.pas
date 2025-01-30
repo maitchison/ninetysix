@@ -35,14 +35,12 @@ unit la96;
    2 = Difference is annoying.
    1 = Difference is very annoying.
 
-  TODO: update these...
-
   Profile   Quality   Ratio
-  LOSSLESS  5         1.4x
-  LOW       2.5       11x
-  MEDIUM    4         5x
-  HIGH      5         3.6x
-  Q10       5         2.9x  (10bit audio)
+  LOSSLESS  5         1.5x
+  LOW       3         10x
+  MEDIUM    3         7.8x
+  HIGH      5         4.6x
+  Q10       5         3.5x  (10bit audio)
 
 
   Decompression speed is very fast. Currently at 20x realtime on P166 MMX
@@ -115,13 +113,14 @@ type
 
   tAudioCompressionProfile = record
     tag: string;
-    {todo: remove quant bits and just use mid/dif?}
+    {todo: remove quant bits / difReduce and just use mid/dif?}
     quantBits: byte; // number of bits to remove 0..15 (0=off)
     ulawBits: byte;  // number of ulaw bits, 0..15 (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
     difReduce: byte; // reduces quality (and volume) of mid channel
     function midQuantBits: byte; // reduces quality of mid channel
     function difQuantBits: byte; // reduces quality of dif channel
+    function difShift: byte;     // reduces volume of dif channel
     function ulawDifBits: byte;
   end;
 
@@ -181,8 +180,8 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
-  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:7;log2Mu:7;difReduce:4);
-  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:8;log2Mu:8;difReduce:2);
+  ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:8;log2Mu:8;difReduce:15);
+  ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:8;log2Mu:8;difReduce:4);
   ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:8;log2Mu:8;difReduce:1);
   ACP_VERYHIGH: tAudioCompressionProfile = (tag:'veryhigh';quantBits:2;ulawBits:8;log2Mu:8;difReduce:0);
   ACP_Q8: tAudioCompressionProfile       = (tag:'q8';      quantBits:8;ulawBits:0;log2Mu:0;difReduce:0);
@@ -258,15 +257,17 @@ type
 {returns number of ulaw bits for mid channel. 0=off}
 function tAudioCompressionProfile.ulawDifBits: byte;
 begin
-  result := clamp(ulawBits-difReduce, 0, 255);
+  result := clamp(ulawBits, 0, 255);
 end;
 
 function tAudioCompressionProfile.difQuantBits: byte;
 begin
-  if difReduce > 1 then
-    result := clamp(quantBits+(difReduce-1), 0, 15)
-  else
-    result := quantBits;
+  result := clamp(quantBits+difReduce, 0, 15)
+end;
+
+function tAudioCompressionProfile.difShift: byte;
+begin
+  result := clamp(difReduce-1, 0, 15)
 end;
 
 function tAudioCompressionProfile.midQuantBits: byte;
@@ -1006,6 +1007,7 @@ begin
 
     trueMid := samplePtr^.mid;
     trueDif := samplePtr^.dif;
+    trueDif := shiftRight(trueDif, profile.difShift);
     inMid := trueMid;
     inDif := trueDif;
     inLeft := inMid + inDif;
@@ -1033,6 +1035,7 @@ begin
 
       trueMid := samplePtr^.mid;
       trueDif := samplePtr^.dif;
+      trueDif := shiftRight(trueDif, profile.difShift);
       inMid := trueMid;
       inDif := trueDif;
       if samplePtr < maxSamplePtr then inc(samplePtr);
