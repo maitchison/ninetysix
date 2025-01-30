@@ -780,6 +780,7 @@ begin
   guiTitle.showForSeconds := 4.5;
   uiShowForSeconds := 1.0;
 
+  musicReader.close();
   musicReader.load(track.filename);
   musicPlay(musicReader);
 end;
@@ -902,15 +903,6 @@ begin
         elapsed := -1;
       textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), textColor);
       screen.markRegion(tRect.create(6,3,40,20));
-
-      {debug info}
-      {
-      screen.markRegion(tRect.create(0,0,200,200));
-      textOut(screen.canvas, 10, 10, format('Offset:%d', [prevSync.offset]), textColor);
-      textOut(screen.canvas, 10, 30, format('Value:%d', [prevSync.value]), textColor);
-      textOut(screen.canvas, 10, 50, format('Slope:%d', [prevSync.slope]), textColor);
-      textOut(screen.canvas, 10, 70, format('Debug:%s', [prevSync.debugStr]), textColor);
-      }
 
       {stats}
       guiStats.text := format('CPU: %f%% RAM:%f/%f', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024, getTotalMemory/1024/1024]);
