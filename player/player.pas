@@ -51,12 +51,18 @@ type
 
   tTracks = array of tTrack;
 
+  {todo: bounds at component level}
   tGuiComponent = class
     pos: tPoint;
     alpha: single;
     targetAlpha: single;
     showForSeconds: single;
-    procedure draw(screen: tScreen); virtual; abstract;
+    visible: boolean;
+    autoFade: boolean;
+  protected
+    procedure doDraw(screen: tScreen); virtual;
+  public
+    procedure draw(screen: tScreen);
     procedure update(elapsed: single); virtual;
     constructor create(aPos: tPoint);
   end;
@@ -67,9 +73,10 @@ type
     textColor: RGBA;
     text: string;
     centered: boolean;
-    procedure draw(screen: tScreen); override;
+  protected
+    procedure doDraw(screen: tScreen); override;
+  public
     constructor create(aPos: tPoint);
-
   end;
 
 type
@@ -97,6 +104,7 @@ var
 
   {gui stuff}
   guiTitle: tGUILabel;
+  guiStats: tGUILabel;
 
 {--------------------------------------------------------}
 { Helpers }
@@ -136,6 +144,10 @@ constructor tGuiComponent.create(aPos: tPoint);
 begin
   inherited create();
   self.pos := aPos;
+  self.alpha := 1;
+  self.targetAlpha := 1;
+  self.showForSeconds := 0;
+  self.autoFade := false;
 end;
 
 procedure tGuiComponent.update(elapsed: single);
@@ -145,17 +157,30 @@ const
 var
   delta: single;
 begin
-  if showForSeconds > 0 then
-    targetAlpha := 1.0
-  else
-    targetAlpha := 0.0;
-  showForSeconds -= elapsed;
-  // todo: respect elapsed
-  delta := targetAlpha - alpha;
-  if delta < 0 then
-    alpha += delta * FADE_OUT
-  else
-    alpha += delta * FADE_IN
+  if autoFade then begin
+    if showForSeconds > 0 then
+      targetAlpha := 1.0
+    else
+      targetAlpha := 0.0;
+    showForSeconds -= elapsed;
+    // todo: respect elapsed
+    delta := targetAlpha - alpha;
+    if delta < 0 then
+      alpha += delta * FADE_OUT
+    else
+      alpha += delta * FADE_IN
+  end;
+end;
+
+procedure tGuiComponent.draw(screen: tScreen);
+begin
+  if not visible then exit;
+  doDraw(screen);
+end;
+
+procedure tGuiComponent.doDraw(screen: tScreen);
+begin
+  //pass
 end;
 
 {-----------------------}
@@ -168,23 +193,17 @@ begin
   self.text := '';
 end;
 
-procedure tGuiLabel.draw(screen: tScreen);
+procedure tGuiLabel.doDraw(screen: tScreen);
 var
   bounds: tRect;
   c: RGBA;
 begin
   c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
   if c.a = 0 then exit;
-  if centered then begin
-    bounds := textExtents(text, pos);
-    bounds.x -= bounds.width div 2;
-    textOut(screen.canvas, bounds.x, bounds.y, text, c);
-    screen.markRegion(bounds);
-  end else begin
-    bounds := textExtents(text, pos);
-    textOut(screen.canvas, bounds.x, bounds.y, text, c);
-    screen.markRegion(bounds);
-  end;
+  bounds := textExtents(text, pos);
+  if centered then bounds.x -= bounds.width div 2;
+  textOut(screen.canvas, bounds.x, bounds.y, text, c);
+  screen.markRegion(bounds);
 end;
 
 {--------------------------------------------------------}
@@ -787,6 +806,9 @@ var
   textColor: RGBA;
   gui: tGuiComponents;
   key: tKeyPair;
+  decodeSpeed: single;
+  exitFlag: boolean;
+  cpuUsage: single;
 
 begin
 
@@ -804,9 +826,15 @@ begin
 
   {setup gui}
   setLength(gui, 0);
+
   guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-40));
   guiTitle.centered := true;
+  guiTitle.autoFade := true;
   gui.append(guiTitle);
+
+  guiStats := tGuiLabel.create(point(10, screen.height-30));
+  guiStats.visible := false;
+  gui.append(guiStats);
 
   {load tracks}
   files := fs.listFiles('music\*.a96');
@@ -820,7 +848,6 @@ begin
   musicReader := tLA96Reader.Create();
   selectedTrackIndex := 0;
   makeSelection();
-
 
   hdrWave := tHDRPage.create(64,32);
   hdrPhase := tHDRPage.create(64,64);
@@ -836,12 +863,12 @@ begin
   uiTargetAlpha := 0;
   uiShowForSeconds := 0;
 
+  exitFlag := false;
+
   {main loop}
   repeat
 
-    startTimer('music');
     musicUpdate(1);
-    stopTimer('music');
 
     {only update waveform if our music buffer has updated}
     if (oldBufferPos <> musicBufferPos()) and (not keyDown(key_space)) then begin
@@ -885,12 +912,16 @@ begin
       textOut(screen.canvas, 10, 70, format('Debug:%s', [prevSync.debugStr]), textColor);
       }
 
+      {stats}
+      guiStats.text := format('CPU: %f%% RAM:%f/%f', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024, getTotalMemory/1024/1024]);
+
       key := getKey();
       if key.code <> 0 then case key.code of
         key_up: moveTrackSelection(-1);
         key_down: moveTrackSelection(+1);
         key_enter: makeSelection();
-        else note(format('Key %d %d', [key.asci, key.code]));
+        key_esc: exitFlag := true;
+        key_s: guiStats.visible := not guiStats.visible;
       end;
 
       {fade change at 1 per s}
@@ -913,9 +944,11 @@ begin
       stopTimer('main');
     end;
 
+    if keyDown(key_esc) then exitFlag := true;
+
     idle();
 
-  until keyDown(key_esc);
+  until exitFlag;
 
   videoDriver.setText();
 

@@ -112,12 +112,11 @@ begin
   {decay max elapsed}
   timeSinceLastStop := getSec - lastStop;
   lastStop := getSec;
+  if iterations <= 0 then exit;
   {this means we average roughly over 1-second}
   alpha := 1-clamp(timeSinceLastStop, 0.01, 0.5);
   maxElapsed *= alpha;
   avElapsed *= alpha;
-
-  if iterations <= 0 then exit;
 
   elapsed := (getSec-startTime) / iterations;
   if cycles = 0 then
