@@ -119,9 +119,9 @@ type
     quantBits: byte; // number of bits to remove 0..15 (0=off)
     ulawBits: byte;  // number of ulaw bits, 0..15 (0 = off).
     log2mu: byte;    // log2 of mu parameter (if ulaw is active)
-    difReduce: byte; // reduces quality of mid channel
-    function midShift: byte; // reduces quality of mid channel
-    function difShift: byte; // reduces quality of dif channel
+    difReduce: byte; // reduces quality (and volume) of mid channel
+    function midQuantBits: byte; // reduces quality of mid channel
+    function difQuantBits: byte; // reduces quality of dif channel
     function ulawDifBits: byte;
   end;
 
@@ -261,14 +261,17 @@ begin
   result := clamp(ulawBits-difReduce, 0, 255);
 end;
 
-function tAudioCompressionProfile.difShift: byte;
+function tAudioCompressionProfile.difQuantBits: byte;
 begin
-  result := clamp(quantBits, 0, 15);
+  if difReduce > 1 then
+    result := clamp(quantBits+(difReduce-1), 0, 15)
+  else
+    result := quantBits;
 end;
 
-function tAudioCompressionProfile.midShift: byte;
+function tAudioCompressionProfile.midQuantBits: byte;
 begin
-  result := clamp(quantBits, 0, 15);
+  result := quantBits;
 end;
 
 function tLA96FileHeader.verStr(): string;
@@ -542,7 +545,7 @@ begin
   );
   stopTimer('LA96_DF_Process');
 
-  {stub: show values}
+  {show values}
   {
   for i := 0 to 10 do begin
     log(format('%d (%d,%d)', [sfxOffset, sfx[sfxOffset+i].left, sfx[sfxOffset+i].right]));
@@ -1008,8 +1011,8 @@ begin
     inLeft := inMid + inDif;
     inRight := inMid - inDif;
 
-    aspMid.reset(qMid(inLeft, inRight, 0, profile.midShift));
-    aspDif.reset(qDif(inLeft, inRight, 0, profile.difShift));
+    aspMid.reset(qMid(inLeft, inRight, 0, profile.midQuantBits));
+    aspDif.reset(qDif(inLeft, inRight, 0, profile.difQuantBits));
     if samplePtr < maxSamplePtr then inc(samplePtr);
 
     midXStats.init(false);
@@ -1019,8 +1022,8 @@ begin
 
     {write frame header (one for each channel)}
     framePtr[i] := fs.pos;
-    fs.writeByte(profile.midShift + profile.ulawBits*16);
-    fs.writeByte(profile.difShift + profile.ulawDifBits*16);
+    fs.writeByte(profile.midQuantBits + profile.ulawBits*16);
+    fs.writeByte(profile.difQuantBits + profile.ulawDifBits*16);
     fs.writeVLC(negEncode(aspMid.y));
     fs.writeVLC(negEncode(aspDif.y));
     fs.byteAlign();
@@ -1040,12 +1043,12 @@ begin
       aspMid.save();
       aspDif.save();
 
-      aspMid.encode(qMid(inLeft, inRight, 0, profile.midShift));
-      aspDif.encode(qDif(inLeft, inRight, 0, profile.difShift));
+      aspMid.encode(qMid(inLeft, inRight, 0, profile.midQuantBits));
+      aspDif.encode(qDif(inLeft, inRight, 0, profile.difQuantBits));
 
       {calculate the decoder's output}
-      decMid := aspMid.xPrime shl profile.midShift;
-      decDif := aspDif.xPrime shl profile.difShift;
+      decMid := aspMid.xPrime shl profile.midQuantBits;
+      decDif := aspDif.xPrime shl profile.difQuantBits;
       outLeft := decMid + decDif;
       outRight := decMid - decDif;
 
@@ -1081,10 +1084,10 @@ begin
         {try again..}
         aspMid.restore;
         aspDif.restore;
-        aspMid.encode(qMid(inLeft, inRight, 0, profile.midShift));
-        aspDif.encode(qDif(inLeft, inRight, 0, profile.difShift));
-        decMid := aspMid.xPrime shl profile.midShift;
-        decDif := aspDif.xPrime shl profile.difShift;
+        aspMid.encode(qMid(inLeft, inRight, 0, profile.midQuantBits));
+        aspDif.encode(qDif(inLeft, inRight, 0, profile.difQuantBits));
+        decMid := aspMid.xPrime shl profile.midQuantBits;
+        decDif := aspDif.xPrime shl profile.difQuantBits;
         outLeft := decMid + decDif;
         outRight := decMid - decDif;
       end;
