@@ -422,8 +422,11 @@ begin
   asm
     pushad
     mov ecx, LEN
+    mov eax, 1
+    mov edx, 0
+    mov ebx, 1
   @LOOP:
-    idiv eax
+    idiv ebx
     loop @LOOP
     popad
    end;
@@ -435,28 +438,30 @@ begin
   asm
     pushad
     mov ecx, LEN
-    FLD1
-    FLD1
+    fld1
+    fld1
   @LOOP:
-    fadd
+    fadd st(0), st(1)
     loop @LOOP
-    FSTP ST(0)
-    FSTP ST(0)
+    fstp st(0)
+    fstp st(0)
     popad
    end;
   timer.stop(); timer.print();
+
+  writeln('                                              --------------');
 
   timer.start('FMUL');
   asm
     pushad
     mov ecx, LEN
-    FLD1
-    FLD1
+    fld1
+    fld1
   @LOOP:
-    fmul
+    fmul st(0), st(1)
     loop @LOOP
-    FSTP ST(0)
-    FSTP ST(0)
+    fstp st(0)
+    fstp st(0)
     popad
    end;
   timer.stop(); timer.print();
@@ -465,13 +470,13 @@ begin
   asm
     pushad
     mov ecx, LEN
-    FLD1
-    FLD1
+    fld1
+    fld1
   @LOOP:
-    fdiv
+    fdiv st(0), st(1)
     loop @LOOP
-    FSTP ST(0)
-    FSTP ST(0)
+    fstp st(0)
+    fstp st(0)
     popad
    end;
   timer.stop(); timer.print();
@@ -517,6 +522,36 @@ begin
   showFlag('MMX', sysInfo.getMMXSupport);
 end;
 
+procedure benchCache();
+var
+  i, n: integer;
+  p: pointer;
+  bytes: dword;
+  timer: tTimer;
+begin
+  getMem(p, 1 shl 20);
+
+  for n := 13 to 20 do begin
+    bytes := 1 shl n;
+    filldword(p^, bytes div 4, 0);
+    timer.create(TM_MBPS, 256*bytes);
+    timer.start('FILL '+intToStr(bytes div 1024)+'kb');
+    for i := 1 to 256 do begin
+      asm
+        pushad
+        mov edi, p
+        mov esi, p
+        mov ecx, bytes
+        shr ecx, 2
+        rep lodsd
+        popad
+      end;
+    end;
+    timer.stop(); timer.print();
+  end;
+  freemem(p);
+end;
+
 begin
   gotoxy(1,1);
   clrscr;
@@ -524,6 +559,7 @@ begin
   printCpuInfo();
   benchCPU();
   benchRAM();
+  benchCache();
   testFloat80();
   testCompilerCorruption();
   testTiming();
