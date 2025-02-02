@@ -47,7 +47,6 @@ type
     // pixel -> grid is divide by 8
     flagGrid: array[0..256-1, 0..256-1] of byte;
     clearBounds, flipBounds: tRect;
-    s3Driver: tS3Driver;
     videoDepth: tVideoDepth;
 
   public
@@ -203,7 +202,6 @@ begin
   background := nil;
   canvas := nil;
   SHOW_DIRTY_RECTS := false;
-  s3Driver := tS3Driver.create();
   scrollMode := SSM_OFFSET;
   viewport := tRect.create(0,0);
   reset();
@@ -259,13 +257,6 @@ begin
   if lfb_seg = 0 then exit;
 
   pixelsPtr := canvas.pixels;
-
-  // show debug regions
-  if keyDown(key_f8) then begin
-    s3Driver.fgColor := rgba.create(rnd,rnd,0);
-    s3Driver.fillRect(rect.x, rect.y, rect.width, rect.height);
-    exit;
-  end;
 
   for y := rect.top to rect.bottom-1 do
     transferLineToScreen(canvas, rect.x, y, rect.x, y, rect.width);
@@ -378,11 +369,6 @@ begin
   if (flags and FG_CLEAR = FG_CLEAR) then begin
     clearBounds.expandToInclude(tPoint.create(x1, y1));
     clearBounds.expandToInclude(tPoint.create(x2, y2));
-  end;
-
-  if keyDown(key_f3) then begin
-    s3Driver.fgColor := rgba.create(0,0,rnd);
-    s3Driver.fillRect(rect.x, rect.y, rect.width, rect.height);
   end;
 
 end;

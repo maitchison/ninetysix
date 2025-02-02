@@ -523,7 +523,9 @@ begin
   {start playing}
   musicReader := tLA96Reader.Create();
   musicReader.playbackFinishedHook := nextSong();
-  selectedTrackIndex := rnd mod length(tracks);
+  // start with 'crazy', as it's shorter (tmp for getting this working on
+  // P200 MMX
+  selectedTrackIndex := 2 mod length(tracks);
   applySelection();
 
   hdrWave := tHDRPage.create(64,32);

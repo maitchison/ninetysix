@@ -77,8 +77,7 @@ var
   mixer: tSoundMixer;
 
 const
-  {This is 1M of memory, or ~6 seconds
-   but is now only around 2 seconds}
+  {This is 1M of memory, or ~6 seconds}
   {todo: make this something we can configure}
   MB_LOG2SAMPLES = 18;
   MB_SAMPLES = 1 shl MB_LOG2SAMPLES;
