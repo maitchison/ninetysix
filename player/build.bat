@@ -46,21 +46,20 @@ deltree /y _tmp
 :: Make Folders
 :: ---------------------------------
 
-mkdir %BUILD_DIR%\snd
+mkdir %BUILD_DIR%\res
+mkdir %BUILD_DIR%\music
+mkdir %BUILD_DIR%\sample
 copy readme.txt %BUILD_DIR%
 copy res\*.* %BUILD_DIR%\res
 copy music\*.* %BUILD_DIR%\music
 copy sample\*.* %BUILD_DIR%\sample
 
 :: ---------------------------------
-:: Update Latest and date_coded
+:: Update Latest
 :: ---------------------------------
 
-deltree /y %LATEST_DIR%
-mkdir %LATEST_DIR%
-mkdir %LATEST_DIR%\snd
-copy %BUILD_DIR%\*.* %LATEST_DIR%\*.*
-copy %BUILD_DIR%\snd\*.* %LATEST_DIR%\snd\*.*
+::deltree /y %LATEST_DIR%
+::vcopy %BUILD_DIR% %LATEST_DIR%
 
 goto :end
 

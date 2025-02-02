@@ -576,8 +576,10 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
+      {
       textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGB(250,250,250,240));
       screen.markRegion(tRect.create(6,3,40,20));
+      }
 
       {stats}
       guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024]);

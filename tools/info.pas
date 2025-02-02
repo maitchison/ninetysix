@@ -5,9 +5,8 @@ program info;
 
 uses
   crt,
-  types,
+  sysTypes,
   sysInfo,
-  cpu,
   utils;
 
 var
