@@ -586,7 +586,7 @@ begin
   irq := getDSPIrq();
 
   if sbGood then
-    info(format(' - detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, irq]))
+    info(format(' - detected SoundBlaster16 at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, irq]))
   else
     warning('No SoundBlaster detected');
 

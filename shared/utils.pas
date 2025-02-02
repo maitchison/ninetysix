@@ -153,10 +153,8 @@ function  getMSCount(): int64;
 procedure setFixedHeapSize(size: int64);
 procedure autoHeapSize();
 
-
 const
   WORD_CHARS: set of char = ['a'..'z','A'..'Z','0'..'9'];
-
 
 implementation
 
@@ -1192,7 +1190,7 @@ var
   p: pointer;
 begin
   getMem(p, size);
-  freemem(p);
+  freemem(p, size);
 end;
 
 {set heap size to max memory, minus a little, with a reasonable upper limit}
@@ -1260,6 +1258,8 @@ begin
   assertEqual(removeExtension('.'), '');
   assertEqual(removeExtension('A.'), 'A');
 
+  assertEqual(comma(0), '0');
+  assertEqual(comma(-1), '-1');
   assertEqual(comma(5), '5');
   assertEqual(comma(100), '100');
   assertEqual(comma(1200), '1,200');

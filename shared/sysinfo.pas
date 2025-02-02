@@ -258,6 +258,7 @@ begin
   go32.get_dpmi_version(ver);
   log(format('DPMI Version: %d.%d', [ver.major, ver.minor]));
   note(' - Page size '+comma(get_page_size)+' bytes');
+  note(format(' - Memory (used:%,K free:%,K, total:%,K)',[getUsedMemory/1024, getFreeSystemMemory/1024, getTotalMemory/1024]));
   if ver.flags and $1 <> $1 then warning(' - 16-bit');
   if ver.flags and $2 = $2 then warning(' - Real Mode');
   if ver.flags and $4 = $4 then note(' - Virtual Memory Support');

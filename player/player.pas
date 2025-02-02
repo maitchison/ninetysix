@@ -632,13 +632,13 @@ var
 
 begin
 
-  autoHeapSize();
+  // this seems to cause problems for the P200?
+  //autoHeapSize();
 
   textAttr := White + Blue*16;
   clrscr;
 
   debug.VERBOSE_SCREEN := llNote;
-  logDPMIInfo();
 
   runTestSuites();
   initKeyboard();

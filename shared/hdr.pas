@@ -344,9 +344,12 @@ end;
 
 procedure initLUT();
 var
-  i: integer;
-  v: single;
+  i: int32;
+  v: double;
 begin
+  // this fixes a 208 bug, but not sure why...
+  // perhaps previous unit corrupted FPU? (which was sbDriver)
+  asm finit; end;
   for i := 0 to (65536 shr LUT_SHIFT)-1 do begin
     v := (i/(65536 shr LUT_SHIFT));
     HDR_LUT[i].init(
