@@ -38,7 +38,7 @@ type tVesaDriver = class(tVGADriver)
     constructor create();
     procedure logInfo();
     procedure logModes();
-    procedure setMode(width, height, BPP: word); override;
+    function  tryMode(width, height, BPP: word): boolean; override;
     procedure setLogicalSize(width, height: word); override;
     procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); override;
     function  vesaVersion: single;
@@ -205,7 +205,7 @@ end;
 
 {Set graphics mode. Once complete the framebuffer can be accessed via
  the LFB pointer}
-procedure tVesaDriver.setMode(width, height, bpp: word);
+function tVesaDriver.tryMode(width, height, bpp: word): boolean;
 var
   i: integer;
   vesaModes: array[0..64] of word;
@@ -215,8 +215,6 @@ var
   regs: tRealRegs;
   dosSeg, dosSel: word;
 begin
-
-  info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
 
   { get list of video modes }
   {todo: this looks wrong}
@@ -237,7 +235,9 @@ begin
   end;
 
   if Mode = 0 then
-    Error(Format('Error: graphics mode %dx%dx%d not available.', [width,height,bpp]));
+    exit(false);
+
+  info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
 
   {Set mode}
   with regs do begin
@@ -268,6 +268,8 @@ begin
   fLogicalWidth := width;
   fLogicalHeight := height;
   fBpp := bpp;
+
+  result := true;
 end;
 
 {Sets the logical screen width, allowing for smooth scrolling}

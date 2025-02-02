@@ -49,7 +49,9 @@ type
     property LFB_SEG:word read getLFB_SEG;
 
     procedure waitVSYNC(); virtual; abstract;
-    procedure setMode(width, height, BPP: word); virtual; abstract;
+    function  tryMode(width, height, bpp: word): boolean; virtual; abstract;
+    procedure setMode(width, height, bpp: word);
+    procedure setTrueColor(width, height: word);
     procedure setLogicalSize(width, height: word); virtual; abstract;
     procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); virtual; abstract;
     procedure setText(); virtual; abstract;
@@ -59,7 +61,7 @@ type
   tVGADriver = class(tVideoDriver)
     {basic VGA driver}
     procedure waitVSYNC(); override;
-    procedure setMode(width, height, BPP: word); override;
+    function tryMode(width, height, bpp: word): boolean; override;
     procedure setText(); override;
   end;
 
@@ -134,26 +136,41 @@ begin
   result := (fPhysicalWidth * fPhysicalHeight) < 32000;
 end;
 
+procedure tVideoDriver.setMode(width, height, bpp: word);
+begin
+  if not tryMode(width, height, bpp) then
+    error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
+end;
+
+{this will select the best true color mode}
+procedure tVideoDriver.setTrueColor(width, height: word);
+begin
+  if not (
+    tryMode(width, height,24) or
+    tryMode(width, height,32) or
+    tryMode(width, height,16)
+  ) then error(format('Could not set true color video mode (%dx%d)', [width, height]));
+end;
+
 {--------------------------------------------------------------}
 { tVGADriver }
 {--------------------------------------------------------------}
 
-procedure tVGADriver.setMode(width, height, bpp: word);
+function tVGADriver.tryMode(width, height, bpp: word): boolean;
 begin
   {VGA knows only one mode}
-  if (width = 320) and (height = 200) and (bpp = 8) then begin
-    asm
-      mov ax, $0013
-      int $10
-      end;
-    self.fPhysicalWidth := width;
-    self.fPhysicalHeight := height;
-    self.fLogicalWidth := width;
-    self.fLogicalHeight := height;
-    self.fBpp := bpp;
-  end else begin
-    error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
-  end;
+  if not ((width = 320) and (height = 200) and (bpp = 8)) then
+    exit(false);
+  asm
+    mov ax, $0013
+    int $10
+    end;
+  self.fPhysicalWidth := width;
+  self.fPhysicalHeight := height;
+  self.fLogicalWidth := width;
+  self.fLogicalHeight := height;
+  self.fBpp := bpp;
+  result := true;
 end;
 
 procedure tVGADriver.waitVSYNC();
