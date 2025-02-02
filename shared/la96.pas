@@ -327,7 +327,7 @@ begin
   end;
   if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
   self.fs := tStream.create();
-  self.fs.readFromFile(aFilename);
+  self.fs.readFromFile(aFilename, 4*1024, 1024*1024); //stub:
   self.ownsStream := true;
   self.filename := aFilename;
   self.loadHeader();

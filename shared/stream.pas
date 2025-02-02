@@ -81,7 +81,7 @@ type
     procedure advance(numBytes: integer);
 
     procedure writeToFile(fileName: string);
-    procedure readFromFile(fileName: string; blockSize: int32=4096);
+    procedure readFromFile(fileName: string; blockSize: int32=4096;maxSize: int32=-1);
 
     procedure flush();
     procedure reset();
@@ -406,7 +406,7 @@ begin
 end;
 
 {loads memory stream from file, and resets position to start of stream.}
-procedure tStream.readFromFile(fileName: string; blockSize: int32=4096);
+procedure tStream.readFromFile(fileName: string; blockSize: int32=4096; maxSize: int32=-1);
 var
   f: file;
   bytesRead: dword;
@@ -421,9 +421,15 @@ begin
   ioError := IOResult; if ioError <> 0 then error(format('Could not open file "%s" for reading, Error:%s', [filename, getIOErrorString(ioError)]));
   {$i+}
 
-  setCapacity(fileSize(f));
-  bytesRemaining := filesize(f);
-  bytesUsed := fileSize(f);
+  {work out how much to read}
+  if maxSize > 0 then
+    bytesToRead := min(maxSize, filesize(f))
+  else
+    bytesToRead := filesize(f);
+  bytesRemaining := bytesToRead;
+  setCapacity(bytesToRead);
+  bytesUsed := bytesToRead;
+
   fPos := 0;
   while bytesRemaining > 0 do begin
     bytesToRead := min(blockSize, bytesRemaining);
