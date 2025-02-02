@@ -339,11 +339,12 @@ begin
   writeln('Reading compressed files...');
 
   for profile in PROFILES do begin
-    startTimer('decode');
+
     tag := profileToTagName(profile);
     {read it}
     reader := tLA96Reader.create();
     reader.load(tag+'.a96');
+    startTimer('decode');
     curSFX := reader.readSFX();
     setLength(outSFX, length(outSFX)+1);
     outSFX[length(outSFX)-1] := curSFX;

@@ -82,7 +82,7 @@ var
   packing4: array[0..255] of array[0..1] of dword;
 
 const
-  RICE_TABLE_BITS = 14;
+  RICE_TABLE_BITS = 16;
   RICE_MASK = (1 shl RICE_TABLE_BITS)-1;
 
 var
@@ -166,6 +166,11 @@ begin
     {see if RICE is an upgrade}
     deltaK := 0;
     guessK := clamp(floor(log2(1+(valueSum / length(values)))), 0, 15);
+
+    // check that this k works with out current lookup table size.
+    // it might generate a -1 length which means some codes are too big.
+    while guessK < 15 and (RICE_Bits(values, guessK) = -1) do inc(guessK);
+
     for k := (guessK - 1) to (guessK + 1) do begin
       if k < 0 then continue;
       if k > 15 then continue;
