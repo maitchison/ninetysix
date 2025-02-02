@@ -90,8 +90,9 @@ begin
   if config.XMAS then
     musicPlay('res\music2.a96')
   else
-    musicPlay
-    ('res\music1.a96');
+    musicPlay('res\music1.a96');
+
+  musicUpdate(44*5); // 5 seconds buffer (if we can)
 
   {todo: store all resources in resource library, and address
    by a 'tag' (which is kind of like what i've started doing here}

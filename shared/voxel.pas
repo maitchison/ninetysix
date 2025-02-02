@@ -139,7 +139,7 @@ begin
       for dz := -d to d do
         if getVoxel(x+dx, y+dy, z+dz).a = 255 then begin
           d2 := sqr(dx)+sqr(dy)+sqr(dz);
-          bestD2 := min(bestD2, d2);
+          bestD2 := minf(bestD2, d2);
         end;
   exit(sqrt(bestD2));
 end;

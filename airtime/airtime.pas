@@ -249,7 +249,7 @@ begin
 
   screen.background := titleBackground;
 
-  screen.clear();
+  screen.pageClear();
   screen.pageFlip();
 
   startClock := getSec;
@@ -356,7 +356,7 @@ procedure setTrackDisplay(page: tPage);
 begin
   screen.reset();
   screen.background := page;
-  screen.clear();
+  screen.pageClear();
   screen.pageFlip();
 end;
 
@@ -420,7 +420,6 @@ begin
       screen.scrollMode := SSM_COPY;
     end;
   end;
-
 
   setTrackDisplay(track.background);
 

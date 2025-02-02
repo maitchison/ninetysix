@@ -169,7 +169,7 @@ begin
 end;
 
 
-function DSPIrq(): integer;
+function getDSPIrq(): integer;
 var
   value: byte;
 begin
@@ -189,7 +189,7 @@ begin
     2: exit(5);
     4: exit(7);
     8: exit(10);
-    else exit(-1);
+    else exit(-value);
   end;
 end;
 
@@ -579,14 +579,18 @@ procedure initSound();
 var
   res: longint;
   addr: dword;
+  irq: integer;
 begin
   note('[init] Sound');
   sbGood := DSPReset();
 
   if sbGood then
-    info(format(' - detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, DSPIrq]))
+    info(format(' - detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, irq]))
   else
     warning('No SoundBlaster detected');
+
+  irq := getDSPIrq();
+  if irq < 0 then warning('Could not detect IRQ for SB16, guessing 5... (mask was %d)', [-irq]);
 
   if BUFFER_SIZE > 32*1024 then
     error('Invalid BUFFER_SIZE, must be <= 32k');

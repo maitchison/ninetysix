@@ -487,7 +487,7 @@ begin
   end;
 
   if (nitroTimer < 0) then
-    nitroTimer := min(nitroTimer + elapsed, 0);
+    nitroTimer := minf(nitroTimer + elapsed, 0);
 
   {engine in 'spaceship' mode}
   vel += engineForce * (1/mass) * elapsed;
