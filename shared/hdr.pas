@@ -342,10 +342,10 @@ begin
   end;
 end;
 
+procedure initLUT();
 var
   i: integer;
   v: single;
-
 begin
   for i := 0 to (65536 shr LUT_SHIFT)-1 do begin
     v := (i/(65536 shr LUT_SHIFT));
@@ -356,4 +356,8 @@ begin
       round(power(v, 0.5)*255)
     )
   end;
+end;
+
+begin
+  initLUT();
 end.

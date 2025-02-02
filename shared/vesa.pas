@@ -134,7 +134,7 @@ end;
 
 procedure tVesaDriver.logInfo();
 begin
-  info(format('VESA v%f (%f MB)', [vesaVersion, videoMemory / 1024 / 1024]));
+  info(format('VESA v%f (%.2f MB)', [vesaVersion, videoMemory / 1024 / 1024]));
 end;
 
 procedure tVesaDriver.logModes();

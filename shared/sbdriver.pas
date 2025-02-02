@@ -550,7 +550,6 @@ begin
 
   DSPWrite($B6);  // 16-bit output mode.
   DSPWrite($30);  // 16-bit stereo signed PCM input.
-
   // according to manual, this must be half the DMA size.
   // since we using 16-bit audio, these are words
 
@@ -584,13 +583,17 @@ begin
   note('[init] Sound');
   sbGood := DSPReset();
 
+  irq := getDSPIrq();
+
   if sbGood then
     info(format(' - detected SoundBlaster compatible soundcard at %hh (V%d.0) IRQ:%d', [SB_BASE, DSPVersion, irq]))
   else
     warning('No SoundBlaster detected');
 
-  irq := getDSPIrq();
-  if irq < 0 then warning('Could not detect IRQ for SB16, guessing 5... (mask was %d)', [-irq]);
+  if irq < 0 then begin
+    warning(format('Could not detect IRQ for SB16, guessing 5... (mask was %d)', [-irq]));
+    irq := 5;
+  end;
 
   if BUFFER_SIZE > 32*1024 then
     error('Invalid BUFFER_SIZE, must be <= 32k');
@@ -613,7 +616,7 @@ begin
 
   note(format(' - successfully allocated dos memory for DMA (%d|%d)', [dosSelector, dosSegment]));
 
-  install_ISR(DSPIrq);
+  install_ISR(irq);
   initiateDMAPlayback();
   speakerOn();
 end;

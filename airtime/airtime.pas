@@ -9,7 +9,6 @@ uses
   s3,
   resLib,
   resources,
-  sndViz,
   {airtime}
   raceTrack,
   car,
@@ -553,7 +552,7 @@ begin
   logHeapStatus('Resources loaded');
   info('Done.');
 
-  videoDriver.setMode(640,480,32);
+  videoDriver.setMode(640,480,16);
 
   screen := tScreen.create();
 
