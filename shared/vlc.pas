@@ -82,7 +82,8 @@ var
   packing4: array[0..255] of array[0..1] of dword;
 
 const
-  RICE_TABLE_BITS = 16;
+  RICE_TABLE_BITS = 14;
+  RICE_MASK = (1 shl RICE_TABLE_BITS)-1;
 
 var
   {used for VLC2 codes. This allows for the 'overlapping' optimization}
@@ -90,7 +91,7 @@ var
 
   {
     stores rice decodes for common values of k, given some input byte
-    stored as decodedValue + (codeLength * 256)
+    stored as decodedValue + (codeLength * 65536)
     a codelenght of 0 indicates input not suffcent for decoding, and we must
     regress to another method
     todo: see if we can make sure in the encoder that this will not happen.
@@ -525,7 +526,7 @@ begin
     quotient := value shr k;
     remainder := value - (quotient shl k);
     bits := k+quotient+1;
-    if bits > 16 then error(format('Fault when writing RICE code, we do not support rice codes longer than 16 bits (value=%d, k=%d, bits=%d)', [value, k, bits]));
+    if bits > RICE_TABLE_BITS then error(format('Fault when writing RICE code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)', [RICE_TABLE_BITS, value, k, bits]));
 
     {the slower method that supports long quotients}
     {todo: remove this and do the fast method, which I think should work now}
@@ -590,8 +591,7 @@ begin
     push ebp
     mov ebp, TABLEPTR
 
-  @Loop:
-
+  @DecodeLoop:
     {read word}
     cmp cl, 16
     jge @SkipRead
@@ -611,6 +611,7 @@ begin
 
   @SkipRead:
     movzx eax, bx                  // eax = 0  || next 16 buffer bits
+    and ax, RICE_MASK              // should be a constant
     mov eax, dword ptr [ebp+eax*4] // eax = 0 | len || value
 
     {consume bits}
@@ -628,7 +629,7 @@ begin
     {end loop}
     add edi, 4
     dec edx
-    jnz @Loop
+    jnz @DecodeLoop
 
     pop ebp
 
@@ -670,7 +671,6 @@ begin
   bs.giveBack();
 end;
 
-{todo: we need this to be super fast asm}
 procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 begin
   //ReadRice_REF(stream, n, outBUffer, k);
@@ -688,7 +688,7 @@ begin
   for value in values do begin
     bitsNeeded := (value shr k) + 1 + k;
     { this is just a method of discouraging the use of long rice codes }
-    if bitsNeeded > 16 then exit(high(int32));
+    if bitsNeeded > RICE_TABLE_BITS then exit(high(int32));
     result += bitsNeeded;
   end;
 end;

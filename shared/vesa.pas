@@ -161,21 +161,25 @@ begin
 end;
 
 procedure tVesaDriver.allocateLFB(physicalAddress: dword);
-const
-  {S3 says we have a 64MB window here (even if only 4MB ram)}
-  VIDEO_MEMORY = 64*1024*1024;
 var
   linearAddress: dword;
+  LFBSize: dword;
 begin
 
+  if videoMemory = 0 then begin
+    warning('Could not detect video memory size, assuming 1MB');
+    LFBSize := 1024*1024;
+  end else
+    LFBSIze := videoMemory;
+
   {Map to linear}
-  linearAddress := get_linear_addr(physicalAddress, VIDEO_MEMORY);
+  linearAddress := get_linear_addr(physicalAddress, LFBSize);
 
   {Set Permissions}
   fLFB_SEG := Allocate_LDT_Descriptors(1);
   if not set_segment_base_address(fLFB_SEG, LinearAddress) then
     error('Error setting LFB segment base address.');
-  if not set_segment_limit(fLFB_SEG, VIDEO_MEMORY-1) then
+  if not set_segment_limit(fLFB_SEG, LFBSize-1) then
     error('Error setting LFB segment limit.');
 
   info('Mapped LFB to segment $' + HexStr(fLFB_SEG, 4));
@@ -248,6 +252,10 @@ begin
 
   {Find our physical address}
   physicalAddress := dword(getModeInfo(mode).PhysBasePtr);
+
+  if physicalAddress = 0 then
+    error('Could not find LFB address.');
+
   if physicalAddress <> $E0000000 then
     warning('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
 
