@@ -30,9 +30,13 @@ type
   end;
 
   tScreenScrollMode = (
-    SSM_OFFSET,  // just update the screen offset
-    SSM_COPY     // copy region using S3
+    SSM_OFFSET,  // flip by updating the screen offset
+    SSM_COPY     // flip copies entire canvas to video
   );
+
+  {bit-depth of the video memory. Screen buffer is always 32bit,
+   however do support on-the-fly conversion to any of these depths}
+  tVideoDepth = (VD_16, VD_24, VD_32);
 
   tScreen = class
 
@@ -44,6 +48,7 @@ type
     flagGrid: array[0..256-1, 0..256-1] of byte;
     clearBounds, flipBounds: tRect;
     s3Driver: tS3Driver;
+    videoDepth: tVideoDepth;
 
   public
     canvas: tPage;
@@ -99,28 +104,87 @@ end;
 
 {-------------------------------------------------}
 
-procedure transferLineToScreen(canvas: tPage; x,y: int32; yDest: integer);
+procedure transferLineToScreen(canvas: tPage; srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
 var
   lfb_seg: word;
   srcOffset,dstOffset: dword;
-  pixelCnt: dword;
+  bytesPerPixel: byte;
 begin
+
   lfb_seg := videoDriver.LFB_SEG;
-  dstOffset := (yDest * canvas.width)*4;
-  srcOffset := dword(canvas.pixels) + ((x + y * videoDriver.logicalWidth) * 4);
-  pixelCnt := videoDriver.physicalWidth;
+  bytesPerPixel := (videoDriver.bitsPerPixel+7) div 8;
+  dstOffset := (dstX+(dstY * canvas.width))*bytesPerPixel;
+  srcOffset := dword(canvas.pixels) + ((srcX + srcY * videoDriver.logicalWidth) * 4);
   asm
     cli
     pushad
     push es
 
-    mov es, [lfb_seg]
+    mov ax, lfb_seg
+    mov es,  ax
     mov edi, dstOffset
-
     mov esi, srcOffset
 
     mov ecx, pixelCnt
+
+    mov al, bytesPerPixel
+    cmp al, 3
+    je  @X24
+    jg  @X32
+    //fall through to @X16
+
+  @X16:
+
+    {todo: mmx 2pixels at a time (is it any faster on real hardware?}
+
+    mov eax, dword ptr ds:[esi]       // aaaaaaaarrrrrrrrggggggggbbbbbbbb
+
+    shr ah, 2                         // aaaaaaaarrrrrrrr00ggggggbbbbbbbb
+    shr ax, 3                         // aaaaaaaarrrrrrrr00000ggggggbbbbb
+    ror eax, 11                       //            aaaaaaaarrrrrrrr00000ggggggbbbbb
+    shr ax, 8                         //                    aaaaaaaarrrrrggggggbbbbb
+    rol eax, 11                       //         aaaaaaaarrrrrggggggbbbbb
+
+    mov word ptr es:[edi], ax
+
+    add esi, 4
+    add edi, 2
+    dec ecx
+    jnz @X16
+
+    jmp @Done
+
+  @X24:
+
+    {mmx is
+      movq        ARGBARGB
+      shl lowd    ARGBRGB0   (if we can, maybe do this on read?)
+      shrq 8      0ARGBRGB
+
+      then repeat for another 0ARGBRGB
+
+      then somehow combine into RGBR GBRG BRGB
+      then write out the 3 dwords.}
+
+
+    {probably wrong...}
+    {also can be done faster if we just write out 4 pixels at a time (aligned)}
+    mov eax, dword ptr ds:[esi]
+    mov word ptr [edi], ax
+    ror eax, 8
+    mov byte ptr es:[edi+2], al
+
+    add esi, 4
+    add edi, 3
+    loop @X24
+
+    jmp @Done
+
+  @X32:
     rep movsd
+    jmp @Done
+
+  @Done:
 
     pop es
     popad
@@ -151,6 +215,12 @@ begin
   {todo: if assigned(canvas) then canvas.done;}
   if assigned(canvas) then canvas.Destroy;
   canvas := tPage.Create(videoDriver.width, videoDriver.height);
+  case videoDriver.bitsPerPixel of
+    16: videoDepth := VD_16;
+    24: videoDepth := VD_24;
+    32: videoDepth := VD_32;
+    else debug.error(format('Bit depth %d not supported',[videoDriver.bitsPerPixel]));
+  end;
 
   fillchar(flagGrid, sizeof(flagGrid), 0);
   clearBounds.init(256, 256, -256, -256);
@@ -177,7 +247,7 @@ procedure tScreen.copyRegion(rect: tRect);
 var
   y,yMin,yMax: int32;
   pixelsPtr: pointer;
-  srcOfs,dstOfs,len: dword;
+  plylen: dword;
   lfb_seg: word;
 begin
   {todo: support S3 upload (but maybe make sure regions are small enough
@@ -197,33 +267,8 @@ begin
     exit;
   end;
 
-  for y := rect.top to rect.bottom-1 do begin
-    srcOfs := (rect.left + (y * canvas.width))*4;
-    dstOfs := (rect.left + (y * canvas.width))*4;
-    if scrollMode = SSM_COPY then
-      dstOfs += videoDriver.logicalWidth * videoDriver.physicalHeight * 4;
-    len := rect.width;
-    asm
-      push es
-      push edi
-      push esi
-      push ecx
-
-      mov es,  lfb_seg
-      mov edi, dstOfs
-
-      mov esi, pixelsPtr
-      add esi, srcOfs
-
-      mov ecx, len
-      rep movsd
-
-      pop ecx
-      pop esi
-      pop edi
-      pop es
-    end;
-  end;
+  for y := rect.top to rect.bottom-1 do
+    transferLineToScreen(canvas, rect.x, y, rect.x, y, rect.width);
 end;
 
 {draw line from x1,y -> x2,y, including final point}
@@ -390,7 +435,7 @@ begin
   case scrollMode of
     SSM_COPY: begin
       for y := 0 to videoDriver.physicalHeight-1 do
-        transferLineToScreen(canvas, viewport.x, viewport.y+y, y);
+        transferLineToScreen(canvas, viewport.x, viewport.y+y, 0, y, videoDriver.physicalWidth);
       end;
     SSM_OFFSET: begin
       videoDriver.setDisplayStart(viewport.x,viewport.y);

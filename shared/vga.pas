@@ -45,7 +45,7 @@ type
     property physicalWidth:word read getPhysicalWidth;
     property physicalHeight:word read getPhysicalHeight;
 
-    property BPP:word read getBPP;
+    property bitsPerPixel:word read getBPP;
     property LFB_SEG:word read getLFB_SEG;
 
     procedure waitVSYNC(); virtual; abstract;

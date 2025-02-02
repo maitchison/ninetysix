@@ -216,8 +216,6 @@ var
   dosSeg, dosSel: word;
 begin
 
-  {stub:}
-  writeln('self',hexStr(dword(self), 8));
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
 
   { get list of video modes }
