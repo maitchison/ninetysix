@@ -163,7 +163,8 @@ end;
 function targetBPP: byte;
 begin
   if lowVRAM then
-    result := 16
+    // we used to force 16bit, but there's no need
+    result := 32
   else
     result := 32;
 end;
@@ -551,6 +552,11 @@ begin
 
   if cpuInfo.ram < 30*1024*1024 then
     error('Application required 30MB of ram.');
+
+  if cpuInfo.ram < 40*1024*1024 then begin
+    warning(format('Low memory detected. (%.1fMB)', [cpuInfo.ram/1024/1024]));
+    setFixedHeapSize(24*1024*1024);
+  end;
 
   {setup heap logging before units start.}
   {$if declared(Heaptrc)}
