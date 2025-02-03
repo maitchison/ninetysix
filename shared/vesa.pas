@@ -251,7 +251,7 @@ begin
   end;
 
   {Find our physical address}
-  physicalAddress := dword(getModeInfo(mode).PhysBasePtr);
+  physicalAddress := dword(getModeInfo($4000+mode).PhysBasePtr);
 
   if physicalAddress = 0 then
     error('Could not find LFB address.');
