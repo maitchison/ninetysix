@@ -441,9 +441,6 @@ begin
     screen.scrollMode := SSM_OFFSET;
   end;
 
-  //stub:
-  screen.scrollMode := SSM_OFFSET;
-
   if screen.scrollMode = SSM_OFFSET then
     videoDriver.setLogicalSize(track.width, track.height);
 
@@ -584,6 +581,8 @@ begin
 
   screen := tScreen.create();
 
+  {todo: init mouse should always put it at end of memory...}
+  mouse.overrideBaseAddress((vd.videoMemory div 1024)-16);
   initMouse();
   initKeyboard();
 
