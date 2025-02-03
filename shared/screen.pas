@@ -73,8 +73,7 @@ type
     function  getViewPort(): tRect;
     procedure setViewPort(x,y: int32);
 
-    procedure reset();
-
+    procedure resize(aWidth: word; aHeight: word);
     {copy commands}
     procedure copyRegion(rect: tRect);
     procedure clearRegion(rect: tRect);
@@ -114,7 +113,7 @@ begin
   bitsPerPixel := videoDriver.bitsPerPixel;
   bytesPerPixel := (videoDriver.bitsPerPixel+7) div 8;
   dstOffset := (dstX+(dstY * videoDriver.physicalWidth))*bytesPerPixel;
-  srcOffset := dword(canvas.pixels) + ((srcX + srcY * videoDriver.logicalWidth) * 4);
+  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
   asm
     cli
     pushad
@@ -230,15 +229,15 @@ begin
   SHOW_DIRTY_RECTS := false;
   scrollMode := SSM_OFFSET;
   viewport := tRect.create(0,0);
-  reset();
+  resize(videoDriver.width, videoDriver.height);
 end;
 
 {must be called whenever a resolution change occurs after creation.}
-procedure tScreen.reset();
+procedure tScreen.resize(aWidth: word; aHeight: word);
 begin
   {todo: if assigned(canvas) then canvas.done;}
-  if assigned(canvas) then canvas.Destroy;
-  canvas := tPage.Create(videoDriver.width, videoDriver.height);
+  if assigned(canvas) then canvas.destroy;
+  canvas := tPage.create(aWidth, aHeight);
   case videoDriver.bitsPerPixel of
     15: videoDepth := VD_15;
     16: videoDepth := VD_16;
@@ -270,23 +269,29 @@ end;
 {copies region from canvas to screen.}
 procedure tScreen.copyRegion(rect: tRect);
 var
-  y,yMin,yMax: int32;
-  pixelsPtr: pointer;
-  plylen: dword;
-  lfb_seg: word;
+  i: int32;
+  srcX, srcY, dstX, dstY, cnt: integer;
 begin
   {todo: support S3 upload (but maybe make sure regions are small enough
    to not cause stutter - S3 is about twice as fast.}
   rect.clipTo(bounds);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
 
-  lfb_seg := videoDriver.LFB_SEG;
-  if lfb_seg = 0 then exit;
+  case scrollmode of
+    SSM_COPY: begin
+      srcX := rect.x; srcY := rect.y;
+      dstX := rect.x; dstY := rect.y;
+    end;
+    SSM_OFFSET: begin
+      srcX := rect.x; srcY := rect.y;
+      dstX := rect.x-viewport.x; dstY := rect.y-viewport.y;
+    end;
+    else error('Invalid scroll mode');
+  end;
 
-  pixelsPtr := canvas.pixels;
-
-  for y := rect.top to rect.bottom-1 do
-    transferLineToScreen(canvas, rect.x, y, rect.x, y, rect.width);
+  cnt := rect.width;
+  for i := 0 to rect.height-1 do
+    transferLineToScreen(canvas, srcX, srcY+i, dstX, dstY+i, cnt);
 end;
 
 {draw line from x1,y -> x2,y, including final point}

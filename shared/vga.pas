@@ -33,7 +33,6 @@ type
     {logical dimensions, which may be larger when uing fullscreen scrolling}
     fLogicalWidth,fLogicalHeight:word;
 
-
     constructor create();
 
     property width:word read getLogicalWidth;
@@ -139,12 +138,11 @@ end;
 {this will select the best true color mode}
 procedure tVideoDriver.setTrueColor(width, height: word; maxBPP: byte=32);
 begin
-  if not (
-    ((maxBPP >= 24) and tryMode(width, height, 24)) or
-    ((maxBPP >= 32) and tryMode(width, height, 32)) or
-    ((maxBPP >= 26) and tryMode(width, height, 16)) or
-    ((maxBPP >= 15) and tryMode(width, height, 150))
-  ) then error(format('Could not set true color video mode (%dx%d)', [width, height]));
+  if (maxBPP >= 24) and tryMode(width, height, 24) then exit;
+  if (maxBPP >= 32) and tryMode(width, height, 32) then exit;
+  if (maxBPP >= 16) and tryMode(width, height, 16) then exit;
+  if (maxBPP >= 15) and tryMode(width, height, 15) then exit;
+  error(format('Could not set true color video mode (%dx%d) [maxBPP=%d]', [width, height, maxBPP]));
 end;
 
 {--------------------------------------------------------------}

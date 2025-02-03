@@ -88,7 +88,7 @@ type
 procedure tScreenLine.reset(); inline;
 begin
   xMax := 0;
-  xMin := videoDriver.width;
+  xMin := 9999;
 end;
 
 procedure tScreenLine.adjust(x: int16); inline;
@@ -402,7 +402,7 @@ var
     yMax := max(s1.y, s2.y);
     yMax := max(yMax, s3.y);
     yMax := max(yMax, s4.y);
-    yMax := min(videoDriver.logicalHeight-1, yMax);
+    yMax := min(canvas.height-1, yMax);
 
     //do not render offscreen sides
     if yMax < yMin then exit;

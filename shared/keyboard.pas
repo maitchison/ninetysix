@@ -292,6 +292,8 @@ begin
   Info('[close] Keyboard');
   dosKey := true;
   set_pm_interrupt($9, oldint9h);
+  // remove keys from buffer
+  while crt.keypressed do crt.readkey;
 end;
 
 

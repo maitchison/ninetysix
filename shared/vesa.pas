@@ -261,11 +261,9 @@ begin
      access the 2nd MB and for some reason VBE still includes modes
      that require it. For this reason I disable any mode we don't have
      video memory for.}
-
-    if (width*height*bpp) div 8 > videoMemory then continue;
+    if (width*height*bpp div 8) > videoMemory then continue;
     mi := getModeInfo(mode);
     if (mi.xResolution = width) and (mi.yResolution = height) and (mi.bitsPerPixel=bpp) then begin
-
       foundMode := mode;
       break
     end;

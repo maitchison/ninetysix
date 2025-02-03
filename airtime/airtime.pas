@@ -155,6 +155,21 @@ end;
 
 {-------------------------------------------------}
 
+function lowVRAM: boolean;
+begin
+  result := (vd.videoMemory < 2*1024*1024);
+end;
+
+function targetBPP: byte;
+begin
+  if lowVRAM then
+    result := 16
+  else
+    result := 32;
+end;
+
+{-------------------------------------------------}
+
 procedure endOfFrame();
 begin
   screen.flipAll();
@@ -354,7 +369,7 @@ end;
 
 procedure setTrackDisplay(page: tPage);
 begin
-  screen.reset();
+  screen.resize(page.width, page.height);
   screen.background := page;
   screen.pageClear();
   screen.pageFlip();
@@ -392,34 +407,23 @@ begin
   end;
 end;
 
-function lowVRAM: boolean;
-begin
-  result := (vd.videoMemory < 2*1024*1024);
-end;
-
 procedure mainLoop();
 var
   startClock,lastClock,thisClock: double;
   car: tCar;
   camX, camY: single;
   drawPos: tPoint;
-  maxBPP: integer;
 begin
 
   note('Main loop started');
 
   track := tRaceTrack.Create('res/track2');
 
-  if lowVRAM then begin
+  if targetBPP <= 16 then
     info('Downgrading to 16-bit color mode due low to VRAM');
-    maxBPP := 16
-  end else
-    maxBPP := 32;
 
   if not config.HIGHRES then
-    videoDriver.setTrueColor(320,240,maxBPP);
-
-  videoDriver.setLogicalSize(track.width, track.height);
+    videoDriver.setTrueColor(320, 240, targetBPP);
 
   // super inefficent... but needed for dosbox-x due to vsync issues
   note('Dos version detected: '+DOS_VERSION);
@@ -432,7 +436,16 @@ begin
   end else if lowVRAM then begin
     note(' - using copy method due to low VRAM.');
     screen.scrollMode := SSM_COPY;
+  end else begin
+    note(' - using offset scroll mode.');
+    screen.scrollMode := SSM_OFFSET;
   end;
+
+  //stub:
+  screen.scrollMode := SSM_COPY;
+
+  if screen.scrollMode = SSM_OFFSET then
+    videoDriver.setLogicalSize(track.width, track.height);
 
   setTrackDisplay(track.background);
 
@@ -567,7 +580,7 @@ begin
   logHeapStatus('Resources loaded');
   info('Done.');
 
-  videoDriver.setMode(640,480,16);
+  videoDriver.setTrueColor(640, 480);
 
   screen := tScreen.create();
 

@@ -487,7 +487,7 @@ end;
 
 procedure processNextMusicFrame();
 begin
-  if mbReadPos >= mbWritePos then
+  if mbReadPos > mbWritePos then
     warning(format('Buffer underflow read:%d write:%d', [mbReadPos div 1024, mbWritePos div 1024]));
   assert(mbWritePos mod 1024 = 0, 'WritePos must be a multiple of frameSize');
   if not musicReader.isLoaded then exit;
