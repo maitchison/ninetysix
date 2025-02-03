@@ -33,6 +33,7 @@ var
 
 var
   nextBellSound: double = 0;
+  vd: tVesaDriver;
 
 procedure mainLoop(); forward;
 function decayFactor(const decayTime: single): single; forward;
@@ -391,20 +392,32 @@ begin
   end;
 end;
 
+function lowVRAM: boolean;
+begin
+  result := (vd.videoMemory < 2*1024*1024);
+end;
+
 procedure mainLoop();
 var
   startClock,lastClock,thisClock: double;
   car: tCar;
   camX, camY: single;
   drawPos: tPoint;
+  maxBPP: integer;
 begin
 
   note('Main loop started');
 
   track := tRaceTrack.Create('res/track2');
 
+  if lowVRAM then begin
+    info('Downgrading to 16-bit color mode due low to VRAM');
+    maxBPP := 16
+  end else
+    maxBPP := 32;
+
   if not config.HIGHRES then
-    videoDriver.setMode(320,240,32);
+    videoDriver.setTrueColor(320,240,maxBPP);
 
   videoDriver.setLogicalSize(track.width, track.height);
 
@@ -413,11 +426,12 @@ begin
   if config.FORCE_COPY then begin
     note('Force enabling SSM_COPY mode');
     screen.scrollMode := SSM_COPY;
-  end else begin
-    if (DOS_VERSION = 'dosbox-x') or (DOS_VERSION = 'dosbox') then begin
-      note(' - using copy method due to VSYNC issues.');
-      screen.scrollMode := SSM_COPY;
-    end;
+  end else if (DOS_VERSION = 'dosbox-x') or (DOS_VERSION = 'dosbox') then begin
+    note(' - using copy method due to VSYNC issues.');
+    screen.scrollMode := SSM_COPY;
+  end else if lowVRAM then begin
+    note(' - using copy method due to low VRAM.');
+    screen.scrollMode := SSM_COPY;
   end;
 
   setTrackDisplay(track.background);
@@ -536,11 +550,12 @@ begin
   heaptrc.maxprintedblocklength := 64;
   {$endif}
 
-  enableVideoDriver(tVesaDriver.create());
+  vd := tVesaDriver.create();
+  enableVideoDriver(vd);
 
-  if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
+  if (vd.vesaVersion) < 2.0 then
     error('Requires VESA 2.0 or greater.');
-  if (tVesaDriver(videoDriver).videoMemory) < 2*1024*1024 then
+  if (vd.videoMemory) < 2*1024*1024 then
     error('Requires 2MB video card.');
 
   runTestSuites();

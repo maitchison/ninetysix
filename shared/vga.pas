@@ -50,7 +50,7 @@ type
     procedure waitVSYNC(); virtual; abstract;
     function  tryMode(width, height, bpp: word): boolean; virtual; abstract;
     procedure setMode(width, height, bpp: word);
-    procedure setTrueColor(width, height: word);
+    procedure setTrueColor(width, height: word; maxBPP: byte=32);
     procedure setLogicalSize(width, height: word); virtual; abstract;
     procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); virtual; abstract;
     procedure setText(); virtual; abstract;
@@ -137,13 +137,13 @@ begin
 end;
 
 {this will select the best true color mode}
-procedure tVideoDriver.setTrueColor(width, height: word);
+procedure tVideoDriver.setTrueColor(width, height: word; maxBPP: byte=32);
 begin
   if not (
-    tryMode(width, height, 24) or
-    tryMode(width, height, 32) or
-    tryMode(width, height, 16) or
-    tryMode(width, height, 15)
+    ((maxBPP >= 24) and tryMode(width, height, 24)) or
+    ((maxBPP >= 32) and tryMode(width, height, 32)) or
+    ((maxBPP >= 26) and tryMode(width, height, 16)) or
+    ((maxBPP >= 15) and tryMode(width, height, 150))
   ) then error(format('Could not set true color video mode (%dx%d)', [width, height]));
 end;
 
