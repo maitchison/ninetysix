@@ -32,6 +32,7 @@ type tVesaDriver = class(tVGADriver)
   private
     vesaInfo: tVesaInfo;
     mappedPhysicalAddress: dword;
+    oemStr: string;
     procedure allocateLFB(physicalAddress:dWord);
     function getVesaInfo(): tVesaInfo;
   public
@@ -127,19 +128,12 @@ end;
 {----------------------------------------------------------------}
 
 constructor tVesaDriver.create();
+var
+  oemBuffer: array[0..256-1] of char;
+  i: integer;
 begin
   inherited create();
   vesaInfo := getVesaInfo();
-  logInfo();
-end;
-
-procedure tVesaDriver.logInfo();
-var
-  lfbTag: string;
-  oemBuffer: array[0..256-1] of char;
-  oemStr: string;
-  i: integer;
-begin
 
   fillchar(oemBuffer, sizeof(oemBuffer), 0);
   dosMemGet(
@@ -155,8 +149,13 @@ begin
     oemStr += oemBuffer[i];
   end;
 
-  if (vesaInfo.capabilities and $8 = $8) then lfbTag := 'LFB' else lfbTag := 'No LFB';
-  info(format('VESA v%f (%.2f MB) %s "%s"', [vesaVersion, videoMemory / 1024 / 1024, lfbTag, oemStr]));
+
+  logInfo();
+end;
+
+procedure tVesaDriver.logInfo();
+begin
+  info(format('VESA v%f (%.2f MB) "%s"', [vesaVersion, videoMemory / 1024 / 1024, oemStr]));
 end;
 
 procedure tVesaDriver.logModes();
@@ -195,7 +194,16 @@ begin
     warning('Could not detect video memory size, assuming 1MB');
     LFBSize := 1024*1024;
   end else
-    LFBSIze := videoMemory;
+    LFBSize := videoMemory;
+
+  {this is a hack for my S3 card, which for some reason reports 1MB}
+  {
+  // while this works, it causes another problem, the memory just loops
+  // so for now we'll try to stick to 1MB... owch... I guess that means
+  // 16bit color
+  if oemStr = 'S3 Incorporated. Trio64' then
+    LFBSize := 2*1024*1024;
+  }
 
   {Map to linear}
   linearAddress := get_linear_addr(physicalAddress, LFBSize);
