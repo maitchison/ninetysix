@@ -501,6 +501,9 @@ begin
   videoDriver.setTrueColor(640,480);
   screen := tScreen.create();
 
+  screen.canvas.clear(RGB(255,0,255));
+  screen.pageFlip();
+
   {init vars}
   oldBufferPos := 0;
 

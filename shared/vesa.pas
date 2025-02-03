@@ -230,7 +230,7 @@ begin
   Mode := 0;
   for i := 0 to length(VesaModes)-1 do begin
     if VesaModes[i] = $FFFF then break;
-    with getModeInfo(VesaModes[i]) do begin
+    with getModeInfo(vesaModes[i]) do begin
       if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
         mode := VesaModes[i];
         break
@@ -246,15 +246,17 @@ begin
   {Set mode}
   with regs do begin
     ax := $4F02;
-    bx := mode + $4000;
+    bx := mode or $4000;
     realintr($10, regs);
   end;
 
   {Find our physical address}
-  physicalAddress := dword(getModeInfo($4000+mode).PhysBasePtr);
+  physicalAddress := dword(getModeInfo(mode or $4000).PhysBasePtr);
 
-  if physicalAddress = 0 then
+  if physicalAddress = 0 then begin
+    setText();
     error('Could not find LFB address.');
+  end;
 
   if physicalAddress <> $E0000000 then
     warning('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
