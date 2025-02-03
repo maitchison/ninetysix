@@ -101,7 +101,7 @@ function joinPath(const path, subpath, filename: string): string; overload;
 function removeExtension(const filename: string): string;
 
 function comma(value: int64; width: word=0; padding: char=' '): string;
-function fltToStr(value: extended): string;
+function fltToStr(value: extended;places: byte=3;padding:byte=0): string;
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
 function bytesToStr(bytes: array of byte): string;
@@ -575,9 +575,9 @@ begin
   if value < 0 then result := '-'+result;
 end;
 
-function fltToStr(value: extended): string;
+function fltToStr(value: extended;places: byte=3;padding:byte=0): string;
 begin
-  str(value, result);
+  str(value:padding:places, result);
 end;
 
 function intToStr(value: int64; width: word; padding: char='0'): string;

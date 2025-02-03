@@ -547,31 +547,6 @@ begin
   result := @bytes[fPos];
 end;
 
-{---------------------------------------------------------------}
-
-procedure runBenchmark();
-var
-  s: tStream;
-  i: int32;
-  startTime, endTime: double;
-begin
-  startTime := getSec;
-  s := tStream.Create();
-  for i := 1 to 1024 do
-    s.writeByte(255);
-  endTime := getSec;
-  writeln('Wrote 1kb at ',1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
-  s.free;
-
-  startTime := getSec;
-  s := tStream.Create();
-  for i := 1 to 64*1024 do
-    s.writeByte(255);
-  endTime := getSec;
-  writeln('Wrote 64kb at ',64*1024/(endTime-startTime)/1024/1024:3:3,' MB/s');
-  s.free;
-end;
-
 {-------------------------------------------}
 
 type

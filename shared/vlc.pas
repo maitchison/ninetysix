@@ -29,6 +29,7 @@ const
   ST_AUTO = 255;  {use rice, pack, or vlc, whichever is best}
   ST_PACK = 254;  {select best pack}
   ST_RICE = 253;  {guess a good rice}
+  ST_FAST = 252;  {same as auto, but only use fast codes and not rice codes}
   ST_RICE_SLOW = 252; {select best rice}
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
@@ -55,6 +56,8 @@ const
 
 function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function  readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
+
+function getSegmentTypeName(segmentType: byte): string;
 
 function  VLC2_Bits(value: dword): word; overload;
 function  VLC2_Bits(values: array of dword): dword; overload;
@@ -126,6 +129,12 @@ begin
     ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
     ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
     ST_FAST0..ST_FAST0+15: result := 'FAST'+intToStr(segmentType - ST_FAST0);
+    {special codes}
+    ST_AUTO: result := 'AUTO';
+    ST_PACK: result := 'PACK';
+    ST_RICE: result := 'RICE';
+    ST_FAST: result := 'FAST';
+
     else result := 'INVALID';
   end;
 end;
@@ -213,6 +222,39 @@ begin
       ]
     ));
     }
+  end;
+
+  {similar to auto, except we restrict to FAST rice codes only}
+  if segmentType = ST_FAST then begin
+    valueSum := 0;
+    valueMax := 0;
+    for value in values do begin
+      valueMax := max(valueMax, value);
+      valueSum += value;
+    end;
+
+    {start with packing}
+    packingBits := bitsToStoreMaxValue(valueMax) * length(values);
+    segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
+    bestBits := packingBits;
+
+    {see if FAST is an upgrade}
+    deltaK := 0;
+    riceBits := -1;
+    guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
+    baseK := guessK;
+
+    {see if FAST is an upgrade}
+    for k := 0 to 15 do begin
+      if (RICE_MaxCodeLength(values, k) > 8) then continue;
+      riceBits := RICE_Bits(values, k);
+      if riceBits < bestBits then begin
+        segmentType := ST_FAST0 + k;
+        bestBits := riceBits;
+        bestK := k;
+        deltaK := bestK - baseK;
+      end;
+    end;
   end;
 
   if segmentType = ST_PACK then begin
@@ -833,45 +875,6 @@ begin
   buildRiceTables();
   buildOffsetTable();
   buildUnpackingTables();
-end;
-
-{----------------------------------------------------}
-
-procedure benchmark();
-var
-  inData, outData: tDwords;
-  i: integer;
-  s: tStream;
-  startTime, encodeElapsed, decodeElapsed: double;
-  segmentType: byte;
-  bytes: int32;
-begin
-  setLength(inData, 64000);
-  setLength(outData, 64000);
-  for i := 0 to length(inData)-1 do
-    inData[i] := rnd div 2;
-
-  {run a bit of a benchmark on random bytes (0..127)}
-  s := tStream.create(2*64*1024);
-  for segmentType in [
-    ST_VLC1, ST_VLC2,
-    ST_PACK7, ST_PACK8, ST_PACK9,
-    ST_RICE0+6,
-    ST_AUTO, ST_PACK, ST_RICE
-  ] do begin
-    s.seek(0);
-    startTime := getSec();
-    bytes := writeSegment(s, inData, segmentType);
-    encodeElapsed := getSec() - startTime;
-
-    s.seek(0);
-    startTime := getSec();
-    readSegment(s, length(inData), outData);
-    decodeElapsed := getSec() - startTime;
-
-    info(format('mode:%d - %d bytes (encode:%fms decode:%fms)', [segmentType, bytes, 1000*encodeElapsed, 1000*decodeElapsed]));
-  end;
-
 end;
 
 {----------------------------------------------------}
