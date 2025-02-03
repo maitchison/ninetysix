@@ -258,14 +258,11 @@ begin
   for mode in vesaModes do begin
     if mode = $ffff then break;
     mi := getModeInfo(mode);
-    writeln('trying ', mode,' ', mi.xResolution, ' ', mi.yResolution, ' ', mi.bitsPerPixel);
     if (mi.xResolution = width) and (mi.yResolution = height) and (mi.bitsPerPixel=bpp) then begin
       foundMode := mode;
       break
     end;
   end;
-
-  writeln('found ', foundMode);
 
   if foundMode = 0 then exit(false);
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
