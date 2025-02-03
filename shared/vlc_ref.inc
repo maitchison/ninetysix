@@ -39,3 +39,24 @@ begin
     dec(bitsRemaining, bitsPerCode);
   end;
 end;
+
+procedure ReadRice_REF(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+var
+  quotient, remainder: dword;
+  value: word;
+  bs: tBitStream;
+  i: integer;
+  decoded: dword;
+  mask: word;
+begin
+  {table lookup method}
+  bs.init(stream);
+  mask := (1 shl RICE_TABLE_BITS)-1;
+  for i := 0 to n-1 do begin
+    decoded := RICE_TABLE[k, bs.peekWord and mask];
+    bs.consumeBits(decoded shr 16);
+    outBuffer^ := decoded and $ffff;
+    inc(outBuffer);
+  end;
+  bs.giveBack();
+end;

@@ -239,3 +239,210 @@ begin
 
   end;
 end;
+
+{-------------------------------------------------------}
+{ RICE }
+{-------------------------------------------------------}
+
+
+{fast inline asm rice code reader.
+This function can only use the lookup table, which is 16bit, which means
+ rice codes longer than this can not be used. For data where that matters
+ we'd need to either use VLC2, or to (more likely) just pack the bits.
+ the k divisor 15 = 32k, so max code representable would be 32k.
+ Reading > 16bits is non-trival as it requires shifting a 64bit integer
+ (so we can load 32bits at a time). Although maybe there would be a 20-bit
+ hack I could do.
+ I think for my case I'm fine as I'm really just using 8-but ulaw anyway.
+
+ Hmm... maybe I should just implement the falt adjustment in asm...
+ it's not that hard.
+}
+procedure ReadRice_ASM(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+var
+  tablePtr, outPtr, streamPtr: pointer;
+  bufferValue: dword;
+  bufferPos: byte;
+  bytesRead: integer;
+begin
+  tablePtr := @RICE_TABLE[k, 0];
+  outPtr := outBuffer;
+  // I think I need to store the length and load it here all at once.
+  streamPtr := stream.getCurrentBytesPtr(); // dodgy...
+  asm
+
+    pushad
+
+    {
+      eax   tmp
+      ebx   bufferValue
+      ecx   0  || tmp | bufferPos
+      edx   loop
+
+      esi   streamPtr
+      edi   outPtr
+      ebp   tablePtr
+    }
+
+    xor eax, eax
+    xor ebx, ebx
+    xor ecx, ecx
+
+    mov edx, N
+
+    mov esi, STREAMPTR
+    mov edi, OUTPTR
+
+    push ebp
+    mov ebp, TABLEPTR
+
+  @DecodeLoop:
+    {read word}
+    cmp cl, 16
+    jge @SkipRead
+  @Read:
+    {this is the correct way to do it...}
+    // todo: change to ebp
+    //mov eax, STREAM
+    // note: could make this faster if we could somehow read all the bytes in first...
+    //call tStream.readWord     // eax = readword
+    {this is the dodgy way}
+    movzx eax, word ptr [esi]
+    add esi, 2
+
+    shl eax, cl
+    or  ebx, eax
+    add cl, 16
+
+  @SkipRead:
+    movzx eax, bx                  // eax = 0  || next 16 buffer bits
+    and ax, RICE_MASK              // should be a constant
+    mov eax, dword ptr [ebp+eax*4] // eax = 0 | len || value
+
+    {consume bits}
+    mov ch, cl                  // ch = old buf len
+    ror eax, 16                 // eax = value || 0 | len
+    mov cl, al                  // cl = bits to burn
+    shr ebx, cl                 // burn bits from buffer
+    neg cl
+    add cl, ch                  // ch = pos - bitsRead
+
+    {write value}
+    shr eax, 16                 // eax = 0 || value
+    mov dword ptr [edi], eax    // outBuffer^ = code
+
+    {end loop}
+    add edi, 4
+    dec edx
+    jnz @DecodeLoop
+
+    pop ebp
+
+    {
+      calculate how many bytes we just read, which is
+      bytes read - bytes remaining in buffer
+    }
+    mov eax, esi
+    sub eax, STREAMPTR
+    and ecx, $ff
+    shr cl, 3
+    sub eax, ecx
+    mov BYTESREAD, eax
+
+    popad
+
+  end;
+  stream.seek(stream.pos+bytesRead);
+end;
+
+{
+faster version that only works if all rice codes have length <= 8 bits
+the main advantage here is that we're more likely to fit into cache.
+}
+procedure ReadRiceFast8_ASM(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+var
+  tablePtr, outPtr, streamPtr: pointer;
+  bufferValue: dword;
+  bufferPos: byte;
+  bytesRead: integer;
+begin
+  tablePtr := @RICE_TABLE[k, 0];
+  outPtr := outBuffer;
+  // I think I need to store the length and load it here all at once.
+  streamPtr := stream.getCurrentBytesPtr(); // dodgy...
+  asm
+
+    pushad
+
+    {
+      eax   tmp
+      ebx   bufferValue
+      ecx   0  || tmp | bufferPos
+      edx   loop
+
+      esi   streamPtr
+      edi   outPtr
+      ebp   tablePtr
+    }
+
+    xor eax, eax
+    xor ebx, ebx
+    xor ecx, ecx
+
+    mov edx, N
+
+    mov esi, STREAMPTR
+    mov edi, OUTPTR
+
+    push ebp
+    mov ebp, TABLEPTR
+
+  @DecodeLoop:
+    {read word}
+    cmp cl, 16
+    jge @SkipRead
+  @Read:
+    movzx eax, word ptr [esi]
+    add esi, 2
+    shl eax, cl
+    or  ebx, eax
+    add cl, 16
+  @SkipRead:
+    movzx eax, bl                  // eax = 0  || next 8 buffer bits
+    mov eax, dword ptr [ebp+eax*4] // eax = 0  | len || value
+
+    {consume bits}
+    mov ch, cl                  // ch = old buf len
+    ror eax, 16                 // eax = value || 0 | len
+    mov cl, al                  // cl = bits to burn
+    shr ebx, cl                 // burn bits from buffer
+    neg cl
+    add cl, ch                  // ch = pos - bitsRead
+
+    {write value}
+    shr eax, 16                 // eax = 0 || value
+    mov dword ptr [edi], eax    // outBuffer^ = code
+
+    {end loop}
+    add edi, 4
+    dec edx
+    jnz @DecodeLoop
+
+    pop ebp
+
+    {
+      calculate how many bytes we just read, which is
+      bytes read - bytes remaining in buffer
+    }
+    mov eax, esi
+    sub eax, STREAMPTR
+    and ecx, $ff
+    shr cl, 3
+    sub eax, ecx
+    mov BYTESREAD, eax
+
+    popad
+
+  end;
+  stream.seek(stream.pos+bytesRead);
+end;

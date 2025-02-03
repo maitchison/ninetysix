@@ -44,8 +44,14 @@ const
   ST_PACK7 = 23;
   ST_PACK8 = 24;
   ST_PACK9 = 25;
-
-  ST_RICE0 = 48; {48..64 = rice}
+  {...}
+  ST_RICE0 = 48; {48..63 = rice (max code is 15)}
+  {...}
+  { these are exactly the same as RICE but are guaranteed to have a
+  rice codelength <= 8 bits, and therefore can be resolved with a
+  smaller lookup table}
+  ST_FAST0 = 64; {64..79 = fast rice codes}
+  {...}
 
 function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function  readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
@@ -64,12 +70,16 @@ procedure SIGN_Read(stream: tStream; n: int32; outBuffer: pDword);
 procedure RICE_Write(stream: tStream; values: array of dword; k: integer);
 procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 function  RICE_Bits(values: array of dword; k: integer): int32;
+function  RICE_MaxCodeLength(values: array of dword; k: integer): int32;
 
 implementation
 
 {vlc1 - depricated}
 procedure VLC1_Write(stream: tStream; values: array of dword); forward;
 function  VLC1_Bits(value: dword): word; forward;
+
+{fast codes}
+procedure FAST_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer); forward;
 
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
@@ -82,8 +92,8 @@ var
   packing4: array[0..255] of array[0..1] of dword;
 
 const
-  RICE_TABLE_BITS = 16;
-  RICE_MASK = (1 shl RICE_TABLE_BITS)-1;
+  RICE_TABLE_BITS = 12;
+  RICE_MASK = (dword(1) shl RICE_TABLE_BITS)-1;
 
 var
   {used for VLC2 codes. This allows for the 'overlapping' optimization}
@@ -92,7 +102,7 @@ var
   {
     stores rice decodes for common values of k, given some input byte
     stored as decodedValue + (codeLength * 65536)
-    a codelenght of 0 indicates input not suffcent for decoding, and we must
+    a codelength of 0 indicates input not suffcent for decoding, and we must
     regress to another method
     todo: see if we can make sure in the encoder that this will not happen.
     (one way to do this is to set length for long codes to very high)
@@ -115,6 +125,7 @@ begin
     ST_SIGN: result := 'SIGN';
     ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
     ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
+    ST_FAST0..ST_FAST0+15: result := 'FAST'+intToStr(segmentType - ST_FAST0);
     else result := 'INVALID';
   end;
 end;
@@ -139,11 +150,12 @@ var
   valueMax: dword;
   valueSum: double;
   packingBits, riceBits: int32;
-  k, bestK, guessK, deltaK: integer;
+  k, bestK, baseK, guessK, deltaK: integer;
   thisBits, bestBits: int32;
   n: int32;
   startPos: int32;
   value: dword;
+  ricePenality: integer;
 begin
 
   startPos := stream.pos;
@@ -165,13 +177,16 @@ begin
 
     {see if RICE is an upgrade}
     deltaK := 0;
-    guessK := clamp(floor(log2(1+(valueSum / length(values)))), 0, 15);
+    riceBits := -1;
+    guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
+    baseK := guessK;
 
     // check that this k works with out current lookup table size.
     // it might generate a -1 length which means some codes are too big.
-    while guessK < 15 and (RICE_Bits(values, guessK) = -1) do inc(guessK);
+    while (baseK < 15) and (RICE_Bits(values, baseK) = -1) do inc(baseK);
 
-    for k := (guessK - 1) to (guessK + 1) do begin
+    {see if rice code is an upgrade}
+    for k := (baseK - 1) to (baseK + 1) do begin
       if k < 0 then continue;
       if k > 15 then continue;
       riceBits := RICE_Bits(values, k);
@@ -179,21 +194,25 @@ begin
         segmentType := ST_RICE0 + k;
         bestBits := riceBits;
         bestK := k;
-        deltaK := bestK - guessK;
+        deltaK := bestK - baseK;
       end;
     end;
 
+    {elevate RICE to FAST if we can}
+    if (segmentType in [ST_RICE0..ST_RICE0+15]) and (RICE_MaxCodeLength(values, bestK) <= 8) then
+      segmentType := segmentType - ST_RICE0 + ST_FAST0;
+
     {
     note(format(
-      'Selecting %s (%d) with scores %d %d (max:%d mean:%f)',
+      'Selecting %s (%d) with scores %d %d (max:%d mean:%f) maxCL:%d',
       [
         getSegmentTypeName(segmentType), deltaK,
         packingBits, riceBits,
-        valueMax, valueSum/length(values)
+        valueMax, valueSum/length(values),
+        RICE_MaxCodeLength(values, bestK)
       ]
     ));
     }
-
   end;
 
   if segmentType = ST_PACK then begin
@@ -226,6 +245,7 @@ begin
     ST_SIGN: SIGN_Write(stream, values);
     ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, stream);
     ST_RICE0..ST_RICE0+15: RICE_Write(stream, values, segmentType - ST_RICE0);
+    ST_FAST0..ST_FAST0+15: RICE_Write(stream, values, segmentType - ST_FAST0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -249,6 +269,7 @@ begin
     ST_SIGN: SIGN_Read(stream, n, @outBuffer[0]);
     ST_PACK0..ST_PACK0+31: unpackBits(stream, n, outBuffer, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: RICE_Read(stream, n, @outBuffer[0], segmentType-ST_RICE0);
+    ST_FAST0..ST_FAST0+15: FAST_Read(stream, n, @outBuffer[0], segmentType-ST_FAST0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -545,143 +566,15 @@ begin
   bs.flush();
 end;
 
-{fast inline asm rice code reader.
-This function can only use the lookup table, which is 16bit, which means
- rice codes longer than this can not be used. For data where that matters
- we'd need to either use VLC2, or to (more likely) just pack the bits.
- the k divisor 15 = 32k, so max code representable would be 32k.
- Reading > 16bits is non-trival as it requires shifting a 64bit integer
- (so we can load 32bits at a time). Although maybe there would be a 20-bit
- hack I could do.
- I think for my case I'm fine as I'm really just using 8-but ulaw anyway.
-
- Hmm... maybe I should just implement the falt adjustment in asm...
- it's not that hard.
-}
-procedure ReadRice_ASM(stream: tStream; n: int32; outBuffer: pDword; k: integer);
-var
-  tablePtr, outPtr, streamPtr: pointer;
-  bufferValue: dword;
-  bufferPos: byte;
-  bytesRead: integer;
-begin
-  tablePtr := @RICE_TABLE[k, 0];
-  outPtr := outBuffer;
-  // I think I need to store the length and load it here all at once.
-  streamPtr := stream.getCurrentBytesPtr(); // dodgy...
-  asm
-
-    pushad
-
-    {
-      eax   tmp
-      ebx   bufferValue
-      ecx   0  || tmp | bufferPos
-      edx   loop
-
-      esi   streamPtr
-      edi   outPtr
-      ebp   tablePtr
-    }
-
-    xor eax, eax
-    xor ebx, ebx
-    xor ecx, ecx
-
-    mov edx, N
-
-    mov esi, STREAMPTR
-    mov edi, OUTPTR
-
-    push ebp
-    mov ebp, TABLEPTR
-
-  @DecodeLoop:
-    {read word}
-    cmp cl, 16
-    jge @SkipRead
-  @Read:
-    {this is the correct way to do it...}
-    // todo: change to ebp
-    //mov eax, STREAM
-    // note: could make this faster if we could somehow read all the bytes in first...
-    //call tStream.readWord     // eax = readword
-    {this is the dodgy way}
-    movzx eax, word ptr [esi]
-    add esi, 2
-
-    shl eax, cl
-    or  ebx, eax
-    add cl, 16
-
-  @SkipRead:
-    movzx eax, bx                  // eax = 0  || next 16 buffer bits
-    and ax, RICE_MASK              // should be a constant
-    mov eax, dword ptr [ebp+eax*4] // eax = 0 | len || value
-
-    {consume bits}
-    mov ch, cl                  // ch = old buf len
-    ror eax, 16                 // eax = value || 0 | len
-    mov cl, al                  // cl = bits to burn
-    shr ebx, cl                 // burn bits from buffer
-    neg cl
-    add cl, ch                  // ch = pos - bitsRead
-
-    {write value}
-    shr eax, 16                 // eax = 0 || value
-    mov dword ptr [edi], eax    // outBuffer^ = code
-
-    {end loop}
-    add edi, 4
-    dec edx
-    jnz @DecodeLoop
-
-    pop ebp
-
-    {
-      calculate how many bytes we just read, which is
-      bytes read - bytes remaining in buffer
-    }
-    mov eax, esi
-    sub eax, STREAMPTR
-    and ecx, $ff
-    shr cl, 3
-    sub eax, ecx
-    mov BYTESREAD, eax
-
-    popad
-
-  end;
-  stream.seek(stream.pos+bytesRead);
-end;
-
-procedure ReadRice_REF(stream: tStream; n: int32; outBuffer: pDword; k: integer);
-var
-  quotient, remainder: dword;
-  value: word;
-  bs: tBitStream;
-  i: integer;
-  decoded: dword;
-  mask: word;
-begin
-  {table lookup method}
-  bs.init(stream);
-  mask := (1 shl RICE_TABLE_BITS)-1;
-  for i := 0 to n-1 do begin
-    decoded := RICE_TABLE[k, bs.peekWord and mask];
-    bs.consumeBits(decoded shr 16);
-    outBuffer^ := decoded and $ffff;
-    inc(outBuffer);
-  end;
-  bs.giveBack();
-end;
-
 procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 begin
-  //ReadRice_REF(stream, n, outBUffer, k);
   ReadRice_ASM(stream, n, outBUffer, k);
 end;
 
+procedure FAST_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+begin
+  ReadRiceFast8_ASM(stream, n, outBUffer, k);
+end;
 
 function RICE_Bits(values: array of dword; k: integer): int32;
 var
@@ -693,8 +586,21 @@ begin
   for value in values do begin
     bitsNeeded := (value shr k) + 1 + k;
     { this is just a method of discouraging the use of long rice codes }
-    if bitsNeeded > RICE_TABLE_BITS then exit(high(int32));
+    if bitsNeeded > RICE_TABLE_BITS then exit(1 shl 24);
     result += bitsNeeded;
+  end;
+end;
+
+function RICE_MaxCodeLength(values: array of dword; k: integer): int32;
+var
+  quotient, remainder: dword;
+  value: dword;
+  bitsNeeded: integer;
+begin
+  result := 0;
+  for value in values do begin
+    bitsNeeded := (value shr k) + 1 + k;
+    if bitsNeeded > result then result := bitsNeeded;
   end;
 end;
 

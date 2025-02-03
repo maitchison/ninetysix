@@ -31,6 +31,9 @@ const
   {todo: make a flag}
   EXPORT_WAVE: boolean = false;
 
+  {only compresses HIGH profile in test mode, but also always recompresses}
+  FAST_TEST: boolean = true;
+
 {globals}
 var
   screen: tScreen;
@@ -298,13 +301,12 @@ begin
   setLength(outSFX, 0);
   setLength(deltaSFX, 0);
 
-{  profiles := [
+  profiles := [
     ACP_LOW, ACP_MEDIUM, ACP_HIGH, ACP_VERYHIGH,
     ACP_Q8, ACP_Q10, ACP_Q12, ACP_Q16
-  ];}
-  profiles := [
-    ACP_HIGH
   ];
+
+  if FAST_TEST then profiles := [ACP_MEDIUM];
 
   writeln();
   writeln('--------------------------');
@@ -325,7 +327,7 @@ begin
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
-    if not fs.exists(music16.tag+'.a96') then begin
+    if FAST_TEST or not fs.exists(music16.tag+'.a96') then begin
       outStream := encodeLA96(music16, profile, true);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
