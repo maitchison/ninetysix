@@ -257,8 +257,15 @@ begin
   foundMode := 0;
   for mode in vesaModes do begin
     if mode = $ffff then break;
+    {My S3 card has 2MB, but reports 1MB. I don't seem to be able to
+     access the 2nd MB and for some reason VBE still includes modes
+     that require it. For this reason I disable any mode we don't have
+     video memory for.}
+
+    if (width*height*bpp) div 8 > videoMemory then continue;
     mi := getModeInfo(mode);
     if (mi.xResolution = width) and (mi.yResolution = height) and (mi.bitsPerPixel=bpp) then begin
+
       foundMode := mode;
       break
     end;

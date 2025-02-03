@@ -500,6 +500,7 @@ begin
 
   videoDriver.setTrueColor(640,480);
   screen := tScreen.create();
+  screen.scrollMode := SSM_COPY;
 
   {init vars}
   oldBufferPos := 0;
