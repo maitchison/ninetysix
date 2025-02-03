@@ -258,8 +258,7 @@ begin
     error('Could not find LFB address.');
   end;
 
-  if physicalAddress <> $E0000000 then
-    warning('Expecting physical address to be $E0000000 but found it at $'+HexStr(PhysicalAddress, 8));
+  info('Physical found at $'+HexStr(PhysicalAddress, 8));
 
   if mappedPhysicalAddress = 0 then begin
     {allocate for the first time}

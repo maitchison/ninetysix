@@ -36,7 +36,7 @@ type
 
   {bit-depth of the video memory. Screen buffer is always 32bit,
    however do support on-the-fly conversion to any of these depths}
-  tVideoDepth = (VD_16, VD_24, VD_32);
+  tVideoDepth = (VD_15, VD_16, VD_24, VD_32);
 
   tScreen = class
 
@@ -108,6 +108,7 @@ var
   lfb_seg: word;
   srcOffset,dstOffset: dword;
   bytesPerPixel: byte;
+  bitsPerPixel: byte;
 begin
 
   lfb_seg := videoDriver.LFB_SEG;
@@ -126,11 +127,36 @@ begin
 
     mov ecx, pixelCnt
 
-    mov al, bytesPerPixel
-    cmp al, 3
+    mov al, bitsPerPixel
+    cmp al, 24
     je  @X24
     jg  @X32
-    //fall through to @X16
+    cmp al, 16
+
+    je  @X16
+    //fall through to @X15
+
+  @X15:
+
+    {todo: mmx 2pixels at a time (is it any faster on real hardware?}
+
+    mov eax, dword ptr ds:[esi]       // aaaaaaaarrrrrrrrggggggggbbbbbbbb
+
+    shr ah, 3                         // aaaaaaaarrrrrrrr000gggggbbbbbbbb
+    shr ax, 3                         // aaaaaaaarrrrrrrr000000gggggbbbbb
+    ror eax, 10                       //           aaaaaaaarrrrrrrr000000gggggbbbbb
+    shr ax, 6                         //                    aaaaaaaarrrrrgggggbbbbb
+    rol eax, 10                       //         aaaaaaaarrrrrggggggbbbbb
+
+    mov word ptr es:[edi], ax
+
+    add esi, 4
+    add edi, 2
+    dec ecx
+    jnz @X16
+
+    jmp @Done
+
 
   @X16:
 
@@ -214,6 +240,7 @@ begin
   if assigned(canvas) then canvas.Destroy;
   canvas := tPage.Create(videoDriver.width, videoDriver.height);
   case videoDriver.bitsPerPixel of
+    15: videoDepth := VD_15;
     16: videoDepth := VD_16;
     24: videoDepth := VD_24;
     32: videoDepth := VD_32;
