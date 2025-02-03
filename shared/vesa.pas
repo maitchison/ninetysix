@@ -335,6 +335,8 @@ procedure tVesaDriver.setLogicalSize(width, height: word);
 var
   actualWidth: word;
 begin
+  if (width * height * bitsPerPixel div 8) > videoMemory then
+    error(format('Logical size (%dx%dx%d) too large for video memory (%dKB)', [width, height, bitsPerPixel, videoMemory div 1024]));
   info(format('Setting logical size: %dx%d', [width, height]));
   asm
     pusha

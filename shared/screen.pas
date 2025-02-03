@@ -112,7 +112,7 @@ begin
   lfb_seg := videoDriver.LFB_SEG;
   bitsPerPixel := videoDriver.bitsPerPixel;
   bytesPerPixel := (videoDriver.bitsPerPixel+7) div 8;
-  dstOffset := (dstX+(dstY * videoDriver.physicalWidth))*bytesPerPixel;
+  dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*bytesPerPixel;
   srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
   asm
     cli
@@ -205,6 +205,7 @@ begin
     jmp @Done
 
   @X32:
+    cld
     rep movsd
     jmp @Done
 
@@ -251,7 +252,7 @@ begin
   flipBounds.init(256, 256, -256, -256);
 
   viewport := tRect.create(0, 0, videoDriver.physicalWidth, videoDriver.physicalHeight);
-  bounds := tRect.create(width, height);
+  bounds := tRect.create(aWidth, aHeight);
 
   stats.reset();
 end;
@@ -275,19 +276,23 @@ begin
   {todo: support S3 upload (but maybe make sure regions are small enough
    to not cause stutter - S3 is about twice as fast.}
   rect.clipTo(bounds);
-  if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   case scrollmode of
     SSM_COPY: begin
-      srcX := rect.x; srcY := rect.y;
-      dstX := rect.x; dstY := rect.y;
-    end;
-    SSM_OFFSET: begin
+      {no need to copy anything offscreen}
+      rect.clipTo(viewport);
       srcX := rect.x; srcY := rect.y;
       dstX := rect.x-viewport.x; dstY := rect.y-viewport.y;
     end;
+    SSM_OFFSET: begin
+      {copy everything}
+      srcX := rect.x; srcY := rect.y;
+      dstX := rect.x; dstY := rect.y;
+    end;
     else error('Invalid scroll mode');
   end;
+
+  if (rect.width <= 0) or (rect.height <= 0) then exit;
 
   cnt := rect.width;
   for i := 0 to rect.height-1 do
@@ -456,7 +461,7 @@ begin
         transferLineToScreen(canvas, viewport.x, viewport.y+y, 0, y, videoDriver.physicalWidth);
       end;
     SSM_OFFSET: begin
-      videoDriver.setDisplayStart(viewport.x,viewport.y);
+      videoDriver.setDisplayStart(viewport.x, viewport.y);
       for y := flipBounds.top to flipBounds.bottom do begin
         rle := 0;
         for x := flipBounds.left to flipBounds.right do begin
@@ -478,7 +483,7 @@ begin
           stats.copyRegions += 1;
         end;
       end;
-      flipBounds.init(256,256,-256, -256);
+      flipBounds.init(256,256,-256,-256);
     end;
     else Error('Invalid copy mode');
   end;

@@ -81,14 +81,14 @@ var
 type
   tScreenLine = record
     xMin, xMax: int32;
-    procedure reset();
+    procedure reset(width: integer);
     procedure adjust(x: int16);
   end;
 
-procedure tScreenLine.reset(); inline;
+procedure tScreenLine.reset(width: integer); inline;
 begin
   xMax := 0;
-  xMin := 9999;
+  xMin := width-1;
 end;
 
 procedure tScreenLine.adjust(x: int16); inline;
@@ -417,7 +417,7 @@ var
     end;
 
     for y := yMin to yMax do
-      screenLines[y].reset();
+      screenLines[y].reset(canvas.width);
 
     {scan the sides of the polygon}
     scanSide(s1, s2);

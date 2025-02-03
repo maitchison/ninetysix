@@ -442,7 +442,7 @@ begin
   end;
 
   //stub:
-  screen.scrollMode := SSM_COPY;
+  screen.scrollMode := SSM_OFFSET;
 
   if screen.scrollMode = SSM_OFFSET then
     videoDriver.setLogicalSize(track.width, track.height);
@@ -568,8 +568,8 @@ begin
 
   if (vd.vesaVersion) < 2.0 then
     error('Requires VESA 2.0 or greater.');
-  if (vd.videoMemory) < 2*1024*1024 then
-    error('Requires 2MB video card.');
+  if (vd.videoMemory) < 1*1024*1024 then
+    error('Requires 1MB video card.');
 
   runTestSuites();
 
