@@ -498,11 +498,9 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     error('Requires 1MB video card.');
 
-  videoDriver.setTrueColor(640,480);
+  {800x600 is required for my weird S3 video card...}
+  videoDriver.setTrueColor(800,600);
   screen := tScreen.create();
-
-  screen.canvas.clear(RGB(255,0,255));
-  screen.pageFlip();
 
   {init vars}
   oldBufferPos := 0;
@@ -541,7 +539,7 @@ begin
   hdrPhase := tHDRPage.create(64,64);
 
   {load background and refresh screen}
-  screen.background := tPage.Load('res\background.p96');
+  screen.background := tPage.Load('res\background_800x600.p96');
 
   screen.pageClear();
   screen.pageFlip();
@@ -620,7 +618,9 @@ begin
       gui.update(elapsed);
       gui.draw(screen);
 
-      screen.flipAll();
+      {screen.flipAll();}
+      {stub:}
+      screen.pageFlip();
 
       oldBufferPos := musicBufferReadPos;
 

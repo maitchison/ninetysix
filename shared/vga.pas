@@ -25,7 +25,6 @@ type
     function getPhysicalHeight: word;
     function getLogicalWidth: word;
     function getLogicalHeight: word;
-    function getBPP: word;
     function getLFB_SEG: word;
 
   public
@@ -45,7 +44,7 @@ type
     property physicalWidth:word read getPhysicalWidth;
     property physicalHeight:word read getPhysicalHeight;
 
-    property bitsPerPixel:word read getBPP;
+    property bitsPerPixel:word read fBPP;
     property LFB_SEG:word read getLFB_SEG;
 
     procedure waitVSYNC(); virtual; abstract;
@@ -118,11 +117,6 @@ end;
 function tVideoDriver.getLogicalHeight: word;
 begin
   result := fLogicalHeight;
-end;
-
-function tVideoDriver.getBPP: word;
-begin
-  result := fBPP;
 end;
 
 function tVideoDriver.getLFB_SEG: word;

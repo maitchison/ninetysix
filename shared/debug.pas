@@ -274,7 +274,7 @@ begin
     end;
   end;
 
-  warning('An error has occured!');
+  PrintLog(5);
 
   case ErrNo of
     100: RunError := 'General Error (100)';

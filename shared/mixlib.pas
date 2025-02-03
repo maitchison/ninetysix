@@ -92,7 +92,7 @@ procedure musicStop();
 function  musicBufferReadPos(): dword;
 function  musicBufferWritePos(): dword;
 function  getMusicStats(): tMusicStats;
-procedure musicUpdate(maxNewFrames: integer=4);
+procedure musicUpdate(maxNewFrames: integer=-1);
 
 function  mixClickDetection(): dword;
 
@@ -496,16 +496,33 @@ begin
   //note(format('Processing r:%d w:%d', [mbReadPos div 1024, mbWritePos div 1024]));
 end;
 
-procedure musicUpdate(maxNewFrames: integer=4);
+procedure musicUpdate(maxNewFrames: integer=-1);
 var
   framesProcessed: integer;
   timer: tTimer;
+  framesFilled: integer;
 begin
   if not musicReader.isLoaded then begin
     //decay timer to zero
     musicTimer.avElapsed *= 0.90;
     exit;
   end;
+
+  framesFilled := getMusicStats().bufferFramesFilled;
+
+  if maxNewFrames < 0 then begin
+    {work out how many frames to process}
+    if framesFilled < 44 then
+      maxNewFrames := 16
+    else if framesFilled < 44*2 then
+      maxNewFrames := 8
+    else if framesFilled < 44*4 then
+      maxNewFrames := 4
+    else
+      maxNewFrames := 2;
+  end;
+
+
   framesProcessed := 0;
   musicTimer.start();
   while (framesProcessed < maxNewFrames) and (getMusicStats().bufferFramesFree > 0) do begin

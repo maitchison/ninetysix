@@ -112,6 +112,7 @@ var
 begin
 
   lfb_seg := videoDriver.LFB_SEG;
+  bitsPerPixel := videoDriver.bitsPerPixel;
   bytesPerPixel := (videoDriver.bitsPerPixel+7) div 8;
   dstOffset := (dstX+(dstY * canvas.width))*bytesPerPixel;
   srcOffset := dword(canvas.pixels) + ((srcX + srcY * videoDriver.logicalWidth) * 4);

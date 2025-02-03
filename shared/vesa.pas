@@ -38,7 +38,7 @@ type tVesaDriver = class(tVGADriver)
     constructor create();
     procedure logInfo();
     procedure logModes();
-    function  tryMode(width, height, BPP: word): boolean; override;
+    function  tryMode(width, height, bpp: word): boolean; override;
     procedure setLogicalSize(width, height: word); override;
     procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); override;
     function  vesaVersion: single;
@@ -258,7 +258,7 @@ begin
     error('Could not find LFB address.');
   end;
 
-  info('Physical found at $'+HexStr(PhysicalAddress, 8));
+  info('Physical address found at $'+HexStr(PhysicalAddress, 8));
 
   if mappedPhysicalAddress = 0 then begin
     {allocate for the first time}
@@ -276,7 +276,7 @@ begin
   fPhysicalHeight := height;
   fLogicalWidth := width;
   fLogicalHeight := height;
-  fBpp := bpp;
+  fBPP := bpp;
 
   result := true;
 end;
