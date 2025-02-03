@@ -33,6 +33,7 @@ type tVesaDriver = class(tVGADriver)
     vesaInfo: tVesaInfo;
     mappedPhysicalAddress: dword;
     oemStr: string;
+    vesaModes: array[0..64] of word;
     procedure allocateLFB(physicalAddress:dWord);
     function getVesaInfo(): tVesaInfo;
   public
@@ -135,6 +136,7 @@ begin
   inherited create();
   vesaInfo := getVesaInfo();
 
+  {oem string}
   fillchar(oemBuffer, sizeof(oemBuffer), 0);
   dosMemGet(
     word(vesaInfo.OemStringPtr shr 16),
@@ -149,7 +151,13 @@ begin
     oemStr += oemBuffer[i];
   end;
 
+  {modes}
+  dosMemGet(
+    word(vesaInfo.VideoModePtr shr 16),
+    word(vesaInfo.VideoModePtr),
+    vesaModes, sizeof(vesaModes));
 
+  {logging...}
   logInfo();
 end;
 
@@ -161,15 +169,9 @@ end;
 procedure tVesaDriver.logModes();
 var
   i: integer;
-  vesaModes: array[0..64] of word;
   postfix: string;
 
 begin
-
-  dosMemGet(
-    word(vesaInfo.VideoModePtr shr 16),
-    word(vesaInfo.VideoModePtr),
-    vesaModes, sizeof(vesaModes));
 
   for i := 0 to length(vesaModes)-1 do begin
     if vesaModes[i] = $FFFF then break;
@@ -244,38 +246,30 @@ end;
  the LFB pointer}
 function tVesaDriver.tryMode(width, height, bpp: word): boolean;
 var
-  i: integer;
-  vesaModes: array[0..64] of word;
-  mode: word;
+  mode, foundMode: word;
   rights: dword;
   physicalAddress: dWord;
   regs: tRealRegs;
   dosSeg, dosSel: word;
+  mi: tVesaModeInfo;
 begin
 
-  { get list of video modes }
-  {todo: this looks wrong}
-  DosMemGet(
-    word(VesaInfo.VideoModePtr shr 16),
-    word(VesaInfo.VideoModePtr),
-    vesaModes, sizeof(vesaModes));
-
-  Mode := 0;
-  for i := 0 to length(VesaModes)-1 do begin
-    if VesaModes[i] = $FFFF then break;
-    with getModeInfo(vesaModes[i]) do begin
-      if (XResolution = width) and (YResolution = height) and (BitsPerPixel=bpp) then begin
-        mode := VesaModes[i];
-        break
-      end;
+  foundMode := 0;
+  for mode in vesaModes do begin
+    if mode = $ffff then break;
+    mi := getModeInfo(mode);
+    writeln('trying ', mode,' ', mi.xResolution, ' ', mi.yResolution, ' ', mi.bitsPerPixel);
+    if (mi.xResolution = width) and (mi.yResolution = height) and (mi.bitsPerPixel=bpp) then begin
+      foundMode := mode;
+      break
     end;
   end;
 
-  if Mode = 0 then exit(false);
+  writeln('found ', foundMode);
 
+  if foundMode = 0 then exit(false);
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
-
-  setMode(mode);
+  setMode(foundMode);
 
   result := true;
 end;

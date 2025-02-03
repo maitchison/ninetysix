@@ -140,10 +140,10 @@ end;
 procedure tVideoDriver.setTrueColor(width, height: word);
 begin
   if not (
-    tryMode(width, height,24) or
-    tryMode(width, height,32) or
-    tryMode(width, height,16) or
-    tryMode(width, height,15)
+    tryMode(width, height, 24) or
+    tryMode(width, height, 32) or
+    tryMode(width, height, 16) or
+    tryMode(width, height, 15)
   ) then error(format('Could not set true color video mode (%dx%d)', [width, height]));
 end;
 

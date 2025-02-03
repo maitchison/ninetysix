@@ -498,8 +498,7 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     error('Requires 1MB video card.');
 
-  {800x600 is required for my weird S3 video card...}
-  videoDriver.setTrueColor(800,600);
+  videoDriver.setTrueColor(640,480);
   screen := tScreen.create();
 
   {init vars}
@@ -539,7 +538,7 @@ begin
   hdrPhase := tHDRPage.create(64,64);
 
   {load background and refresh screen}
-  screen.background := tPage.Load('res\background_800x600.p96');
+  screen.background := tPage.Load('res\background.p96');
 
   screen.pageClear();
   screen.pageFlip();
