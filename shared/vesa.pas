@@ -38,6 +38,7 @@ type tVesaDriver = class(tVGADriver)
     constructor create();
     procedure logInfo();
     procedure logModes();
+    procedure setMode(mode: word); overload;
     function  tryMode(width, height, bpp: word): boolean; override;
     procedure setLogicalSize(width, height: word); override;
     procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); override;
@@ -133,8 +134,29 @@ begin
 end;
 
 procedure tVesaDriver.logInfo();
+var
+  lfbTag: string;
+  oemBuffer: array[0..256-1] of char;
+  oemStr: string;
+  i: integer;
 begin
-  info(format('VESA v%f (%.2f MB)', [vesaVersion, videoMemory / 1024 / 1024]));
+
+  fillchar(oemBuffer, sizeof(oemBuffer), 0);
+  dosMemGet(
+    word(vesaInfo.OemStringPtr shr 16),
+    word(vesaInfo.OemStringPtr and $ffff),
+    oemBuffer[0], 256
+  );
+  oemStr := '';
+  for i := 0 to 32-1 do begin
+    // i > 4 is a hack because for some reason dosbox-x has corrupt
+    // inital 4 characters
+    if (i > 4) and (oemBuffer[i] = #0) then break;
+    oemStr += oemBuffer[i];
+  end;
+
+  if (vesaInfo.capabilities and $8 = $8) then lfbTag := 'LFB' else lfbTag := 'No LFB';
+  info(format('VESA v%f (%.2f MB) %s "%s"', [vesaVersion, videoMemory / 1024 / 1024, lfbTag, oemStr]));
 end;
 
 procedure tVesaDriver.logModes();
@@ -142,11 +164,14 @@ var
   i: integer;
   vesaModes: array[0..64] of word;
   postfix: string;
+
 begin
+
   dosMemGet(
     word(vesaInfo.VideoModePtr shr 16),
     word(vesaInfo.VideoModePtr),
     vesaModes, sizeof(vesaModes));
+
   for i := 0 to length(vesaModes)-1 do begin
     if vesaModes[i] = $FFFF then break;
     with getModeInfo(vesaModes[i]) do begin
@@ -155,7 +180,7 @@ begin
       else
         postfix := '';
 
-      note(format('[%d] %dx%dx%d %s', [i, xResolution, yResolution, bitsPerPixel, postfix]));
+      note(format('[%d] %dx%dx%d %s', [vesaModes[i], xResolution, yResolution, bitsPerPixel, postfix]));
     end;
   end;
 end;
@@ -238,20 +263,42 @@ begin
     end;
   end;
 
-  if Mode = 0 then
-    exit(false);
+  if Mode = 0 then exit(false);
 
   info(format('Setting video mode: %dx%dx%d', [width, height, bpp]));
+
+  setMode(mode);
+
+  result := true;
+end;
+
+{Set graphics mode. Once complete the framebuffer can be accessed via
+ the LFB pointer}
+procedure tVesaDriver.setMode(mode: word);
+var
+  i: integer;
+  vesaModes: array[0..64] of word;
+  rights: dword;
+  physicalAddress: dWord;
+  regs: tRealRegs;
+  dosSeg, dosSel: word;
+  mi: tVesaModeInfo;
+begin
+
+  {we use $4000 to request LFB}
+  mode := mode or $4000;
 
   {Set mode}
   with regs do begin
     ax := $4F02;
-    bx := mode or $4000;
+    bx := mode;
     realintr($10, regs);
   end;
 
+  mi := getModeInfo(mode);
+
   {Find our physical address}
-  physicalAddress := dword(getModeInfo(mode or $4000).PhysBasePtr);
+  physicalAddress := dword(mi.PhysBasePtr);
 
   if physicalAddress = 0 then begin
     setText();
@@ -272,13 +319,11 @@ begin
     allocateLFB(physicalAddress);
   end;
 
-  fPhysicalWidth := width;
-  fPhysicalHeight := height;
-  fLogicalWidth := width;
-  fLogicalHeight := height;
-  fBPP := bpp;
-
-  result := true;
+  fPhysicalWidth := mi.xResolution;
+  fPhysicalHeight := mi.yResolution;
+  fLogicalWidth := mi.xResolution;
+  fLogicalHeight := mi.yResolution;
+  fBPP := mi.bitsPerPixel;
 end;
 
 {Sets the logical screen width, allowing for smooth scrolling}

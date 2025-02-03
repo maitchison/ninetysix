@@ -14,7 +14,7 @@ var
   screen: tScreen;
   driver: tVesaDriver;
   i: integer;
-  LFB: word;
+  mode: word;
 
 begin
   clrscr;
@@ -24,20 +24,19 @@ begin
   driver.logModes();
   driver.logInfo();
 
-  {quick test}
-  driver.setMode(800, 600, 16);
-
-  screen := tScreen.create();
-  screen.scrollMode := SSM_COPY;
-
-  for i := 0 to 100 do begin
-    screen.canvas.clear(RGB(rnd,rnd,rnd));
-    screen.pageFlip();
-    delay(1);
+  if paramCount = 1 then begin
+    mode := strToInt(paramStr(1));
+    {quick test}
+    driver.setMode(mode);
+    screen := tScreen.create();
+    screen.scrollMode := SSM_COPY;
+    for i := 0 to 10 do begin
+      screen.canvas.clear(RGB(rnd,rnd,rnd));
+      screen.pageFlip();
+    end;
+    readkey;
+    driver.setText();
+    note('All done');
   end;
-
-  readkey;
-  driver.setText();
-  note('All done');
 
 end.
