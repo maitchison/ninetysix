@@ -174,6 +174,7 @@ var
 begin
 
   startPos := stream.pos;
+  result := 0;
 
   if length(values) = 0 then exit;
 
@@ -201,6 +202,7 @@ begin
     while (baseK < 15) and (RICE_Bits(values, baseK) = -1) do inc(baseK);
 
     {see if rice code is an upgrade}
+    bestK := -1;
     for k := (baseK - 1) to (baseK + 1) do begin
       if k < 0 then continue;
       if k > 15 then continue;
@@ -214,7 +216,7 @@ begin
     end;
 
     {elevate RICE to FAST if we can}
-    if (segmentType in [ST_RICE0..ST_RICE0+15]) and (RICE_MaxCodeLength(values, bestK) <= 8) then
+    if (bestK >= 0) and (RICE_MaxCodeLength(values, bestK) <= 8) then
       segmentType := segmentType - ST_RICE0 + ST_FAST0;
 
     {
@@ -276,6 +278,7 @@ begin
   end;
 
   if segmentType = ST_RICE_SLOW then begin
+    riceBits := 0;
     for i := 0 to 15 do begin
       thisBits := RICE_Bits(values, i);
       if (i = 0) or (thisBits < riceBits) then begin

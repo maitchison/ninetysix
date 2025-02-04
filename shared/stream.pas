@@ -40,6 +40,10 @@ type
     function  asBytes(): tBytes;
     procedure writeChars(s: string);
     procedure writeVLC8(value: dword);
+    function  readBytes(n: int32): tBytes;
+    procedure writeBytes(aBytes: tBytes;aLen:int32=-1);
+    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
+    function  writeSegment(values: array of dword;segmentType:byte=255): int32;
 
     procedure advance(numBytes: integer);
 
@@ -47,15 +51,11 @@ type
     function  readByte: byte; virtual; abstract;
     function  readWord: word; virtual; abstract;
     function  readDWord: dword; virtual; abstract;
-    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords; virtual; abstract;
-    function  readBytes(n: int32): tBytes; virtual; abstract;
     procedure readBlock(var x;numBytes: int32); virtual; abstract;
     procedure writeByte(b: byte); virtual; abstract;
     procedure writeWord(w: word); virtual; abstract;
     procedure writeDWord(d: dword); virtual; abstract;
-    procedure writeBytes(aBytes: tBytes;aLen:int32=-1); virtual; abstract;
     procedure writeBlock(var x;numBytes: int32); virtual; abstract;
-    function  writeSegment(values: array of dword;segmentType:byte=255): int32; virtual; abstract;
 
     {for direct access}
     function  getCurrentBytesPtr(requestedBytes: int32): pointer; virtual;
@@ -103,15 +103,11 @@ type
     function  readByte: byte; override;
     function  readWord: word; override;
     function  readDWord: dword; override;
-    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords; override;
-    function  readBytes(n: int32): tBytes; override;
     procedure readBlock(var x;numBytes: int32); override;
     procedure writeByte(b: byte); override;
     procedure writeWord(w: word); override;
     procedure writeDWord(d: dword); override;
-    procedure writeBytes(aBytes: tBytes;aLen:int32=-1); override;
     procedure writeBlock(var x;numBytes: int32); override;
-    function  writeSegment(values: array of dword;segmentType:byte=255): int32; override;
 
     {properties}
     property  capacity: int32 read fCapacity;
@@ -223,6 +219,36 @@ begin
     end;
   until false;
 end;
+
+function tStream.readBytes(n: int32): tBytes;
+begin
+  result := nil;
+  if n = 0 then exit;
+  if n > (len-fPos) then
+    error(Format('Read over end of stream, requested, %d bytes but %d remain.', [n,  len - fpos]));
+  setLength(result, n);
+  readBlock(result[0], n);
+end;
+
+procedure tStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
+begin
+  if aLen < 0 then aLen := length(aBytes);
+  if aLen = 0 then exit;
+  if aLen > length(aBytes) then error('tried writing too many bytes');
+  expandLen(fPos + aLen);
+  writeBlock(aBytes[0], aLen);
+end;
+
+function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
+begin
+  result := vlc.readSegment(self, n, outBuffer);
+end;
+
+function tStream.writeSegment(values: array of dword;segmentType:byte=255): int32;
+begin
+  result := vlc.writeSegment(self, values, segmentType);
+end;
+
 
 {this is very slow. Make a copy of the entire stream from start to end
  as a tBytes}
@@ -372,7 +398,6 @@ end;
 procedure tMemoryStream.writeWord(w: word);
 begin
   expandLen(fPos+2);
-  {little edian}
   pWord(bytes + fPos)^ := w;
   inc(fPos, 2);
 end;
@@ -380,19 +405,8 @@ end;
 procedure tMemoryStream.writeDWord(d: dword);
 begin
   expandLen(fPos+4);
-  {little edian}
   pDWord(bytes + fPos)^ := d;
   inc(fPos, 4);
-end;
-
-procedure tMemoryStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
-begin
-  if aLen < 0 then aLen := length(aBytes);
-  if aLen = 0 then exit;
-  if aLen > length(aBytes) then error('tried writing too many bytes');
-  expandLen(fPos + aLen);
-  move(aBytes[0], self.bytes[fPos], aLen);
-  inc(fPos, aLen);
 end;
 
 function tMemoryStream.readByte: byte;
@@ -413,17 +427,6 @@ begin
   inc(fPos,4);
 end;
 
-function tMemoryStream.readBytes(n: int32): tBytes;
-begin
-  result := nil;
-  if n = 0 then exit;
-  if n > (len-fPos) then
-    error(Format('Read over end of stream, requested, %d bytes but %d remain.', [n,  len - fpos]));
-  system.setLength(result, n);
-  move(bytes[fPos], result[0], n);
-  fPos += n;
-end;
-
 {read a block from stream into variable}
 procedure tMemoryStream.readBlock(var x;numBytes: int32);
 begin
@@ -441,16 +444,6 @@ begin
   expandLen(fPos + numBytes);
   move(x, self.bytes[fPos], numBytes);
   inc(fPos, numBytes);
-end;
-
-function tMemoryStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
-begin
-  result := vlc.readSegment(self, n, outBuffer);
-end;
-
-function tMemoryStream.writeSegment(values: array of dword;segmentType:byte=255): int32;
-begin
-  result := vlc.writeSegment(self, values, segmentType);
 end;
 
 {---------------------------------------------}
