@@ -28,15 +28,17 @@ type
     constructor create(aInitialCapacity: dword=0);
     destructor destroy(); override;
 
-    procedure seek(aPos: int32); virtual;
-    procedure flush(); virtual;
-    procedure reset(); virtual;
-
     {derived}
     function  peekByte: byte; inline;
     function  peekWord: word; inline;
     function  peekDWord: dword; inline;
     function  readVLC8: dword; inline;
+    function  readByte: byte; virtual;
+    function  readWord: word; virtual;
+    function  readDWord: dword; virtual;
+    procedure writeByte(b: byte); virtual;
+    procedure writeWord(w: word); virtual;
+    procedure writeDWord(d: dword); virtual;
     function  asBytes(): tBytes;
     procedure writeChars(s: string);
     procedure writeVLC8(value: dword);
@@ -48,13 +50,10 @@ type
     procedure advance(numBytes: integer);
 
     {base functions for other classes to implement}
-    function  readByte: byte; virtual; abstract;
-    function  readWord: word; virtual; abstract;
-    function  readDWord: dword; virtual; abstract;
+    procedure seek(aPos: int32); virtual;
+    procedure flush(); virtual;
+    procedure reset(); virtual;
     procedure readBlock(var x;numBytes: int32); virtual; abstract;
-    procedure writeByte(b: byte); virtual; abstract;
-    procedure writeWord(w: word); virtual; abstract;
-    procedure writeDWord(d: dword); virtual; abstract;
     procedure writeBlock(var x;numBytes: int32); virtual; abstract;
 
     {for direct access}
@@ -81,7 +80,6 @@ type
     procedure setCapacity(newSize: dword);
     procedure setLen(n: int32); override;
   public
-
     constructor create(aInitialCapacity: dword=0);
     destructor destroy(); override;
 
@@ -114,9 +112,26 @@ type
 
   end;
 
-  {implements stream using an on-disk file}
+  {Unbuffered filestream}
   tFileStream = class(tStream)
+  protected
+    f: file;
+  public
+
+    constructor create(aFilename: string);
+    destructor destroy(); override;
+
+    {our core overrides}
+    procedure seek(aPos: int32); override;
+    procedure flush(); override;
+    procedure reset(); override;
+
+    {our r/w override}
+    procedure readBlock(var x;numBytes: int32); override;
+    procedure writeBlock(var x;numBytes: int32); override;
+
   end;
+
 
 implementation
 
@@ -237,6 +252,42 @@ begin
   if aLen > length(aBytes) then error('tried writing too many bytes');
   expandLen(fPos + aLen);
   writeBlock(aBytes[0], aLen);
+end;
+
+procedure tStream.writeByte(b: byte);
+begin
+  writeBlock(b, 1)
+end;
+
+procedure tStream.writeWord(w: word);
+begin
+  writeBlock(w, 2)
+end;
+
+procedure tStream.writeDWord(d: dword);
+begin
+  writeBlock(d, 4)
+end;
+
+function tStream.readByte: byte;
+var
+  b: byte;
+begin
+  readBlock(b, 1); result := b;
+end;
+
+function tStream.readWord: word;
+var
+  w: word;
+begin
+  readBlock(w, 2); result := w;
+end;
+
+function tStream.readDWord: dword;
+var
+  d: dword;
+begin
+  readBlock(d, 4); result := d;
 end;
 
 function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
@@ -446,25 +497,6 @@ begin
   inc(fPos, numBytes);
 end;
 
-{---------------------------------------------}
-
-{writes memory stream to file}
-procedure tMemoryStream.writeToFile(fileName: string);
-var
-  f: file;
-  bytesWritten: dword;
-  ioError: word;
-begin
-  {$i-}
-  assignFile(f, fileName);
-  rewrite(f,1);
-  ioError := IORESULT; if ioError <> 0 then error(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
-  blockwrite(f, bytes[0], len, bytesWritten);
-  ioError := IORESULT; if ioError <> 0 then error(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
-  close(f);
-  {$i+}
-end;
-
 {loads memory stream from file, and resets position to start of stream.}
 procedure tMemoryStream.readFromFile(fileName: string; blockSize: int32=4096; maxSize: int32=-1);
 var
@@ -503,14 +535,104 @@ begin
   seek(0);
 end;
 
+{writes memory stream to file}
+procedure tMemoryStream.writeToFile(fileName: string);
+var
+  f: file;
+  bytesWritten: dword;
+  ioError: word;
+begin
+  {$i-}
+  assignFile(f, fileName);
+  rewrite(f,1);
+  ioError := IORESULT; if ioError <> 0 then error(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
+  blockwrite(f, bytes[0], len, bytesWritten);
+  ioError := IORESULT; if ioError <> 0 then error(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
+  close(f);
+  {$i+}
+end;
+
+{---------------------------------------------}
+
+constructor tFileStream.create(aFilename: string);
+var
+  oldFileMode: word;
+begin
+  fPos := 0;
+  oldFileMode := system.fileMode;
+  system.fileMode := 2; // read+write
+  if fs.exists(aFilename) then begin
+    {load current file}
+    system.assign(f, aFilename);
+    system.reset(f,1);
+    fLen := filesize(f);
+  end else begin
+    {create a new empty file}
+    system.assign(f, aFilename);
+    system.rewrite(f,1);
+    system.reset(f,1);
+    fLen := 0;
+  end;
+  system.fileMode := oldFileMode;
+end;
+
+destructor tFileStream.destroy();
+begin
+  close(f);
+  inherited destroy();
+end;
+
+procedure tFileStream.seek(aPos: int32);
+begin
+  system.seek(f, aPos);
+  fPos := aPos;
+end;
+
+procedure tFileStream.flush();
+begin
+  // when we use buffering we'll have to write out our buffer here.
+end;
+
+procedure tFileStream.reset();
+begin
+  fPos := 0;
+  fLen := 0;
+end;
+
+procedure tFileStream.readBlock(var x;numBytes: int32);
+begin
+  blockread(f, x, numBytes);
+  fPos += numBytes;
+end;
+
+procedure tFileStream.writeBlock(var x;numBytes: int32);
+begin
+  blockwrite(f, x, numBytes);
+  fPos += numBytes;
+  if fPos > fLen then fLen := fPos;
+end;
+
 {-------------------------------------------}
 
 type
   tStreamTest = class(tTestSuite)
     procedure run; override;
+    procedure testFileStream();
+    procedure testMemoryStream();
   end;
 
 procedure tStreamTest.run();
+begin
+  testMemoryStream();
+  testFileStream();
+end;
+
+procedure tStreamTest.testFileStream();
+begin
+  // pass
+end;
+
+procedure tStreamTest.testMemoryStream();
 var
   s: tMemoryStream;
   i: integer;

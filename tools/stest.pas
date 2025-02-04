@@ -48,21 +48,22 @@ begin
   note(format('%s %sMB/s', [pad(testName, 40), fltToStr(testMBPS, 2, 8)]));
 end;
 
-procedure benchmarkStream();
-var
-  s: tStream;
-  i: int32;
-  startTime, endTime: double;
+procedure benchmarkStream(s: tStream; title:string);
 const
   numTestBytes = 64*1024;
+var
+  i: int32;
+  startTime, endTime: double;
+  buffer: array[0..numTestBytes-1] of byte;
+
 begin
 
-  setTestGroup('tStream R/W');
+  setTestGroup(title);
 
   {---------------------------------}
   {read}
 
-  s := tMemoryStream.create(numTestBytes);
+  s.reset();
   for i := 1 to numTestBytes do s.writeByte(255);
 
   s.seek(0);
@@ -80,18 +81,13 @@ begin
   for i := 1 to numTestBytes div 4 do s.readDword();
   stopTest(numTestBytes); displayTestResults();
 
-  s.free;
+  s.seek(0);
+  startTest('Read BLOCK');
+  s.readBlock(buffer, numTestBytes);
+  stopTest(numTestBytes); displayTestResults();
 
   {---------------------------------}
   {write}
-
-  s := tMemoryStream.create();
-  startTest('Write BYTE (no preallocation)');
-  for i := 1 to numTestBytes do s.writeByte(255);
-  stopTest(numTestBytes); displayTestResults();
-  s.free;
-
-  s := tMemoryStream.create(numTestBytes);
 
   s.seek(0);
   startTest('Write BYTE');
@@ -108,7 +104,10 @@ begin
   for i := 1 to (numTestBytes div 4) do s.writeDWord(255);
   stopTest(numTestBytes); displayTestResults();
 
-  s.free;
+  s.seek(0);
+  startTest('Write BLOCK');
+  s.writeBlock(buffer, numTestBytes);
+  stopTest(numTestBytes); displayTestResults();
 
 end;
 
@@ -159,7 +158,8 @@ end;
 begin
   textAttr := White;
   debug.VERBOSE_SCREEN := llNote;
-  benchmarkStream();
+  benchmarkStream(tMemoryStream.create(), 'MemoryStream R/W');
+  benchmarkStream(tFileStream.create('stream.tmp'), 'FileStream R/W');
   benchmarkVLC();
   textAttr := White;
 end.
