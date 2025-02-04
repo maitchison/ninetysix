@@ -341,8 +341,13 @@ begin
       //outStream := encodeLA96(music16, profile, true);
 
       startTimer('encode');
-      writer.open(music16.tag+'.a96');
+      { for the moment encode to memory, as fileStream is not yet buffered
+       and therefore very slow for small writes. }
+      outStream := tMemoryStream.create();
+      writer.open(outStream);
       writer.writeSFX(music16, profile);
+      outStream.writeToFile(music16.tag+'.a96');
+      outStream.free;
 
       stopTimer('encode');
       writeln(format('Encoded at %fx', [(music16.length/44100)/getTimer('encode').elapsed]));
