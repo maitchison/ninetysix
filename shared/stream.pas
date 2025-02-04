@@ -57,7 +57,7 @@ type
     procedure writeBlock(var x;numBytes: int32); virtual; abstract;
 
     {for direct access}
-    function  getCurrentBytesPtr(requestedBytes: int32): pointer; virtual;
+    function  getCurrentBytesPtr(requestedBytes: int32=0): pointer; virtual;
 
     {properties}
     property  len: int32 read fLen write setLen;
@@ -87,7 +87,7 @@ type
     procedure seek(aPos: int32); override;
     procedure flush(); override;
     procedure reset(); override;
-    function  getCurrentBytesPtr(requestedBytes: int32): pointer; override;
+    function  getCurrentBytesPtr(requestedBytes: int32=0): pointer; override;
 
     {soft reset does not freem memory and maintains capacity}
     procedure softReset();
@@ -379,7 +379,7 @@ begin
   fPos := 0;
 end;
 
-function tMemoryStream.getCurrentBytesPtr(requestedBytes: int32): pointer;
+function tMemoryStream.getCurrentBytesPtr(requestedBytes: int32=0): pointer;
 begin
   result := @bytes[fPos];
 end;

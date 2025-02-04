@@ -1,13 +1,5 @@
-procedure readVLC1Sequence_ASM(stream: tStream; n: int32;outBuffer: tDwords);
-var
-  inPtr, outPtr: pointer;
-  nibblesRead: dword;
+procedure readVLC1Sequence_ASM(inPtr,outPtr: pointer; n: int32);
 begin
-  {todo: this should be done by segment, and segment should allocate/deallocate}
-  inPtr := stream.getCurrentBytesPtr(0);
-  outPtr := @outBuffer[0];
-  nibblesRead := 0;
-
   {
   optimized read VLC
 
@@ -33,7 +25,6 @@ begin
 
   @VLC_LOOP:
 
-    inc nibblesRead
     mov al, byte ptr [esi]    // todo: could do this read only as needed
     cmp ah, 0                 //       i.e. when esi changes
     je @notMidByte
@@ -69,18 +60,10 @@ begin
   @Done:
     popad
   end;
-  stream.advance((nibblesRead + 1) div 2);
 end;
 
-procedure readVLC2Sequence_ASM(stream: tStream; n: int32;outBuffer: tDwords);
-var
-  inPtr, outPtr: pointer;
-  bytesRead: dword;
+procedure readVLC2Sequence_ASM(inPtr, outPtr: pointer;n: int32);
 begin
-  {todo: this should be done by segment, and segment should allocate/deallocate}
-  inPtr := stream.getCurrentBytesPtr(0);
-  outPtr := @outBuffer[0];
-  bytesRead := 0;
 
   {
   optimized read VLC
@@ -147,16 +130,11 @@ begin
     jnz @VLC_LOOP
 
   @Done:
-
-    sub esi, inPtr
-    mov bytesRead, esi
-
     popad
   end;
-  stream.advance(bytesRead);
 end;
 
-procedure unpack_ASM(inBuffer: pByte;outBuffer: pDWord; n: dword;bitsPerCode: byte);
+procedure unpack_ASM(inPtr, outPtr: pointer; n: dword;bitsPerCode: byte);
 var
   i,j: int32;
   bitBuffer: dword;         { buffer for our bits }
@@ -164,21 +142,16 @@ var
   value: dword;             { current value being unpacked}
   mask: dword;              { mask for extracting bits}
 
-  inPtr,outPtr: pointer;
-
 begin
 
   {we require the following}
   {atleast 1 padding bytes left in buffer}
   {bits must be <= 16}
   if bitsPerCode > 16 then begin
-    unpack_REF(inBUffer, outBuffer, n, bitsPerCode);
+    unpack_REF(inPtr, outPtr, n, bitsPerCode);
     exit;
   end;
 
-
-  inPtr := @inBuffer^;
-  outPtr := @outBuffer^;
   mask := (1 shl bitsPerCode) - 1;
 
   asm
@@ -188,8 +161,8 @@ begin
       ecx = 0 0 [bitsPerCode] [bitsRemaining]
       edx = bitBuffer
 
-      esi = inBuffer
-      edi = outBuffer
+      esi = inPtr
+      edi = outPtr
       ebp = mask
 
     }
@@ -260,17 +233,11 @@ This function can only use the lookup table, which is 16bit, which means
  Hmm... maybe I should just implement the falt adjustment in asm...
  it's not that hard.
 }
-procedure ReadRice_ASM(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+procedure ReadRice_ASM(inPtr, outPtr: pointer; n: int32; k: integer);
 var
-  tablePtr, outPtr, streamPtr: pointer;
-  bufferValue: dword;
-  bufferPos: byte;
-  bytesRead: integer;
+  tablePtr: pointer;
 begin
   tablePtr := @RICE_TABLE[k, 0];
-  outPtr := outBuffer;
-  // I think I need to store the length and load it here all at once.
-  streamPtr := stream.getCurrentBytesPtr(0); // TOOD: have segment do this and pass in ptr dodgy...
   asm
 
     pushad
@@ -281,7 +248,7 @@ begin
       ecx   0  || tmp | bufferPos
       edx   loop
 
-      esi   streamPtr
+      esi   inPtr
       edi   outPtr
       ebp   tablePtr
     }
@@ -292,7 +259,7 @@ begin
 
     mov edx, N
 
-    mov esi, STREAMPTR
+    mov esi, INPTR
     mov edi, OUTPTR
 
     push ebp
@@ -340,19 +307,7 @@ begin
 
     pop ebp
 
-    {
-      calculate how many bytes we just read, which is
-      bytes read - bytes remaining in buffer
-    }
-    mov eax, esi
-    sub eax, STREAMPTR
-    and ecx, $ff
-    shr cl, 3
-    sub eax, ecx
-    mov BYTESREAD, eax
-
     popad
 
   end;
-  stream.seek(stream.pos+bytesRead);
 end;

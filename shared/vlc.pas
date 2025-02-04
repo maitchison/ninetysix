@@ -32,8 +32,6 @@ const
   ST_RICE_SLOW = 252; {select best rice}
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
-  ST_VLC8 = 2;  {this is basically the old VLC1 system but at the byte level. Not as efficent as VLC2}
-  ST_SIGN = 8;  {special encoding for sign bits}
 
   ST_PACK0 = 16; {16..48 = pack}
   ST_PACK1 = 17;
@@ -58,15 +56,7 @@ function  VLC2_Bits(value: dword): word; overload;
 function  VLC2_Bits(values: array of dword): dword; overload;
 procedure VLC2_Write(stream: tStream; values: array of dword);
 
-procedure SIGN_Write(stream: tStream; values: array of dword); overload;
-procedure SIGN_Write(stream: tStream; values: array of int8); overload;
-function  SIGN_Bits(values: array of dword): int32; overload;
-function  SIGN_Bits(values: array of int8): int32; overload;
-procedure SIGN_ReadMasked(stream: tStream; n: int32; outBuffer: pDword);
-procedure SIGN_Read(stream: tStream; n: int32; outBuffer: pDword);
-
 procedure RICE_Write(stream: tStream; values: array of dword; k: integer);
-procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 function  RICE_Bits(values: array of dword; k: integer): int32;
 function  RICE_MaxCodeLength(values: array of dword; k: integer): int32;
 
@@ -77,17 +67,9 @@ procedure VLC1_Write(stream: tStream; values: array of dword); forward;
 function  VLC1_Bits(value: dword): word; forward; overload;
 function  VLC1_Bits(values: array of dword): dword; forward; overload;
 
-{vlc8}
-procedure VLC8_Write(stream: tStream; values: array of dword); forward;
-function  VLC8_Read(stream: tStream; n: int32;outBuffer: tDwords): tDWords; forward;
-function  VLC8_Bits(value: dword): word; forward; overload;
-function  VLC8_Bits(values: array of dword): dword; forward; overload;
-
-
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
-procedure unpack(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte); forward;
-procedure unpackBits(s: tStream;nCodes: integer;outBuffer: tDWords;bitsPerCode: byte); forward;
+procedure unpack(inPtr: pointer;outBuffer: pDWord; n: word;bitsPerCode: byte); forward;
 
 var
   packing1: array[0..255] of array[0..7] of dword;
@@ -112,6 +94,9 @@ var
   }
   RICE_TABLE: array[0..15, 0..(1 shl RICE_TABLE_BITS)-1] of dword;
 
+  { used for segment reading}
+  INBUFFER: array[0..(128*1024)-1] of byte;
+
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
 
@@ -125,8 +110,6 @@ begin
   case segmentType of
     ST_VLC1: result := 'VLC1';
     ST_VLC2: result := 'VLC2';
-    ST_VLC8: result := 'VLC8';
-    ST_SIGN: result := 'SIGN';
     ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
     ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
     {special codes}
@@ -147,8 +130,6 @@ begin
   case segmentType of
     ST_VLC1: result := bytesForBits(VLC1_Bits(values));
     ST_VLC2: result := bytesForBits(VLC2_Bits(values));
-    ST_VLC8: result := bytesForBits(VLC8_Bits(values));
-    ST_SIGN: result := 0; // NIY
     ST_PACK0..ST_PACK0+31: result := bytesForBits((segmentType - ST_PACK0) * length(values));
     ST_RICE0..ST_RICE0+15: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
     else error('Invalid segment type '+intToStr(segmentType));
@@ -178,13 +159,12 @@ var
   k, bestK, baseK, guessK, deltaK: integer;
   thisBits, bestBits: int32;
   n: int32;
-  startPos: int32;
+  startPos,postHeaderPos: int32;
   value: dword;
   ricePenality: int32;
   segmentLen: dword;
 begin
 
-  startPos := s.pos;
   result := 0;
 
   if length(values) = 0 then exit;
@@ -267,19 +247,21 @@ begin
   segmentLen := getSegmentLength(values, segmentType);
 
   {write out the data}
+  startPos := s.pos;
   s.writeByte(segmentType);
   s.writeVLC8(segmentLen);
+  postHeaderPos := s.pos;
   case segmentType of
     ST_VLC1: VLC1_Write(s, values);
     ST_VLC2: VLC2_Write(s, values);
-    ST_VLC8: VLC8_Write(s, values);
-    ST_SIGN: SIGN_Write(s, values);
     ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, s);
     ST_RICE0..ST_RICE0+15: RICE_Write(s, values, segmentType - ST_RICE0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
   result := s.pos-startPos; // includes header
+
+  test.assertEqual(s.pos-postHeaderPos, segmentLen);
 
 end;
 
@@ -295,17 +277,18 @@ begin
   segmentType := s.readByte();
   segmentLen := s.readVLC8();
 
-  {todo: block read here}
-  //s.readBlock(segmentInBuffer, segmentLen);
+  if segmentLen > length(INBUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(INBUFFER)]));
 
-  {todo: move these over to a pointer system}
+  {todo: block read here}
+  {todo: allow zero copy but looking at bytes ptr then incrementing...
+   note: this means setting requiredBytes to segmentLength}
+  s.readBlock(INBUFFER[0], segmentLen);
+
   case segmentType of
-    ST_VLC1: readVLC1Sequence_ASM(s, n, outBuffer);
-    ST_VLC2: readVLC2Sequence_ASM(s, n, outBuffer);
-    ST_VLC8: VLC8_Read(s, n, outBuffer);
-    ST_SIGN: SIGN_Read(s, n, @outBuffer[0]);
-    ST_PACK0..ST_PACK0+31: unpackBits(s, n, outBuffer, segmentType-ST_PACK0);
-    ST_RICE0..ST_RICE0+15: RICE_Read(s, n, @outBuffer[0], segmentType-ST_RICE0);
+    ST_VLC1: readVLC1Sequence_ASM(@INBUFFER[0], @outBuffer[0], n);
+    ST_VLC2: readVLC2Sequence_ASM(@INBUFFER[0], @outBuffer[0], n);
+    ST_PACK0..ST_PACK0+31: unpack(@INBUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
+    ST_RICE0..ST_RICE0+15: ReadRice_ASM(@INBUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -360,6 +343,7 @@ var
 
 begin
   midByte := false;
+  buffer := 0;
   for x in values do begin
     value := x;
     {write this value}
@@ -388,6 +372,7 @@ begin
   if d < 32768+4096+512+64+8 then exit(5);
   if d < 262144+32768+4096+512+64+8 then exit(6);
   error('Can not encode VLC value, too large.');
+  exit(255);
 end;
 
 {returns size of variable length encoded token}
@@ -415,6 +400,7 @@ var
   nib: byte;
 begin
   midByte := false;
+  buffer := 0;
   for value in values do begin
     nibLen := VLC2_Length(value);
     encode := value - VLC2_OFFSET_TABLE[nibLen-1];
@@ -454,164 +440,6 @@ begin
   end;
 end;
 
-function VLC8_Bits(values: array of dword): dword;
-var
-  value: dword;
-begin
-  result := 0;
-  for value in values do result += VLC8_Bits(value);
-end;
-
-procedure VLC8_Write(stream: tStream; values: array of dword);
-var
-  value: dword;
-begin
-  for value in values do
-    stream.writeVLC8(value);
-end;
-
-function VLC8_Read(stream: tStream; n: int32;outBuffer: tDwords): tDWords;
-var
-  i: integer;
-begin
-  for i := 0 to n-1 do
-    outBuffer[i] := stream.readVLC8();
-end;
-
-{--------------------------------------------------------------}
-{ SIGN strategy }
-{--------------------------------------------------------------}
-
-procedure SIGN_Write(stream: tStream; values: array of dword); overload;
-var
-  i: int32;
-  value, prevValue: dword;
-  counter: integer;
-begin
-  {todo: update to rice codes}
-  prevValue := 0;
-  counter := 0;
-  for i := 0 to length(values)-1 do begin
-    value := values[i];
-    if prevValue = value then
-      inc(counter)
-    else begin
-      stream.writeVLC8(counter);
-      counter := 1;
-      prevValue := value;
-    end;
-  end;
-  stream.writeVLC8(counter);
-end;
-
-{special version for signs, i.e. -1, 0, and 1. We store the sign bit
- for 0 as what ever compresses the best}
-procedure SIGN_Write(stream: tStream; values: array of int8); overload;
-var
-  i: int32;
-  value, prevValue: int8;
-  counter: integer;
-begin
-  prevValue := 1;
-  counter := 0;
-  for i := 0 to length(values)-1 do begin
-    value := values[i];
-    if prevValue * value < 0 then begin
-      {change of sign}
-      stream.writeVLC8(counter);
-      counter := 1;
-      prevValue *= -1;
-    end else
-      inc(counter)
-  end;
-  stream.writeVLC8(counter);
-end;
-
-function SIGN_Bits(values: array of dword): int32; overload;
-var
-  i: int32;
-  value, prevValue: dword;
-  counter: integer;
-begin
-  prevValue := 0;
-  counter := 0;
-
-  result := 0;
-
-  for i := 0 to length(values)-1 do begin
-    value := values[i];
-    if prevValue = value then
-      inc(counter)
-    else begin
-      result += VLC1_Bits(counter);
-      counter := 1;
-      prevValue := value;
-    end;
-  end;
-  result += VLC1_Bits(counter);
-end;
-
-{special version for signs, i.e. -1, 0, and 1. We store the sign bit
- for 0 as what ever compresses the best}
-function SIGN_Bits(values: array of int8): int32; overload;
-var
-  i: int32;
-  value, prevValue: int8;
-  counter: integer;
-begin
-  prevValue := 1;
-  counter := 0;
-  result := 0;
-  for i := 0 to length(values)-1 do begin
-    value := values[i];
-    if prevValue * value < 0 then begin
-      {change of sign}
-      result += VLC1_Bits(counter);
-      counter := 1;
-      prevValue *= -1;
-    end else
-      inc(counter)
-  end;
-  result += VLC1_Bits(counter);
-end;
-
-
-procedure SIGN_Read(stream: tStream; n: int32; outBuffer: pDword);
-var
-  i: int32;
-  value: dword;
-  counter: integer;
-begin
-  value := 0;
-  repeat
-    counter := stream.readVLC8();
-    for i := 0 to counter-1 do begin
-      outBuffer^ := value;
-      inc(outBuffer);
-    end;
-    n -= counter;
-    value := 1-value;
-  until n <= 0;
-end;
-
-{outputs 0 for non-signed, and -1 ($ffff...) for signed}
-procedure SIGN_ReadMasked(stream: tStream; n: int32; outBuffer: pDword);
-var
-  i: int32;
-  mask: int32;
-  counter: integer;
-begin
-  mask := 0;
-  repeat
-    counter := stream.readVLC8();
-    if counter > 0 then
-      filldword(outBuffer^, counter, dword(mask));
-    outBuffer += counter;
-    n -= counter;
-    if mask = 0 then dec(mask) else inc(mask);
-  until n <= 0;
-end;
-
 {--------------------------------------------------------------}
 { RICE strategy }
 {--------------------------------------------------------------}
@@ -642,11 +470,6 @@ begin
     bs.writeBits(remainder, k);
   end;
   bs.flush();
-end;
-
-procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
-begin
-  ReadRice_ASM(stream, n, outBUffer, k);
 end;
 
 function RICE_Bits(values: array of dword; k: integer): int32;
@@ -795,43 +618,17 @@ begin
   end;
 end;
 
-{General unpacking routine. Works on any number of bits, but is a bit slow.}
-procedure unpack(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
+procedure unpack(inPtr: pointer;outBuffer: pDWord; n: word;bitsPerCode: byte);
 begin
-  unpack_ASM(inBuffer, outBuffer, n, bitsPerCode)
-end;
-
-{Unpack bits
-  s             the stream to read from
-  bitsPerCode   the number of packed bits per symbol
-  nCodes         the number of symbols
-
-  output         array of 32bit dwords
-}
-
-procedure unpackBits(s: tStream;nCodes: integer;outBuffer: tDWords;bitsPerCode: byte);
-var
-  bytesRequired: int32;
-  bytesPtr: pointer;
-begin
-
-  if nCodes = 0 then exit;
-
-  bytesRequired := bytesForBits(bitsPerCode * nCodes);
-
-  bytesPtr := s.getCurrentBytesPtr(bytesRequired);
-
   case bitsPerCode of
-    0: unpack0(bytesPtr, @outBuffer[0], nCodes);
-    1: unpack1(bytesPtr, @outBuffer[0], nCodes);
-    2: unpack2(bytesPtr, @outBuffer[0], nCodes);
-    4: unpack4(bytesPtr, @outBuffer[0], nCodes);
-    8: unpack8(bytesPtr, @outBuffer[0], nCodes);
-    16: unpack16(bytesPtr, @outBuffer[0], nCodes);
-    else unpack(bytesPtr, @outBuffer[0], nCodes, bitsPerCode);
+    0: unpack0(inPtr, @outBuffer[0], n);
+    1: unpack1(inPtr, @outBuffer[0], n);
+    2: unpack2(inPtr, @outBuffer[0], n);
+    4: unpack4(inPtr, @outBuffer[0], n);
+    8: unpack8(inPtr, @outBuffer[0], n);
+    16: unpack16(inPtr, @outBuffer[0], n);
+    else unpack_ASM(inPtr, @outBuffer[0], n, bitsPerCode);
   end;
-
-  s.advance(bytesRequired);
 end;
 
 procedure buildOffsetTable();
@@ -952,12 +749,13 @@ begin
    being supported}
   for k := 4 to 8 do begin
     s.reset();
-    RICE_Write(s, testData, k);
+    s.writeSegment(testData, ST_RICE0+k);
     s.seek(0);
     setLength(outData, length(testData));
-    RICE_Read(s, length(testData), @outData[0], k);
+    s.readSegment(length(testData), @outData[0]);
+
     assertEqual(toBytes(outData).toString, toBytes(testData).toString);
-    assertEqual(s.pos, bytesForBits(RICE_bits(testData, k)));
+    assertEqual(s.pos, 2+bytesForBits(RICE_bits(testData, k)));
   end;
   s.free;
 end;
@@ -967,7 +765,7 @@ var
   s: tStream;
   i: integer;
   w: word;
-  bitsStream: tStream;
+  bs: tStream;
   data: tDWords;
   bits: byte;
   prevMax: dword;
@@ -981,43 +779,15 @@ const
   testData4: array of dword = [31, 31, 31, 31, 31, 31, 31];
   {for VLC testing}
   testData5: array of dword = [14, 12, 1, 2, 100];
-  {for sign testing}
-  testSign1: array of dword = [1,1,1,0,1,1,1];
-  testSign2: array of dword = [0,0,0];
-  testSign3: array of dword = [1,1,1];
-  testSign4: array of dword = [1,1,0];
 begin
-
-  {test sign}
-  for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
-    s := tMemoryStream.create();
-    writeSegment(s, testSign, ST_SIGN);
-    s.seek(0);
-    setLength(data, length(testSign));
-    data := readSegment(s, length(testSign), data);
-    s.free;
-    for i := 0 to length(testSign)-1 do
-      assertEqual(data[i], testSign[i]);
-  end;
-
-  for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
-    s := tMemoryStream.create();
-    SIGN_Write(s, testSign);
-    s.seek(0);
-    setLength(data, length(testSign));
-    SIGN_ReadMasked(s, length(testSign), @data[0]);
-    s.free;
-    for i := 0 to length(testSign)-1 do
-      assertEqual(int32(data[i]), -testSign[i]);
-  end;
 
   {check pack and unpack}
   for bits := 7 to 15 do begin
-    bitsStream := packBits(testData2, bits);
-    AssertEqual(bitsStream.len, bytesForBits(bits*length(testData2)));
-    bitsStream.seek(0);
+    bs := packBits(testData2, bits);
+    AssertEqual(bs.len, bytesForBits(bits*length(testData2)));
+    bs.seek(0);
     setLength(data, length(testData2));
-    unpackBits(bitsStream, length(testData2), data, bits);
+    unpack(bs.getCurrentBytesPtr(0), @data[0], length(testData2), bits);
     for i := 0 to length(testData2)-1 do
       AssertEqual(data[i], testData2[i]);
   end;
@@ -1057,7 +827,7 @@ begin
   VLC2_Write(s, testData5);
   setLength(data, length(testData5));
   s.seek(0);
-  readVLC2Sequence_ASM(s, length(testData5), data);
+  readVLC2Sequence_ASM(s.getCurrentBytesPtr(0), data, length(testData5));
   for i := 0 to length(testData5)-1 do
     assertEqual(data[i], testData5[i]);
   s.free;

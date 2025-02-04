@@ -1,10 +1,3 @@
-function readVLC1Sequence_REF(stream: tStream; n: int32;outBuffer: tDwords): tDWords;
-var
-  i: integer;
-begin
-  error('VLC1 is no longer supported');
-end;
-
 {General unpacking routine. Works on any number of bits, but is a bit slow.}
 procedure unpack_REF(inBuffer: pByte;outBuffer: pDWord; n: word;bitsPerCode: byte);
 var
@@ -38,7 +31,10 @@ begin
   end;
 end;
 
-procedure ReadRice_REF(stream: tStream; n: int32; outBuffer: pDword; k: integer);
+(*
+{updating this to no longer use stream is difficult as we are using
+ bitStream...}
+procedure ReadRice_REF(inPtr, outPtr: pointer; n: int32; k: integer);
 var
   quotient, remainder: dword;
   value: word;
@@ -46,15 +42,18 @@ var
   i: integer;
   decoded: dword;
   mask: word;
+  streamPtr: pWord;
 begin
+  streamPtr := inPtr;
   {table lookup method}
   bs.init(stream);
   mask := (1 shl RICE_TABLE_BITS)-1;
   for i := 0 to n-1 do begin
     decoded := RICE_TABLE[k, bs.peekWord and mask];
     bs.consumeBits(decoded shr 16);
-    outBuffer^ := decoded and $ffff;
+    pDWord(outBuffer)^ := decoded and $ffff;
     inc(outBuffer);
   end;
   bs.giveBack();
 end;
+*)
