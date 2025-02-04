@@ -130,8 +130,8 @@ type
     tag: array[1..4] of char;
     versionSmall, versionBig: word;
     format, compressionMode: byte;
-    numFrames: dWord;
-    numSamples: dWord;
+    numFrames: int32;
+    numSamples: int32;
     frameSize: word;
     log2mu: byte;
     postFilter: byte; {requested post processing highpass filter in KHZ}
@@ -142,7 +142,6 @@ type
   tFrameFrameGenProc = procedure(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
   tPlaybackFinishedProc = procedure();
 
-  {todo: make a LA96Writer aswell (for progressive save)}
   tLA96Reader = class
   private
     fs: tStream;
@@ -177,24 +176,24 @@ type
     procedure readNextFrame(samplePtr: pAudioSample16S);
   end;
 
-  {todo: make a LA96Writer aswell (for progressive save)}
-  (*
   tLA96Writer = class
   private
     fs: tStream;
     ownsStream: boolean;
-  protected
-
+    frameOn: int32;
+    header: tLA96FileHeader;
+    // raw frame values to write out
+    frameA, frameB: array[0..FRAME_SIZE-1] of dWord;
   public
     constructor create();
     destructor destroy(); override;
     procedure open(aFilename: string); overload;
     procedure open(aStream: tStream); overload;
-    procedure writeNextFrame(pSample: pAudioSample16S);
-    procedure close();
-  end;
-  *)
 
+    procedure writeNextFrame(samplePtr: pAudioSample16S);
+    procedure close();
+    procedure writeSFX(sfx: tSoundEffect; profile: tAudioCompressionProfile);
+  end;
 
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
@@ -324,7 +323,9 @@ begin
   end;
 end;
 
-{-------------------------------------------------------}
+{-------------------------------------------------------------------------}
+{ tLA96Reader }
+{-------------------------------------------------------------------------}
 
 constructor tLA96Reader.create();
 var
@@ -514,7 +515,7 @@ begin
 
   //writeln('processing frame ',frameOn);
 
-  startTimer('LA96_DF');
+  startTimer('LA96_FRAME');
 
   {read frame header}
   frameType := fs.readByte(); midShift := frameType and $f; midUlaw := frameType shr 4;
@@ -523,14 +524,14 @@ begin
   midCode := negDecode(fs.readWord());
   difCode := negDecode(fs.readWord());
 
-  startTimer('LA96_DF_ReadSegments');
+  startTimer('LA96_FRAME_ReadSegments');
   fs.readSegment(header.frameSize-1, midCodes);
   fs.readSegment(header.frameSize-1, difCodes);
-  stopTimer('LA96_DF_ReadSegments');
-  startTimer('LA96_DF_ReadSigns');
+  stopTimer('LA96_FRAME_ReadSegments');
+  startTimer('LA96_FRAME_ReadSigns');
   readSigns(midSigns);
   readSigns(difSigns);
-  stopTimer('LA96_DF_ReadSigns');
+  stopTimer('LA96_FRAME_ReadSigns');
 
   frameSpec.length := header.frameSize;
   frameSpec.midShift := midShift;
@@ -545,7 +546,7 @@ begin
 
   samplePtr^ := generateSample(midCode, difCode, @frameSpec);
 
-  startTimer('LA96_DF_Process');
+  startTimer('LA96_FRAME_Process');
   process_ASM(
     pointer(samplePtr)+4,
     midCode, difCode,
@@ -553,7 +554,7 @@ begin
     midSigns, difSigns,
     @frameSpec
   );
-  stopTimer('LA96_DF_Process');
+  stopTimer('LA96_FRAME_Process');
 
   {show values}
   {
@@ -564,10 +565,10 @@ begin
 
   {todo: implement this as a frameGenHook}
   if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
-    startTimer('LA96_DF_PostProcess');
+    startTimer('LA96_FRAME_PostProcess');
     alpha := exp((-2 * pi * header.postFilter * 1000) / 44100);
     postProcessEMA(samplePtr, cLeft, cRight, frameSpec.length, alpha);
-    stopTimer('LA96_DF_PostProcess');
+    stopTimer('LA96_FRAME_PostProcess');
   end;
 
   if assigned(frameGenHook) then
@@ -587,8 +588,7 @@ begin
     end;
   end;
 
-  stopTimer('LA96_DF');
-
+  stopTimer('LA96_FRAME');
 
 end;
 
@@ -776,6 +776,8 @@ begin
   reader.free;
 end;
 
+{------------------------------------------------------}
+
 function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
 asm
   push cx
@@ -829,7 +831,170 @@ begin
     end;
 end;
 
+{-------------------------------------------------------------------------}
+{ tLA96Writer }
+{-------------------------------------------------------------------------}
 
+constructor tLA96Writer.create();
+begin
+  inherited create();
+  fs := nil;
+  ownsStream := false;
+  frameOn := 0;
+end;
+
+destructor tLA96Writer.destroy();
+begin
+  close();
+  inherited destroy();
+end;
+
+procedure tLA96Writer.open(aFilename: string);
+var
+  fs: tFileStream;
+begin
+  fs := tFileStream.create(aFilename);
+  open(fs);
+  ownsStream := true;
+end;
+
+procedure tLA96Writer.open(aStream: tStream);
+begin
+  close();
+  fs := aStream;
+  frameOn := 0;
+  fillchar(header, sizeof(header), 0);
+end;
+
+{---------------------------}
+{todo: move these into ASM / REF}
+{---------------------------}
+
+{converts samples from LeftRight to quantized Mid/Diff}
+procedure ApplyLRtoQMD_REF(samplePtr: pAudioSample16S;qMid, qDif: byte; n: int32);
+var
+  i: integer;
+  mid, dif: int32;
+begin
+  for i := 0 to n-1 do begin
+    mid := samplePtr^.toMid;
+    dif := samplePtr^.toDif;
+    samplePtr^.left := shiftRight(mid, qMid);
+    samplePtr^.right := shiftRight(dif, qDif);
+    inc(samplePtr);
+  end;
+end;
+
+{converts samples from Linear to ULaw}
+procedure ApplyULAW_REF(samplePtr: pAudioSample16S;uMid, uDif: byte; n: int32);
+var
+  i: integer;
+begin
+  for i := 0 to n-1 do begin
+    {todo: use a lookup table, and also maybe log2mu as a parameter?}
+    samplePtr^.left := round(uLaw(samplePtr^.left, 256) * (1 shl uMid));
+    samplePtr^.right := round(uLaw(samplePtr^.right, 256) * (1 shl uDif));
+    inc(samplePtr);
+  end;
+end;
+
+procedure ApplyDeltaModulation_REF(samplePtr: pAudioSample16S; n: int32);
+var
+  i: integer;
+  prevA, prevB: int32;
+  deltaA, deltaB: int32;
+begin
+  prevA := samplePtr^.a;
+  prevB := samplePtr^.b;
+  for i := 0 to n-1 do begin
+    {todo: support wrapping optimization - i.e. use wrap around delta if it's smaller}
+    {note wrapping is also required for 16bit uncompressed I think}
+    deltaA := samplePtr^.a - prevA;
+    deltaB := samplePtr^.b - prevB;
+    prevA := samplePtr^.a;
+    prevB := samplePtr^.b;
+    samplePtr^.a := deltaA;
+    samplePtr^.b := deltaB;
+  end;
+end;
+
+procedure tLA96Writer.writeNextFrame(samplePtr: pAudioSample16S);
+var
+  i: integer;
+  qMid, qDif: byte;
+  uMid, uDif: byte;
+begin
+
+  {work out how we want to compress this frame}
+  {todo: do this properly}
+  qMid := 4;
+  qDif := 4;
+  uMid := 8;
+  uDif := 8;
+
+  {write frame header}
+  {todo}
+
+  {process audio}
+  ApplyLRToQMD_REF(samplePtr, qMid, qDif, FRAME_SIZE);
+  ApplyULaw_REF(samplePtr, uMid, uDif, FRAME_SIZE);
+  ApplyDeltaModulation_REF(samplePtr, FRAME_SIZE);
+
+  {convert using negEncode}
+  for i := 0 to n-1 do begin
+    frameA[i] := negEncode((samplePtr+i*4)^.a);
+    frameB[i] := negEncode((samplePtr+i*4)^.b);
+    {todo: remove these checks unless a flag is set}
+    if frameA[i] > 65535 then error('Value too large');
+    if frameB[i] > 65535 then error('Value too large');
+  end;
+
+  {write out}
+  fs.writeSegment(frameA);
+  fs.writeSegment(frameB);
+
+  fs.flush();
+end;
+
+procedure tLA96Writer.close();
+begin
+  if assigned(fs) then begin
+    if ownsStream then fs.free;
+  end;
+  fs := nil;
+  frameOn := 0;
+  ownsStream := false;
+end;
+
+procedure tLA96Writer.writeSFX(sfx: tSoundEffect; profile: tAudioCompressionProfile);
+var
+  i: integer;
+begin
+
+  { write header }
+  fillchar(header, sizeof(header),0);
+  header.tag := 'LA96';
+  header.versionSmall := VER_SMALL;
+  header.versionBig := VER_BIG;
+  header.format := 0; // this will be for stero / mono etc
+  header.compressionMode := 0;
+  header.numFrames := (sfx.length + FRAME_SIZE - 1) div FRAME_SIZE;
+  header.numSamples := sfx.length; // we don't know this yet
+  header.frameSize := FRAME_SIZE;
+  header.log2mu := profile.log2mu;
+  header.postFilter := 0; // not used anymore
+  fs.writeBlock(header, sizeof(header));
+
+  { write pointers }
+  {todo...}
+
+  { write frames }
+  for i := 0 to header.numFrames-1 do
+    writeNextFrame(sfx.data + (i*header.frameSize*4));
+end;
+
+
+{todo: remove this}
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 const
   {note: we don't use centering anymore as it adds too much noise}
@@ -952,6 +1117,7 @@ begin
     aspMid := tASPDelta.create();
     aspDif := tASPDelta.create();
   end;
+
   // -------------------------
   // Write Header
 
@@ -1009,8 +1175,8 @@ begin
 
   for i := 0 to numFrames-1 do begin
 
-    trueMid := samplePtr^.mid;
-    trueDif := samplePtr^.dif;
+    trueMid := samplePtr^.toMid;
+    trueDif := samplePtr^.toDif;
     trueDif := shiftRight(trueDif, profile.difShift);
     inMid := trueMid;
     inDif := trueDif;
@@ -1036,8 +1202,8 @@ begin
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
 
-      trueMid := samplePtr^.mid;
-      trueDif := samplePtr^.dif;
+      trueMid := samplePtr^.toMid;
+      trueDif := samplePtr^.toDif;
       trueDif := shiftRight(trueDif, profile.difShift);
       inMid := trueMid;
       inDif := trueDif;

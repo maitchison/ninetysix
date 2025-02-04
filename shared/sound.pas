@@ -44,8 +44,10 @@ type
   tAudioSample16S = packed record
     left, right: int16;
     class operator subtract(a,b: tAudioSample16S): tAudioSample16S;
-    function mid: int16;
-    function dif: int16;
+    function toMid: int16; inline;
+    function toDif: int16; inline;
+    property a: int16 read left write right;
+    property b: int16 read left write right;
   end;
   tAudioSample8S = packed record
     left, right: uint8;
@@ -165,12 +167,12 @@ begin
   result.right := clamp16(a.right - b.right);
 end;
 
-function tAudioSample16S.mid: int16;
+function tAudioSample16S.toMid: int16; inline;
 begin
   result := (int32(left)+int32(right)) div 2;
 end;
 
-function tAudioSample16S.dif: int16;
+function tAudioSample16S.toDif: int16; inline;
 begin
   result := (int32(left)-int32(right)) div 2;
 end;

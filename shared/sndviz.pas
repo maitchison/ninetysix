@@ -35,8 +35,6 @@ implementation
 var
   sampleBuffer: array[0..16*1024-1] of tAudioSample16S;
 
-
-
 {draw a vertical line with AA on the edges}
 procedure vLineAA(page: tPage; x: integer;y1,y2: single; col: RGBA);
 var
@@ -120,7 +118,7 @@ begin
   pSample := samplePtr;
   for xlp := 0 to sampleMax-1 do begin
     // this roughly matches voice, which is 300 hz.
-    mid := mid * 0.92 + (pSample^.mid) * 0.08;
+    mid := mid * 0.92 + (pSample^.toMid) * 0.08;
     sampleBuffer[xlp].left := clamp16(mid);
     inc(pSample);
   end;
