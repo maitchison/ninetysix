@@ -49,8 +49,8 @@ const
   ST_RICE0 = 48; {48..63 = rice (max code is 15)}
   {...}
 
-function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
-function  readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
+function  writeSegment(s: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
+function  readSegment(s: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 
 function  getSegmentTypeName(segmentType: byte): string;
 
@@ -74,11 +74,15 @@ implementation
 
 {vlc1 - depricated}
 procedure VLC1_Write(stream: tStream; values: array of dword); forward;
-function  VLC1_Bits(value: dword): word; forward;
+function  VLC1_Bits(value: dword): word; forward; overload;
+function  VLC1_Bits(values: array of dword): dword; forward; overload;
 
 {vlc8}
 procedure VLC8_Write(stream: tStream; values: array of dword); forward;
 function  VLC8_Read(stream: tStream; n: int32;outBuffer: tDwords): tDWords; forward;
+function  VLC8_Bits(value: dword): word; forward; overload;
+function  VLC8_Bits(values: array of dword): dword; forward; overload;
+
 
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
@@ -134,6 +138,23 @@ begin
   end;
 end;
 
+{returns the number of bytes required to encode given values using given
+ segment type. Does not include the header (type and length)
+ Auto is not supported}
+function getSegmentLength(values: array of dword; segmentType: byte): int32;
+begin
+  result := 0;
+  case segmentType of
+    ST_VLC1: result := bytesForBits(VLC1_Bits(values));
+    ST_VLC2: result := bytesForBits(VLC2_Bits(values));
+    ST_VLC8: result := bytesForBits(VLC8_Bits(values));
+    ST_SIGN: result := 0; // NIY
+    ST_PACK0..ST_PACK0+31: result := bytesForBits((segmentType - ST_PACK0) * length(values));
+    ST_RICE0..ST_RICE0+15: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
+    else error('Invalid segment type '+intToStr(segmentType));
+  end;
+end;
+
 {
 Writes a series of variable length codes, with optional packing.
 Generaly this just writes out a list of VLC codes.
@@ -148,7 +169,7 @@ make use of 8bit packing with very little loss in efficency.
 
 returns the number of bytes used
 }
-function writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
+function writeSegment(s: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 var
   i: int32;
   valueMax: dword;
@@ -159,10 +180,11 @@ var
   n: int32;
   startPos: int32;
   value: dword;
-  ricePenality: integer;
+  ricePenality: int32;
+  segmentLen: dword;
 begin
 
-  startPos := stream.pos;
+  startPos := s.pos;
   result := 0;
 
   if length(values) = 0 then exit;
@@ -240,39 +262,50 @@ begin
     end;
   end;
 
+  {calculate the segment bytes. Todo: in many cases we already know this
+   and do not need to recalculate it}
+  segmentLen := getSegmentLength(values, segmentType);
+
   {write out the data}
-  stream.writeByte(segmentType);
+  s.writeByte(segmentType);
+  s.writeVLC8(segmentLen);
   case segmentType of
-    ST_VLC1: VLC1_Write(stream, values);
-    ST_VLC2: VLC2_Write(stream, values);
-    ST_VLC8: VLC8_Write(stream, values);
-    ST_SIGN: SIGN_Write(stream, values);
-    ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, stream);
-    ST_RICE0..ST_RICE0+15: RICE_Write(stream, values, segmentType - ST_RICE0);
+    ST_VLC1: VLC1_Write(s, values);
+    ST_VLC2: VLC2_Write(s, values);
+    ST_VLC8: VLC8_Write(s, values);
+    ST_SIGN: SIGN_Write(s, values);
+    ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, s);
+    ST_RICE0..ST_RICE0+15: RICE_Write(s, values, segmentType - ST_RICE0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
-  result := stream.pos-startPos;
+  result := s.pos-startPos; // includes header
 
 end;
 
-function readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
+function readSegment(s: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 var
   segmentType: byte;
+  segmentLen: dword;
 begin
 
   if not assigned(outBuffer) then
     system.setLength(outBuffer, n);
 
-  segmentType := stream.readByte();
+  segmentType := s.readByte();
+  segmentLen := s.readVLC8();
 
+  {todo: block read here}
+  //s.readBlock(segmentInBuffer, segmentLen);
+
+  {todo: move these over to a pointer system}
   case segmentType of
-    ST_VLC1: readVLC1Sequence_ASM(stream, n, outBuffer);
-    ST_VLC2: readVLC2Sequence_ASM(stream, n, outBuffer);
-    ST_VLC8: VLC8_Read(stream, n, outBuffer);
-    ST_SIGN: SIGN_Read(stream, n, @outBuffer[0]);
-    ST_PACK0..ST_PACK0+31: unpackBits(stream, n, outBuffer, segmentType-ST_PACK0);
-    ST_RICE0..ST_RICE0+15: RICE_Read(stream, n, @outBuffer[0], segmentType-ST_RICE0);
+    ST_VLC1: readVLC1Sequence_ASM(s, n, outBuffer);
+    ST_VLC2: readVLC2Sequence_ASM(s, n, outBuffer);
+    ST_VLC8: VLC8_Read(s, n, outBuffer);
+    ST_SIGN: SIGN_Read(s, n, @outBuffer[0]);
+    ST_PACK0..ST_PACK0+31: unpackBits(s, n, outBuffer, segmentType-ST_PACK0);
+    ST_RICE0..ST_RICE0+15: RICE_Read(s, n, @outBuffer[0], segmentType-ST_RICE0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -297,6 +330,14 @@ begin
       value := value shr 3;
     end;
   end;
+end;
+
+function VLC1_Bits(values: array of dword): dword; overload;
+var
+  value: dword;
+begin
+  result := 0;
+  for value in values do result += VLC1_Bits(value);
 end;
 
 procedure VLC1_Write(stream: tStream; values: array of dword);
@@ -355,7 +396,7 @@ begin
   result := VLC2_Length(value) * 4;
 end;
 
-function  VLC2_Bits(values: array of dword): dword; overload;
+function VLC2_Bits(values: array of dword): dword;
 var
   value: dword;
 begin
@@ -411,6 +452,14 @@ begin
       value := value shr 7;
     end;
   end;
+end;
+
+function VLC8_Bits(values: array of dword): dword;
+var
+  value: dword;
+begin
+  result := 0;
+  for value in values do result += VLC8_Bits(value);
 end;
 
 procedure VLC8_Write(stream: tStream; values: array of dword);
