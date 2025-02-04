@@ -260,6 +260,7 @@ var
   log2mu, ulawBits, quantBits: integer;
   outStream: tMemoryStream;
   reader: tLA96Reader;
+  writer: tLA96Writer;
   outSFX: array of tSoundEffect;
   deltaSFX: array of tSoundEffect;
   curSFX, errSFX: tSoundEffect;
@@ -322,11 +323,14 @@ begin
   writeln('Compressing....');
   LA96_ENABLE_STATS := false;
 
+  writer := tLA96Writer.create();
+
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if fastMode or not fs.exists(music16.tag+'.a96') then begin
       startTimer('encode');
+      writer.open(music16.tag+'.a96');
       outStream := encodeLA96(music16, profile, true);
       stopTimer('encode');
       outStream.writeToFile(music16.tag+'.a96');

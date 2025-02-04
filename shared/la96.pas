@@ -182,8 +182,9 @@ type
     ownsStream: boolean;
     frameOn: int32;
     header: tLA96FileHeader;
+    profile: tAudioCompressionProfile;
     // raw frame values to write out
-    frameA, frameB: array[0..FRAME_SIZE-1] of dWord;
+    frameA, frameB: array of dWord;
   public
     constructor create();
     destructor destroy(); override;
@@ -192,7 +193,8 @@ type
 
     procedure writeNextFrame(samplePtr: pAudioSample16S);
     procedure close();
-    procedure writeSFX(sfx: tSoundEffect; profile: tAudioCompressionProfile);
+    procedure writeSFX(sfx: tSoundEffect; aProfile: tAudioCompressionProfile); overload;
+    procedure writeSFX(sfx: tSoundEffect); overload;
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
@@ -347,8 +349,7 @@ begin
     end else
       self.close();
   end;
-  if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
-  self.fs := tFileStream.create(aFilename);
+  self.fs := tFileStream.create(aFilename, FM_READ);
   self.ownsStream := true;
   self.filename := aFilename;
   self.loadHeader();
@@ -838,9 +839,12 @@ end;
 constructor tLA96Writer.create();
 begin
   inherited create();
+  setLength(frameA, FRAME_SIZE-1);
+  setLength(frameB, FRAME_SIZE-1);
   fs := nil;
   ownsStream := false;
   frameOn := 0;
+  profile := ACP_HIGH;
 end;
 
 destructor tLA96Writer.destroy();
@@ -853,7 +857,7 @@ procedure tLA96Writer.open(aFilename: string);
 var
   fs: tFileStream;
 begin
-  fs := tFileStream.create(aFilename);
+  fs := tFileStream.create(aFilename, FM_WRITE);
   open(fs);
   ownsStream := true;
 end;
@@ -921,35 +925,28 @@ end;
 procedure tLA96Writer.writeNextFrame(samplePtr: pAudioSample16S);
 var
   i: integer;
-  qMid, qDif: byte;
-  uMid, uDif: byte;
 begin
 
-  {work out how we want to compress this frame}
-  {todo: do this properly}
-  qMid := 4;
-  qDif := 4;
-  uMid := 8;
-  uDif := 8;
-
   {write frame header}
-  {todo}
+  fs.writeByte(0); // frame type (16bit, joint stereo)
+  fs.writeByte(profile.midQuantBits + profile.ulawBits*16);
+  fs.writeByte(profile.difQuantBits + profile.ulawDifBits*16);
 
   {process audio}
-  ApplyLRToQMD_REF(samplePtr, qMid, qDif, FRAME_SIZE);
-  ApplyULaw_REF(samplePtr, uMid, uDif, FRAME_SIZE);
+  ApplyLRToQMD_REF(samplePtr, profile.midQuantBits, profile.difQuantBits, FRAME_SIZE);
+  ApplyULaw_REF(samplePtr, profile.ulawBits, profile.ulawDifBits, FRAME_SIZE);
   ApplyDeltaModulation_REF(samplePtr, FRAME_SIZE);
 
-  {convert using negEncode}
-  for i := 0 to n-1 do begin
-    frameA[i] := negEncode((samplePtr+i*4)^.a);
-    frameB[i] := negEncode((samplePtr+i*4)^.b);
-    {todo: remove these checks unless a flag is set}
-    if frameA[i] > 65535 then error('Value too large');
-    if frameB[i] > 65535 then error('Value too large');
+  {convert using zigZag}
+  for i := 1 to FRAME_SIZE-1 do begin
+    frameA[i] := zigZag(samplePtr^.a);
+    frameB[i] := zigZag(samplePtr^.b);
+    inc(samplePtr);
   end;
 
   {write out}
+  fs.writeWord(frameA[0]);
+  fs.writeWord(frameB[0]);
   fs.writeSegment(frameA);
   fs.writeSegment(frameB);
 
@@ -966,7 +963,13 @@ begin
   ownsStream := false;
 end;
 
-procedure tLA96Writer.writeSFX(sfx: tSoundEffect; profile: tAudioCompressionProfile);
+procedure tLA96Writer.writeSFX(sfx: tSoundEffect;aProfile: tAudioCompressionProfile);
+begin
+  self.profile := aProfile;
+  writeSFX(sfx);
+end;
+
+procedure tLA96Writer.writeSFX(sfx: tSoundEffect);
 var
   i: integer;
 begin

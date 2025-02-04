@@ -121,6 +121,8 @@ function join(lines: array of string;seperator: string=#13#10): string;
 
 function  negDecode(x: dword): int32; inline;
 function  negEncode(x: int32): dword; inline;
+function  zigZag(x: int32): dword; inline;
+function  unzigZag(y: dword): int32; inline;
 function  encodeByteDelta(a,b: byte): byte; inline;
 
 function  sign(x: int32): int32; overload;
@@ -833,6 +835,21 @@ begin
   result := s;
 end;
 
+{interleave pos and negative numbers into a whole number
+ 0 -> 0
++1 -> 1
+-1 -> 2
+...
+}
+{this is the old system, which has the issue that -32768 -> 65536 and
+ therefore 17bits are needed to encode uint16 values}
+{todo: remove this and just use zigZag}
+function negEncode(x: int32): dword; inline;
+begin
+  result := abs(x)*2;
+  if x > 0 then dec(result);
+end;
+
 {interleave pos and negative numbers into a whole number}
 function negDecode(x: dword): int32; inline;
 begin
@@ -842,14 +859,35 @@ end;
 
 {interleave pos and negative numbers into a whole number
  0 -> 0
-+1 -> 1
--1 -> 2
+-1 -> 1
++1 -> 2
 ...
 }
-function negEncode(x: int32): dword; inline;
+function zigZag(x: int32): dword; inline; register;
 begin
-  result := abs(x)*2;
-  if x > 0 then dec(result);
+  //result := abs(x)*2;
+  //if x > 0 then dec(result);
+  asm
+    push ebx
+    mov ebx, eax
+    shl eax, 1
+    sar ebx, 31
+    xor eax, ebx
+    pop ebx
+  end;
+end;
+
+function unzigZag(y: dword): int32; inline; register;
+begin
+  asm
+    push ebx
+    mov ebx, eax
+    shr eax, 1
+    and ebx, $1
+    neg ebx
+    xor eax, ebx
+    pop ebx
+  end;
 end;
 
 {generates code representing delta to go from a to b}
@@ -1243,6 +1281,12 @@ begin
   {test negEncode neg}
   for i := -256 to +256 do
     assertEqual(negDecode(negEncode(i)), i);
+
+  {test zigZag}
+  for i := -256 to +256 do
+    assertEqual(unZigZag(zigZag(i)), i);
+  assert(zigZag(low(int16)) <= 65535);
+  assert(zigZag(high(int16)) <= 65535);
 
   assertEqual(extractExtension('fish.com'), 'com');
   assertEqual(extractExtension('FISH.COM'), 'COM');

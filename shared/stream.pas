@@ -14,6 +14,10 @@ uses
 
 type
 
+
+  {file mode, from DOS I think}
+  tFileMode = (FM_READ=0, FM_WRITE=1, FM_READWRITE=2);
+
   tStream = class
 
   protected
@@ -118,7 +122,7 @@ type
     f: file;
   public
 
-    constructor create(aFilename: string);
+    constructor create(aFilename: string; fileMode: tFileMode=FM_READ);
     destructor destroy(); override;
 
     {our core overrides}
@@ -558,26 +562,48 @@ end;
 
 {---------------------------------------------}
 
-constructor tFileStream.create(aFilename: string);
+constructor tFileStream.create(aFilename: string; fileMode: tFileMode=FM_READ);
 var
   oldFileMode: word;
 begin
+
   fPos := 0;
   oldFileMode := system.fileMode;
-  system.fileMode := 2; // read+write
-  if fs.exists(aFilename) then begin
-    {load current file}
-    system.assign(f, aFilename);
-    system.reset(f,1);
-    fLen := filesize(f);
-  end else begin
-    {create a new empty file}
-    system.assign(f, aFilename);
-    system.rewrite(f,1);
-    system.reset(f,1);
-    fLen := 0;
+  system.fileMode := byte(fileMode);
+
+  case fileMode of
+    FM_READ: begin
+      {open file for read only}
+      if not fs.exists(aFilename) then error('Could not open "'+aFilename+'" for reading');
+      system.assign(f, aFilename);
+      system.reset(f,1);
+      fLen := filesize(f);
+    end;
+    FM_WRITE: begin
+      {creates a new file, or overwrites it if it exists}
+      system.assign(f, aFilename);
+      system.rewrite(f,1);
+      fLen := 0;
+    end;
+    FM_READWRITE: begin
+      {if file exists it is opened, with pos at the start of the file,
+       and the ability to both read and write to it}
+      if fs.exists(aFilename) then begin
+        system.assign(f, aFilename);
+        system.rewrite(f,1);
+        system.reset(f,1);
+        fLen := filesize(f);
+      end else begin
+        system.assign(f, aFilename);
+        system.rewrite(f,1);
+        fLen := 0;
+      end;
+    end;
+    else error(format('Invalid fileMode %d', [fileMode]));
   end;
+
   system.fileMode := oldFileMode;
+
 end;
 
 destructor tFileStream.destroy();

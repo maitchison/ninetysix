@@ -138,7 +138,7 @@ begin
   Log(s, llWarning);
 end;
 
-procedure Error(s: string; code: byte=100);
+procedure Error(s: string; code: byte=100); noreturn;
 begin
   Log(s, llError);
   RunErrorSkipFrame(code);
