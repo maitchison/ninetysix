@@ -2,9 +2,7 @@ function readVLC1Sequence_REF(stream: tStream; n: int32;outBuffer: tDwords): tDW
 var
   i: integer;
 begin
-  for i := 0 to n-1 do
-    outBuffer[i] := stream.readVLC;
-  stream.byteAlign();
+  error('VLC1 is no longer supported');
 end;
 
 {General unpacking routine. Works on any number of bits, but is a bit slow.}

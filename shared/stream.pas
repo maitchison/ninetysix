@@ -3,8 +3,6 @@ unit stream;
 
 {$MODE Delphi}
 
-{todo: borrow most of LZBlock}
-
 interface
 
 uses
@@ -32,7 +30,6 @@ type
     bytesAllocated: int32;   {capacity is how much memory we allocated}
     bytesUsed: int32;   {bytesUsed is the number of actual bytes used}
     fPos: int32;        {current position in stream}
-    midByte: boolean;
 
   private
     procedure makeCapacity(n: dword);
@@ -50,12 +47,11 @@ type
 
     property items[index: dword]: byte read getByte write setByte; default;
 
-    procedure writeNibble(b: byte); inline;
     procedure writeByte(b: byte); inline;
     procedure writeWord(w: word); inline;
     procedure writeDWord(d: dword); inline;
-    procedure writeVLC(value: dword); inline;
-    function  writeVLCSegment(values: array of dword;segmentType:byte=255): int32;
+    procedure writeVLC8(value: dword); inline;
+    function  writeSegment(values: array of dword;segmentType:byte=255): int32;
 
     procedure setSize(newSize: int32);
 
@@ -68,16 +64,14 @@ type
     function  peekDWord: dword; inline;
 
     function  readByte: byte; inline;
-    function  readNibble: byte; inline;
     function  readWord: word; inline;
     function  readDWord: dword; inline;
-    function  readVLC: dword; inline;
-    function  readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
+    function  readVLC8: dword; inline;
+    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
     function  readBytes(n: int32): tBytes;
     procedure readBlock(var x;numBytes: int32);
 
-    procedure byteAlign(); inline;
-    procedure seek(aPos: dword; aMidByte: boolean=False);
+    procedure seek(aPos: dword);
     procedure advance(numBytes: integer);
 
     procedure writeToFile(fileName: string);
@@ -99,6 +93,7 @@ type
 implementation
 
 uses
+  filesystem,
   vlc;
 
 {------------------------------------------------------}
@@ -108,7 +103,6 @@ begin
   inherited Create();
   bytes := nil;
   bytesAllocated := 0;
-  midByte := False;
   if aInitialCapacity > 0 then
     makeCapacity(aInitialCapacity)
 end;
@@ -190,26 +184,8 @@ end;
 
 {------------------------------------------------------}
 
-procedure tStream.writeNibble(b: byte); inline;
-begin
-  if midByte then begin
-    bytes[fPos] := bytes[fPos] or (b shl 4);
-    midByte := false;
-    inc(fPos);
-  end else begin
-    setLength(fPos+1);
-    bytes[fPos] := b;
-    midByte := true;
-  end;
-end;
-
 procedure tStream.writeByte(b: byte); inline;
 begin
-  if midByte then begin
-    writeNibble((b shr 0) and $f);
-    writeNibble((b shr 4) and $f);
-    exit;
-  end;
   setLength(fPos+1);
   bytes[fPos] := b;
   inc(fPos);
@@ -217,12 +193,6 @@ end;
 
 procedure tStream.writeWord(w: word); inline;
 begin
-  if midByte then begin
-    writeNibble((w shr 0) and $f);
-    writeByte((w shr 4) and $ff);
-    writeNibble((w shr 12) and $f);
-    exit;
-  end;
   setLength(fPos+2);
   {little edian}
   bytes[fPos] := w and $FF;
@@ -232,14 +202,6 @@ end;
 
 procedure tStream.writeDWord(d: dword); inline;
 begin
-  if midByte then begin
-    writeNibble((d shr 0) and $f);
-    writeByte((d shr 4) and $ff);
-    writeByte((d shr 12) and $ff);
-    writeByte((d shr 20) and $ff);
-    writeNibble((d shr 28) and $f);
-    exit;
-  end;
   setLength(fPos+4);
   {little edian}
   bytes[fPos] := d and $ff;
@@ -247,6 +209,15 @@ begin
   bytes[fPos+2] := (d shr 16) and $ff;
   bytes[fPos+3] := (d shr 24) and $ff;
   inc(fPos,4);
+end;
+
+procedure tStream.writeVLC8(value: dword); inline;
+begin
+  while value >= 128 do begin
+    writeByte($80 + value and $7f);
+    value := value shr 7;
+  end;
+  writeByte($00 + value);
 end;
 
 procedure tStream.writeChars(s: string);
@@ -268,100 +239,67 @@ procedure tStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
 begin
   if aLen < 0 then aLen := length(aBytes);
   if aLen = 0 then exit;
-  if midByte then error('unaligned write bytes');
   if aLen > length(aBytes) then error('tried writing too many bytes');
   setLength(fPos + aLen);
   move(aBytes[0], self.bytes[fPos], aLen);
   inc(fPos, aLen);
 end;
 
-function tStream.readNibble: byte; inline;
-begin
-  if midByte then begin
-    result := bytes[fPos] shr 4;
-    midByte := false;
-    inc(fPos);
-  end else begin
-    result := bytes[fPos] and $f;
-    midByte := true;
-  end;
-end;
-
 function tStream.readByte: byte; inline;
 begin
-  {todo: support halfbyte}
-  if midByte then
-    Error('Reading missaligned bytes not yet supported');
   result := bytes[fPos];
   inc(fPos);
 end;
 
 function tStream.readWord: word; inline;
 begin
-  if midByte then
-    Error('Reading missaligned words not yet supported');
-  result := bytes[fPos] + (bytes[fPos+1] shl 8);
+  result := pWord(bytes + fPos)^;
   inc(fPos,2);
 end;
 
 function tStream.readDWord: dword; inline;
 begin
-  if midByte then
-    Error('Reading missaligned dwords not yet supported');
-  result := bytes[fPos] + (bytes[fPos+1] shl 8) + (bytes[fPos+2] shl 16) + (bytes[fPos+3] shl 24);
+  result := pDWord(bytes + fPos)^;
   inc(fPos,4);
+end;
+
+function tStream.readVLC8: dword; inline;
+var b: byte;
+begin
+  result := 0;
+  repeat
+    b := readByte();
+    if b < 128 then begin
+      result := result or b;
+      exit;
+    end else begin
+      result := result or (b-128);
+      result := result shl 7;
+    end;
+  until false;
 end;
 
 function tStream.peekByte: byte; inline;
 begin
-  {todo: support halfbyte}
-  if midByte then
-    Error('Reading missaligned bytes not yet supported');
   result := bytes[fPos];
 end;
 
 function tStream.peekWord: word; inline;
 begin
-  if midByte then
-    Error('Reading missaligned bytes not yet supported');
-  result := bytes[fPos] + (bytes[fPos+1] shl 8);
+  result := pWord(bytes + fPos)^;
 end;
 
 function tStream.peekDWord: dword; inline;
 begin
-  if midByte then
-    Error('Reading missaligned dwords not yet supported');
-  result := bytes[fPos] + (bytes[fPos+1] shl 8) + (bytes[fPos+2] shl 16) + (bytes[fPos+3] shl 24);
-end;
-
-function tStream.readVLC: dword; inline;
-var
-  value: dword;
-  b: byte;
-  shift: byte;
-begin
-  value := 0;
-  shift := 0;
-  while True do begin
-    b := readNibble;
-    value += (b and $7) shl shift;
-    if b < $8 then begin
-      exit(value);
-    end else begin
-      inc(shift, 3);
-    end;
-  end;
+  result := pDWord(bytes + fPos)^;
 end;
 
 function tStream.readBytes(n: int32): tBytes;
 begin
   result := nil;
   if n = 0 then exit;
-  if midByte then
-    error('Unaligned readBytes');
   if n > (len-fPos) then
     error(Format('Read over end of stream, requested, %d bytes but %d remain.', [n,  len - fpos]));
-
   system.setLength(result, n);
   move(bytes[fPos], result[0], n);
   fPos += n;
@@ -371,7 +309,6 @@ end;
 procedure tStream.readBlock(var x;numBytes: int32);
 begin
   if numBytes = 0 then exit;
-  if midByte then error('Unaligned readBlock');
   if numBytes > (len-fPos) then
     error(Format('Read over end of stream, requested, %d bytes but %d remain.', [numBytes,  len-fPos]));
   move(bytes[fPos], x, numBytes);
@@ -379,10 +316,9 @@ begin
 end;
 
 {write a block from stream into variable}
-procedure tStream.writeBlock(var x;numBytes: int32);
+procedure tStream.writeBlock(var x; numBytes: int32);
 begin
   if numBytes = 0 then exit;
-  if midByte then error('unaligned writeBlock');
   setLength(fPos + numBytes);
   move(x, self.bytes[fPos], numBytes);
   inc(fPos, numBytes);
@@ -441,20 +377,11 @@ begin
   end;
   close(f);
   seek(0);
-  midByte := False;
 end;
 
-procedure tStream.byteAlign(); inline;
-{writes a nibble if we are halfway though a nibble}
-begin
-  if midByte then writeNibble(0);
-end;
-
-procedure tStream.seek(aPos: dword; aMidByte: boolean=False);
+procedure tStream.seek(aPos: dword);
 begin
   fPos := aPos;
-  midByte := aMidByte;
-  {note: we'll get an error if we seek beyond capacity}
   if bytesUsed < fPos then bytesUsed := fPos;
 end;
 
@@ -464,49 +391,12 @@ begin
   fPos += numBytes;
 end;
 
-{write a variable length encoded token
-
-Encoding is as follows
-
-with most signficant nibbles on the right.
-
-(todo: check this is still right)
-
-xxx0               (0-7)
-xxx1xxx0           (8-63)
-xxx1xxx1xxx0       (64-511)
-xxx1xxx1xxx1xxx0   (512-4095)
-
-Note: codes in the form
-
-0000xxx1
-...
-
-are out of band, and used for control codes
-
-}
-{todo: remove this from stream... we will no longer support it or
- nibble writing}
-procedure tStream.writeVLC(value: dword);
-begin
-  {this is the nibble aligned method}
-  while true do begin
-    if value < 8 then begin
-      writeNibble(value);
-      exit;
-    end else begin
-      writeNibble($8+(value and $7));
-      value := value shr 3;
-    end;
-  end;
-end;
-
-function tStream.readVLCSegment(n: int32;outBuffer: tDwords=nil): tDWords;
+function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
 begin
   result := vlc.readSegment(self, n, outBuffer);
 end;
 
-function tStream.writeVLCSegment(values: array of dword;segmentType:byte=255): int32;
+function tStream.writeSegment(values: array of dword;segmentType:byte=255): int32;
 begin
   result := vlc.writeSegment(self, values, segmentType);
 end;
@@ -522,7 +412,6 @@ begin
   bytesUsed := 0;
   bytesAllocated := 0;
   fPos := 0;
-  midByte := false;
 end;
 
 {Reset stream, but keep previous capcity}
@@ -530,7 +419,6 @@ procedure tStream.softReset();
 begin
   bytesUsed := 0;
   fPos := 0;
-  midByte := false;
 end;
 
 function tStream.asBytes(): tBytes;
@@ -570,21 +458,6 @@ const
   {this will be packed to 5 bits}
   testData4: array of dword = [31, 31, 31, 31, 31, 31, 31];
 begin
-
-  {check nibble}
-  s := tStream.Create();
-  for i := 0 to 15 do
-    s.writeNibble(i);
-  assertEqual(s.len, 8);
-  s.writeToFile('tmp.dat');
-  s.free;
-
-  s := tStream.Create();
-  s.readFromFile('tmp.dat');
-  assertEqual(s.len, 8);
-  for i := 0 to 15 do
-    assertEqual(s.readNibble, i);
-  s.free;
 
   {check bytes}
   s := tStream.Create();
@@ -631,6 +504,17 @@ begin
   s.writeByte(5);
   assertEqual(s.asBytes, [1,2,3,4,5]);
   s.free;
+
+  {check vlc}
+  s := tStream.Create();
+  for i := 0 to length(testData1)-1 do
+    s.writeVLC8(testData1[i]);
+  s.seek(0);
+  for i := 0 to length(testData1)-1 do
+    assertEqual(s.readVLC8, testData1[i]);
+  s.free;
+
+  filesystem.fs.delFile('tmp.dat');
 
 end;
 

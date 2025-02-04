@@ -33,6 +33,7 @@ const
   ST_RICE_SLOW = 252; {select best rice}
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
+  ST_VLC8 = 2;  {this is basically the old VLC1 system but at the byte level. Not as efficent as VLC2}
   ST_SIGN = 8;  {special encoding for sign bits}
 
   ST_PACK0 = 16; {16..48 = pack}
@@ -57,7 +58,7 @@ const
 function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function  readSegment(stream: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 
-function getSegmentTypeName(segmentType: byte): string;
+function  getSegmentTypeName(segmentType: byte): string;
 
 function  VLC2_Bits(value: dword): word; overload;
 function  VLC2_Bits(values: array of dword): dword; overload;
@@ -80,6 +81,10 @@ implementation
 {vlc1 - depricated}
 procedure VLC1_Write(stream: tStream; values: array of dword); forward;
 function  VLC1_Bits(value: dword): word; forward;
+
+{vlc8}
+procedure VLC8_Write(stream: tStream; values: array of dword); forward;
+function  VLC8_Read(stream: tStream; n: int32;outBuffer: tDwords): tDWords; forward;
 
 {fast codes}
 procedure FAST_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer); forward;
@@ -125,6 +130,7 @@ begin
   case segmentType of
     ST_VLC1: result := 'VLC1';
     ST_VLC2: result := 'VLC2';
+    ST_VLC8: result := 'VLC8';
     ST_SIGN: result := 'SIGN';
     ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
     ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
@@ -284,6 +290,7 @@ begin
   case segmentType of
     ST_VLC1: VLC1_Write(stream, values);
     ST_VLC2: VLC2_Write(stream, values);
+    ST_VLC8: VLC8_Write(stream, values);
     ST_SIGN: SIGN_Write(stream, values);
     ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, stream);
     ST_RICE0..ST_RICE0+15: RICE_Write(stream, values, segmentType - ST_RICE0);
@@ -308,6 +315,7 @@ begin
   case segmentType of
     ST_VLC1: readVLC1Sequence_ASM(stream, n, outBuffer);
     ST_VLC2: readVLC2Sequence_ASM(stream, n, outBuffer);
+    ST_VLC8: VLC8_Read(stream, n, outBuffer);
     ST_SIGN: SIGN_Read(stream, n, @outBuffer[0]);
     ST_PACK0..ST_PACK0+31: unpackBits(stream, n, outBuffer, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: RICE_Read(stream, n, @outBuffer[0], segmentType-ST_RICE0);
@@ -374,7 +382,6 @@ begin
   if midByte then writeNibble(0);
 end;
 
-
 {-------------------------}
 
 {returns number of nibbles required to store given value}
@@ -437,6 +444,38 @@ end;
 
 {--------------------------------------}
 
+{returns size of variable length encoded token}
+function VLC8_Bits(value: dword): word;
+begin
+  result := 0;
+  {this is the nibble aligned method}
+  while True do begin
+    if value < 128 then begin
+      result += 8;
+      exit;
+    end else begin
+      result += 8;
+      value := value shr 7;
+    end;
+  end;
+end;
+
+procedure VLC8_Write(stream: tStream; values: array of dword);
+var
+  value: dword;
+begin
+  for value in values do
+    stream.writeVLC8(value);
+end;
+
+function VLC8_Read(stream: tStream; n: int32;outBuffer: tDwords): tDWords;
+var
+  i: integer;
+begin
+  for i := 0 to n-1 do
+    outBuffer[i] := stream.readVLC8();
+end;
+
 {--------------------------------------------------------------}
 { SIGN strategy }
 {--------------------------------------------------------------}
@@ -455,13 +494,12 @@ begin
     if prevValue = value then
       inc(counter)
     else begin
-      stream.writeVLC(counter);
+      stream.writeVLC8(counter);
       counter := 1;
       prevValue := value;
     end;
   end;
-  stream.writeVLC(counter);
-  stream.byteAlign();
+  stream.writeVLC8(counter);
 end;
 
 {special version for signs, i.e. -1, 0, and 1. We store the sign bit
@@ -472,21 +510,19 @@ var
   value, prevValue: int8;
   counter: integer;
 begin
-  {todo: update to rice codes}
   prevValue := 1;
   counter := 0;
   for i := 0 to length(values)-1 do begin
     value := values[i];
     if prevValue * value < 0 then begin
       {change of sign}
-      stream.writeVLC(counter);
+      stream.writeVLC8(counter);
       counter := 1;
       prevValue *= -1;
     end else
       inc(counter)
   end;
-  stream.writeVLC(counter);
-  stream.byteAlign();
+  stream.writeVLC8(counter);
 end;
 
 function SIGN_Bits(values: array of dword): int32; overload;
@@ -546,7 +582,7 @@ var
 begin
   value := 0;
   repeat
-    counter := stream.readVLC();
+    counter := stream.readVLC8();
     for i := 0 to counter-1 do begin
       outBuffer^ := value;
       inc(outBuffer);
@@ -554,7 +590,6 @@ begin
     n -= counter;
     value := 1-value;
   until n <= 0;
-  stream.byteAlign();
 end;
 
 {outputs 0 for non-signed, and -1 ($ffff...) for signed}
@@ -566,14 +601,13 @@ var
 begin
   mask := 0;
   repeat
-    counter := stream.readVLC();
+    counter := stream.readVLC8();
     if counter > 0 then
       filldword(outBuffer^, counter, dword(mask));
     outBuffer += counter;
     n -= counter;
     if mask = 0 then dec(mask) else inc(mask);
   until n <= 0;
-  stream.byteAlign();
 end;
 
 {--------------------------------------------------------------}
@@ -960,10 +994,10 @@ begin
   {test sign}
   for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
     s := tStream.create();
-    s.writeVLCSegment(testSign, ST_SIGN);
+    writeSegment(s, testSign, ST_SIGN);
     s.seek(0);
     setLength(data, length(testSign));
-    data := s.readVLCSegment(length(testSign), data);
+    data := readSegment(s, length(testSign), data);
     s.free;
     for i := 0 to length(testSign)-1 do
       assertEqual(data[i], testSign[i]);
@@ -996,36 +1030,27 @@ begin
 
   {check vlcsegment standard}
   s := tStream.create();
-  s.writeVLCSegment(testData1);
+  writeSegment(s, testData1);
   s.seek(0);
-  data := s.readVLCSegment(length(testData1));
+  data := readSegment(s, length(testData1));
   s.free;
   for i := 0 to length(testData1)-1 do
     AssertEqual(data[i], testData1[i]);
 
   {check vlcsegment packed}
   s := tStream.create;
-  s.writeVLCSegment(testData3);
+  writeSegment(s, testData3);
   s.seek(0);
-  data := s.readVLCSegment(length(testData3));
+  data := readSegment(s, length(testData3));
   s.free;
   for i := 0 to length(testData3)-1 do
     AssertEqual(data[i], testData3[i]);
 
-  {check vlc}
-  s := tStream.Create();
-  for i := 0 to length(testData1)-1 do
-    s.writeVLC(testData1[i]);
-  s.seek(0);
-  for i := 0 to length(testData1)-1 do
-    assertEqual(s.readVLC, testData1[i]);
-  s.free;
-
   {check odd size packing}
   s := tStream.Create();
-  s.writeVLCSegment(testData4);
+  writeSegment(s, testData4);
   s.seek(0);
-  data := s.readVLCSegment(length(testData4));
+  data := readSegment(s, length(testData4));
   assertEqual(toBytes(data), toBytes(testData4));
   assertEqual(s.pos, s.len);
   s.free;

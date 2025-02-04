@@ -535,7 +535,7 @@ begin
     bytes := 1 shl n;
     filldword(p^, bytes div 4, 0);
     timer.create(TM_MBPS, 256*bytes);
-    timer.start('FILL '+intToStr(bytes div 1024)+'kb');
+    timer.start('READ '+intToStr(bytes div 1024)+'kb');
     for i := 1 to 256 do begin
       asm
         pushad

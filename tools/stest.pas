@@ -85,6 +85,12 @@ begin
   {---------------------------------}
   {write}
 
+  s := tStream.Create();
+  startTest('Write BYTE (no preallocation)');
+  for i := 1 to numTestBytes do s.writeByte(255);
+  stopTest(numTestBytes); displayTestResults();
+  s.free;
+
   s := tStream.Create(numTestBytes);
 
   s.seek(0);
@@ -128,7 +134,7 @@ begin
   note(format('%s     %s    %s (MB/s)', [pad('Segment Type',40), 'Read', 'Write']));
   writeln('-----------------------------------------------------------------');
   for segmentType in [
-    ST_VLC1, ST_VLC2,
+    ST_VLC1, ST_VLC2, ST_VLC8,
     ST_PACK7, ST_PACK8, ST_PACK9,
     ST_RICE0+6,
     ST_FAST0+6,
