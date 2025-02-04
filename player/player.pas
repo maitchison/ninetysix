@@ -328,9 +328,12 @@ begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if FAST_TEST or not fs.exists(music16.tag+'.a96') then begin
+      startTimer('encode');
       outStream := encodeLA96(music16, profile, true);
+      stopTimer('encode');
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
+      writeln(format('Decoded at %fx', [(music16.length/44100)/getTimer('encode').elapsed]));
     end;
   end;
 
