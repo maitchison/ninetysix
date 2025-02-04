@@ -16,78 +16,110 @@ type
 
   tStream = class
 
-    {
-    note on position
-    fPos is our current position within the buffer.
-    valid bytes are considered to be [0..bytesUsed-1]
-
-    capacity (bytesAllocated) is always >= fPos
-    using seek(fPos) is a 'soft clear', as in does not change the capacitiy.
-    }
-
   protected
-    bytes: pByte;
-    bytesAllocated: int32;   {capacity is how much memory we allocated}
-    bytesUsed: int32;   {bytesUsed is the number of actual bytes used}
     fPos: int32;        {current position in stream}
+    fLen: int32;        {length of stream}
 
-  private
-    procedure makeCapacity(n: dword);
-    procedure setCapacity(newSize: dword);
-    procedure setLength(n: dword);
-
-    function getByte(index: dword): byte; inline;
-    procedure setByte(index: dword; value: byte); inline;
+    procedure setLen(newLen: int32); virtual;
+    procedure expandLen(n: dword);
 
   public
 
-    constructor Create(aInitialCapacity: dword=0);
-    destructor Destroy(); override;
-    class function FromFile(filename: string): tStream; static;
+    constructor create(aInitialCapacity: dword=0);
+    destructor destroy(); override;
 
-    property items[index: dword]: byte read getByte write setByte; default;
+    procedure seek(aPos: int32); virtual;
+    procedure flush(); virtual;
+    procedure reset(); virtual;
 
-    procedure writeByte(b: byte); inline;
-    procedure writeWord(w: word); inline;
-    procedure writeDWord(d: dword); inline;
-    procedure writeVLC8(value: dword); inline;
-    function  writeSegment(values: array of dword;segmentType:byte=255): int32;
-
-    procedure setSize(newSize: int32);
-
-    procedure writeChars(s: string);
-    procedure writeBytes(aBytes: tBytes;aLen:int32=-1);
-    procedure writeBlock(var x;numBytes: int32);
-
+    {derived}
     function  peekByte: byte; inline;
     function  peekWord: word; inline;
     function  peekDWord: dword; inline;
-
-    function  readByte: byte; inline;
-    function  readWord: word; inline;
-    function  readDWord: dword; inline;
     function  readVLC8: dword; inline;
-    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
-    function  readBytes(n: int32): tBytes;
-    procedure readBlock(var x;numBytes: int32);
+    function  asBytes(): tBytes;
+    procedure writeChars(s: string);
+    procedure writeVLC8(value: dword);
 
-    procedure seek(aPos: dword);
     procedure advance(numBytes: integer);
 
+    {base functions for other classes to implement}
+    function  readByte: byte; virtual; abstract;
+    function  readWord: word; virtual; abstract;
+    function  readDWord: dword; virtual; abstract;
+    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords; virtual; abstract;
+    function  readBytes(n: int32): tBytes; virtual; abstract;
+    procedure readBlock(var x;numBytes: int32); virtual; abstract;
+    procedure writeByte(b: byte); virtual; abstract;
+    procedure writeWord(w: word); virtual; abstract;
+    procedure writeDWord(d: dword); virtual; abstract;
+    procedure writeBytes(aBytes: tBytes;aLen:int32=-1); virtual; abstract;
+    procedure writeBlock(var x;numBytes: int32); virtual; abstract;
+    function  writeSegment(values: array of dword;segmentType:byte=255): int32; virtual; abstract;
+
+    {for direct access}
+    function  getCurrentBytesPtr(requestedBytes: int32): pointer; virtual;
+
+    {properties}
+    property  len: int32 read fLen write setLen;
+    property  pos: int32 read fPos write seek;
+  end;
+
+  {implements stream with an in-memory buffer
+
+  tMemoryStream makes use of a 'capacity' which are the number of bytes
+  allocated in the bytesBuffer. This will always be >= len.
+  Bytes at address >= len have undefined value.
+  }
+  tMemoryStream = class(tStream)
+  protected
+    bytes: pByte;
+    fCapacity: int32;   {capacity is how much memory we allocated}
+
+  protected
+    procedure makeCapacity(n: dword);
+    procedure setCapacity(newSize: dword);
+    procedure setLen(n: int32); override;
+  public
+
+    constructor create(aInitialCapacity: dword=0);
+    destructor destroy(); override;
+
+    {our core overrides}
+    procedure seek(aPos: int32); override;
+    procedure flush(); override;
+    procedure reset(); override;
+    function  getCurrentBytesPtr(requestedBytes: int32): pointer; override;
+
+    {soft reset does not freem memory and maintains capacity}
+    procedure softReset();
+
+    {helpers}
+    class function fromFile(filename: string): tMemoryStream; static;
     procedure writeToFile(fileName: string);
     procedure readFromFile(fileName: string; blockSize: int32=4096;maxSize: int32=-1);
 
-    procedure flush();
-    procedure reset();
-    procedure softReset();
+    {our r/w override}
+    function  readByte: byte; override;
+    function  readWord: word; override;
+    function  readDWord: dword; override;
+    function  readSegment(n: int32;outBuffer: tDwords=nil): tDWords; override;
+    function  readBytes(n: int32): tBytes; override;
+    procedure readBlock(var x;numBytes: int32); override;
+    procedure writeByte(b: byte); override;
+    procedure writeWord(w: word); override;
+    procedure writeDWord(d: dword); override;
+    procedure writeBytes(aBytes: tBytes;aLen:int32=-1); override;
+    procedure writeBlock(var x;numBytes: int32); override;
+    function  writeSegment(values: array of dword;segmentType:byte=255): int32; override;
 
-    property  capacity: int32 read bytesAllocated;
-    property  len: int32 read bytesUsed;
-    property  pos: int32 read fPos;
+    {properties}
+    property  capacity: int32 read fCapacity;
 
-    function  asBytes: tBytes;
-    function  getCurrentBytesPtr: pointer;
+  end;
 
+  {implements stream using an on-disk file}
+  tFileStream = class(tStream)
   end;
 
 implementation
@@ -97,118 +129,66 @@ uses
   vlc;
 
 {------------------------------------------------------}
+{ tStream }
+{------------------------------------------------------}
 
-constructor tStream.Create(aInitialCapacity: dword=0);
+constructor tStream.create();
 begin
-  inherited Create();
-  bytes := nil;
-  bytesAllocated := 0;
-  if aInitialCapacity > 0 then
-    makeCapacity(aInitialCapacity)
+  inherited create();
+  if self.classType = tStream then
+    error('Attempted to instantiate an abstract class: tStream');
+  fPos := 0;
+  fLen := 0;
 end;
 
-destructor tStream.Destroy();
+destructor tStream.destroy();
 begin
-  freeMem(bytes); bytes := nil;
   inherited destroy;
 end;
 
-class function tStream.FromFile(filename: string): tStream; static;
+procedure tStream.setLen(newLen: int32);
 begin
-  result := tStream.Create();
-  result.readFromFile(filename);
+  fLen := newLen;
 end;
 
-{------------------------------------------------------}
-
-function tStream.getByte(index: dword): byte; inline;
+procedure tStream.seek(aPos: int32);
 begin
-  result := bytes[index];
+  fPos := aPos;
 end;
 
-procedure tStream.setByte(index: dword; value: byte); inline;
+procedure tStream.flush();
 begin
-  bytes[index] := value;
+  // nop
 end;
 
-{updates stream so that it has this much capacity.
-Will truncate down if needed.
-What get's modified
- - Pos: no change
- - ByteSize: >= newSize
- - ByteUsed: truncated down to newSize
-}
-procedure tStream.setCapacity(newSize: dword);
-var
-  blocks: int32;
+procedure tStream.reset();
 begin
-
-  //if newSize > 64*1024 then
-  //  log(format('Allocating large block of size %,->%,', [bytesAllocated, newSize]));
-
-  blocks := (newSize+1023) div 1024;
-
-  {quick check to make sure everythings ok}
-  if assigned(bytes) <> (bytesAllocated > 0) then
-    error('Looks like stream was not initialized.');
-
-  if blocks=0 then begin
-    freeMem(bytes);
-  end else begin
-    reallocMem(bytes, blocks*1024);
-    if bytes = nil then error('Could not allocate memory block');
-  end;
-
-  bytesAllocated := blocks*1024;
-
-  {bytesUsed can not be more than actual buffer size}
-  if bytesUsed > newSize then
-    bytesUsed := newSize;
+  fPos := 0;
+  fLen := 0;
 end;
 
-{makes sure the stream has capacity for *atleast* n bytes}
-procedure tStream.makeCapacity(n: dword);
+{expand the length this many bytes, will not contract length}
+procedure tStream.expandLen(n: dword);
 begin
-  if bytesAllocated < n then
-    {resize might require a copy, so always increase size by atleast 5%}
-    setCapacity(max(n, dword(int64(bytesAllocated)*105 div 100)));
+  if fLen < n then setLen(n);
 end;
 
-{expand (or contract) the length this many bytes}
-{note: we never shrink the capacity here.}
-procedure tStream.setLength(n: dword);
+function tStream.peekByte: byte; inline;
 begin
-  makeCapacity(n);
-  bytesUsed := n;
+  result := readByte;
+  advance(-1);
 end;
 
-{------------------------------------------------------}
-
-procedure tStream.writeByte(b: byte); inline;
+function tStream.peekWord: word; inline;
 begin
-  setLength(fPos+1);
-  bytes[fPos] := b;
-  inc(fPos);
+  result := readWord;
+  advance(-2);
 end;
 
-procedure tStream.writeWord(w: word); inline;
+function tStream.peekDWord: dword; inline;
 begin
-  setLength(fPos+2);
-  {little edian}
-  bytes[fPos] := w and $FF;
-  bytes[fPos+1] := w shr 8;
-  inc(fPos,2);
-end;
-
-procedure tStream.writeDWord(d: dword); inline;
-begin
-  setLength(fPos+4);
-  {little edian}
-  bytes[fPos] := d and $ff;
-  bytes[fPos+1] := (d shr 8) and $ff;
-  bytes[fPos+2] := (d shr 16) and $ff;
-  bytes[fPos+3] := (d shr 24) and $ff;
-  inc(fPos,4);
+  result := readDWord;
+  advance(-4);
 end;
 
 procedure tStream.writeVLC8(value: dword); inline;
@@ -228,41 +208,6 @@ begin
     writeByte(ord(s[i]));
 end;
 
-{expands stream to given new size (or truncates if needed)}
-procedure tStream.setSize(newSize: int32);
-begin
-  setLength(newSize);
-  bytesUsed := newSize
-end;
-
-procedure tStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
-begin
-  if aLen < 0 then aLen := length(aBytes);
-  if aLen = 0 then exit;
-  if aLen > length(aBytes) then error('tried writing too many bytes');
-  setLength(fPos + aLen);
-  move(aBytes[0], self.bytes[fPos], aLen);
-  inc(fPos, aLen);
-end;
-
-function tStream.readByte: byte; inline;
-begin
-  result := bytes[fPos];
-  inc(fPos);
-end;
-
-function tStream.readWord: word; inline;
-begin
-  result := pWord(bytes + fPos)^;
-  inc(fPos,2);
-end;
-
-function tStream.readDWord: dword; inline;
-begin
-  result := pDWord(bytes + fPos)^;
-  inc(fPos,4);
-end;
-
 function tStream.readVLC8: dword; inline;
 var b: byte;
 begin
@@ -279,22 +224,196 @@ begin
   until false;
 end;
 
-function tStream.peekByte: byte; inline;
+{this is very slow. Make a copy of the entire stream from start to end
+ as a tBytes}
+function tStream.asBytes(): tBytes;
+begin
+  result := nil;
+  if flen = 0 then exit;
+  seek(0);
+  setLength(result, fLen);
+  readBlock(result[0], fLen);
+end;
+
+{advance the current position this many bytes}
+procedure tStream.advance(numBytes: integer);
+begin
+  seek(fpos + numBytes);
+end;
+
+{returns a pointer to a buffer containing (atleast) the next
+ 'requestedBytes' bytes. Not all streams will implement this
+ method, in which case they will return nil. Writing this this
+ buffer is strongly discouraged.}
+function tStream.getCurrentBytesPtr(requestedBytes: int32): pointer;
+begin
+  result := nil;
+end;
+
+{-------------------------------------------}
+{ tMemoryStream }
+{-------------------------------------------}
+
+constructor tMemoryStream.create(aInitialCapacity: dword=0);
+begin
+  inherited create();
+  bytes := nil;
+  fCapacity := 0;
+  if aInitialCapacity > 0 then
+    makeCapacity(aInitialCapacity)
+end;
+
+destructor tMemoryStream.destroy();
+begin
+  freeMem(bytes); bytes := nil;
+  inherited destroy;
+end;
+
+class function tMemoryStream.FromFile(filename: string): tMemoryStream; static;
+begin
+  result := tMemoryStream.Create();
+  result.readFromFile(filename);
+end;
+
+{-------------------------------------------}
+
+{process all pending writes}
+procedure tMemoryStream.flush();
+begin
+  {not used for memory stream}
+end;
+
+{resets stream, freeing all memory.}
+procedure tMemoryStream.reset();
+begin
+  freeMem(bytes); bytes := nil;
+  fPos := 0;
+  fLen := 0;
+  fCapacity := 0;
+end;
+
+{reset stream, but keep memory allocation}
+procedure tMemoryStream.softReset();
+begin
+  fLen := 0;
+  fPos := 0;
+end;
+
+function tMemoryStream.getCurrentBytesPtr(requestedBytes: int32): pointer;
+begin
+  result := @bytes[fPos];
+end;
+
+{-------------------------------------------}
+
+{updates stream so that it has this much capacity.
+Will truncate down if needed.
+What get's modified
+ - Pos: no change
+ - ByteSize: >= newSize
+ - ByteUsed: truncated down to newSize
+}
+procedure tMemoryStream.setCapacity(newSize: dword);
+var
+  blocks: int32;
+begin
+
+  blocks := (newSize+1023) div 1024;
+
+  {quick check to make sure everythings ok}
+  if assigned(bytes) <> (fCapacity > 0) then
+    error('Looks like stream was not initialized.');
+
+  if blocks=0 then begin
+    freeMem(bytes);
+  end else begin
+    reallocMem(bytes, blocks*1024);
+    if bytes = nil then error('Could not allocate memory block');
+  end;
+
+  fCapacity := blocks*1024;
+
+  {truncate if needed}
+  if fLen > newSize then
+    fLen := newSize;
+end;
+
+procedure tMemoryStream.seek(aPos: int32);
+begin
+  if aPos > fLen then error(format('Seek past end of file (seek to %,/%,).', [aPos, fLen]));
+  fPos := aPos;
+end;
+
+{makes sure the stream has capacity for *atleast* n bytes}
+procedure tMemoryStream.makeCapacity(n: dword);
+begin
+  if fCapacity < n then
+    {resize might require a copy, so always increase size by atleast 5%}
+    setCapacity(max(n, dword(int64(fCapacity)*105 div 100)));
+end;
+
+{expand (or contract) the length this many bytes}
+{note: we never shrink the capacity here.}
+procedure tMemoryStream.setLen(n: int32);
+begin
+  makeCapacity(n);
+  flen := n;
+end;
+
+{------------------------------------------------------}
+
+procedure tMemoryStream.writeByte(b: byte);
+begin
+  expandLen(fPos+1);
+  bytes[fPos] := b;
+  inc(fPos);
+end;
+
+procedure tMemoryStream.writeWord(w: word);
+begin
+  expandLen(fPos+2);
+  {little edian}
+  pWord(bytes + fPos)^ := w;
+  inc(fPos, 2);
+end;
+
+procedure tMemoryStream.writeDWord(d: dword);
+begin
+  expandLen(fPos+4);
+  {little edian}
+  pDWord(bytes + fPos)^ := d;
+  inc(fPos, 4);
+end;
+
+procedure tMemoryStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
+begin
+  if aLen < 0 then aLen := length(aBytes);
+  if aLen = 0 then exit;
+  if aLen > length(aBytes) then error('tried writing too many bytes');
+  expandLen(fPos + aLen);
+  move(aBytes[0], self.bytes[fPos], aLen);
+  inc(fPos, aLen);
+end;
+
+function tMemoryStream.readByte: byte;
 begin
   result := bytes[fPos];
+  inc(fPos);
 end;
 
-function tStream.peekWord: word; inline;
+function tMemoryStream.readWord: word;
 begin
   result := pWord(bytes + fPos)^;
+  inc(fPos,2);
 end;
 
-function tStream.peekDWord: dword; inline;
+function tMemoryStream.readDWord: dword;
 begin
   result := pDWord(bytes + fPos)^;
+  inc(fPos,4);
 end;
 
-function tStream.readBytes(n: int32): tBytes;
+function tMemoryStream.readBytes(n: int32): tBytes;
 begin
   result := nil;
   if n = 0 then exit;
@@ -306,7 +425,7 @@ begin
 end;
 
 {read a block from stream into variable}
-procedure tStream.readBlock(var x;numBytes: int32);
+procedure tMemoryStream.readBlock(var x;numBytes: int32);
 begin
   if numBytes = 0 then exit;
   if numBytes > (len-fPos) then
@@ -316,16 +435,28 @@ begin
 end;
 
 {write a block from stream into variable}
-procedure tStream.writeBlock(var x; numBytes: int32);
+procedure tMemoryStream.writeBlock(var x; numBytes: int32);
 begin
   if numBytes = 0 then exit;
-  setLength(fPos + numBytes);
+  expandLen(fPos + numBytes);
   move(x, self.bytes[fPos], numBytes);
   inc(fPos, numBytes);
 end;
 
+function tMemoryStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
+begin
+  result := vlc.readSegment(self, n, outBuffer);
+end;
+
+function tMemoryStream.writeSegment(values: array of dword;segmentType:byte=255): int32;
+begin
+  result := vlc.writeSegment(self, values, segmentType);
+end;
+
+{---------------------------------------------}
+
 {writes memory stream to file}
-procedure tStream.writeToFile(fileName: string);
+procedure tMemoryStream.writeToFile(fileName: string);
 var
   f: file;
   bytesWritten: dword;
@@ -335,14 +466,14 @@ begin
   assignFile(f, fileName);
   rewrite(f,1);
   ioError := IORESULT; if ioError <> 0 then error(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
-  blockwrite(f, bytes[0], bytesUsed, bytesWritten);
+  blockwrite(f, bytes[0], len, bytesWritten);
   ioError := IORESULT; if ioError <> 0 then error(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
   close(f);
   {$i+}
 end;
 
 {loads memory stream from file, and resets position to start of stream.}
-procedure tStream.readFromFile(fileName: string; blockSize: int32=4096; maxSize: int32=-1);
+procedure tMemoryStream.readFromFile(fileName: string; blockSize: int32=4096; maxSize: int32=-1);
 var
   f: file;
   bytesRead: dword;
@@ -364,7 +495,7 @@ begin
     bytesToRead := filesize(f);
   bytesRemaining := bytesToRead;
   setCapacity(bytesToRead);
-  bytesUsed := bytesToRead;
+  flen := bytesToRead;
 
   fPos := 0;
   while bytesRemaining > 0 do begin
@@ -379,62 +510,6 @@ begin
   seek(0);
 end;
 
-procedure tStream.seek(aPos: dword);
-begin
-  fPos := aPos;
-  if bytesUsed < fPos then bytesUsed := fPos;
-end;
-
-{advance the current position this many bytes}
-procedure tStream.advance(numBytes: integer);
-begin
-  fPos += numBytes;
-end;
-
-function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
-begin
-  result := vlc.readSegment(self, n, outBuffer);
-end;
-
-function tStream.writeSegment(values: array of dword;segmentType:byte=255): int32;
-begin
-  result := vlc.writeSegment(self, values, segmentType);
-end;
-
-procedure tStream.flush();
-begin
-  {not used for memory stream}
-end;
-
-procedure tStream.reset();
-begin
-  freeMem(bytes); bytes := nil;
-  bytesUsed := 0;
-  bytesAllocated := 0;
-  fPos := 0;
-end;
-
-{Reset stream, but keep previous capcity}
-procedure tStream.softReset();
-begin
-  bytesUsed := 0;
-  fPos := 0;
-end;
-
-function tStream.asBytes(): tBytes;
-begin
-  result := nil;
-  if bytesUsed = 0 then exit;
-  system.setLength(result, bytesUsed);
-  move(bytes^, result[0], bytesUsed);
-end;
-
-{returns pointer to current byte... use with caution.}
-function tStream.getCurrentBytesPtr: pointer;
-begin
-  result := @bytes[fPos];
-end;
-
 {-------------------------------------------}
 
 type
@@ -444,10 +519,10 @@ type
 
 procedure tStreamTest.run();
 var
-  s: tStream;
+  s: tMemoryStream;
   i: integer;
   w: word;
-  bitsStream: tStream;
+  bitsStream: tMemoryStream;
   data: tDWords;
   bits: byte;
 const
@@ -460,14 +535,14 @@ const
 begin
 
   {check bytes}
-  s := tStream.Create();
+  s := tMemoryStream.create();
   for i := 1 to 16 do
     s.writeByte(i);
   assertEqual(s.len, 16);
   s.writeToFile('tmp.dat');
   s.free;
 
-  s := tStream.Create();
+  s := tMemoryStream.create();
   s.readFromFile('tmp.dat');
   assertEqual(s.len, 16);
   for i := 1 to 16 do
@@ -475,14 +550,14 @@ begin
   s.free;
 
   {check words}
-  s := tStream.Create();
+  s := tMemoryStream.create();
   for i := 1 to 16 do
     s.writeWord(256+i);
   assertEqual(s.len, 32);
   s.writeToFile('tmp.dat');
   s.free;
 
-  s := tStream.Create();
+  s := tMemoryStream.create();
   s.readFromFile('tmp.dat');
   assertEqual(s.len, 32);
   for i := 1 to 16 do
@@ -490,7 +565,7 @@ begin
   s.free;
 
   {check as bytes}
-  s := tStream.Create();
+  s := tMemoryStream.create();
   s.writeByte(5);
   s.writeByte(9);
   s.writeByte(2);
@@ -498,7 +573,7 @@ begin
   s.free;
 
   {check writeBytes}
-  s := tStream.Create();
+  s := tMemoryStream.create();
   s.writeByte(1);
   s.writeBytes([2,3,4]);
   s.writeByte(5);
@@ -506,7 +581,7 @@ begin
   s.free;
 
   {check vlc}
-  s := tStream.Create();
+  s := tMemoryStream.create();
   for i := 0 to length(testData1)-1 do
     s.writeVLC8(testData1[i]);
   s.seek(0);

@@ -3,7 +3,8 @@ var
   inPtr, outPtr: pointer;
   nibblesRead: dword;
 begin
-  inPtr := stream.getCurrentBytesPtr;
+  {todo: this should be done by segment, and segment should allocate/deallocate}
+  inPtr := stream.getCurrentBytesPtr(0);
   outPtr := @outBuffer[0];
   nibblesRead := 0;
 
@@ -76,7 +77,8 @@ var
   inPtr, outPtr: pointer;
   bytesRead: dword;
 begin
-  inPtr := stream.getCurrentBytesPtr;
+  {todo: this should be done by segment, and segment should allocate/deallocate}
+  inPtr := stream.getCurrentBytesPtr(0);
   outPtr := @outBuffer[0];
   bytesRead := 0;
 
@@ -268,7 +270,7 @@ begin
   tablePtr := @RICE_TABLE[k, 0];
   outPtr := outBuffer;
   // I think I need to store the length and load it here all at once.
-  streamPtr := stream.getCurrentBytesPtr(); // dodgy...
+  streamPtr := stream.getCurrentBytesPtr(0); // TOOD: have segment do this and pass in ptr dodgy...
   asm
 
     pushad
@@ -369,7 +371,7 @@ begin
   tablePtr := @RICE_TABLE[k, 0];
   outPtr := outBuffer;
   // I think I need to store the length and load it here all at once.
-  streamPtr := stream.getCurrentBytesPtr(); // dodgy...
+  streamPtr := stream.getCurrentBytesPtr(0); // TODO: replace dodgy...
   asm
 
     pushad

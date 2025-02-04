@@ -138,7 +138,7 @@ var
   bs: tBitStream;
 begin
 
-  s := tStream.create();
+  s := tMemoryStream.create();
   bs.init(s);
   bs.writeBits(7, 4);
   bs.writeBits(6, 11);

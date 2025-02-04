@@ -693,7 +693,7 @@ var
 begin
 
   if not assigned(outStream) then
-    outStream := tStream.create();
+    outStream := tMemoryStream.create();
   result := outStream;
   bs.init(outStream);
 
@@ -822,7 +822,7 @@ begin
 
   bytesRequired := bytesForBits(bitsPerCode * nCodes);
 
-  bytesPtr := s.getCurrentBytesPtr();
+  bytesPtr := s.getCurrentBytesPtr(bytesRequired);
 
   case bitsPerCode of
     0: unpack0(bytesPtr, @outBuffer[0], nCodes);
@@ -950,7 +950,7 @@ var
   k: integer;
   outData: tDwords;
 begin
-  s := tStream.create();
+  s := tMemoryStream.create();
   {lower values of k will not work due to long code length no longer
    being supported}
   for k := 4 to 8 do begin
@@ -993,7 +993,7 @@ begin
 
   {test sign}
   for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
-    s := tStream.create();
+    s := tMemoryStream.create();
     writeSegment(s, testSign, ST_SIGN);
     s.seek(0);
     setLength(data, length(testSign));
@@ -1004,7 +1004,7 @@ begin
   end;
 
   for testSign in [testSign1, testSign2, testSign3, testSign4] do begin
-    s := tStream.create();
+    s := tMemoryStream.create();
     SIGN_Write(s, testSign);
     s.seek(0);
     setLength(data, length(testSign));
@@ -1029,7 +1029,7 @@ begin
   testRice();
 
   {check vlcsegment standard}
-  s := tStream.create();
+  s := tMemoryStream.create();
   writeSegment(s, testData1);
   s.seek(0);
   data := readSegment(s, length(testData1));
@@ -1038,7 +1038,7 @@ begin
     AssertEqual(data[i], testData1[i]);
 
   {check vlcsegment packed}
-  s := tStream.create;
+  s := tMemoryStream.create;
   writeSegment(s, testData3);
   s.seek(0);
   data := readSegment(s, length(testData3));
@@ -1047,7 +1047,7 @@ begin
     AssertEqual(data[i], testData3[i]);
 
   {check odd size packing}
-  s := tStream.Create();
+  s := tMemoryStream.create();
   writeSegment(s, testData4);
   s.seek(0);
   data := readSegment(s, length(testData4));
@@ -1056,7 +1056,7 @@ begin
   s.free;
 
   {check VLC2}
-  s := tStream.create(10);
+  s := tMemoryStream.create(10);
   VLC2_Write(s, testData5);
   setLength(data, length(testData5));
   s.seek(0);

@@ -62,7 +62,7 @@ begin
   {---------------------------------}
   {read}
 
-  s := tStream.Create(numTestBytes);
+  s := tMemoryStream.create(numTestBytes);
   for i := 1 to numTestBytes do s.writeByte(255);
 
   s.seek(0);
@@ -85,13 +85,13 @@ begin
   {---------------------------------}
   {write}
 
-  s := tStream.Create();
+  s := tMemoryStream.create();
   startTest('Write BYTE (no preallocation)');
   for i := 1 to numTestBytes do s.writeByte(255);
   stopTest(numTestBytes); displayTestResults();
   s.free;
 
-  s := tStream.Create(numTestBytes);
+  s := tMemoryStream.create(numTestBytes);
 
   s.seek(0);
   startTest('Write BYTE');
@@ -130,7 +130,7 @@ begin
   setTestGroup('Segment R/W');
 
   {run a bit of a benchmark on random bytes (0..127)}
-  s := tStream.create(2*64*1024);
+  s := tMemoryStream.create(2*64*1024);
   note(format('%s     %s    %s (MB/s)', [pad('Segment Type',40), 'Read', 'Write']));
   writeln('-----------------------------------------------------------------');
   for segmentType in [
