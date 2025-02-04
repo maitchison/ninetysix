@@ -31,9 +31,6 @@ const
   {todo: make a flag}
   EXPORT_WAVE: boolean = false;
 
-  {only compresses HIGH profile in test mode, but also always recompresses}
-  FAST_TEST: boolean = true;
-
 {globals}
 var
   screen: tScreen;
@@ -219,7 +216,7 @@ var
 begin
   filename := aFilename;
   reader := tLA96Reader.create();
-  reader.load(filename);
+  reader.open(filename);
 
   {this is a hack until we get metadata going}
   title := extractFilename(aFilename);
@@ -254,7 +251,8 @@ begin
 end;
 
 {allow user to switch between compression samples}
-procedure testCompression();
+{fast: only compresses HIGH profile in test mode, but also always recompresses}
+procedure testCompression(fastMode: boolean=false);
 var
   music16, musicL, musicD: tSoundEffect;
   SAMPLE_LENGTH: int32;
@@ -306,7 +304,7 @@ begin
     ACP_Q8, ACP_Q10, ACP_Q12, ACP_Q16
   ];
 
-  if FAST_TEST then profiles := [ACP_HIGH];
+  if fastMode then profiles := [ACP_HIGH];
 
   writeln();
   writeln('--------------------------');
@@ -327,7 +325,7 @@ begin
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
-    if FAST_TEST or not fs.exists(music16.tag+'.a96') then begin
+    if fastMode or not fs.exists(music16.tag+'.a96') then begin
       startTimer('encode');
       outStream := encodeLA96(music16, profile, true);
       stopTimer('encode');
@@ -348,7 +346,7 @@ begin
     tag := profileToTagName(profile);
     {read it}
     reader := tLA96Reader.create();
-    reader.load(tag+'.a96');
+    reader.open(tag+'.a96');
     startTimer('decode');
     curSFX := reader.readSFX();
     setLength(outSFX, length(outSFX)+1);
@@ -445,7 +443,7 @@ begin
   end;
 
   note('Loading new track');
-  musicReader.load(track.filename);
+  musicReader.open(track.filename);
   note('Starting playback');
   musicPlay(musicReader);
 end;
@@ -467,7 +465,7 @@ begin
   guiTitle.text := track.title;
   guiTitle.showForSeconds := 3.5;
   musicReader.close();
-  musicReader.load(track.filename);
+  musicReader.open(track.filename);
   musicPlay(musicReader);
 end;
 
@@ -665,7 +663,9 @@ begin
   if mode = 'play' then
     soundPlayer()
   else if mode = 'test' then
-    testCompression()
+    testCompression(false)
+  else if mode = 'fast' then
+    testCompression(true)
   else
     error('Invalid mode '+mode);
 

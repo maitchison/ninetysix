@@ -165,17 +165,36 @@ type
     playbackFinishedHook: tPlaybackFinishedProc;
   public
     constructor create();
+    destructor destroy(); override;
     function  isLoaded: boolean;
     function  duration: single;
     function  frameSize: integer;
     procedure seek(frameNumber: integer);
-    procedure load(aFilename: string); overload;
-    procedure load(aStream: tStream); overload;
-    destructor destroy(); override;
+    procedure open(aFilename: string); overload;
+    procedure open(aStream: tStream); overload;
     procedure close();
     function  readSFX(): tSoundEffect;
-    procedure nextFrame(sfx: tSoundEffect;sfxOffset: dword);
+    procedure readNextFrame(samplePtr: pAudioSample16S);
   end;
+
+  {todo: make a LA96Writer aswell (for progressive save)}
+  (*
+  tLA96Writer = class
+  private
+    fs: tStream;
+    ownsStream: boolean;
+  protected
+
+  public
+    constructor create();
+    destructor destroy(); override;
+    procedure open(aFilename: string); overload;
+    procedure open(aStream: tStream); overload;
+    procedure writeNextFrame(pSample: pAudioSample16S);
+    procedure close();
+  end;
+  *)
+
 
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
@@ -317,7 +336,7 @@ begin
   looping := false;
 end;
 
-procedure tLA96Reader.load(aFilename: string); overload;
+procedure tLA96Reader.open(aFilename: string); overload;
 begin
   if isLoaded then begin
     if self.filename = aFilename then begin
@@ -336,7 +355,7 @@ end;
 
 {loads from a stream. Stream is still owned by caller and so must
  be freed by them}
-procedure tLA96Reader.load(aStream: tStream); overload;
+procedure tLA96Reader.open(aStream: tStream); overload;
 begin
   fs := aStream;
   ownsStream := false;
@@ -438,9 +457,8 @@ var
   i: integer;
 begin
   result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
-  for i := 0 to header.numFrames-1 do begin
-    nextFrame(result, i*header.frameSize);
-  end;
+  for i := 0 to header.numFrames-1 do
+    readNextFrame(result.data + (i*header.frameSize*4));
 end;
 
 function tLA96Reader.getULAW(bits: byte): pULawLookup;
@@ -453,11 +471,14 @@ begin
     error(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
 end;
 
+
 {decodes the next frame into sfx at given sample position.
- can be used to stream music compressed in memory.}
-{todo: this should be just writing to a pointer}
+ can be used to stream music compressed in memory.
+
+ samplePtr: the destination to write one frame of sample data to
+ }
 {todo: remove timers and other stuff unless verbose is on}
-procedure tLA96Reader.nextFrame(sfx: tSoundEffect;sfxOffset: dword);
+procedure tLA96Reader.readNextFrame(samplePtr: pAudioSample16S);
 var
   frameType: byte;
   midShift, difShift, midULaw, difULaw: byte;
@@ -469,7 +490,6 @@ var
   i: int32;
 
   sample: tAudioSample16S;
-  sfxSamplePtr: pAudioSample16S;
   frameSpec: tFrameSpec;
 
   procedure readSigns(var signs: tDwords);
@@ -486,12 +506,9 @@ var
 
 begin
 
-  if sfx.format <> AF_16_STEREO then error('Can only decompress to 16bit stereo');
-
   if (frameOn >= header.numFrames) then begin
     {if we reached the end, then just output silence}
-    sfxSamplePtr := sfx.data + (sfxOffset * 4);
-    filldword(sfxSamplePtr^, header.frameSize, 0);
+    filldword(samplePtr^, header.frameSize, 0);
     exit;
   end;
 
@@ -515,8 +532,6 @@ begin
   readSigns(difSigns);
   stopTimer('LA96_DF_ReadSigns');
 
-  sfxSamplePtr := sfx.data + (sfxOffset * 4);
-
   frameSpec.length := header.frameSize;
   frameSpec.midShift := midShift;
   frameSpec.difShift := difShift;
@@ -528,11 +543,11 @@ begin
   if frameOn = header.numFrames-1 then
     frameSpec.length := ((header.numSamples-1) mod header.frameSize)+1;
 
-  sfxSamplePtr^ := generateSample(midCode, difCode, @frameSpec);
+  samplePtr^ := generateSample(midCode, difCode, @frameSpec);
 
   startTimer('LA96_DF_Process');
   process_ASM(
-    pointer(sfxSamplePtr)+4,
+    pointer(samplePtr)+4,
     midCode, difCode,
     midCodes, difCodes,
     midSigns, difSigns,
@@ -551,12 +566,12 @@ begin
   if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
     startTimer('LA96_DF_PostProcess');
     alpha := exp((-2 * pi * header.postFilter * 1000) / 44100);
-    postProcessEMA(sfxSamplePtr, cLeft, cRight, frameSpec.length, alpha);
+    postProcessEMA(samplePtr, cLeft, cRight, frameSpec.length, alpha);
     stopTimer('LA96_DF_PostProcess');
   end;
 
   if assigned(frameGenHook) then
-    frameGenHook(frameOn, sfxSamplePtr, frameSpec.length);
+    frameGenHook(frameOn, samplePtr, frameSpec.length);
 
   inc(frameOn);
 
@@ -756,7 +771,7 @@ var
   reader: tLA96Reader;
 begin
   reader := tLA96Reader.create();
-  reader.load(s);
+  reader.open(s);
   result := reader.readSFX();
   reader.free;
 end;

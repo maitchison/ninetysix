@@ -491,7 +491,7 @@ begin
     warning(format('Buffer underflow read:%d write:%d', [mbReadPos div 1024, mbWritePos div 1024]));
   assert(mbWritePos mod 1024 = 0, 'WritePos must be a multiple of frameSize');
   if not musicReader.isLoaded then exit;
-  musicReader.nextFrame(musicBuffer, mbWritePos and MB_MASK);
+  musicReader.readNextFrame(musicBuffer.data + (mbWritePos and MB_MASK) * 4);
   mbWritePos += musicReader.frameSize;
   //note(format('Processing r:%d w:%d', [mbReadPos div 1024, mbWritePos div 1024]));
 end;
@@ -560,7 +560,7 @@ begin
   if musicReader.isLoaded() then musicReader.close();
   mbReadPos := 0;
   mbWritePos := 0;
-  musicReader.load(filename);
+  musicReader.open(filename);
   {since we read the whole thing off disk, we may as well load a fair bit}
   {this should be ~10 seconds}
   musicUpdate(256);
