@@ -16,8 +16,7 @@ unit la96;
   v0.4
     - added rice codes
   [pending] v0.5:
-    - remove VLC
-    - integrated sign bits
+    - new format with integrated sign bits
   [future] v0.6:
     - linear prediction
   [future] v0.7:
@@ -220,7 +219,7 @@ var
 implementation
 
 const
-  VER_SMALL = 4;
+  VER_SMALL = 5;
   VER_BIG = 0;
   FRAME_SIZE = 1024;
 
@@ -1022,9 +1021,14 @@ end;
 procedure tLA96Writer.writeSFX(sfx: tSoundEffect);
 var
   i: integer;
+  startPos, endPos: int32;
+  framePtr: tIntList;
 begin
 
   if (profile.log2mu <> 8) then error('Values other than 8 for Log2MU are not currently supported');
+
+  framePtr.clear();
+  startPos := fs.pos;
 
   { write header }
   fillchar(header, sizeof(header),0);
@@ -1039,13 +1043,26 @@ begin
   header.log2mu := profile.log2mu;
   header.postFilter := 0; // not used anymore
   fs.writeBlock(header, sizeof(header));
+  while fs.pos < startPos + 128 do
+    fs.writeByte(0);
 
   { write pointers }
-  {todo...}
+  for i := 0 to header.numFrames-1 do
+    fs.writeDWord(0);
 
   { write frames }
-  for i := 0 to header.numFrames-1 do
+  for i := 0 to header.numFrames-1 do begin
+    framePtr.append(fs.pos-startPos);
     writeNextFrame(sfx.data + (i*header.frameSize*4));
+  end;
+
+  { go back and write frame pointers}
+  endPos := fs.pos;
+  fs.seek(startPos+128);
+  for i := 0 to header.numFrames-1 do
+    fs.writeDWord(framePtr[i]);
+  fs.seek(endPos);
+
 end;
 
 
