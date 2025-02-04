@@ -15,11 +15,13 @@ unit la96;
     - sign bit compression
   v0.4
     - added rice codes
-  [future] v0.5:
+  [pending] v0.5:
     - remove VLC
     - integrated sign bits
   [future] v0.6:
     - linear prediction
+  [future] v0.7:
+    - variable bitrate
 *)
 
 

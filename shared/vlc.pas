@@ -155,7 +155,6 @@ var
   i: int32;
   valueMax: dword;
   valueSum: double;
-  packingBits, riceBits: int32;
   k, bestK, baseK, guessK, deltaK: integer;
   thisBits, bestBits: int32;
   n: int32;
@@ -169,6 +168,8 @@ begin
 
   if length(values) = 0 then exit;
 
+  bestBits := -1;
+
   if segmentType = ST_AUTO then begin
     valueSum := 0;
     valueMax := 0;
@@ -178,13 +179,11 @@ begin
     end;
 
     {start with packing}
-    packingBits := bitsToStoreMaxValue(valueMax) * length(values);
+    bestBits := bitsToStoreMaxValue(valueMax) * length(values);
     segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
-    bestBits := packingBits;
 
     {see if RICE is an upgrade}
     deltaK := 0;
-    riceBits := -1;
     guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
     baseK := guessK;
 
@@ -197,10 +196,10 @@ begin
     for k := (baseK - 1) to (baseK + 1) do begin
       if k < 0 then continue;
       if k > 15 then continue;
-      riceBits := RICE_Bits(values, k);
-      if riceBits < bestBits then begin
+      thisBits := RICE_Bits(values, k);
+      if thisBits < bestBits then begin
         segmentType := ST_RICE0 + k;
-        bestBits := riceBits;
+        bestBits := thisBits;
         bestK := k;
         deltaK := bestK - baseK;
       end;
@@ -232,11 +231,10 @@ begin
   end;
 
   if segmentType = ST_RICE_SLOW then begin
-    riceBits := 0;
     for i := 0 to 15 do begin
       thisBits := RICE_Bits(values, i);
-      if (i = 0) or (thisBits < riceBits) then begin
-        riceBits := thisBits;
+      if (i = 0) or (thisBits < bestBits) then begin
+        bestBits := thisBits;
         segmentType := ST_RICE0+i;
       end;
     end;
@@ -244,7 +242,10 @@ begin
 
   {calculate the segment bytes. Todo: in many cases we already know this
    and do not need to recalculate it}
-  segmentLen := getSegmentLength(values, segmentType);
+  if bestBits > 0 then
+    segmentLen := bytesForBits(bestBits)
+  else
+    segmentLen := getSegmentLength(values, segmentType);
 
   {write out the data}
   startPos := s.pos;

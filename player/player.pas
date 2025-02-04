@@ -250,7 +250,7 @@ end;
 
 function profileToTagName(profile: tAudioCompressionProfile): string;
 begin
-  result := joinPath('sample', profile.tag+'_'+format('%d_%d_%d_v4', [profile.quantBits, profile.ulawBits, profile.log2mu]));
+  result := joinPath('sample', profile.tag+'_'+format('%d_%d_%d_v5', [profile.quantBits, profile.ulawBits, profile.log2mu]));
 end;
 
 {allow user to switch between compression samples}
@@ -306,7 +306,7 @@ begin
     ACP_Q8, ACP_Q10, ACP_Q12, ACP_Q16
   ];
 
-  if FAST_TEST then profiles := [ACP_MEDIUM];
+  if FAST_TEST then profiles := [ACP_HIGH];
 
   writeln();
   writeln('--------------------------');
