@@ -107,7 +107,7 @@ begin
   fileHeader.height := aHeight;
   fileHeader.numFrames := -1;
 
-  outStream := tStream.create();
+  outStream := tMemoryStream.create();
   outStream.writeBlock(fileHeader, sizeof(fileHeader));
   for i := 1 to (128-sizeof(fileHeader)) do
     outStream.writeByte(0);
@@ -217,7 +217,7 @@ begin
 
   if isOpen then close();
 
-  inStream := tStream.create();
+  inStream := tMemoryStream.create();
   inStream.readFromFile(aFilename);
 
   {header}

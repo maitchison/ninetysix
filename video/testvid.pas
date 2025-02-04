@@ -550,7 +550,7 @@ begin
   SelectPatchAt(100, 52);
 
   {setup output stream}
-  outStream := tStream.create();
+  outStream := tMemoryStream.create();
 
   {show uncompressed image}
   xofs := (640-(320*2)) div 2;

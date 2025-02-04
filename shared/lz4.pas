@@ -48,7 +48,7 @@ const
 
 type
 
-  tLZ4Stream = class(tStream)
+  tLZ4Stream = class(tMemoryStream)
 
   private
     procedure writeVLL(value: int32);
@@ -252,7 +252,7 @@ end;
 
 function LZ4Compress(data: tBytes;level: tCompressionProfile): tBytes;
 var
-  literalBuffer: tStream;
+  literalBuffer: tMemoryStream;
   pos, lastClean: int32;
   code: dword;
   bytesMatched: dword;
@@ -303,7 +303,7 @@ begin
 
   {push first character}
   pos := 0;
-  literalBuffer := tStream.create(128);
+  literalBuffer := tMemoryStream.create(128);
   literalBuffer.writeByte(data[0]);
   addRef(0);
   pos += 1;
@@ -867,7 +867,7 @@ begin
   assertEqual(MatchLength(testData, 0, 3), 0);
   assertEqual(MatchLength(testData, 0, 0), 19);
 
-  inBytes := tStream.create();
+  inBytes := tMemoryStream.create();
   for i := 1 to length(testString) do
     inBytes.writeByte(ord(testString[i]));
   compressedData := lz4Compress(inBytes.asBytes);
@@ -875,7 +875,7 @@ begin
   AssertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free;
 
-  inBytes := tStream.create();
+  inBytes := tMemoryStream.create();
   for i := 0 to 100 do
     inBytes.writeByte(ord('x'));
   compressedData := LZ4Compress(inBytes.asBytes);
@@ -884,7 +884,7 @@ begin
   inBytes.free;
 
   {make sure we don't match on end sequence}
-  inBytes := tStream.create();
+  inBytes := tMemoryStream.create();
   for i := 0 to length(testCase1)-1 do
     inBytes.writeByte(testCase1[i]);
   compressedData := lz4Compress(inBytes.asBytes);

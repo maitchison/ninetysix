@@ -153,7 +153,7 @@ begin
 
   writeln();
 
-  inBytes := tStream.create();
+  inBytes := tMemoryStream.create();
   for i := 1 to length(testString) do
     inBytes.writeByte(ord(testString[i]));
 

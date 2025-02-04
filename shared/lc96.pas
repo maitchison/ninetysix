@@ -111,7 +111,7 @@ begin
   {write choice word}
   s.writeWord(choiceCode shr 1);
 
-  s.writeVLCSegment(deltas);
+  s.writeSegment(deltas);
 
 end;
 
@@ -155,8 +155,7 @@ begin
   end;
   {write choice word}
   s.writeWord(choiceCode shr 1);
-  s.writeVLCSegment(deltas);
-  s.byteAlign();
+  s.writeSegment(deltas);
 end;
 
 var
@@ -181,10 +180,9 @@ begin
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
   if withAlpha then
-    s.readVLCSegment(16*4, gDeltaCodes)
+    s.readSegment(16*4, gDeltaCodes)
   else
-    s.readVLCSegment(16*3, gDeltaCodes);
-  s.byteAlign();
+    s.readSegment(16*3, gDeltaCodes);
 
   dPos := 0;
   for y := 0 to 3 do begin
@@ -252,8 +250,7 @@ begin
   deltaBytes := 16 * DELTA_INC;
   lineBytes := 4 * page.width;
 
-  s.readVLCSegment(deltaBytes, gDeltaCodes);
-  s.byteAlign();
+  s.readSegment(deltaBytes, gDeltaCodes);
 
   pixelsPtr := page.pixels;
   ppLeft := pixelsPtr - 4;
@@ -455,7 +452,7 @@ begin
    }
   decompressedBytes := nil;
   setLength(decompressedBytes, uncompressedSize);
-  data := tStream.create();
+  data := tMemoryStream.create();
   bytes := s.readBytes(compressedSize);
   LZ4Decompress(bytes, decompressedBytes);
   data.writeBytes(decompressedBytes);
@@ -498,7 +495,7 @@ begin
     error('Invalid page bits-per-pixel');
 
   if not assigned(s) then
-    s := tStream.Create();
+    s := tMemoryStream.Create();
 
   startPos := s.pos;
 
@@ -514,7 +511,7 @@ begin
   numPatches := (page.width div 4) * (page.height div 4);
 
   {compress first so we know length}
-  data := tStream.create();
+  data := tMemoryStream.create();
   for py := 0 to page.height div 4-1 do
     for px := 0 to page.width div 4-1 do
       case bpp of
@@ -556,21 +553,21 @@ end;
   saves alpha channel if there is atleast one non-solid pixel}
 procedure saveLC96(filename: string; page: tPage;forceAlpha: boolean=False);
 var
-  s: tStream;
+  s: tMemoryStream;
   withAlpha: boolean;
 begin
   withAlpha := forceAlpha or page.checkForAlpha;
-  s := encodeLC96(page, nil, withAlpha);
-
+  s := tMemoryStream.create();
+  encodeLC96(page, s, withAlpha);
   s.writeToFile(filename);
   s.free;
 end;
 
 function loadLC96(filename: string): tPage;
 var
-  s: tStream;
+  s: tMemoryStream;
 begin
-  s := tStream.create();
+  s := tMemoryStream.create();
   s.readFromFile(filename);
   result := decodeLC96(s);
   s.free;

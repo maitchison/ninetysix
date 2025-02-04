@@ -326,8 +326,7 @@ begin
       self.close();
   end;
   if not filesystem.fs.exists(filename) then error(format('Could not open audio file "%s"', [filename]));
-  self.fs := tStream.create();
-  self.fs.readFromFile(aFilename);
+  self.fs := tFileStream.create(aFilename);
   self.ownsStream := true;
   self.filename := aFilename;
   self.loadHeader();
@@ -477,16 +476,10 @@ var
     signsPtr: pointer;
   begin
     len := header.frameSize-1;
-    if fs.peekByte = ST_SIGN then begin
-      {optimized path}
-      fs.readByte;
-      SIGN_ReadMasked(fs, len, @signs[0]);
-    end else begin
-      {this is a bit slower, but more efficent for complex sign patterns}
-      signsPtr := signs;
-      fs.readVLCSegment(len, signs);
-      convertSigns(signs);
-    end;
+    {this is a bit slower, but more efficent for complex sign patterns}
+    signsPtr := signs;
+    fs.readSegment(len, signs);
+    convertSigns(signs);
   end;
 
 begin
@@ -508,13 +501,12 @@ begin
   frameType := fs.readByte(); midShift := frameType and $f; midUlaw := frameType shr 4;
   frameType := fs.readByte(); difShift := frameType and $f; difUlaw := frameType shr 4;
 
-  midCode := negDecode(fs.readVLC());
-  difCode := negDecode(fs.readVLC());
-  fs.byteAlign();
+  midCode := negDecode(fs.readWord());
+  difCode := negDecode(fs.readWord());
 
   startTimer('LA96_DF_ReadSegments');
-  fs.readVLCSegment(header.frameSize-1, midCodes);
-  fs.readVLCSegment(header.frameSize-1, difCodes);
+  fs.readSegment(header.frameSize-1, midCodes);
+  fs.readSegment(header.frameSize-1, difCodes);
   stopTimer('LA96_DF_ReadSegments');
   startTimer('LA96_DF_ReadSigns');
   readSigns(midSigns);
@@ -883,15 +875,10 @@ var
     i: integer;
   begin
     startPos := fs.pos;
-    if vlc.SIGN_Bits(signs) < FRAME_SIZE then begin
-      fs.writeByte(ST_SIGN);
-      vlc.SIGN_Write(fs, signs)
-    end else begin
-      fillchar(signBits, sizeof(signBits), 0);
-      for i := 0 to (FRAME_SIZE-1)-1 do
-        if signs[i] < 0 then signBits[i] := 1;
-      fs.writeVLCSegment(signBits, ST_PACK1);
-    end;
+    fillchar(signBits, sizeof(signBits), 0);
+    for i := 0 to (FRAME_SIZE-1)-1 do
+      if signs[i] < 0 then signBits[i] := 1;
+    fs.writeSegment(signBits, ST_PACK1);
   end;
 
 begin
@@ -929,7 +916,7 @@ begin
 
   // Setup out output stream
   {guess that we'll need 2 bytes per sample, i.e 4:1 compression vs 16bit stereo}
-  fs := tStream.create(2*sfx.length);
+  fs := tMemoryStream.create(2*sfx.length);
   result := fs;
 
   startTimer('LA96');
@@ -1026,9 +1013,8 @@ begin
     framePtr[i] := fs.pos;
     fs.writeByte(profile.midQuantBits + profile.ulawBits*16);
     fs.writeByte(profile.difQuantBits + profile.ulawDifBits*16);
-    fs.writeVLC(negEncode(aspMid.y));
-    fs.writeVLC(negEncode(aspDif.y));
-    fs.byteAlign();
+    fs.writeWord(negEncode(aspMid.y));
+    fs.writeWord(negEncode(aspDif.y));
 
     startTimer('LA96_process');
     for j := 0 to (FRAME_SIZE-1)-1 do begin
@@ -1129,8 +1115,8 @@ begin
 
     {write out frame}
     startTimer('LA96_segments');
-    midFrameSize := fs.writeVLCSegment(midCodes);
-    difFrameSize := fs.writeVLCSegment(difCodes);
+    midFrameSize := fs.writeSegment(midCodes);
+    difFrameSize := fs.writeSegment(difCodes);
     stopTimer('LA96_segments');
 
     {write signs}
@@ -1221,7 +1207,7 @@ begin
   sample.left := 1000;
   sample.right := -300;
   sfxIn[1] := sample;
-  s := tStream.create();
+  s := tMemoryStream.create();
   s := encodeLA96(sfxIn, ACP_VERYHIGH);
   s.seek(0);
   sfxOut := decodeLA96(s);

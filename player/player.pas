@@ -260,7 +260,7 @@ var
   SAMPLE_LENGTH: int32;
   profile: tAudioCompressionProfile;
   log2mu, ulawBits, quantBits: integer;
-  outStream: tStream;
+  outStream: tMemoryStream;
   reader: tLA96Reader;
   outSFX: array of tSoundEffect;
   deltaSFX: array of tSoundEffect;
@@ -328,7 +328,7 @@ begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if FAST_TEST or not fs.exists(music16.tag+'.a96') then begin
-      outStream := encodeLA96(music16, profile, true);
+      outStream := tMemoryStream(encodeLA96(music16, profile, true));
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
     end;

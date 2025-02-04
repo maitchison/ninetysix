@@ -26,7 +26,7 @@ begin
 
   {look for memory leak}
   initialMem := mem;
-  s := tStream.Create(0);
+  s := tMemoryStream.Create(0);
   startMem := mem;
   prevMem := startMem;
   {allocate up to 16megs}
