@@ -29,7 +29,6 @@ const
   ST_AUTO = 255;  {use rice, pack, or vlc, whichever is best}
   ST_PACK = 254;  {select best pack}
   ST_RICE = 253;  {guess a good rice}
-  ST_FAST = 252;  {same as auto, but only use fast codes and not rice codes}
   ST_RICE_SLOW = 252; {select best rice}
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
@@ -48,11 +47,6 @@ const
   ST_PACK9 = 25;
   {...}
   ST_RICE0 = 48; {48..63 = rice (max code is 15)}
-  {...}
-  { these are exactly the same as RICE but are guaranteed to have a
-  rice codelength <= 8 bits, and therefore can be resolved with a
-  smaller lookup table}
-  ST_FAST0 = 64; {64..79 = fast rice codes}
   {...}
 
 function  writeSegment(stream: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
@@ -85,9 +79,6 @@ function  VLC1_Bits(value: dword): word; forward;
 {vlc8}
 procedure VLC8_Write(stream: tStream; values: array of dword); forward;
 function  VLC8_Read(stream: tStream; n: int32;outBuffer: tDwords): tDWords; forward;
-
-{fast codes}
-procedure FAST_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer); forward;
 
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
@@ -134,12 +125,10 @@ begin
     ST_SIGN: result := 'SIGN';
     ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
     ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
-    ST_FAST0..ST_FAST0+15: result := 'FAST'+intToStr(segmentType - ST_FAST0);
     {special codes}
     ST_AUTO: result := 'AUTO';
     ST_PACK: result := 'PACK';
     ST_RICE: result := 'RICE';
-    ST_FAST: result := 'FAST';
 
     else result := 'INVALID';
   end;
@@ -215,10 +204,6 @@ begin
       end;
     end;
 
-    {elevate RICE to FAST if we can}
-    if (bestK >= 0) and (RICE_MaxCodeLength(values, bestK) <= 8) then
-      segmentType := segmentType - ST_RICE0 + ST_FAST0;
-
     {
     note(format(
       'Selecting %s (%d) with scores %d %d (max:%d mean:%f) maxCL:%d',
@@ -230,39 +215,6 @@ begin
       ]
     ));
     }
-  end;
-
-  {similar to auto, except we restrict to FAST rice codes only}
-  if segmentType = ST_FAST then begin
-    valueSum := 0;
-    valueMax := 0;
-    for value in values do begin
-      valueMax := max(valueMax, value);
-      valueSum += value;
-    end;
-
-    {start with packing}
-    packingBits := bitsToStoreMaxValue(valueMax) * length(values);
-    segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
-    bestBits := packingBits;
-
-    {see if FAST is an upgrade}
-    deltaK := 0;
-    riceBits := -1;
-    guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
-    baseK := guessK;
-
-    {see if FAST is an upgrade}
-    for k := 0 to 15 do begin
-      if (RICE_MaxCodeLength(values, k) > 8) then continue;
-      riceBits := RICE_Bits(values, k);
-      if riceBits < bestBits then begin
-        segmentType := ST_FAST0 + k;
-        bestBits := riceBits;
-        bestK := k;
-        deltaK := bestK - baseK;
-      end;
-    end;
   end;
 
   if segmentType = ST_PACK then begin
@@ -297,7 +249,6 @@ begin
     ST_SIGN: SIGN_Write(stream, values);
     ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, stream);
     ST_RICE0..ST_RICE0+15: RICE_Write(stream, values, segmentType - ST_RICE0);
-    ST_FAST0..ST_FAST0+15: RICE_Write(stream, values, segmentType - ST_FAST0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -322,7 +273,6 @@ begin
     ST_SIGN: SIGN_Read(stream, n, @outBuffer[0]);
     ST_PACK0..ST_PACK0+31: unpackBits(stream, n, outBuffer, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: RICE_Read(stream, n, @outBuffer[0], segmentType-ST_RICE0);
-    ST_FAST0..ST_FAST0+15: FAST_Read(stream, n, @outBuffer[0], segmentType-ST_FAST0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -648,11 +598,6 @@ end;
 procedure RICE_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
 begin
   ReadRice_ASM(stream, n, outBUffer, k);
-end;
-
-procedure FAST_Read(stream: tStream; n: int32; outBuffer: pDword; k: integer);
-begin
-  ReadRiceFast8_ASM(stream, n, outBUffer, k);
 end;
 
 function RICE_Bits(values: array of dword; k: integer): int32;

@@ -140,8 +140,7 @@ begin
     ST_VLC1, ST_VLC2, ST_VLC8,
     ST_PACK7, ST_PACK8, ST_PACK9,
     ST_RICE0+6,
-    ST_FAST0+6,
-    ST_AUTO, ST_PACK, ST_RICE, ST_FAST
+    ST_AUTO, ST_PACK, ST_RICE
   ] do begin
 
     s.seek(0);
