@@ -176,7 +176,7 @@ type
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
@@ -813,7 +813,7 @@ begin
 end;
 
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tStream;
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 const
   {note: we don't use centering anymore as it adds too much noise}
   MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
@@ -833,7 +833,7 @@ var
 
   signBits: array[0..(FRAME_SIZE-1)-1] of dword;
 
-  fs: tStream;  // our file stream
+  fs: tMemoryStream;  // our file stream
   fsEndPos: dword;
 
   counter: int32;

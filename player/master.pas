@@ -13,6 +13,10 @@ uses
   sysPNG,
   filesystem;
 
+var
+  {force processing of all files}
+  FORCE: boolean = false;
+
 {create compressed copies of master music tracks}
 procedure masterSongs();
 var
@@ -21,7 +25,7 @@ var
   filename: string;
   srcPath, dstPath: string;
   srcMusic: tSoundEffect;
-  outStream: tStream;
+  outStream: tMemoryStream;
 begin
   writeln();
   writeln('--------------------------');
@@ -38,7 +42,7 @@ begin
     end;
 
     dstPath := joinPath('music', filename+'.a96');
-    if fs.exists(dstPath) then begin
+    if (not FORCE) and fs.exists(dstPath) then begin
       note('Skipping '+srcPath);
       continue;
     end;
@@ -62,7 +66,7 @@ var
 begin
   srcPath := joinPath('c:\dev\masters\player', filename+'.png');
   dstPath := 'res\'+filename+'.p96';
-  if fs.exists(dstPath) then exit;
+  if (not FORCE) and fs.exists(dstPath) then exit;
   img := tPage.Load(srcPath);
   saveLC96(dstPath, img);
   textAttr := Green;
@@ -79,6 +83,8 @@ begin
 end;
 
 begin
+  if (paramcount = 1) and (paramStr(1).toLower() = '--force') then
+    FORCE := true;
   masterGFX();
   masterSongs();
 end.

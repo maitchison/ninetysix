@@ -328,7 +328,7 @@ begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if FAST_TEST or not fs.exists(music16.tag+'.a96') then begin
-      outStream := tMemoryStream(encodeLA96(music16, profile, true));
+      outStream := encodeLA96(music16, profile, true);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
     end;
