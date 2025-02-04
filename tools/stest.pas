@@ -58,7 +58,11 @@ var
 
 begin
 
+  runTestSuites();
+
   setTestGroup(title);
+
+  fillchar(buffer, sizeof(buffer), 255);
 
   {---------------------------------}
   {read}

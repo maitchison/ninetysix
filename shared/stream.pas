@@ -21,11 +21,11 @@ type
     fLen: int32;        {length of stream}
 
     procedure setLen(newLen: int32); virtual;
-    procedure expandLen(n: dword);
+    procedure expandLen(n: int32);
 
   public
 
-    constructor create(aInitialCapacity: dword=0);
+    constructor create();
     destructor destroy(); override;
 
     {derived}
@@ -53,7 +53,7 @@ type
     procedure seek(aPos: int32); virtual;
     procedure flush(); virtual;
     procedure reset(); virtual;
-    procedure readBlock(var x;numBytes: int32); virtual; abstract;
+    procedure readBlock(out x;numBytes: int32); virtual; abstract;
     procedure writeBlock(var x;numBytes: int32); virtual; abstract;
 
     {for direct access}
@@ -76,7 +76,7 @@ type
     fCapacity: int32;   {capacity is how much memory we allocated}
 
   protected
-    procedure makeCapacity(n: dword);
+    procedure makeCapacity(n: int32);
     procedure setCapacity(newSize: dword);
     procedure setLen(n: int32); override;
   public
@@ -101,7 +101,7 @@ type
     function  readByte: byte; override;
     function  readWord: word; override;
     function  readDWord: dword; override;
-    procedure readBlock(var x;numBytes: int32); override;
+    procedure readBlock(out x;numBytes: int32); override;
     procedure writeByte(b: byte); override;
     procedure writeWord(w: word); override;
     procedure writeDWord(d: dword); override;
@@ -127,7 +127,7 @@ type
     procedure reset(); override;
 
     {our r/w override}
-    procedure readBlock(var x;numBytes: int32); override;
+    procedure readBlock(out x;numBytes: int32); override;
     procedure writeBlock(var x;numBytes: int32); override;
 
   end;
@@ -179,7 +179,7 @@ begin
 end;
 
 {expand the length this many bytes, will not contract length}
-procedure tStream.expandLen(n: dword);
+procedure tStream.expandLen(n: int32);
 begin
   if fLen < n then setLen(n);
 end;
@@ -220,17 +220,20 @@ begin
 end;
 
 function tStream.readVLC8: dword; inline;
-var b: byte;
+var
+  b: byte;
+  shift: byte;
 begin
   result := 0;
+  shift := 0;
   repeat
     b := readByte();
     if b < 128 then begin
-      result := result or b;
+      result := result or (b shl shift);
       exit;
     end else begin
-      result := result or (b-128);
-      result := result shl 7;
+      result := result or (dword(b-128) shl shift);
+      shift += 7;
     end;
   until false;
 end;
@@ -422,11 +425,11 @@ begin
 end;
 
 {makes sure the stream has capacity for *atleast* n bytes}
-procedure tMemoryStream.makeCapacity(n: dword);
+procedure tMemoryStream.makeCapacity(n: int32);
 begin
   if fCapacity < n then
     {resize might require a copy, so always increase size by atleast 5%}
-    setCapacity(max(n, dword(int64(fCapacity)*105 div 100)));
+    setCapacity(max(dword(n), dword(int64(fCapacity)*105 div 100)));
 end;
 
 {expand (or contract) the length this many bytes}
@@ -479,7 +482,7 @@ begin
 end;
 
 {read a block from stream into variable}
-procedure tMemoryStream.readBlock(var x;numBytes: int32);
+procedure tMemoryStream.readBlock(out x;numBytes: int32);
 begin
   if numBytes = 0 then exit;
   if numBytes > (len-fPos) then
@@ -546,7 +549,8 @@ begin
   assignFile(f, fileName);
   rewrite(f,1);
   ioError := IORESULT; if ioError <> 0 then error(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
-  blockwrite(f, bytes[0], len, bytesWritten);
+  bytesWritten := 0;
+  blockWrite(f, bytes[0], len, bytesWritten);
   ioError := IORESULT; if ioError <> 0 then error(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
   close(f);
   {$i+}
@@ -599,7 +603,7 @@ begin
   fLen := 0;
 end;
 
-procedure tFileStream.readBlock(var x;numBytes: int32);
+procedure tFileStream.readBlock(out x;numBytes: int32);
 begin
   blockread(f, x, numBytes);
   fPos += numBytes;
@@ -636,17 +640,8 @@ procedure tStreamTest.testMemoryStream();
 var
   s: tMemoryStream;
   i: integer;
-  w: word;
-  bitsStream: tMemoryStream;
-  data: tDWords;
-  bits: byte;
 const
   testData1: array of dword = [1000, 0, 1000, 32, 15, 16, 17];
-  testData2: array of dword = [100, 0, 127, 32, 15, 16, 17];
-  {this will get packed}
-  testData3: array of dword = [15, 14, 0, 15, 15, 12, 11];
-  {this will be packed to 5 bits}
-  testData4: array of dword = [31, 31, 31, 31, 31, 31, 31];
 begin
 
   {check bytes}
