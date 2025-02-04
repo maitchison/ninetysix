@@ -250,6 +250,12 @@ begin
   result := joinPath('sample', profile.tag+'_'+format('%d_%d_%d_v5', [profile.quantBits, profile.ulawBits, profile.log2mu]));
 end;
 
+procedure updateEncodeProgress(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+begin
+  {todo: do something fancy here, like eta, speed etc}
+  if frameOn mod 16 = 15 then write('.');
+end;
+
 {allow user to switch between compression samples}
 {fast: only compresses HIGH profile in test mode, but also always recompresses}
 procedure testCompression(fastMode: boolean=false);
@@ -324,20 +330,26 @@ begin
   LA96_ENABLE_STATS := false;
 
   writer := tLA96Writer.create();
+  writer.frameWriteHook := updateEncodeProgress();
 
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
     if fastMode or not fs.exists(music16.tag+'.a96') then begin
+
+      // reference
+      //outStream := encodeLA96(music16, profile, true);
+
       startTimer('encode');
       writer.open(music16.tag+'.a96');
-      outStream := encodeLA96(music16, profile, true);
+      writer.writeSFX(music16, profile);
+
       stopTimer('encode');
-      outStream.writeToFile(music16.tag+'.a96');
-      outStream.free;
-      writeln(format('Decoded at %fx', [(music16.length/44100)/getTimer('encode').elapsed]));
+      writeln(format('Encoded at %fx', [(music16.length/44100)/getTimer('encode').elapsed]));
     end;
   end;
+
+  writer.free;
 
   music16.tag := 'original';
 

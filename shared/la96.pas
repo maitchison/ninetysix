@@ -62,16 +62,11 @@ unit la96;
   -------------------------------------------------
   How it all works (x? means x is optional via config settings)
 
-  (LEFT,RIGHT) -> [clip protection] -> MID,DIF -> CENTERING? -> QUANTIZE?
-    -> ULAW? -> DELTA -> SIGN_EXTRACT
+  LeftRight_to_MidDif -> QUANTIZE -> ULAW -> DELTA
 
+  and to unwind
 
-  and unwind
-
-  process_REF
-  SIGN_ADD -> INVDELTA ->
-  generate_sample
-  INVULAW -> INVQUANT -> INVCENTER -> INV MID,DIF -> (LEFT,RIGHT)
+  INV_DELTA -> INV_ULAW -> INV_QUANTIZE -> LeftRight_to_MidDif
 
 }
 
@@ -124,6 +119,7 @@ type
     function difQuantBits: byte; // reduces quality of dif channel
     function difShift: byte;     // reduces volume of dif channel
     function ulawDifBits: byte;
+    function toString: string;
   end;
 
   tLA96FileHeader = packed record
@@ -139,7 +135,7 @@ type
     function verStr: string;
   end;
 
-  tFrameFrameGenProc = procedure(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+  tFrameFrameProc = procedure(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
   tPlaybackFinishedProc = procedure();
 
   tLA96Reader = class
@@ -160,7 +156,7 @@ type
   public
     filename: string;
     looping: boolean;
-    frameGenHook: tFrameFrameGenProc;
+    frameReadHook: tFrameFrameProc;
     playbackFinishedHook: tPlaybackFinishedProc;
   public
     constructor create();
@@ -177,14 +173,20 @@ type
   end;
 
   tLA96Writer = class
-  private
+  protected
     fs: tStream;
     ownsStream: boolean;
     frameOn: int32;
     header: tLA96FileHeader;
     profile: tAudioCompressionProfile;
     // raw frame values to write out
-    frameA, frameB: array of dWord;
+    frameA, frameB: tDWords;
+    ulawTable: array[1..8] of tULawLookup;
+  public
+    {hooks}
+    frameWriteHook: tFrameFrameProc;
+  protected
+    function getULAW(bits: byte): pULawLookup;
   public
     constructor create();
     destructor destroy(); override;
@@ -202,6 +204,7 @@ function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
+  {todo: high should be 8/7 for ulaw}
   ACP_LOW: tAudioCompressionProfile      = (tag:'low';     quantBits:6;ulawBits:8;log2Mu:8;difReduce:15);
   ACP_MEDIUM: tAudioCompressionProfile   = (tag:'medium';  quantBits:5;ulawBits:8;log2Mu:8;difReduce:4);
   ACP_HIGH: tAudioCompressionProfile     = (tag:'high';    quantBits:4;ulawBits:8;log2Mu:8;difReduce:1);
@@ -297,10 +300,19 @@ begin
   result := quantBits;
 end;
 
+function tAudioCompressionProfile.toString();
+begin
+  result := format('%s quant:%d,%d ulaw:%d,%d', [tag, midQuantBits, difQuantBits, ulawBits, ulawDifBits]);
+end;
+
+{----------------------}
+
 function tLA96FileHeader.verStr(): string;
 begin
   result := utils.format('%d.%d', [versionBig, versionSmall]);
 end;
+
+{----------------------}
 
 {convert from +=0, -=1 to +=$00.., -=$FF..}
 procedure convertSigns(signs: tDwords);
@@ -473,7 +485,6 @@ begin
     error(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
 end;
 
-
 {decodes the next frame into sfx at given sample position.
  can be used to stream music compressed in memory.
 
@@ -564,7 +575,7 @@ begin
   end;
   }
 
-  {todo: implement this as a frameGenHook}
+  {todo: implement this as a frameWriteHook}
   if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
     startTimer('LA96_FRAME_PostProcess');
     alpha := exp((-2 * pi * header.postFilter * 1000) / 44100);
@@ -572,8 +583,8 @@ begin
     stopTimer('LA96_FRAME_PostProcess');
   end;
 
-  if assigned(frameGenHook) then
-    frameGenHook(frameOn, samplePtr, frameSpec.length);
+  if assigned(frameReadHook) then
+    frameReadHook(frameOn, samplePtr, frameSpec.length);
 
   inc(frameOn);
 
@@ -837,13 +848,24 @@ end;
 {-------------------------------------------------------------------------}
 
 constructor tLA96Writer.create();
+var
+  bits: integer;
 begin
+
   inherited create();
+
+  {setup buffers}
   setLength(frameA, FRAME_SIZE-1);
   setLength(frameB, FRAME_SIZE-1);
+
+  {create ulaw tables}
+  for bits := low(ulawTable) to high(ulawTable) do
+    ulawTable[bits].initEncode(bits, 8);
+
   fs := nil;
   ownsStream := false;
   frameOn := 0;
+  frameWriteHook := nil;
   profile := ACP_HIGH;
 end;
 
@@ -878,26 +900,25 @@ end;
 procedure ApplyLRtoQMD_REF(samplePtr: pAudioSample16S;qMid, qDif: byte; n: int32);
 var
   i: integer;
-  mid, dif: int32;
+  mid, dif: int16;
 begin
   for i := 0 to n-1 do begin
     mid := samplePtr^.toMid;
     dif := samplePtr^.toDif;
-    samplePtr^.left := shiftRight(mid, qMid);
-    samplePtr^.right := shiftRight(dif, qDif);
+    samplePtr^.a := shiftRight(mid, qMid);
+    samplePtr^.b := shiftRight(dif, qDif);
     inc(samplePtr);
   end;
 end;
 
 {converts samples from Linear to ULaw}
-procedure ApplyULAW_REF(samplePtr: pAudioSample16S;uMid, uDif: byte; n: int32);
+procedure ApplyULAW_REF(samplePtr: pAudioSample16S;lutA, lutB: pUlawLookup; n: int32);
 var
   i: integer;
 begin
   for i := 0 to n-1 do begin
-    {todo: use a lookup table, and also maybe log2mu as a parameter?}
-    samplePtr^.left := round(uLaw(samplePtr^.left, 256) * (1 shl uMid));
-    samplePtr^.right := round(uLaw(samplePtr^.right, 256) * (1 shl uDif));
+    samplePtr^.a := lutA^.lookup(samplePtr^.a);
+    samplePtr^.b := lutB^.lookup(samplePtr^.b);
     inc(samplePtr);
   end;
 end;
@@ -908,8 +929,8 @@ var
   prevA, prevB: int32;
   deltaA, deltaB: int32;
 begin
-  prevA := samplePtr^.a;
-  prevB := samplePtr^.b;
+  prevA := 0;
+  prevB := 0;
   for i := 0 to n-1 do begin
     {todo: support wrapping optimization - i.e. use wrap around delta if it's smaller}
     {note wrapping is also required for 16bit uncompressed I think}
@@ -919,7 +940,18 @@ begin
     prevB := samplePtr^.b;
     samplePtr^.a := deltaA;
     samplePtr^.b := deltaB;
+    inc(samplePtr);
   end;
+end;
+
+function tLA96Writer.getULAW(bits: byte): pULawLookup;
+begin
+  result := nil;
+  if bits = 0 then exit;
+  if bits in [1..8] then
+    result := @ulawTable[bits]
+  else
+    error(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
 end;
 
 procedure tLA96Writer.writeNextFrame(samplePtr: pAudioSample16S);
@@ -927,30 +959,48 @@ var
   i: integer;
 begin
 
+  if assigned(frameWriteHook) then frameWriteHook(frameOn, samplePtr, FRAME_SIZE);
+
   {write frame header}
   fs.writeByte(0); // frame type (16bit, joint stereo)
   fs.writeByte(profile.midQuantBits + profile.ulawBits*16);
   fs.writeByte(profile.difQuantBits + profile.ulawDifBits*16);
 
   {process audio}
-  ApplyLRToQMD_REF(samplePtr, profile.midQuantBits, profile.difQuantBits, FRAME_SIZE);
-  ApplyULaw_REF(samplePtr, profile.ulawBits, profile.ulawDifBits, FRAME_SIZE);
+  ApplyLRToQMD_REF(
+    samplePtr,
+    profile.midQuantBits,
+    profile.difQuantBits + profile.difShift,
+    FRAME_SIZE
+  );
+
+  if profile.ulawBits > 0 then
+    ApplyULaw_REF(
+      samplePtr,
+      getULaw(profile.ulawBits),
+      getULaw(profile.ulawDifBits),
+      FRAME_SIZE
+    );
   ApplyDeltaModulation_REF(samplePtr, FRAME_SIZE);
 
   {convert using zigZag}
-  for i := 1 to FRAME_SIZE-1 do begin
+  fs.writeWord(zigZag(samplePtr^.a));
+  fs.writeWord(zigZag(samplePtr^.b));
+  inc(samplePtr);
+
+  for i := 0 to FRAME_SIZE-2 do begin
     frameA[i] := zigZag(samplePtr^.a);
     frameB[i] := zigZag(samplePtr^.b);
     inc(samplePtr);
   end;
+  dec(samplePtr, FRAME_SIZE-1);
 
   {write out}
-  fs.writeWord(frameA[0]);
-  fs.writeWord(frameB[0]);
   fs.writeSegment(frameA);
   fs.writeSegment(frameB);
 
   fs.flush();
+  inc(frameOn);
 end;
 
 procedure tLA96Writer.close();
@@ -973,6 +1023,8 @@ procedure tLA96Writer.writeSFX(sfx: tSoundEffect);
 var
   i: integer;
 begin
+
+  if (profile.log2mu <> 8) then error('Values other than 8 for Log2MU are not currently supported');
 
   { write header }
   fillchar(header, sizeof(header),0);

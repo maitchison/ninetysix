@@ -46,8 +46,8 @@ type
     class operator subtract(a,b: tAudioSample16S): tAudioSample16S;
     function toMid: int16; inline;
     function toDif: int16; inline;
-    property a: int16 read left write right;
-    property b: int16 read left write right;
+    property a: int16 read left write left;
+    property b: int16 read right write right;
   end;
   tAudioSample8S = packed record
     left, right: uint8;

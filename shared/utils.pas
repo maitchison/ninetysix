@@ -71,7 +71,7 @@ function power(Base, Exponent: double): double; inline;
 function log10(x: double): double;
 function log2(x: double): double;
 function roundUpToPowerOfTwo(x: dword): dword;
-function shiftRight(x: int32; shift: byte): int32;
+function shiftRight(x: int32; shift: byte): int32; inline; register;
 
 {------------------------------------------------}
 { SysUtils replacements}
@@ -248,7 +248,7 @@ begin
 end;
 
 {returns x / (1 shl shift)}
-function shiftRight(x: int32; shift: byte): int32;
+function shiftRight(x: int32; shift: byte): int32; inline; register;
 asm
   push cx
   mov cl, shift
@@ -864,9 +864,6 @@ end;
 ...
 }
 function zigZag(x: int32): dword; inline; register;
-begin
-  //result := abs(x)*2;
-  //if x > 0 then dec(result);
   asm
     push ebx
     mov ebx, eax
@@ -875,10 +872,8 @@ begin
     xor eax, ebx
     pop ebx
   end;
-end;
 
 function unzigZag(y: dword): int32; inline; register;
-begin
   asm
     push ebx
     mov ebx, eax
@@ -888,7 +883,6 @@ begin
     xor eax, ebx
     pop ebx
   end;
-end;
 
 {generates code representing delta to go from a to b}
 function encodeByteDelta(a,b: byte): byte; inline;

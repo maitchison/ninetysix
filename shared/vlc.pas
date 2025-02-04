@@ -116,7 +116,6 @@ begin
     ST_AUTO: result := 'AUTO';
     ST_PACK: result := 'PACK';
     ST_RICE: result := 'RICE';
-
     else result := 'INVALID';
   end;
 end;
@@ -171,6 +170,7 @@ begin
   bestBits := -1;
 
   if segmentType = ST_AUTO then begin
+
     valueSum := 0;
     valueMax := 0;
     for value in values do begin
@@ -187,7 +187,7 @@ begin
     guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
     baseK := guessK;
 
-    // check that this k works with out current lookup table size.
+    // check that this k works with our current lookup table size.
     // it might generate a -1 length which means some codes are too big.
     while (baseK < 15) and (RICE_Bits(values, baseK) = -1) do inc(baseK);
 
@@ -262,7 +262,9 @@ begin
 
   result := s.pos-startPos; // includes header
 
+  {$ifdef DEBUG}
   test.assertEqual(s.pos-postHeaderPos, segmentLen);
+  {$endif}
 
 end;
 
@@ -455,19 +457,11 @@ var
 begin
   bs.init(stream);
   for value in values do begin
-
     quotient := value shr k;
     remainder := value - (quotient shl k);
     bits := k+quotient+1;
     if bits > RICE_TABLE_BITS then error(format('Fault when writing RICE code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)', [RICE_TABLE_BITS, value, k, bits]));
-
-    {the slower method that supports long quotients}
-    {todo: remove this and do the fast method, which I think should work now}
-    for i := 1 to quotient do bs.writeBits(1, 1);
-    bs.writeBits(0, 1);
-    {this is faster, but does not work with quotents with > 16 bits}
-    //oh... this is wrong, the zero should be a the other end...
-    //bs.writeBits((1 shl (quotient+1)) - 2, quotient+1); {e.g. 4 = 11110}
+    bs.writeBits((1 shl quotient)-1, quotient+1); {e.g. for (k=2) 12 = 010-0111}
     bs.writeBits(remainder, k);
   end;
   bs.flush();
