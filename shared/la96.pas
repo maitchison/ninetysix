@@ -191,8 +191,8 @@ type
 
     procedure writeNextFrame(samplePtr: pAudioSample16S);
     procedure close();
-    procedure writeSFX(sfx: tSoundEffect; aProfile: tAudioCompressionProfile); overload;
-    procedure writeSFX(sfx: tSoundEffect); overload;
+    procedure writeA96(sfx: tSoundEffect; aProfile: tAudioCompressionProfile); overload;
+    procedure writeA96(sfx: tSoundEffect); overload;
   end;
 
 function decodeLA96(s: tStream): tSoundEffect;
@@ -593,7 +593,7 @@ begin
     writer.frameWriteHook := updateEncodeProgress;
   ms := tMemoryStream.create();
   writer.open(ms);
-  writer.writeSFX(sfx, profile);
+  writer.writeA96(sfx, profile);
   result := ms;
   writer.free;
 end;
@@ -782,13 +782,13 @@ begin
   inc(frameOn);
 end;
 
-procedure tLA96Writer.writeSFX(sfx: tSoundEffect;aProfile: tAudioCompressionProfile);
+procedure tLA96Writer.writeA96(sfx: tSoundEffect;aProfile: tAudioCompressionProfile);
 begin
   self.profile := aProfile;
-  writeSFX(sfx);
+  writeA96(sfx);
 end;
 
-procedure tLA96Writer.writeSFX(sfx: tSoundEffect);
+procedure tLA96Writer.writeA96(sfx: tSoundEffect);
 var
   i: integer;
   startPos, endPos: int32;

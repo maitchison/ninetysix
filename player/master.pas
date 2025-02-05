@@ -17,11 +17,18 @@ var
   {force processing of all files}
   FORCE: boolean = false;
 
+procedure updateEncodeProgress(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+begin
+  {todo: do something fancy here, like eta, speed etc}
+  if frameOn mod 16 = 15 then write('.');
+end;
+
 {create compressed copies of master music tracks}
 procedure masterSongs();
 var
   verbose: boolean;
   sourceFiles: array of string = ['sunshine', 'clowns', 'crazy', 'blue'];
+  writer: tLA96Writer;
   filename: string;
   srcPath, dstPath: string;
   srcMusic: tSoundEffect;
@@ -33,6 +40,8 @@ begin
   writeln('--------------------------');
   LA96_ENABLE_STATS := false;
   verbose := true;
+
+  writer := tLA96Writer.create();
 
   for filename in sourceFiles do begin
     srcPath := joinPath('c:\dev\masters\player', filename+'.wav');
@@ -51,11 +60,14 @@ begin
     writeln();
     write(filename+': ');
     srcMusic := tSoundEffect.loadFromWave(srcPath);
-    outStream := encodeLA96(srcMusic, ACP_HIGH, verbose);
-    outStream.writeToFile(dstPath);
-    outStream.free;
+    writer.open(dstPath);
+    writer.frameWriteHook := updateEncodeProgress();
+    writer.writeA96(srcMusic, ACP_HIGH);
   end;
 
+  writer.free();
+
+  writeln();
   writeln('Done.');
 end;
 

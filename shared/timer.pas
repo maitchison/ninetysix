@@ -136,5 +136,13 @@ begin
   result := format('%s: %f (%f) [total:%.2f]', [tag, elapsed, maxElapsed, totalElapsed]);
 end;
 
-begin
+var timer: tTimer;
+
+initialization
+
+finalization
+
+  for timer in Timers do
+    timer.free;
+
 end.

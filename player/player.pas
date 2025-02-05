@@ -106,6 +106,9 @@ var
   {gui stuff}
   guiTitle: tGUILabel;
   guiStats: tGUILabel;
+  //guiBuffer: tGUIBuffer;
+  guiFPS: tGUILabel;
+
 
 {--------------------------------------------------------}
 { Helpers }
@@ -345,7 +348,7 @@ begin
        and therefore very slow for small writes. }
       outStream := tMemoryStream.create();
       writer.open(outStream);
-      writer.writeSFX(music16, profile);
+      writer.writeA96(music16, profile);
       outStream.writeToFile(music16.tag+'.a96');
       outStream.free;
 
@@ -505,13 +508,19 @@ var
   oldBufferPos: dword;
   elapsed: double;
   x,y: integer;
-  gui: tGuiComponents;
   key: tKeyPair;
   decodeSpeed: single;
   exitFlag: boolean;
   cpuUsage: single;
   statsString: string;
   refMusic: tSoundEffect;
+
+  gui: tGuiComponents;
+
+
+  showFps: boolean = false;
+  showBuffer: boolean = false;
+
 
 begin
 
@@ -610,10 +619,11 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
-      {
-      textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGB(250,250,250,240));
-      screen.markRegion(tRect.create(6,3,40,20));
-      }
+
+      if showFps then begin
+        textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGB(250,250,250,240));
+        screen.markRegion(tRect.create(6,3,40,20));
+      end;
 
       {stats}
       guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024]);
@@ -627,6 +637,8 @@ begin
         key_enter: applySelection();
         key_esc: exitFlag := true;
         key_s: guiStats.visible := not guiStats.visible;
+        key_f: guiFPS.visible := not guiFPS.visible;
+        key_b: guiBuffer.visible := not guiBuffer.visible;
       end;
 
       {fade change at 1 per s}
