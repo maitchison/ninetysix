@@ -12,9 +12,10 @@ uses
   sysTypes,
   test;
 
+const
+  FS_READBUFFER_SIZE = 16*1024;
+
 type
-
-
   {file mode, from DOS I think}
   tFileMode = (FM_READ=0, FM_WRITE=1, FM_READWRITE=2);
 
@@ -120,6 +121,12 @@ type
   tFileStream = class(tStream)
   protected
     f: file;
+    // Just a read buffer for the moment... write buffer to come later.
+    bufferPos: int32; // index of first byte in buffer.
+    bufferLen: int32; // number of valid bytes in buffer.
+    buffer: array[0..FS_READBUFFER_SIZE-1] of byte;
+    procedure moveBuffer(aPos: int32);
+    procedure requestBufferBytes(aPos, numBytes: int32);
   public
 
     constructor create(aFilename: string; fileMode: tFileMode=FM_READ);
@@ -571,6 +578,10 @@ begin
   oldFileMode := system.fileMode;
   system.fileMode := byte(fileMode);
 
+  fillchar(buffer, sizeof(buffer), 0);
+  bufferPos := 0;
+  bufferLen := 0;
+
   case fileMode of
     FM_READ: begin
       {open file for read only}
@@ -631,15 +642,61 @@ end;
 
 procedure tFileStream.readBlock(out x;numBytes: int32);
 begin
-  blockread(f, x, numBytes);
+  {direct read for large blocks}
+  if (numBytes > FS_READBUFFER_SIZE div 2) then begin
+    system.seek(f, pos);
+    blockRead(f, x, numBytes)
+  end else begin
+    requestBufferBytes(fPos, numBytes);
+    move(buffer[fPos - bufferPos], x, numBytes);
+  end;
   fPos += numBytes;
 end;
 
 procedure tFileStream.writeBlock(var x;numBytes: int32);
 begin
-  blockwrite(f, x, numBytes);
+  system.seek(f, pos);
+  blockWrite(f, x, numBytes);
   fPos += numBytes;
   if fPos > fLen then fLen := fPos;
+end;
+
+{-------------------------------------------}
+
+{move the buffer such that the bytes [fpos..fpos+numBytes) are contained somewhere within it}
+procedure tFileStream.requestBufferBytes(aPos, numBytes: int32);
+var
+  delta: int32;
+begin
+  {
+  note: this isn't very efficent, especially for rewinding
+  we could improve this by moving with 4k alignment, and copying
+  the parts of the buffer that remain the same.
+  however for sequential reading, this is ok for the moment
+  although reading, say 33k at a time would be bad
+  }
+  delta := aPos - bufferPos;
+  if delta < 0 then begin
+    {requested before the buffer so move it}
+    moveBuffer(aPos);
+    exit;
+  end else begin
+    {requested after the buffer so move it}
+    if delta + numBytes > FS_READBUFFER_SIZE then begin
+      moveBuffer(aPos);
+      exit;
+    end;
+  end;
+end;
+
+procedure tFilestream.moveBuffer(aPos: int32);
+begin
+  bufferPos := aPos;
+  bufferLen := min(FS_READBUFFER_SIZE, len - aPos);
+  if bufferLen > 0 then begin
+    system.seek(f, bufferPos);
+    blockRead(f, buffer[0], bufferLen);
+  end;
 end;
 
 {-------------------------------------------}
