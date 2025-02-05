@@ -330,7 +330,6 @@ begin
   @Read:
     movzx eax, word ptr [esi]
     add esi, 2
-
     shl eax, cl
     or  ebx, eax
     add cl, 16
@@ -348,15 +347,43 @@ begin
     neg cl
     add cl, ch                  // ch = pos - bitsRead
 
+    {check for exception}
+    test ah, ah
+    jnz @Exception
+
     {write value}
     shr eax, 16                 // eax = 0 || value
     mov dword ptr [edi], eax    // outBuffer^ = code
 
     {end loop}
+  @EndLoop:
     add edi, 4
     dec edx
     jnz @DecodeLoop
 
+    jmp @Done
+
+  @Exception:
+    {read more bits if needed}
+    cmp cl, 16
+    jge @SkipExceptionRead
+  @ExceptionRead:
+    movzx eax, word ptr [esi]
+    add esi, 2
+    shl eax, cl
+    or  ebx, eax
+    add cl, 16
+  @SkipExceptionRead:
+    {read the literal}
+    xor eax, eax
+    mov ax, bx
+    mov dword ptr [edi], eax    // outBuffer^ = literal
+    {consume the bits}
+    shr ebx, 16
+    sub cl, 16
+    jmp @EndLoop
+
+  @Done:
     pop ebp
 
     popad
@@ -403,7 +430,6 @@ begin
   @Read:
     movzx eax, word ptr [esi]
     add esi, 2
-
     shl eax, cl
     or  ebx, eax
     add cl, 16
@@ -421,15 +447,41 @@ begin
     neg cl
     add cl, ch                  // ch = pos - bitsRead
 
+    {check for exception}
+    test ah, ah
+    jnz @Exception
+
     {write value}
     shr eax, 16                 // eax = 0 || value
     mov word ptr [edi], ax      // outBuffer^ = code
 
     {end loop}
+  @EndLoop:
     add edi, 2
     dec edx
     jnz @DecodeLoop
 
+    jmp @Done
+
+  @Exception:
+    {read more bits if needed}
+    cmp cl, 16
+    jge @SkipExceptionRead
+  @ExceptionRead:
+    movzx eax, word ptr [esi]
+    add esi, 2
+    shl eax, cl
+    or  ebx, eax
+    add cl, 16
+  @SkipExceptionRead:
+    {read the literal}
+    mov word ptr [edi], bx    // outBuffer^ = literal
+    {consume the bits}
+    shr ebx, 16
+    sub cl, 16
+    jmp @EndLoop
+
+  @Done:
     pop ebp
 
     popad

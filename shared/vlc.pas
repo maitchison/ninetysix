@@ -377,10 +377,12 @@ begin
     end;
     ST_PACK0..ST_PACK0+31:
       unpack16(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
-    ST_RICE0..ST_RICE0+15:
+    ST_RICE0..ST_RICE0+15: begin
       ReadRice16_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
-    ST_EXPG0..ST_EXPG0+15:
+    end;
+    ST_EXPG0..ST_EXPG0+15: begin
       ReadRice16_ASM(@IN_BUFFER[0], @outBuffer[0], n, 16+segmentType-ST_EXPG0);
+    end;
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -549,11 +551,21 @@ begin
     quotient := value shr k;
     remainder := value - (quotient shl k);
     bits := k+quotient+1;
-    if bits > RICE_TABLE_BITS then error(
+    if bits > RICE_TABLE_BITS then begin
+      bs.writeBits((1 shl RICE_TABLE_BITS)-1, RICE_TABLE_BITS);
+      bs.writeBits(value, 16);
+      continue;
+    end;
+    {error(
       format(
         'Fault when writing RICE code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)',
         [RICE_TABLE_BITS, value, k, bits]
-      ));
+      ));}
+    {if bits > RICE_TABLE_BITS then error(
+      format(
+        'Fault when writing RICE code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)',
+        [RICE_TABLE_BITS, value, k, bits]
+      ));}
     bs.writeBits((1 shl quotient)-1, quotient+1); {e.g. for (k=2) 12 = 010-0111}
     bs.writeBits(remainder, k);
   end;
@@ -569,8 +581,13 @@ begin
   result := 0;
   for value in values do begin
     bitsNeeded := (value shr k) + 1 + k;
-    { this is just a method of discouraging the use of long rice codes }
-    if bitsNeeded > RICE_TABLE_BITS then exit(1 shl 24);
+    {exceptions...}
+    if bitsNeeded > RICE_TABLE_BITS then begin
+      {encode an exception}
+      result += RICE_TABLE_BITS;
+      result += 16;
+      continue;
+    end;
     result += bitsNeeded;
   end;
 end;
@@ -810,12 +827,14 @@ var
   valuePlusOne: int32;
   valuePlusOneReversed: int32;
   prefixLength: int32;
+  numEntries: int32;
 
 begin
   if RICE_TABLE_BITS > 16 then error('RICE_TABLE_BITS is limited to 16 due to how we read bitStreams');
   fillchar(RICE_TABLE, sizeof(RICE_TABLE), 0);
+  numEntries := (1 shl RICE_TABLE_BITS);
   for k := 0 to 15 do begin
-    for value := 0 to (1 shl RICE_TABLE_BITS)-1 do begin
+    for value := 0 to numEntries-1 do begin
       q := value shr k;
       codeLength := k + q + 1;
       if codeLength > RICE_TABLE_BITS then continue;
@@ -833,10 +852,20 @@ begin
         RICE_TABLE[k, input] := output;
       end;
     end;
+    {add exception}
+    {note: there are much shorter exception codes to use..}
+    RICE_TABLE[k, numEntries-1] := (1 shl 24) or (RICE_TABLE_BITS shl 16);
+    {look for empty slots}
+    {
+    for value := 0 to numEntries-1 do begin
+      if RICE_TABLE[k, value] = 0 then
+        note(format('Empty slot on k:%d v:%s',[k, binToStr(value, 16)]));
+    end;
+    }
   end;
 
   {for the moment just k=0, i.e. standard EGC}
-  for value := 0 to (1 shl RICE_TABLE_BITS)-1 do begin
+  for value := 0 to numEntries-1 do begin
 
     valuePlusOne := value + 1;
     prefixLength := bitsToStoreValue(valuePlusOne)-1;

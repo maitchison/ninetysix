@@ -104,6 +104,7 @@ function comma(value: int64; width: word=0; padding: char=' '): string;
 function fltToStr(value: extended;places: byte=3;padding:byte=0): string;
 function intToStr(value: int64; width: word=0; padding: char='0'): string;
 function binToStr(value: int64; width: word=0; padding: char='0'): string;
+function hexToStr(value: int64; width: word=8): string;
 function bytesToStr(bytes: array of byte): string;
 function bytesToSanStr(bytes: tBytes): string;
 function strToInt(s: string): int64;
@@ -307,6 +308,15 @@ begin
             else Error('Invalid type for %d:'+IntToStr(a.VType));
           end;
         end;
+        'b': begin
+          // integer
+          case a.VType of
+            vtInteger: result += binToStr(a.VInteger);
+            vtInt64: result += binToStr(a.VInt64^);
+            vtExtended: result += binToStr(trunc(a.VExtended^));
+            else Error('Invalid type for %d:'+IntToStr(a.VType));
+          end;
+        end;
         ',': begin
           // integer
           case a.VType of
@@ -334,7 +344,9 @@ begin
         end;
         'h': begin
           case a.VType of
-            vtInteger: result += HexStr(args[ArgIndex].VInteger, 4);
+            vtInteger: result += hexToStr(a.VInteger);
+            vtInt64: result += hexToStr(a.VInt64^);
+            vtExtended: result += hexToStr(trunc(a.VExtended^));
             else Error('Invalid type for %h:'+IntToStr(a.VType));
           end;
         end;
@@ -604,6 +616,11 @@ begin
   end;
   while length(result) < width do
     result := padding + result;
+end;
+
+function hexToStr(value: int64; width: word=8): string;
+begin
+  result := hexStr(value, width);
 end;
 
 function strToInt(s: string): int64;

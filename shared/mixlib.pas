@@ -393,21 +393,6 @@ begin
       lastUpdatePitch := pitch;
     end;
 
-  {stub: simulate 8 bit}
-  if keyDownNoCheck(key_8) then
-    for i := 0 to bufSamples-1 do begin
-      scratchBufferI32[i].left := fake8Bit(scratchBufferI32[i].left);
-      scratchBufferI32[i].right := fake8Bit(scratchBufferI32[i].right);
-    end;
-  {stub: simulate u-law}
-  if keyDownNoCheck(key_u) then
-    for i := 0 to bufSamples-1 do begin
-      scratchBufferI32[i].left := fakeULAW(scratchBufferI32[i].left);
-      scratchBufferI32[i].right := fakeULAW(scratchBufferI32[i].right);
-    end;
-
-  //prevSample := scratchBuffer[bufSamples-1];
-
   {mix down}
   if mixer.mute then begin
     filldword(scratchBuffer, bufSamples, 0);

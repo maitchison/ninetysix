@@ -701,9 +701,7 @@ begin
       gui.update(elapsed);
       gui.draw(screen);
 
-      {screen.flipAll();}
-      {stub:}
-      screen.pageFlip();
+      screen.flipAll();
 
       oldBufferPos := musicBufferReadPos;
 
