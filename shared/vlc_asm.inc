@@ -270,12 +270,6 @@ begin
     cmp cl, 16
     jge @SkipRead
   @Read:
-    {this is the correct way to do it...}
-    // todo: change to ebp
-    //mov eax, STREAM
-    // note: could make this faster if we could somehow read all the bytes in first...
-    //call tStream.readWord     // eax = readword
-    {this is the dodgy way}
     movzx eax, word ptr [esi]
     add esi, 2
 

@@ -1,10 +1,9 @@
-procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
+procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int16; midCodes,difCodes: tDwords; frameSpec: pFrameSpec);
 var
   maxCounter: dword;
   shiftCode: word;
   left, right: word;
-  midCodePtr, midSignPtr: pointer;
-  difCodePtr, difSignPtr: pointer;
+  midCodePtr, difCodePtr: pointer;
   midUTable,difUTable: pointer;
   MC,DC: int32;
   i: integer;
@@ -13,9 +12,7 @@ begin
   maxCounter := frameSpec^.length-1;
   shiftCode := frameSpec^.midShift + (frameSpec^.difShift shl 8);
   midCodePtr := @midCodes[0];
-  midSignPtr := @midSigns[0];
   difCodePtr := @difCodes[0];
-  difSignPtr := @difSigns[0];
   left := 0; right := 0; // make compiler happy
   MC := midCode;
   DC := difCode;
@@ -23,7 +20,7 @@ begin
   if assigned(frameSpec^.midUTable) then midUTable := frameSpec^.midUTable^.tableCenterPtr else midUTable := nil;
 
   {not yet supported
-    Clipping (encoder should insure this does not happen)
+    Clipping (will implement in MMX version..)
   }
 
   asm
@@ -80,6 +77,29 @@ begin
       edx = tmp
     }
 
+    {process midcode}
+    mov esi, midCodePtr
+    mov eax, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    mov edx, eax
+    shr eax, 1
+    and edx, 1
+    neg edx
+    xor eax, edx
+    add eax, MC
+    mov MC, eax                        // eax = MC + delta
+
+    {process difcode}
+    mov esi, difCodePtr
+    mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    mov edx, ebx
+    shr ebx, 1
+    and edx, 1
+    neg edx
+    xor ebx, edx
+    add ebx, DC
+    mov DC, ebx                        // ebx = DC + delta
+
+    (*
     {process midcode add/subtract}
     mov esi, midCodePtr
     mov eax, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
@@ -101,6 +121,7 @@ begin
     sub ebx, edx
     add ebx, DC
     mov DC, ebx                        // ebx = DC + delta
+    *)
 
     {
       eax=mid

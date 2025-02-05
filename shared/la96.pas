@@ -551,7 +551,7 @@ begin
   samplePtr^ := generateSample(midValue, difValue, @frameSpec);
 
   startTimer('LA96_FRAME_Process');
-  process_REF(
+  process_ASM(
     pointer(samplePtr)+4,
     midValue, difValue,
     midCodes, difCodes,
