@@ -7,6 +7,7 @@ type
   tInt8s = array of int8;
   tWords = array of word;
   tDWords = array of dword;
+  tInt16s = array of int16;
   tInt32s = array of int32;
   tStrings = array of string;
 

@@ -122,7 +122,7 @@ function join(lines: array of string;seperator: string=#13#10): string;
 function  negDecode(x: dword): int32; inline;
 function  negEncode(x: int32): dword; inline;
 function  zigZag(x: int32): dword; inline;
-function  unzigZag(y: dword): int32; inline;
+function  zagZig(y: dword): int32; inline;
 function  encodeByteDelta(a,b: byte): byte; inline;
 
 function  sign(x: int32): int32; overload;
@@ -873,7 +873,7 @@ function zigZag(x: int32): dword; inline; register;
     pop ebx
   end;
 
-function unzigZag(y: dword): int32; inline; register;
+function zagZig(y: dword): int32; inline; register;
   asm
     push ebx
     mov ebx, eax
@@ -1278,7 +1278,7 @@ begin
 
   {test zigZag}
   for i := -256 to +256 do
-    assertEqual(unZigZag(zigZag(i)), i);
+    assertEqual(zagZig(zigZag(i)), i);
   assert(zigZag(low(int16)) <= 65535);
   assert(zigZag(high(int16)) <= 65535);
 

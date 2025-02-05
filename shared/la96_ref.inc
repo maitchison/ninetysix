@@ -12,15 +12,15 @@ begin
   end;
 end;
 
-function generateSample(midCode, difCode: int32;frameSpec: pFrameSpec): tAudioSample16S; {stub: inline}
+function generateSample(midValue, difValue: int16;frameSpec: pFrameSpec): tAudioSample16S;
 var
   mid, dif: int32;
   left,right: int32;
   shift: byte;
 begin
 
-  mid := midCode;
-  dif := difCode;
+  mid := midValue;
+  dif := difValue;
 
   if assigned(frameSpec^.midUTable) then
     mid := frameSpec^.midUTable^.lookup(mid);
@@ -33,34 +33,23 @@ begin
   left := mid + dif;
   right := mid - dif;
 
-  //note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midCode, difCode]));
+  //note(format('LR:%d,%d MD:%d,%d CLR:%d,%d CODE:%d,%d', [left, right, mid, dif, frameSpec^.cMid, frameSpec^.cDif, midValue, difValue]));
 
-  {$ifdef DEBUG}
-  if (left > high(int16)) then
-    warning(format('Clipping LO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
-  if (left < low(int16)) then
-    warning(format('Clipping LU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(left)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
-  if (right > high(int16)) then
-    warning(format('Clipping RO:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
-  if (right < low(int16)) then
-    warning(format('Clipping RU:%d mid:%d dif:%d shift:%d %d [%d]', [abs(right)-high(int16), midCode, difCode, frameSpec^.midShift, frameSpec^.difShift, frameSpec^.idx]));
+  {clipping on decoder is now required...}
   result.left := clamp16(left);
   result.right := clamp16(right);
-  {$else}
-  result.left := left;
-  result.right := right;
-  {$endif}
 end;
 
-procedure process_REF(sfxSamplePtr: pAudioSample16S; midCode, difCode: int32; midCodes,difCodes,midSigns,difSigns: tDwords; frameSpec: pFrameSpec);
+procedure process_REF(sfxSamplePtr: pAudioSample16S; midValue, difValue: int16; midCodes,difCodes: tDwords; frameSpec: pFrameSpec);
 var
-  i: int32;
+  i: int16;
 begin
   for i := 0 to (frameSpec^.length-1)-1 do begin
-    if midSigns[i] = 0 then midCode += midCodes[i] else midCode -= midCodes[i];
-    if difSigns[i] = 0 then difCode += difCodes[i] else difCode -= difCodes[i];
+    {note: codes should wrap}
+    midValue := int16(midValue + zagZig(midCodes[i]));
+    difValue := int16(difValue + zagZig(difCodes[i]));
     frameSpec^.idx := i+1;
-    sfxSamplePtr^ := generateSample(midCode, difCode, frameSpec);
+    sfxSamplePtr^ := generateSample(midValue, difValue, frameSpec);
     inc(sfxSamplePtr);
   end;
 end;

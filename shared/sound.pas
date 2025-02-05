@@ -46,6 +46,7 @@ type
     class operator subtract(a,b: tAudioSample16S): tAudioSample16S;
     function toMid: int16; inline;
     function toDif: int16; inline;
+    function toString: string;
     property a: int16 read left write left;
     property b: int16 read right write right;
   end;
@@ -175,6 +176,11 @@ end;
 function tAudioSample16S.toDif: int16; inline;
 begin
   result := (int32(left)-int32(right)) div 2;
+end;
+
+function tAudioSample16S.toString: string;
+begin
+  result := '('+intToStr(left)+','+intToStr(right)+')';
 end;
 
 class operator tAudioSampleF32.implicit(a: tAudioSample16S): tAudioSampleF32;

@@ -90,9 +90,6 @@ uses
   audioFilter,
   stream;
 
-const
-  ENABLE_POST_PROCESS = false; {doesn't really help right now, need a better noise gate}
-
 type
 
   {fast uLaw calculations via a lookup table}
@@ -144,8 +141,7 @@ type
   protected
     header: tLA96FileHeader;
     ulawTable: array[1..8] of tULawLookup;
-    midCodes, difCodes: tDwords;
-    midSigns, difSigns: tDwords;
+    midCodes, difCodes: tDWords; {todo: make 16bit}
     framePtr: tInt32s; {will be filled with -1 if no frame pointers}
     frameOn: int32;
     cLeft, cRight: single; {used for EMA}
@@ -179,7 +175,8 @@ type
     header: tLA96FileHeader;
     profile: tAudioCompressionProfile;
     // raw frame values to write out
-    frameA, frameB: tDWords;
+    inBuffer: tDwords;
+    outA, outB: tDWords;
     ulawTable: array[1..8] of tULawLookup;
   public
     {hooks}
@@ -423,8 +420,6 @@ begin
   {setup our buffers}
   setLength(midCodes, header.frameSize-1);
   setLength(difCodes, header.frameSize-1);
-  setLength(midSigns, header.frameSize-1);
-  setLength(difSigns, header.frameSize-1);
 
   {create ulaw tables}
   for bits := low(ulawTable) to high(ulawTable) do
@@ -495,7 +490,7 @@ var
   frameType: byte;
   midShift, difShift, midULaw, difULaw: byte;
 
-  midCode, difCode: int32;
+  midValue, difValue: int16;
   signFormat: byte;
   alpha: single;
 
@@ -529,20 +524,18 @@ begin
   startTimer('LA96_FRAME');
 
   {read frame header}
+  fs.readWord(); // this should be 0, for joint stereo.
   frameType := fs.readByte(); midShift := frameType and $f; midUlaw := frameType shr 4;
   frameType := fs.readByte(); difShift := frameType and $f; difUlaw := frameType shr 4;
 
-  midCode := negDecode(fs.readWord());
-  difCode := negDecode(fs.readWord());
+  midValue := zagZig(fs.readWord());
+  difValue := zagZig(fs.readWord());
 
   startTimer('LA96_FRAME_ReadSegments');
+  {todo: read 16bit segment}
   fs.readSegment(header.frameSize-1, midCodes);
   fs.readSegment(header.frameSize-1, difCodes);
   stopTimer('LA96_FRAME_ReadSegments');
-  startTimer('LA96_FRAME_ReadSigns');
-  readSigns(midSigns);
-  readSigns(difSigns);
-  stopTimer('LA96_FRAME_ReadSigns');
 
   frameSpec.length := header.frameSize;
   frameSpec.midShift := midShift;
@@ -555,14 +548,13 @@ begin
   if frameOn = header.numFrames-1 then
     frameSpec.length := ((header.numSamples-1) mod header.frameSize)+1;
 
-  samplePtr^ := generateSample(midCode, difCode, @frameSpec);
+  samplePtr^ := generateSample(midValue, difValue, @frameSpec);
 
   startTimer('LA96_FRAME_Process');
-  process_ASM(
+  process_REF(
     pointer(samplePtr)+4,
-    midCode, difCode,
+    midValue, difValue,
     midCodes, difCodes,
-    midSigns, difSigns,
     @frameSpec
   );
   stopTimer('LA96_FRAME_Process');
@@ -573,14 +565,6 @@ begin
     log(format('%d (%d,%d)', [sfxOffset, sfx[sfxOffset+i].left, sfx[sfxOffset+i].right]));
   end;
   }
-
-  {todo: implement this as a frameWriteHook}
-  if ENABLE_POST_PROCESS and (header.postFilter > 0) then begin
-    startTimer('LA96_FRAME_PostProcess');
-    alpha := exp((-2 * pi * header.postFilter * 1000) / 44100);
-    postProcessEMA(samplePtr, cLeft, cRight, frameSpec.length, alpha);
-    stopTimer('LA96_FRAME_PostProcess');
-  end;
 
   if assigned(frameReadHook) then
     frameReadHook(frameOn, samplePtr, frameSpec.length);
@@ -787,6 +771,27 @@ begin
   reader.free;
 end;
 
+procedure updateEncodeProgress(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
+begin
+  {todo: do something fancy here, like eta, speed etc}
+  if frameOn mod 16 = 15 then write('.');
+end;
+
+function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
+var
+  writer: tLA96Writer;
+  ms: tMemoryStream;
+begin
+  writer := tLA96Writer.create();
+  if verbose then
+    writer.frameWriteHook := updateEncodeProgress;
+  ms := tMemoryStream.create();
+  writer.open(ms);
+  writer.writeSFX(sfx, profile);
+  result := ms;
+  writer.free;
+end;
+
 {------------------------------------------------------}
 
 function quant(x: int32;shiftAmount: byte): int32; inline; pascal;
@@ -854,8 +859,9 @@ begin
   inherited create();
 
   {setup buffers}
-  setLength(frameA, FRAME_SIZE-1);
-  setLength(frameB, FRAME_SIZE-1);
+  setLength(inBuffer, FRAME_SIZE);
+  setLength(outA, FRAME_SIZE-1);
+  setLength(outB, FRAME_SIZE-1);
 
   {create ulaw tables}
   for bits := low(ulawTable) to high(ulawTable) do
@@ -874,6 +880,16 @@ begin
   inherited destroy();
 end;
 
+procedure tLA96Writer.close();
+begin
+  if assigned(fs) then begin
+    if ownsStream then fs.free;
+  end;
+  fs := nil;
+  frameOn := 0;
+  ownsStream := false;
+end;
+
 procedure tLA96Writer.open(aFilename: string);
 var
   fs: tFileStream;
@@ -887,6 +903,7 @@ procedure tLA96Writer.open(aStream: tStream);
 begin
   close();
   fs := aStream;
+  ownsStream := false;
   frameOn := 0;
   fillchar(header, sizeof(header), 0);
 end;
@@ -956,12 +973,24 @@ end;
 procedure tLA96Writer.writeNextFrame(samplePtr: pAudioSample16S);
 var
   i: integer;
+  frameSize: integer;
 begin
 
   if assigned(frameWriteHook) then frameWriteHook(frameOn, samplePtr, FRAME_SIZE);
 
+  {handle last frame}
+  if frameOn = header.numFrames-1 then
+    frameSize := header.numSamples mod FRAME_SIZE
+  else
+    frameSize := FRAME_SIZE;
+
+  {make a copy of the input, as we will modify it}
+  fillchar(inBuffer[0], FRAME_SIZE*4, 0);
+  move(samplePtr^, inBuffer[0], frameSize*4);
+  samplePtr := @inBuffer[0];
+
   {write frame header}
-  fs.writeByte(0); // frame type (16bit, joint stereo)
+  fs.writeWord(0); // frame type (16bit, joint stereo)
   fs.writeByte(profile.midQuantBits + profile.ulawBits*16);
   fs.writeByte(profile.difQuantBits + profile.ulawDifBits*16);
 
@@ -970,46 +999,36 @@ begin
     samplePtr,
     profile.midQuantBits,
     profile.difQuantBits + profile.difShift,
-    FRAME_SIZE
+    frameSize
   );
-
   if profile.ulawBits > 0 then
     ApplyULaw_REF(
       samplePtr,
       getULaw(profile.ulawBits),
       getULaw(profile.ulawDifBits),
-      FRAME_SIZE
+      frameSize
     );
-  ApplyDeltaModulation_REF(samplePtr, FRAME_SIZE);
+  ApplyDeltaModulation_REF(samplePtr, frameSize);
 
   {convert using zigZag}
   fs.writeWord(zigZag(samplePtr^.a));
   fs.writeWord(zigZag(samplePtr^.b));
   inc(samplePtr);
-
-  for i := 0 to FRAME_SIZE-2 do begin
-    frameA[i] := zigZag(samplePtr^.a);
-    frameB[i] := zigZag(samplePtr^.b);
+  fillchar(outA[0], length(outA)*4, 0);
+  fillchar(outB[0], length(outB)*4, 0);
+  for i := 0 to frameSize-2 do begin
+    outA[i] := zigZag(samplePtr^.a);
+    outB[i] := zigZag(samplePtr^.b);
     inc(samplePtr);
   end;
-  dec(samplePtr, FRAME_SIZE-1);
+  dec(samplePtr, frameSize-1);
 
   {write out}
-  fs.writeSegment(frameA);
-  fs.writeSegment(frameB);
+  fs.writeSegment(outA);
+  fs.writeSegment(outB);
 
   fs.flush();
   inc(frameOn);
-end;
-
-procedure tLA96Writer.close();
-begin
-  if assigned(fs) then begin
-    if ownsStream then fs.free;
-  end;
-  fs := nil;
-  frameOn := 0;
-  ownsStream := false;
 end;
 
 procedure tLA96Writer.writeSFX(sfx: tSoundEffect;aProfile: tAudioCompressionProfile);
@@ -1022,12 +1041,11 @@ procedure tLA96Writer.writeSFX(sfx: tSoundEffect);
 var
   i: integer;
   startPos, endPos: int32;
-  framePtr: tIntList;
+  framePtr: tDwords;
 begin
 
   if (profile.log2mu <> 8) then error('Values other than 8 for Log2MU are not currently supported');
 
-  framePtr.clear();
   startPos := fs.pos;
 
   { write header }
@@ -1051,23 +1069,23 @@ begin
     fs.writeDWord(0);
 
   { write frames }
+  setLength(framePtr, header.numFrames);
   for i := 0 to header.numFrames-1 do begin
-    framePtr.append(fs.pos-startPos);
+    framePtr[i] := fs.pos-startPos;
     writeNextFrame(sfx.data + (i*header.frameSize*4));
   end;
 
   { go back and write frame pointers}
   endPos := fs.pos;
   fs.seek(startPos+128);
-  for i := 0 to header.numFrames-1 do
-    fs.writeDWord(framePtr[i]);
+  fs.writeBlock(framePtr[0], length(framePtr)*4);
   fs.seek(endPos);
 
 end;
 
 
 {todo: remove this}
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
+function xencodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 const
   {note: we don't use centering anymore as it adds too much noise}
   MAX_ATTEMPTS = 100; {max attempts for clipping protection (0=off)}
@@ -1144,7 +1162,7 @@ begin
   if sfx.format <> AF_16_STEREO then begin
     {convert as needed}
     sfx := sfx.asFormat(AF_16_STEREO);
-    result := encodeLA96(sfx, profile);
+    result := xencodeLA96(sfx, profile);
     sfx.free;
     exit;
   end;
@@ -1462,10 +1480,25 @@ begin
   sample.left := 1000;
   sample.right := -300;
   sfxIn[1] := sample;
-  s := tMemoryStream.create();
   s := encodeLA96(sfxIn, ACP_VERYHIGH);
   s.seek(0);
+
+  //logbytes
+  {
+  log(intToStr(s.len));
+  for i := 0 to 1024-1 do begin
+    if i mod 32 = 0 then writeln();
+    s.seek(i);
+    write(hexStr(s.readByte,2));
+  end;
+  }
+
   sfxOut := decodeLA96(s);
+
+  {show output}
+  for i := 0 to sfxOut.length-1 do begin
+    log(format('in: %s out:%s', [sfxIn[i].toString, sfxOut[i].toString]));
+  end;
 
   assertEqual(sfxOut.length, sfxIn.length);
   for i := 0 to sfxOut.length-1 do begin
