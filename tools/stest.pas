@@ -124,7 +124,7 @@ var
   startTime, encodeElapsed, decodeElapsed: double;
   segmentType: byte;
   bytes: int32;
-  readMBPS, writeMBPS: single;
+  read32MBPS, read16MBPS, writeMBPS: single;
   write16Str: string;
 begin
   setLength(inData, 64000);
@@ -137,11 +137,11 @@ begin
 
   {run a bit of a benchmark on random bytes (0..127)}
   s := tMemoryStream.create(2*64*1024);
-  note(format('%s  %s  %s  %s (MB/s)', [pad('Segment Type', 30), ' Read32', 'Write32', ' Read16']));
+  note(format('%s  %s  %s  %s (MB/s)', [pad('Segment Type', 30), ' Read16', ' Read32', 'Write32']));
   writeln('----------------------------------------------------------------');
   for segmentType in [
     ST_VLC1, ST_VLC2,
-    ST_PACK7, ST_PACK8, ST_PACK9,
+    ST_PACK7, ST_PACK8, ST_PACK9, ST_PACK0+16,
     ST_RICE0+6,
     ST_AUTO, ST_PACK, ST_RICE
   ] do begin
@@ -152,23 +152,20 @@ begin
     stopTest(2*60*1024); writeMBPS := testMBPS();
 
     s.seek(0);
-    startTest(getSegmentTypeName(segmentType)+ ' read');
+    startTest(getSegmentTypeName(segmentType)+ ' read32');
     readSegment(s, length(inData), outData);
-    stopTest(2*60*1024); readMBPS := testMBPS();
+    stopTest(2*60*1024); read32MBPS := testMBPS();
 
-    if getSegmentTypeName(segmentType).toLower().startsWith('pack') then begin
-      s.seek(0);
-      startTest(getSegmentTypeName(segmentType)+ ' read16');
-      readSegment16(s, length(inData), outData16);
-      stopTest(2*60*1024); write16Str := fltToStr(testMBPS(), 2, 8);
-    end else
-      write16Str := '';
+    s.seek(0);
+    startTest(getSegmentTypeName(segmentType)+ ' read16');
+    readSegment16(s, length(inData), outData16);
+    stopTest(2*60*1024); read16MBPS := testMBPS();
 
     note(format('%s %s %s %s', [
       pad(getSegmentTypeName(segmentType), 30),
-      fltToStr(readMBPS, 2, 8),
-      fltToStr(writeMBPS, 2, 8),
-      write16str
+      fltToStr(read16MBPS, 2, 8),
+      fltToStr(read32MBPS, 2, 8),
+      fltToStr(writeMBPS, 2, 8)
     ]));
   end;
 

@@ -363,3 +363,76 @@ begin
 
   end;
 end;
+
+procedure ReadRice16_ASM(inPtr, outPtr: pointer; n: int32; k: integer);
+var
+  tablePtr: pointer;
+begin
+  tablePtr := @RICE_TABLE[k, 0];
+  asm
+
+    pushad
+
+    {
+      eax   tmp
+      ebx   bufferValue
+      ecx   0  || tmp | bufferPos
+      edx   loop
+
+      esi   inPtr
+      edi   outPtr
+      ebp   tablePtr
+    }
+
+    xor eax, eax
+    xor ebx, ebx
+    xor ecx, ecx
+
+    mov edx, N
+
+    mov esi, INPTR
+    mov edi, OUTPTR
+
+    push ebp
+    mov ebp, TABLEPTR
+
+  @DecodeLoop:
+    {read word}
+    cmp cl, 16
+    jge @SkipRead
+  @Read:
+    movzx eax, word ptr [esi]
+    add esi, 2
+
+    shl eax, cl
+    or  ebx, eax
+    add cl, 16
+
+  @SkipRead:
+    movzx eax, bx                  // eax = 0  || next 16 buffer bits
+    and ax, RICE_MASK              // should be a constant
+    mov eax, dword ptr [ebp+eax*4] // eax = 0 | len || value
+
+    {consume bits}
+    mov ch, cl                  // ch = old buf len
+    ror eax, 16                 // eax = value || 0 | len
+    mov cl, al                  // cl = bits to burn
+    shr ebx, cl                 // burn bits from buffer
+    neg cl
+    add cl, ch                  // ch = pos - bitsRead
+
+    {write value}
+    shr eax, 16                 // eax = 0 || value
+    mov word ptr [edi], ax      // outBuffer^ = code
+
+    {end loop}
+    add edi, 2
+    dec edx
+    jnz @DecodeLoop
+
+    pop ebp
+
+    popad
+
+  end;
+end;

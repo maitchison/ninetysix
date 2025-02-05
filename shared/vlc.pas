@@ -343,10 +343,8 @@ begin
     end;
     ST_PACK0..ST_PACK0+31:
       unpack16(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_PACK0);
-    ST_RICE0..ST_RICE0+15: begin
-      ReadRice32_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_RICE0);
-      convert32to16(OUT_BUFFER, outBuffer);
-    end;
+    ST_RICE0..ST_RICE0+15:
+      ReadRice16_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_RICE0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
