@@ -2,7 +2,7 @@ procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int16; mi
 var
   maxCounter: dword;
   shiftCode: word;
-  left, right: word;
+  left, right: int32;
   midCodePtr, difCodePtr: pointer;
   midUTable,difUTable: pointer;
   MC,DC: int32;
@@ -133,11 +133,11 @@ begin
 
     mov edx, eax
     add edx, ebx
-    mov LEFT, dx
+    mov LEFT, edx
 
     mov edx, eax
     sub edx, ebx
-    mov RIGHT, dx
+    mov RIGHT, edx
     pop cx
 
     {write out sample}
@@ -146,10 +146,31 @@ begin
       edi = samplePtr
     }
 
-    mov ax, RIGHT
-    shl eax, 16
-    mov ax, LEFT
-    mov dword ptr [edi+ecx*4], eax
+    {clipping: will be faster when we have MMX}
+
+    mov eax, RIGHT
+    cmp eax, 32767
+    jle @SkipRightToBig
+    mov eax, 32767
+  @SkipRightToBig:
+    cmp eax, -32768
+    jge @RightGood
+    mov eax, -32768
+  @RightGood:
+    mov bx, ax
+    shl ebx, 16
+
+    mov eax, LEFT
+    cmp eax, 32767
+    jle @SkipLeftToBig
+    mov eax, 32767
+  @SkipLeftToBig:
+    cmp eax, -32768
+    jge @LeftGood
+    mov eax, -32768
+  @LeftGood:
+    mov bx, ax
+    mov dword ptr [edi+ecx*4], ebx
 
     inc ecx
     cmp ecx, maxCounter
