@@ -518,9 +518,7 @@ var
   gui: tGuiComponents;
 
 
-  showFps: boolean = false;
   showBuffer: boolean = false;
-
 
 begin
 
@@ -550,6 +548,10 @@ begin
   guiStats := tGuiLabel.create(point(10, screen.height-30));
   guiStats.visible := false;
   gui.append(guiStats);
+
+  guiFPS := tGuiLabel.create(point(10, 10));
+  guiFPS.visible := false;
+  gui.append(guiFPS);
 
   {load tracks}
   files := fs.listFiles('music\*.a96');
@@ -619,16 +621,14 @@ begin
         elapsed := getTimer('main').avElapsed
       else
         elapsed := -1;
-
-      if showFps then begin
-        textOut(screen.canvas, 6, 3, format('%f', [1/elapsed]), RGB(250,250,250,240));
-        screen.markRegion(tRect.create(6,3,40,20));
-      end;
+      guiFPS.text := format('%f', [1/elapsed]);
 
       {stats}
       guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024]);
       if mixClickDetection > 0 then
         guiStats.text += ' click:'+intToStr(mixClickDetection);
+
+      guiBuffer.visible := showBuffer or getMusicStats.bufferFreeSlots < 8;
 
       key := getKey();
       if key.code <> 0 then case key.code of
@@ -638,7 +638,7 @@ begin
         key_esc: exitFlag := true;
         key_s: guiStats.visible := not guiStats.visible;
         key_f: guiFPS.visible := not guiFPS.visible;
-        key_b: guiBuffer.visible := not guiBuffer.visible;
+        key_b: showBuffer := not showBuffer;
       end;
 
       {fade change at 1 per s}
