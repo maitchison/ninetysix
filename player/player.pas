@@ -80,6 +80,14 @@ type
     constructor create(aPos: tPoint);
   end;
 
+  tGuiBuffer = class(tGuiComponent)
+    valueMin, valueMax, value: integer;
+  protected
+    procedure doDraw(screen: tScreen); override;
+  public
+    constructor create(aPos: tPoint;aMin,aMax: integer);
+  end;
+
 type
   tTracksHelper = record helper for tTracks
     procedure append(x: tTrack);
@@ -106,7 +114,7 @@ var
   {gui stuff}
   guiTitle: tGUILabel;
   guiStats: tGUILabel;
-  //guiBuffer: tGUIBuffer;
+  guiBuffer: tGUIBuffer;
   guiFPS: tGUILabel;
 
 
@@ -209,6 +217,36 @@ begin
   if centered then bounds.x -= bounds.width div 2;
   textOut(screen.canvas, bounds.x, bounds.y, text, c);
   screen.markRegion(bounds);
+end;
+
+{--------------------------------------------------------}
+
+procedure tGuiBuffer.doDraw(screen: tScreen);
+var
+  bounds: tRect;
+  col: RGBA;
+  i: integer;
+begin
+  bounds := tRect.create(pos.x, pos.y, valueMax*5+1, 6);
+  screen.canvas.fillRect(bounds, rgb(0,0,0,192));
+  for i := 0 to valueMax-1 do begin
+    if (valueMax-i) <= valueMin then
+      col := RGB(255,100,100)
+    else if (valueMax-i) <= value then
+      col := RGB(100,255,100)
+    else
+      col := RGB(200,200,200);
+    screen.canvas.fillRect(tRect.create(bounds.x+i*5+1, bounds.y+1, 4, 4), col);
+  end;
+  screen.markRegion(bounds);
+end;
+
+constructor tGuiBuffer.create(aPos: tPoint;aMin,aMax: integer);
+begin
+  inherited create(aPos);
+  valueMin := aMin;
+  valueMax := aMax;
+  value := 0;
 end;
 
 {--------------------------------------------------------}
@@ -514,9 +552,9 @@ var
   cpuUsage: single;
   statsString: string;
   refMusic: tSoundEffect;
+  musicStats: tMusicStats;
 
   gui: tGuiComponents;
-
 
   showBuffer: boolean = false;
 
@@ -552,6 +590,13 @@ begin
   guiFPS := tGuiLabel.create(point(10, 10));
   guiFPS.visible := false;
   gui.append(guiFPS);
+
+  guiBuffer := tGuiBuffer.create(
+    point(screen.width-10-5*(getMusicStats().bufferFramesMax div 4), 10),
+    4, getMusicStats().bufferFramesMax div 4
+  );
+  guiBuffer.visible := false;
+  gui.append(guiBuffer);
 
   {load tracks}
   files := fs.listFiles('music\*.a96');
@@ -624,11 +669,13 @@ begin
       guiFPS.text := format('%f', [1/elapsed]);
 
       {stats}
-      guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats.cpuUsage, getUsedMemory/1024/1024]);
+      guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats().cpuUsage, getUsedMemory/1024/1024]);
       if mixClickDetection > 0 then
         guiStats.text += ' click:'+intToStr(mixClickDetection);
 
-      guiBuffer.visible := showBuffer or getMusicStats.bufferFreeSlots < 8;
+      {buffer}
+      guiBuffer.value := getMusicStats().bufferFramesFilled div 4;
+      guiBuffer.visible := showBuffer or (guiBuffer.value < 4);
 
       key := getKey();
       if key.code <> 0 then case key.code of
