@@ -58,6 +58,8 @@ function  VLC2_Bits(value: dword): word; overload;
 function  VLC2_Bits(values: array of dword): dword; overload;
 procedure VLC2_Write(stream: tStream; values: array of dword);
 
+function  VLC8_Bits(value: dword): word;
+
 procedure RICE_Write(stream: tStream; values: array of dword; k: integer);
 function  RICE_Bits(values: array of dword; k: integer): int32;
 function  RICE_MaxCodeLength(values: array of dword; k: integer): int32;
@@ -150,9 +152,9 @@ begin
 end;
 
 {returns the number of bytes required to encode given values using given
- segment type. Does not include the header (type and length)
+ segment type, without the header.
  Auto is not supported}
-function getSegmentLength(values: array of dword; segmentType: byte): int32;
+function getSegmentLengthWithoutHeader(values: array of dword; segmentType: byte): int32;
 begin
   result := 0;
   case segmentType of
@@ -162,6 +164,22 @@ begin
     ST_RICE0..ST_RICE0+15: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
     ST_EXPG0: result := bytesForBits(EXPG_Bits(values));
     else error('Invalid segment type '+intToStr(segmentType));
+  end;
+end;
+
+{returns the number of bytes required to encode given values using given
+ segment type, including the header (type and length).
+ Auto is not supported}
+function getSegmentLength(values: array of dword; segmentType: byte): int32;
+var
+  tagCost, lenCost, segCost: integer;
+begin
+  tagCost := 1;
+  lenCost := bytesForBits(VLC8_Bits(length(values)));
+  segCost := getSegmentLengthWithoutHeader(values, segmentType);
+  case segmentType of
+    ST_PACK0..ST_PACK0+31: result := tagCost + segCost;
+    else result := tagCost + lenCost + segCost;
   end;
 end;
 
@@ -185,19 +203,20 @@ var
   valueMax: dword;
   valueSum: double;
   k, baseK, guessK: integer;
-  thisBits, bestBits: int32;
+  thisBytes, bestBytes: int32;
+  pkBits: integer;
   n: int32;
-  startPos,postHeaderPos: int32;
+  startPos, postHeaderPos: int32;
   value: dword;
   ricePenality: int32;
   segmentLen: dword;
+
 begin
 
   result := 0;
+  bestBytes := -1;
 
   if length(values) = 0 then exit;
-
-  bestBits := -1;
 
   if segmentType = ST_AUTO then begin
 
@@ -209,25 +228,21 @@ begin
     end;
 
     {start with packing}
-    bestBits := bitsToStoreMaxValue(valueMax) * length(values);
-    segmentType := ST_PACK0 + bitsToStoreMaxValue(valueMax);
+    pkBits := bitsToStoreMaxValue(valueMax);
+    segmentType := ST_PACK0 + pkBits;
+    bestBytes := getSegmentLength(values, segmentType);
 
     {see if RICE is an upgrade}
     guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
     baseK := guessK;
 
-    // check that this k works with our current lookup table size.
-    // it might generate a -1 length which means some codes are too big.
-    while (baseK < 15) and (RICE_Bits(values, baseK) = -1) do inc(baseK);
-
-    {see if rice code is an upgrade}
     for k := (baseK - 1) to (baseK + 1) do begin
       if k < 0 then continue;
       if k > 15 then continue;
-      thisBits := RICE_Bits(values, k);
-      if thisBits < bestBits then begin
+      thisBytes := getSegmentLength(values, ST_RICE0 + k);
+      if thisBytes < bestBytes then begin
         segmentType := ST_RICE0 + k;
-        bestBits := thisBits;
+        bestBytes := thisBytes;
       end;
     end;
 
@@ -266,27 +281,14 @@ begin
     segmentType := ST_RICE0+floor(log2(1+(valueSum / length(values))));
   end;
 
-  if segmentType = ST_RICE_SLOW then begin
-    for i := 0 to 15 do begin
-      thisBits := RICE_Bits(values, i);
-      if (i = 0) or (thisBits < bestBits) then begin
-        bestBits := thisBits;
-        segmentType := ST_RICE0+i;
-      end;
-    end;
-  end;
-
-  {calculate the segment bytes. Todo: in many cases we already know this
-   and do not need to recalculate it}
-  if bestBits > 0 then
-    segmentLen := bytesForBits(bestBits)
-  else
-    segmentLen := getSegmentLength(values, segmentType);
+  {calculate the segment bytes without header}
+  segmentLen := getSegmentLengthWithoutHeader(values, segmentType);
 
   {write out the data}
   startPos := s.pos;
   s.writeByte(segmentType);
-  s.writeVLC8(segmentLen);
+  if not segmentType in [ST_PACK0..ST_PACK0+31] then
+    s.writeVLC8(segmentLen);
   postHeaderPos := s.pos;
   case segmentType of
     ST_VLC1: VLC1_Write(s, values);
@@ -300,7 +302,10 @@ begin
   result := s.pos-startPos; // includes header
 
   {$ifdef DEBUG}
-  test.assertEqual(s.pos-postHeaderPos, segmentLen);
+  if s.pos-postHeaderPos <> segmentLen then error(format(
+    'Segment length error, expecting %d but found %d on type %s (calc=%d)',
+    [segmentLen, s.pos-postHeaderPos, getSegmentTypeName(segmentType), getSegmentLength(values, segmentType)]
+  ));
   {$endif}
 
 end;
@@ -315,7 +320,10 @@ begin
     system.setLength(outBuffer, n);
 
   segmentType := s.readByte();
-  segmentLen := s.readVLC8();
+  if segmentType in [ST_PACK0..ST_PACK0+31] then
+    segmentLen := bytesForBits(n*(segmentType-ST_PACK0))
+  else
+    segmentLen := s.readVLC8();
 
   if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
