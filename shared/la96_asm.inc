@@ -90,7 +90,7 @@ begin
 
     {process difcode}
     mov esi, difCodePtr
-    movzx bx, word ptr [esi+ecx*2]     // ebx = abs(midCode[i])
+    movzx ebx, word ptr [esi+ecx*2]     // ebx = abs(midCode[i])
     mov edx, ebx
     shr ebx, 1
     and edx, 1
@@ -113,9 +113,9 @@ begin
     mov esi, MIDUTABLE
     test esi, esi
     jz @Skip
-    mov eax, dword ptr [esi+eax*4]
+    movsx eax, word ptr [esi+eax*2]
     mov esi, DIFUTABLE
-    mov ebx, dword ptr [esi+ebx*4]
+    movsx ebx, word ptr [esi+ebx*2]
   @Skip:
 
     {at this point

@@ -96,7 +96,7 @@ type
   {settings bits to 0 gives identity transform}
   tULawLookup = record
     maxValue: int32;
-    table: tIntList;
+    table: tInt16s;
     procedure initEncode(bits: byte; log2Mu: byte);
     procedure initDecode(bits: byte; log2Mu: byte);
     function tableCenterPtr: pointer; inline;
@@ -609,16 +609,15 @@ var
 begin
   mu := 1 shl log2Mu;
   maxValue := (1 shl bits);
-  table := tIntList.create(2*maxValue+1); {-codesize..codesize (inclusive)}
-  for i := -maxValue to maxValue do begin
-    table[maxValue+i] := uLawInv(i / maxValue, mu);
-  end;
+  setLength(table, 2*maxValue+1); {-codesize..codesize (inclusive)}
+  for i := -maxValue to maxValue do
+    table[maxValue+i] := clamp16(uLawInv(i / maxValue, mu));
 end;
 
 {pointer to midpoint of table, i.e. f(0)}
 function tULawLookup.tableCenterPtr: pointer; inline;
 begin
-  result := @table.data[maxValue];
+  result := @table[maxValue];
 end;
 
 procedure tULawLookup.initEncode(bits: byte; log2Mu: byte);
@@ -630,14 +629,14 @@ begin
   mu := 1 shl log2Mu;
   codeSize := (1 shl bits);
   maxValue := 32*1024;
-  table := tIntList.create(2*maxValue+1);
+  setLength(table, 2*maxValue+1);
   for i := -maxValue to maxValue do
-    table[maxValue+i] := round(uLaw(i, mu) * codeSize);
+    table[maxValue+i] := round(uLaw(clamp16(i), mu) * codeSize);
 end;
 
 function tULawLookup.lookup(x: int32): int32; inline;
 begin
-  result := table.data[maxValue+x];
+  result := table[maxValue+x];
 end;
 
 {-------------------------------------------------------}
@@ -1457,6 +1456,7 @@ var
   s: tStream;
   sfxIn, sfxOut: tSoundEffect;
   sample: tAudioSample16S;
+  value: int16;
 const
   mu = 256;
   bits = 6;
@@ -1466,10 +1466,11 @@ begin
   lutEncode.initEncode(bits, round(log2(mu)));
   lutDecode.initDecode(bits, round(log2(mu)));
   for i := -codeSize to codeSize do
-    assertEqual(lutDecode.lookup(i), uLawInv(i/codeSize, mu));
+    assertEqual(clamp16(lutDecode.lookup(i)), clamp16(uLawInv(i/codeSize, mu)));
   for i := -1024 to 1024 do begin
     {check all values -1k..-1k, and also samples from whole range}
-    assertEqual(lutEncode.lookup(32*i), round(uLaw(32*i, mu) * codeSize));
+    value := clamp16(32*i);
+    assertEqual(lutEncode.lookup(value), round(uLaw(value, mu) * codeSize));
     assertEqual(lutEncode.lookup(i), round(uLaw(i, mu) * codeSize));
   end;
 
