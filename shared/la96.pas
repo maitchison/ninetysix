@@ -1496,9 +1496,11 @@ begin
   sfxOut := decodeLA96(s);
 
   {show output}
+  {
   for i := 0 to sfxOut.length-1 do begin
     log(format('in: %s out:%s', [sfxIn[i].toString, sfxOut[i].toString]));
   end;
+  }
 
   assertEqual(sfxOut.length, sfxIn.length);
   for i := 0 to sfxOut.length-1 do begin
