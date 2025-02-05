@@ -134,14 +134,72 @@ begin
   end;
 end;
 
-procedure unpack_ASM(inPtr, outPtr: pointer; n: dword;bitsPerCode: byte);
+procedure unpack16_ASM(inPtr, outPtr: pointer; n: dword;bitsPerCode: byte);
 var
-  i,j: int32;
-  bitBuffer: dword;         { buffer for our bits }
-  bitsRemaining: int32;     { number of bits left in the buffer }
-  value: dword;             { current value being unpacked}
   mask: dword;              { mask for extracting bits}
+begin
+  mask := (1 shl bitsPerCode) - 1;
+  asm
+    {
+      eax = temp
+      ebx = remaining dwords
+      ecx = 0 0 [bitsPerCode] [bitsRemaining]
+      edx = bitBuffer
 
+      esi = inPtr
+      edi = outPtr
+      ebp = mask
+    }
+
+    pushad
+
+    xor eax,  eax
+    mov ebx,  n
+    mov cl,   0     // bitsRemaining=0
+    mov ch,   bitsPerCode
+    xor edx,  edx   // bitbuffer=0
+
+    mov esi,  inPtr
+    mov edi,  outPtr
+    mov ebp,  mask
+
+    @LOOP_START:
+
+      cmp cl, ch
+      jae @SKIP_READ_VALUE
+
+      { read value }
+      { note: we assume there is atleast 1 spare bytes at the end of
+        this array }
+      movzx eax, word ptr ds:[esi]
+      shl eax, cl
+      or  edx, eax
+      add esi, 2
+      add cl, 16
+
+    @SKIP_READ_VALUE:
+
+      { extract code }
+      mov eax, edx
+      and eax, ebp
+      mov word ptr ds:[edi], ax
+      add edi, 2
+
+      {remove code from bit buffer}
+      xchg cl, ch
+      shr edx, cl
+      xchg cl, ch
+      sub cl, ch
+
+      dec ebx
+      jnz @LOOP_START
+    popad
+  end;
+end;
+
+procedure unpack32_ASM(inPtr, outPtr: pointer; n: dword;bitsPerCode: byte);
+var
+  mask: dword;              { mask for extracting bits}
 begin
 
   {we require the following}

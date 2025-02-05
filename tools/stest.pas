@@ -45,7 +45,7 @@ end;
 
 procedure displayTestResults();
 begin
-  note(format('%s %sMB/s', [pad(testName, 40), fltToStr(testMBPS, 2, 8)]));
+  note(format('%s %sMB/s', [pad(testName, 30), fltToStr(testMBPS, 2, 8)]));
 end;
 
 procedure benchmarkStream(s: tStream; title:string);
@@ -118,15 +118,18 @@ end;
 procedure benchmarkVLC();
 var
   inData, outData: tDwords;
+  outData16: tWords;
   i: integer;
   s: tStream;
   startTime, encodeElapsed, decodeElapsed: double;
   segmentType: byte;
   bytes: int32;
   readMBPS, writeMBPS: single;
+  write16Str: string;
 begin
   setLength(inData, 64000);
   setLength(outData, 64000);
+  setLength(outData16, 64000);
   for i := 0 to length(inData)-1 do
     inData[i] := rnd div 2;
 
@@ -134,8 +137,8 @@ begin
 
   {run a bit of a benchmark on random bytes (0..127)}
   s := tMemoryStream.create(2*64*1024);
-  note(format('%s     %s    %s (MB/s)', [pad('Segment Type',40), 'Read', 'Write']));
-  writeln('-----------------------------------------------------------------');
+  note(format('%s  %s  %s  %s (MB/s)', [pad('Segment Type', 30), ' Read32', 'Write32', ' Read16']));
+  writeln('----------------------------------------------------------------');
   for segmentType in [
     ST_VLC1, ST_VLC2,
     ST_PACK7, ST_PACK8, ST_PACK9,
@@ -153,7 +156,20 @@ begin
     readSegment(s, length(inData), outData);
     stopTest(2*60*1024); readMBPS := testMBPS();
 
-    note(format('%s %s %s', [pad(getSegmentTypeName(segmentType), 40), fltToStr(readMBPS, 2, 8), fltToStr(writeMBPS, 2, 8)]));
+    if getSegmentTypeName(segmentType).toLower().startsWith('pack') then begin
+      s.seek(0);
+      startTest(getSegmentTypeName(segmentType)+ ' read16');
+      readSegment16(s, length(inData), outData16);
+      stopTest(2*60*1024); write16Str := fltToStr(testMBPS(), 2, 8);
+    end else
+      write16Str := '';
+
+    note(format('%s %s %s %s', [
+      pad(getSegmentTypeName(segmentType), 30),
+      fltToStr(readMBPS, 2, 8),
+      fltToStr(writeMBPS, 2, 8),
+      write16str
+    ]));
   end;
 
 end;
@@ -162,7 +178,7 @@ begin
   textAttr := White;
   debug.VERBOSE_SCREEN := llNote;
   benchmarkStream(tMemoryStream.create(), 'MemoryStream R/W');
-  benchmarkStream(tFileStream.create('stream.tmp'), 'FileStream R/W');
+  benchmarkStream(tFileStream.create('stream.tmp', FM_READWRITE), 'FileStream R/W');
   benchmarkVLC();
   textAttr := White;
 end.

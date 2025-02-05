@@ -71,11 +71,15 @@ function  VLC1_Bits(values: array of dword): dword; forward; overload;
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
 procedure unpack32(inBuf: pByte;outBuf: pDWord; n: int32;bitsPerCode: byte); forward;
+procedure unpack16(inBuf: pByte;outBuf: pWord; n: int32;bitsPerCode: byte); forward;
 
 var
-  packing1: array[0..255] of array[0..7] of dword;
-  packing2: array[0..255] of array[0..3] of dword;
-  packing4: array[0..255] of array[0..1] of dword;
+  packing16_1: array[0..255] of array[0..7] of word;
+  packing16_2: array[0..255] of array[0..3] of word;
+  packing16_4: array[0..255] of array[0..1] of word;
+  packing32_1: array[0..255] of array[0..7] of dword;
+  packing32_2: array[0..255] of array[0..3] of dword;
+  packing32_4: array[0..255] of array[0..1] of dword;
 
 const
   RICE_TABLE_BITS = 12;
@@ -337,10 +341,8 @@ begin
       readVLC2Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
       convert32to16(OUT_BUFFER, outBuffer);
     end;
-    ST_PACK0..ST_PACK0+31: begin
-      unpack32(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_PACK0);
-      convert32to16(OUT_BUFFER, outBuffer);
-    end;
+    ST_PACK0..ST_PACK0+31:
+      unpack16(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: begin
       ReadRice32_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_RICE0);
       convert32to16(OUT_BUFFER, outBuffer);
@@ -582,36 +584,32 @@ end;
 procedure unpack32(inBuf: pByte;outBuf: pDWord; n: int32;bitsPerCode: byte);
 var
   i: integer;
-  inPtr, outPtr: pointer;
 begin
-  inPtr := @inBuf[0];
-  outPtr := @outBuf[0];
-
   case bitsPerCode of
     0: filldword(outBuf^, n, 0);
     1: begin
       for i := 1 to (n shr 3) do begin
-        move(packing1[inBuf^], outBuf^, 4*8);
+        move(packing32_1[inBuf^], outBuf^, 4*8);
         inc(inBuf);
-        inc(outBuf, 8); // inc is dwords...
+        inc(outBuf, 8);
       end;
-      move(packing1[inBuf^], outBuf^, 4*(n and $7));
+      move(packing32_1[inBuf^], outBuf^, 4*(n and $7));
     end;
     2: begin
       for i := 1 to (n shr 2) do begin
-        move(packing2[inBuf^], outBuf^, 4*4);
+        move(packing32_2[inBuf^], outBuf^, 4*4);
         inc(inBuf);
         inc(outBuf, 4);
       end;
-      move(packing2[inBuf^], outBuf^, 4*(n and $3));
+      move(packing32_2[inBuf^], outBuf^, 4*(n and $3));
     end;
     4: begin
       for i := 1 to (n shr 1) do begin
-        move(packing4[inBuf^], outBuf^, 4*2);
+        move(packing32_4[inBuf^], outBuf^, 4*2);
         inc(inBuf);
         inc(outBuf, 2);
       end;
-      move(packing4[inBuf^], outBuf^, 4*(n and $1));
+      move(packing32_4[inBuf^], outBuf^, 4*(n and $1));
     end;
     8: asm
       pushad
@@ -642,7 +640,57 @@ begin
       jnz @PACKLOOP
       popad
     end;
-    else unpack_ASM(inBuf, @outBuf[0], n, bitsPerCode);
+    else unpack32_ASM(inBuf, @outBuf[0], n, bitsPerCode);
+  end;
+end;
+
+procedure unpack16(inBuf: pByte;outBuf: pWord; n: int32;bitsPerCode: byte);
+var
+  i: integer;
+begin
+  if bitsPerCode > 16 then error(format('Can not unpack %d bits with unpack16', [bitsPerCode]));
+  case bitsPerCode of
+    0: fillword(outBuf^, n, 0);
+    1: begin
+      for i := 1 to (n shr 3) do begin
+        move(packing16_1[inBuf^], outBuf^, 2*8);
+        inc(inBuf);
+        inc(outBuf, 8);
+      end;
+      move(packing16_1[inBuf^], outBuf^, 2*(n and $7));
+    end;
+    2: begin
+      for i := 1 to (n shr 2) do begin
+        move(packing16_2[inBuf^], outBuf^, 2*4);
+        inc(inBuf);
+        inc(outBuf, 4);
+      end;
+      move(packing16_2[inBuf^], outBuf^, 2*(n and $3));
+    end;
+    4: begin
+      for i := 1 to (n shr 1) do begin
+        move(packing16_4[inBuf^], outBuf^, 2*2);
+        inc(inBuf);
+        inc(outBuf, 2);
+      end;
+      move(packing16_4[inBuf^], outBuf^, 2*(n and $1));
+    end;
+    8: asm
+      pushad
+      mov ecx, n
+      mov esi, inBuf
+      mov edi, outBuf
+    @PACKLOOP:
+      movzx ax, byte ptr [esi]
+      inc esi
+      mov word ptr [edi], ax
+      add edi, 2
+      dec ecx
+      jnz @PACKLOOP
+      popad
+    end;
+    16: move(inBuf^, outBuf^, n*2);
+    else unpack16_ASM(inBuf, @outBuf[0], n, bitsPerCode);
   end;
 end;
 
@@ -704,12 +752,18 @@ var
   i,j: integer;
 begin
   for i := 0 to 255 do begin
-    for j := 0 to 7 do
-      packing1[i][j] := (i shr j) and $1;
-    for j := 0 to 3 do
-      packing2[i][j] := (i shr (j*2)) and $3;
-    for j := 0 to 1 do
-      packing4[i][j] := (i shr (j*4)) and $f;
+    for j := 0 to 7 do begin
+      packing16_1[i][j] := (i shr j) and $1;
+      packing32_1[i][j] := (i shr j) and $1;
+    end;
+    for j := 0 to 3 do begin
+      packing16_2[i][j] := (i shr (j*2)) and $3;
+      packing32_2[i][j] := (i shr (j*2)) and $3;
+    end;
+    for j := 0 to 1 do begin
+      packing16_4[i][j] := (i shr (j*4)) and $f;
+      packing32_4[i][j] := (i shr (j*4)) and $f;
+    end;
   end;
 end;
 
