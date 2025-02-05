@@ -233,7 +233,7 @@ This function can only use the lookup table, which is 16bit, which means
  Hmm... maybe I should just implement the falt adjustment in asm...
  it's not that hard.
 }
-procedure ReadRice_ASM(inPtr, outPtr: pointer; n: int32; k: integer);
+procedure ReadRice32_ASM(inPtr, outPtr: pointer; n: int32; k: integer);
 var
   tablePtr: pointer;
 begin

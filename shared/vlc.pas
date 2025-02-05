@@ -49,6 +49,7 @@ const
 
 function  writeSegment(s: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function  readSegment(s: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
+function  readSegment16(s: tStream; n: int32;outBuffer: tWords=nil): tWords;
 
 function  getSegmentTypeName(segmentType: byte): string;
 
@@ -69,7 +70,7 @@ function  VLC1_Bits(values: array of dword): dword; forward; overload;
 
 {packing}
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
-procedure unpack(inPtr: pointer;outBuffer: pDWord; n: word;bitsPerCode: byte); forward;
+procedure unpack32(inBuf: pByte;outBuf: pDWord; n: int32;bitsPerCode: byte); forward;
 
 var
   packing1: array[0..255] of array[0..7] of dword;
@@ -95,7 +96,8 @@ var
   RICE_TABLE: array[0..15, 0..(1 shl RICE_TABLE_BITS)-1] of dword;
 
   { used for segment reading}
-  INBUFFER: array[0..(128*1024)-1] of byte;
+  IN_BUFFER: array[0..(128*1024)-1] of byte;
+  OUT_BUFFER: array[0..(64*1024)-1] of dword;
 
 {$I vlc_ref.inc}
 {$I vlc_asm.inc}
@@ -280,18 +282,69 @@ begin
   segmentType := s.readByte();
   segmentLen := s.readVLC8();
 
-  if segmentLen > length(INBUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(INBUFFER)]));
+  if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
   {todo: block read here}
   {todo: allow zero copy but looking at bytes ptr then incrementing...
    note: this means setting requiredBytes to segmentLength}
-  s.readBlock(INBUFFER[0], segmentLen);
+  s.readBlock(IN_BUFFER[0], segmentLen);
 
   case segmentType of
-    ST_VLC1: readVLC1Sequence_ASM(@INBUFFER[0], @outBuffer[0], n);
-    ST_VLC2: readVLC2Sequence_ASM(@INBUFFER[0], @outBuffer[0], n);
-    ST_PACK0..ST_PACK0+31: unpack(@INBUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
-    ST_RICE0..ST_RICE0+15: ReadRice_ASM(@INBUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
+    ST_VLC1: readVLC1Sequence_ASM(@IN_BUFFER[0], @outBuffer[0], n);
+    ST_VLC2: readVLC2Sequence_ASM(@IN_BUFFER[0], @outBuffer[0], n);
+    ST_PACK0..ST_PACK0+31: unpack32(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
+    ST_RICE0..ST_RICE0+15: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
+    else error('Invalid segment type '+intToStr(segmentType));
+  end;
+
+  exit(outBuffer);
+end;
+
+procedure convert32to16(buffer32: array of dword; buffer16: array of word);
+var
+  i: integer;
+begin
+  for i := 0 to length(buffer32) do
+    buffer16[i] := buffer32[i];
+end;
+
+{16bit word version of read segment. Can be a little faster}
+function readSegment16(s: tStream; n: int32;outBuffer: tWords=nil): tWords;
+var
+  segmentType: byte;
+  segmentLen: dword;
+begin
+
+  if not assigned(outBuffer) then
+    system.setLength(outBuffer, n);
+
+  segmentType := s.readByte();
+  segmentLen := s.readVLC8();
+
+  if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
+
+  {todo: block read here}
+  {todo: allow zero copy but looking at bytes ptr then incrementing...
+   note: this means setting requiredBytes to segmentLength}
+  s.readBlock(IN_BUFFER[0], segmentLen);
+
+  case segmentType of
+    ST_VLC1: begin
+      readVLC1Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
+      convert32to16(OUT_BUFFER, outBuffer);
+    end;
+    ST_VLC2: begin
+      readVLC2Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
+      convert32to16(OUT_BUFFER, outBuffer);
+    end;
+    ST_PACK0..ST_PACK0+31: begin
+      unpack32(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_PACK0);
+      convert32to16(OUT_BUFFER, outBuffer);
+    end;
+    ST_RICE0..ST_RICE0+15: begin
+      ReadRice32_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_RICE0);
+      convert32to16(OUT_BUFFER, outBuffer);
+    end;
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -526,103 +579,70 @@ begin
   bs.flush();
 end;
 
-procedure unpack0(inBuf: pByte; outBuf: pDWord;n: dWord);
-begin
-  filldword(outBuf^, n, 0);
-end;
-
-procedure unpack1(inBuf: pByte; outBuf: pDWord;n: dWord);
-var
-  i: integer;
-begin
-  for i := 1 to (n shr 3) do begin
-    move(packing1[inBuf^], outBuf^, 4*8);
-    inc(inBuf);
-    inc(outBuf, 8); // inc is dwords...
-  end;
-  move(packing1[inBuf^], outBuf^, 4*(n and $7));
-end;
-
-procedure unpack2(inBuf: pByte; outBuf: pDWord;n: dWord);
-var
-  i: integer;
-begin
-  for i := 1 to (n shr 2) do begin
-    move(packing2[inBuf^], outBuf^, 4*4);
-    inc(inBuf);
-    inc(outBuf, 4);
-  end;
-  move(packing2[inBuf^], outBuf^, 4*(n and $3));
-end;
-
-procedure unpack4(inBuf: pByte; outBuf: pDWord;n: dWord);
-var
-  i: integer;
-begin
-  for i := 1 to (n shr 1) do begin
-    move(packing4[inBuf^], outBuf^, 4*2);
-    inc(inBuf);
-    inc(outBuf, 2);
-  end;
-  move(packing4[inBuf^], outBuf^, 4*(n and $1));
-end;
-
-procedure unpack8(inBuf: pByte; outBuf: pDWord;n: dWord);
+procedure unpack32(inBuf: pByte;outBuf: pDWord; n: int32;bitsPerCode: byte);
 var
   i: integer;
   inPtr, outPtr: pointer;
 begin
-  asm
-    pushad
-    mov ecx, n
-    mov esi, inBuf
-    mov edi, outBuf
-  @PACKLOOP:
+  inPtr := @inBuf[0];
+  outPtr := @outBuf[0];
 
-    movzx eax, byte ptr [esi]
-    inc esi
-    mov dword ptr [edi], eax
-    add edi, 4
-
-    dec ecx
-    jnz @PACKLOOP
-    popad
-  end;
-end;
-
-procedure unpack16(inBuf: pByte; outBuf: pDWord;n: dWord);
-var
-  i: integer;
-  inPtr, outPtr: pointer;
-begin
-  asm
-    pushad
-    mov ecx, n
-    mov esi, inBuf
-    mov edi, outBuf
-  @PACKLOOP:
-
-    movzx eax, word ptr [esi]
-    add esi, 2
-    mov dword ptr [edi], eax
-    add edi, 4
-
-    dec ecx
-    jnz @PACKLOOP
-    popad
-  end;
-end;
-
-procedure unpack(inPtr: pointer;outBuffer: pDWord; n: word;bitsPerCode: byte);
-begin
   case bitsPerCode of
-    0: unpack0(inPtr, @outBuffer[0], n);
-    1: unpack1(inPtr, @outBuffer[0], n);
-    2: unpack2(inPtr, @outBuffer[0], n);
-    4: unpack4(inPtr, @outBuffer[0], n);
-    8: unpack8(inPtr, @outBuffer[0], n);
-    16: unpack16(inPtr, @outBuffer[0], n);
-    else unpack_ASM(inPtr, @outBuffer[0], n, bitsPerCode);
+    0: filldword(outBuf^, n, 0);
+    1: begin
+      for i := 1 to (n shr 3) do begin
+        move(packing1[inBuf^], outBuf^, 4*8);
+        inc(inBuf);
+        inc(outBuf, 8); // inc is dwords...
+      end;
+      move(packing1[inBuf^], outBuf^, 4*(n and $7));
+    end;
+    2: begin
+      for i := 1 to (n shr 2) do begin
+        move(packing2[inBuf^], outBuf^, 4*4);
+        inc(inBuf);
+        inc(outBuf, 4);
+      end;
+      move(packing2[inBuf^], outBuf^, 4*(n and $3));
+    end;
+    4: begin
+      for i := 1 to (n shr 1) do begin
+        move(packing4[inBuf^], outBuf^, 4*2);
+        inc(inBuf);
+        inc(outBuf, 2);
+      end;
+      move(packing4[inBuf^], outBuf^, 4*(n and $1));
+    end;
+    8: asm
+      pushad
+      mov ecx, n
+      mov esi, inBuf
+      mov edi, outBuf
+    @PACKLOOP:
+      movzx eax, byte ptr [esi]
+      inc esi
+      mov dword ptr [edi], eax
+      add edi, 4
+
+      dec ecx
+      jnz @PACKLOOP
+      popad
+    end;
+    16: asm
+      pushad
+      mov ecx, n
+      mov esi, inBuf
+      mov edi, outBuf
+    @PACKLOOP:
+      movzx eax, word ptr [esi]
+      add esi, 2
+      mov dword ptr [edi], eax
+      add edi, 4
+      dec ecx
+      jnz @PACKLOOP
+      popad
+    end;
+    else unpack_ASM(inBuf, @outBuf[0], n, bitsPerCode);
   end;
 end;
 
@@ -725,8 +745,8 @@ begin
     {to check if we are overwriting values or not}
     outBuffer[i] := i;
 
-  unpack(@inBuffer[0], @ref[0], 10, 1);
-  unpack1(@inBuffer[0], @outBuffer[0], 10);
+  unpack32(@inBuffer[0], @ref[0], 10, 1);
+  unpack_REF(@inBuffer[0], @outBuffer[0], 10, 1);
 
   assertEqual(toBytes(outBuffer), toBytes(ref));
 end;
@@ -782,7 +802,7 @@ begin
     AssertEqual(bs.len, bytesForBits(bits*length(testData2)));
     bs.seek(0);
     setLength(data, length(testData2));
-    unpack(bs.getCurrentBytesPtr(0), @data[0], length(testData2), bits);
+    unpack32(bs.getCurrentBytesPtr(0), @data[0], length(testData2), bits);
     for i := 0 to length(testData2)-1 do
       AssertEqual(data[i], testData2[i]);
   end;
