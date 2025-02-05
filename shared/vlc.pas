@@ -334,17 +334,19 @@ begin
 
   case segmentType of
     ST_VLC1: begin
+      {convert for compatability... slower than readSegment32}
       readVLC1Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
       convert32to16(OUT_BUFFER, outBuffer);
     end;
     ST_VLC2: begin
+      {convert for compatability... slower than readSegment32}
       readVLC2Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
       convert32to16(OUT_BUFFER, outBuffer);
     end;
     ST_PACK0..ST_PACK0+31:
-      unpack16(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_PACK0);
+      unpack16(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15:
-      ReadRice16_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n, segmentType-ST_RICE0);
+      ReadRice16_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -810,6 +812,7 @@ var
   s: tStream;
   k: integer;
   outData: tDwords;
+  outData16: tWords;
 begin
   s := tMemoryStream.create();
   {lower values of k will not work due to long code length no longer
@@ -817,11 +820,20 @@ begin
   for k := 4 to 8 do begin
     s.reset();
     s.writeSegment(testData, ST_RICE0+k);
+
+    {32bit}
     s.seek(0);
     setLength(outData, length(testData));
     s.readSegment(length(testData), @outData[0]);
-
     assertEqual(toBytes(outData).toString, toBytes(testData).toString);
+
+    {16bit}
+    s.seek(0);
+    setLength(outData16, length(testData));
+    vlc.readSegment16(s, length(testData), @outData16[0]);
+    assertEqual(toBytes(outData16).toString, toBytes(testData).toString);
+
+    {make sure size is ok}
     assertEqual(s.pos, 2+bytesForBits(RICE_bits(testData, k)));
   end;
   s.free;

@@ -1,4 +1,4 @@
-procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int16; midCodes,difCodes: tDwords; frameSpec: pFrameSpec);
+procedure process_ASM(sfxSamplePtr: pAudioSample16S; midCode, difCode: int16; midCodes,difCodes: tWords; frameSpec: pFrameSpec);
 var
   maxCounter: dword;
   shiftCode: word;
@@ -79,7 +79,7 @@ begin
 
     {process midcode}
     mov esi, midCodePtr
-    mov eax, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    movzx eax, word ptr [esi+ecx*2]     // ebx = abs(midCode[i])
     mov edx, eax
     shr eax, 1
     and edx, 1
@@ -90,7 +90,7 @@ begin
 
     {process difcode}
     mov esi, difCodePtr
-    mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
+    movzx bx, word ptr [esi+ecx*2]     // ebx = abs(midCode[i])
     mov edx, ebx
     shr ebx, 1
     and edx, 1
@@ -98,30 +98,6 @@ begin
     xor ebx, edx
     add ebx, DC
     mov DC, ebx                        // ebx = DC + delta
-
-    (*
-    {process midcode add/subtract}
-    mov esi, midCodePtr
-    mov eax, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
-    mov esi, midSignPtr
-    mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
-    {this performs the following
-     if mask is 1s then ebx = -ebx, if mask is 0s then ebx is unchanged}
-    xor eax, edx
-    sub eax, edx
-    add eax, MC
-    mov MC, eax                        // eax = MC + delta
-
-    {process difcode add/subtract}
-    mov esi, difCodePtr
-    mov ebx, dword ptr [esi+ecx*4]     // ebx = abs(midCode[i])
-    mov esi, difSignPtr
-    mov edx, dword ptr [esi+ecx*4]     // edx = signMask (0s for add, 1s for subtract)
-    xor ebx, edx
-    sub ebx, edx
-    add ebx, DC
-    mov DC, ebx                        // ebx = DC + delta
-    *)
 
     {
       eax=mid

@@ -14,7 +14,7 @@ end;
 
 function generateSample(midValue, difValue: int16;frameSpec: pFrameSpec): tAudioSample16S;
 var
-  mid, dif: int32;
+  mid, dif: int16;
   left,right: int32;
   shift: byte;
 begin
@@ -40,7 +40,7 @@ begin
   result.right := clamp16(right);
 end;
 
-procedure process_REF(sfxSamplePtr: pAudioSample16S; midValue, difValue: int16; midCodes,difCodes: tDwords; frameSpec: pFrameSpec);
+procedure process_REF(sfxSamplePtr: pAudioSample16S; midValue, difValue: int16; midCodes,difCodes: tWords; frameSpec: pFrameSpec);
 var
   i: int16;
 begin

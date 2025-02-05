@@ -141,7 +141,7 @@ type
   protected
     header: tLA96FileHeader;
     ulawTable: array[1..8] of tULawLookup;
-    midCodes, difCodes: tDWords; {todo: make 16bit}
+    midCodes, difCodes: tWords; {todo: make 16bit}
     framePtr: tInt32s; {will be filled with -1 if no frame pointers}
     frameOn: int32;
     cLeft, cRight: single; {used for EMA}
@@ -175,7 +175,7 @@ type
     header: tLA96FileHeader;
     profile: tAudioCompressionProfile;
     // raw frame values to write out
-    inBuffer: tDwords;
+    inBuffer: tDwords; // our 16bit stereo values
     outA, outB: tDWords;
     ulawTable: array[1..8] of tULawLookup;
   public
@@ -532,9 +532,8 @@ begin
   difValue := zagZig(fs.readWord());
 
   startTimer('LA96_FRAME_ReadSegments');
-  {todo: read 16bit segment}
-  fs.readSegment(header.frameSize-1, midCodes);
-  fs.readSegment(header.frameSize-1, difCodes);
+  vlc.readSegment16(fs, header.frameSize-1, midCodes);
+  vlc.readSegment16(fs, header.frameSize-1, difCodes);
   stopTimer('LA96_FRAME_ReadSegments');
 
   frameSpec.length := header.frameSize;
@@ -979,9 +978,11 @@ begin
   if assigned(frameWriteHook) then frameWriteHook(frameOn, samplePtr, FRAME_SIZE);
 
   {handle last frame}
-  if frameOn = header.numFrames-1 then
-    frameSize := header.numSamples mod FRAME_SIZE
-  else
+  if frameOn = header.numFrames-1 then begin
+    frameSize := header.numSamples mod FRAME_SIZE;
+    fillchar(outA[0], length(outA)*4, 0);
+    fillchar(outB[0], length(outB)*4, 0);
+  end else
     frameSize := FRAME_SIZE;
 
   {make a copy of the input, as we will modify it}
@@ -1014,8 +1015,6 @@ begin
   fs.writeWord(zigZag(samplePtr^.a));
   fs.writeWord(zigZag(samplePtr^.b));
   inc(samplePtr);
-  fillchar(outA[0], length(outA)*4, 0);
-  fillchar(outB[0], length(outB)*4, 0);
   for i := 0 to frameSize-2 do begin
     outA[i] := zigZag(samplePtr^.a);
     outB[i] := zigZag(samplePtr^.b);
