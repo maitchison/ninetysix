@@ -59,6 +59,7 @@ type
     noise: boolean;
 
     constructor create();
+    destructor destroy(); override;
     function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
     function playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
     function play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
@@ -705,6 +706,15 @@ begin
   end;
 end;
 
+destructor tSoundMixer.destroy();
+var
+  i: integer;
+begin
+  for i := 1 to NUM_CHANNELS do
+    channels[i].free;
+  inherited destroy();
+end;
+
 {returns a channel to use for given sound}
 function tSoundMixer.getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
 var
@@ -811,9 +821,6 @@ begin
   unlock_data(scratchBuffer, sizeof(scratchBuffer));
   unlock_data(scratchBufferF32, sizeof(scratchBufferF32));
   unlock_data(scratchBufferI32, sizeof(scratchBufferI32));
-  {clean up}
-  mixer.free;
-  musicBuffer.free;
 end;
 
 initialization
@@ -835,7 +842,20 @@ initialization
   masterMusicReader := tLA96Reader.create();
   masterMusicReader.looping := true;
   musicReader := masterMusicReader;
+
   initMixer();
-  addExitProc(closeMixer);
+
+finalization
+
+  {wait for music to close...}
+  closeMixer();
+  delay(500);
+
+  musicTimer.free;
+  musicBuffer.free;
+  musicReader.free;
+  mixer.free;
+  { we might not own the musicReader, so don't free it... }
+  //if assigned(masterMusicReader) then masterMusicReader.free;
 
 end.

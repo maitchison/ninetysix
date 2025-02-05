@@ -337,7 +337,7 @@ begin
   startPos := fs.pos;
   fs.readBlock(header, sizeof(header));
 
-  if header.tag <> 'LA96' then raise ValueError.create(format('Not an LA96 file. Found "%s", expecting LA96', [header.tag]));
+  if header.tag <> 'LA96' then raise ValueError.create(format('Not an LA96 file. Found "%s", expecting LA96', [string(header.tag)]));
   if (header.versionSmall > VER_SMALL) or (header.versionBig <> VER_BIG) then
     raise ValueError.create(format('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]));
   if header.format <> 0 then raise ValueError.create(format('Format type %d not supported', [header.format]));

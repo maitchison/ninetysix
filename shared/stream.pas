@@ -574,13 +574,10 @@ var
   oldFileMode: word;
 begin
 
-  fPos := 0;
+  reset();
+
   oldFileMode := system.fileMode;
   system.fileMode := byte(fileMode);
-
-  fillchar(buffer, sizeof(buffer), 0);
-  bufferPos := 0;
-  bufferLen := 0;
 
   case fileMode of
     FM_READ: begin
@@ -619,13 +616,13 @@ end;
 
 destructor tFileStream.destroy();
 begin
+  flush();
   close(f);
   inherited destroy();
 end;
 
 procedure tFileStream.seek(aPos: int32);
 begin
-  system.seek(f, aPos);
   fPos := aPos;
 end;
 
@@ -638,13 +635,16 @@ procedure tFileStream.reset();
 begin
   fPos := 0;
   fLen := 0;
+  fillchar(buffer, sizeof(buffer), 0);
+  bufferPos := 0;
+  bufferLen := 0;
 end;
 
 procedure tFileStream.readBlock(out x;numBytes: int32);
 begin
   {direct read for large blocks}
   if (numBytes > FS_READBUFFER_SIZE div 2) then begin
-    system.seek(f, pos);
+    system.seek(f, fPos);
     blockRead(f, x, numBytes)
   end else begin
     requestBufferBytes(fPos, numBytes);
@@ -679,12 +679,10 @@ begin
   if delta < 0 then begin
     {requested before the buffer so move it}
     moveBuffer(aPos);
-    exit;
   end else begin
     {requested after the buffer so move it}
-    if delta + numBytes > FS_READBUFFER_SIZE then begin
+    if delta + numBytes > bufferLen then begin
       moveBuffer(aPos);
-      exit;
     end;
   end;
 end;
@@ -695,7 +693,7 @@ begin
   bufferLen := min(FS_READBUFFER_SIZE, len - aPos);
   if bufferLen > 0 then begin
     system.seek(f, bufferPos);
-    blockRead(f, buffer[0], bufferLen);
+    system.blockRead(f, buffer[0], bufferLen);
   end;
 end;
 
@@ -715,8 +713,23 @@ begin
 end;
 
 procedure tStreamTest.testFileStream();
+var
+  fs: tFileStream;
+  i: integer;
 begin
-  // pass
+  fs := tFileStream.create('tmp.dat', FM_WRITE);
+  for i := 1 to 100 do
+    fs.writeByte(i);
+  fs.free;
+
+  assertEqual(filesystem.fs.getFilesize('tmp.dat'), 100);
+
+  fs := tFileStream.create('tmp.dat');
+  for i := 1 to 100 do
+    assertEqual(fs.readByte, i);
+  fs.free;
+
+  filesystem.fs.delFile('tmp.dat');
 end;
 
 procedure tStreamTest.testMemoryStream();

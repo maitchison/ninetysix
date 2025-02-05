@@ -264,7 +264,7 @@ var
   SAMPLE_LENGTH: int32;
   profile: tAudioCompressionProfile;
   log2mu, ulawBits, quantBits: integer;
-  inStream, outStream: tMemoryStream;
+  outStream: tMemoryStream;
   reader: tLA96Reader;
   writer: tLA96Writer;
   outSFX: array of tSoundEffect;
@@ -368,11 +368,7 @@ begin
     {read it}
     reader := tLA96Reader.create();
 
-    {this should be reader.open(tag+'.a96'), but we don't yet have
-     buffered reads... and so it's slow on the P200}
-    inStream := tMemoryStream.create();
-    inStream.readFromFile(tag+'.a96');
-    reader.open(inStream);
+    reader.open(tag+'.a96');
 
     startTimer('decode');
     curSFX := reader.readSFX();
