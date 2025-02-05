@@ -29,7 +29,7 @@ type
     constructor Create(); overload;
     constructor Create(filename: string); overload;
     constructor CreateOrLoad(filename: string); overload;
-    destructor Destroy;
+    destructor Destroy; override;
 
     procedure serialize(fileName: string);
     procedure deserialize(fileName: string);

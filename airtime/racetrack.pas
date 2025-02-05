@@ -27,7 +27,7 @@ type
     function sampleTerrain(pos: V3D): tTerrainDef;
 
     constructor Create(filename: string);
-    destructor Destroy();
+    destructor Destroy(); override;
   end;
 
 const

@@ -48,7 +48,7 @@ type
     maxBinSize: integer;
     matches: array[0..65535] of tShortList;
     constructor create(aMaxBinSize: integer=32);
-    destructor destroy();
+    destructor destroy(); override;
     procedure addReference(key: word; pos: dword);
     procedure trim(minPos: dword);
   end;
@@ -167,6 +167,7 @@ end;
 
 constructor tHashMap.create(aMaxBinSize: integer=32);
 begin
+  inherited create();
   fillchar(matches, sizeof(matches), 0);
   maxBinSize := aMaxBinSize;
 end;
@@ -178,6 +179,7 @@ begin
   for i := 0 to 65536-1 do
     matches[i].done;
   fillchar(matches, sizeof(matches), 0);
+  inherited destroy();
 end;
 
 procedure tHashMap.addReference(key: word; pos: dword);

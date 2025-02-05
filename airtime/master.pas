@@ -135,7 +135,7 @@ procedure convertAudio(filename: string;srcPath:string); overload;
 var
   dstPath: string;
   sfx: tSoundEffect;
-  s: tStream;
+  s: tMemoryStream;
   ss,mm: word;
 begin
 

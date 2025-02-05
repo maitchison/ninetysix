@@ -100,7 +100,7 @@ type
     constructor create(aFormat: tAudioFormat=AF_16_STEREO; aLength: int32=0; aTag: string='');
     destructor destroy(); override;
 
-    function toString(): string;
+    function toString(): string; override;
 
     function bytesPerSample: int32; inline;
     function calculateRMS: double;

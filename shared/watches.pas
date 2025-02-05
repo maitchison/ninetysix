@@ -14,7 +14,7 @@ type
     value: string;
     lastUpdated: double;
     constructor Create(aTag: string);
-    function  toString(): string;
+    function toString(): string; override;
   end;
 
 procedure Watch(aTag: string; aValue: string); overload;
