@@ -36,6 +36,8 @@ function textExtents(s: string): tRect; overload;
 
 implementation
 
+uses filesystem;
+
 var
   font1: TFont;
 
@@ -74,7 +76,14 @@ var
 begin
   fillchar(result.chars, sizeof(result.chars), 0);
   fillchar(result.kerning, sizeof(result.kerning), 0);
-  result.bitmap := LoadLC96(filename+'.p96');
+
+  if fs.exists(filename+'.p96') then
+    result.bitmap := LoadLC96(filename+'.p96')
+  else if fs.exists(filename+'.bmp') then
+    result.bitmap := LoadBMP(filename+'.bmp')
+  else
+    error('File not found "'+filename+'.[p96|bmp]"');
+
   {$I-}
   Assign(TextFile, filename+'.fnt');
   Reset(TextFile);

@@ -29,7 +29,6 @@ const
   ST_AUTO = 255;  {use rice, pack, or vlc, whichever is best}
   ST_PACK = 254;  {select best pack}
   ST_RICE = 253;  {guess a good rice}
-  ST_RICE_SLOW = 252; {select best rice}
   ST_VLC1 = 0;  {this is the less efficent VLC method} {todo: make this 1, and VLC2 2}
   ST_VLC2 = 1;  {this is the newer VLC method}
 
@@ -45,7 +44,6 @@ const
   ST_PACK9 = 25;
   {...}
   ST_RICE0 = 48; {48..63 = rice (max code is 15)}
-  ST_EXPG0 = 64; {64 = exponential-golomb coding (reserve space for 4 of these)}
   {...}
 
 function  writeSegment(s: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
@@ -75,10 +73,6 @@ function  VLC1_Bits(values: array of dword): dword; forward; overload;
 function  packBits(values: array of dword;bits: byte;outStream: tStream=nil): tStream; forward;
 procedure unpack32(inBuf: pByte;outBuf: pDWord; n: int32;bitsPerCode: byte); forward;
 procedure unpack16(inBuf: pByte;outBuf: pWord; n: int32;bitsPerCode: byte); forward;
-
-{exp golomb}
-function EXPG_Bits(values: array of dword; k: integer=0): int32; forward;
-procedure EXPG_Write(stream: tStream; values: array of dword; k: integer); forward;
 
 var
   packing16_1: array[0..255] of array[0..7] of word;
@@ -142,7 +136,6 @@ begin
     ST_VLC2: result := 'VLC2';
     ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
     ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
-    ST_EXPG0: result := 'EXPG0';
     {special codes}
     ST_AUTO: result := 'AUTO';
     ST_PACK: result := 'PACK';
@@ -162,7 +155,6 @@ begin
     ST_VLC2: result := bytesForBits(VLC2_Bits(values));
     ST_PACK0..ST_PACK0+31: result := bytesForBits((segmentType - ST_PACK0) * length(values));
     ST_RICE0..ST_RICE0+15: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
-    ST_EXPG0: result := bytesForBits(EXPG_Bits(values));
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 end;
@@ -246,16 +238,6 @@ begin
       end;
     end;
 
-    {see if exponential-golomb coding is better}
-    {this tends to be better for segments with outliers}
-    {
-    thisBits := EXPG_Bits(values, 0);
-    if thisBits < bestBits then begin
-      segmentType := ST_EXPG0;
-      bestBits := thisBits;
-    end;
-    }
-
     {
     note(format(
       'Selecting %s (%d) with scores %d %d (max:%d mean:%f) maxCL:%d',
@@ -295,7 +277,6 @@ begin
     ST_VLC2: VLC2_Write(s, values);
     ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, s);
     ST_RICE0..ST_RICE0+15: RICE_Write(s, values, segmentType - ST_RICE0);
-    ST_EXPG0: EXPG_Write(s, values, 0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -325,6 +306,9 @@ begin
   else
     segmentLen := s.readVLC8();
 
+  //stub:
+  //note('Segment length is ',
+
   if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
   {todo: block read here}
@@ -337,7 +321,6 @@ begin
     ST_VLC2: readVLC2Sequence_ASM(@IN_BUFFER[0], @outBuffer[0], n);
     ST_PACK0..ST_PACK0+31: unpack32(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
-    ST_EXPG0..ST_EXPG0+15: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, 16+segmentType-ST_EXPG0);
     else error('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -387,9 +370,6 @@ begin
       unpack16(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: begin
       ReadRice16_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
-    end;
-    ST_EXPG0..ST_EXPG0+15: begin
-      ReadRice16_ASM(@IN_BUFFER[0], @outBuffer[0], n, 16+segmentType-ST_EXPG0);
     end;
     else error('Invalid segment type '+intToStr(segmentType));
   end;
@@ -564,16 +544,6 @@ begin
       bs.writeBits(value, 16);
       continue;
     end;
-    {error(
-      format(
-        'Fault when writing RICE code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)',
-        [RICE_TABLE_BITS, value, k, bits]
-      ));}
-    {if bits > RICE_TABLE_BITS then error(
-      format(
-        'Fault when writing RICE code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)',
-        [RICE_TABLE_BITS, value, k, bits]
-      ));}
     bs.writeBits((1 shl quotient)-1, quotient+1); {e.g. for (k=2) 12 = 010-0111}
     bs.writeBits(remainder, k);
   end;
@@ -611,53 +581,6 @@ begin
     bitsNeeded := (value shr k) + 1 + k;
     if bitsNeeded > result then result := bitsNeeded;
   end;
-end;
-
-function EXPG_Bits(values: array of dword; k: integer=0): int32;
-var
-  quotient, remainder: dword;
-  value: dword;
-  bitsNeeded: integer;
-begin
-  if k <> 0 then error('Only k=0 is supported');
-  result := 0;
-  for value in values do begin
-    bitsNeeded := bitsToStoreValue(value+1)*2-1;
-    if bitsNeeded > RICE_TABLE_BITS then exit(1 shl 24);
-    result += bitsNeeded;
-  end;
-end;
-
-procedure EXPG_Write(stream: tStream; values: array of dword; k: integer);
-var
-  value, valuePlusOne, payload: dword;
-  dataLength, prefixLength: word;
-
-  bs: tBitStream;
-  bits: integer;
-  i: integer;
-begin
-  if k <> 0 then error('Only k=0 is supported with EXPG');
-  bs.init(stream);
-  for value in values do begin
-
-    valuePlusOne := value+1;
-    dataLength := bitsToStoreValue(valuePlusOne);
-    prefixLength := dataLength - 1;
-    bits := dataLength + prefixLength;
-
-    if bits > RICE_TABLE_BITS then error(
-      format(
-        'Fault when writing EXPG code, we do not support rice codes longer than %d bits (value=%d, k=%d, bits=%d)',
-        [RICE_TABLE_BITS, value, k, bits]
-      ));
-
-    bs.writeBits(0, prefixLength);
-    payload := reverseBits16(valuePlusOne) shr (16-dataLength);
-    bs.writeBits(payload, dataLength);
-    //note(intToStr(value,4)+' b:'+hexStr(pointer(bs.buffer))+' p:'+intToStr(payload));
-  end;
-  bs.flush();
 end;
 
 {--------------------------------------------------------------}
@@ -961,8 +884,6 @@ end;
 procedure tVLCTest.testRice();
 const
   testData1: array of dword = [100, 0, 127, 32, 15, 16, 17];
-  {expg codes, when limited to 12bits, are capped fairly low}
-  testData2: array of dword = [23, 0, 27, 32, 15, 16, 17];
 var
   s: tStream;
   k: integer;
@@ -975,6 +896,9 @@ begin
   for k := 4 to 8 do begin
     s.reset();
     s.writeSegment(testData1, ST_RICE0+k);
+
+    //stub:
+    writeln(s.len);
 
     {32bit}
     s.seek(0);
@@ -991,27 +915,6 @@ begin
     {make sure size is ok}
     {+2 is for header}
     assertEqual(s.pos, 2+bytesForBits(RICE_bits(testData1, k)));
-  end;
-
-  {check expg}
-  for k := 0 to 0 do begin
-    s.reset();
-    s.writeSegment(testData2, ST_EXPG0+k);
-
-    {32bit}
-    s.seek(0);
-    setLength(outData, length(testData2));
-    s.readSegment(length(testData2), @outData[0]);
-    assertEqual(toBytes(outData).toString, toBytes(testData2).toString);
-
-    {16bit}
-    s.seek(0);
-    setLength(outData16, length(testData2));
-    vlc.readSegment16(s, length(testData2), @outData16[0]);
-    assertEqual(toBytes(outData16).toString, toBytes(testData2).toString);
-
-    {make sure size is ok}
-    assertEqual(s.pos, 2+bytesForBits(EXPG_bits(testData2, k)));
   end;
 
   s.free;
