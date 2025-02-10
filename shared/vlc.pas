@@ -46,6 +46,9 @@ const
   ST_RICE0 = 48; {48..63 = rice (max code is 15)}
   {...}
 
+var
+  RICE_EXCEPTIONS: dword = 0;
+
 function  writeSegment(s: tStream; values: array of dword;segmentType:byte=ST_AUTO): int32;
 function  readSegment(s: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 function  readSegment16(s: tStream; n: int32;outBuffer: tWords=nil): tWords;
@@ -548,6 +551,7 @@ begin
     remainder := value - (quotient shl k);
     bits := k+quotient+1;
     if bits > RICE_TABLE_BITS then begin
+      inc(RICE_EXCEPTIONS);
       bs.writeBits((1 shl RICE_TABLE_BITS)-1, RICE_TABLE_BITS);
       bs.writeBits(value, 16);
       continue;

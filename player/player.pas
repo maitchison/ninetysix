@@ -378,9 +378,6 @@ begin
     music16.tag := profileToTagName(profile);
     if fastMode or not fs.exists(music16.tag+'.a96') then begin
 
-      // reference
-      //outStream := encodeLA96(music16, profile, true);
-
       startTimer('encode');
       { for the moment encode to memory, as fileStream is not yet buffered
        and therefore very slow for small writes. }
@@ -391,7 +388,8 @@ begin
       outStream.free;
 
       stopTimer('encode');
-      writeln(format('Encoded at %fx', [(music16.length/44100)/getTimer('encode').elapsed]));
+      writeln();
+      note(format('Encoded at %fx (%, exceptions)', [(music16.length/44100)/getTimer('encode').elapsed, RICE_EXCEPTIONS]));
     end;
   end;
 
