@@ -105,7 +105,18 @@ type
     class operator Multiply(a: tMatrix4x4; b: tMatrix4x4): tMatrix4x4;
   end;
 
+function V2(x,y: single): V2D;
+
 implementation
+
+{-----------------------------------------}
+
+function V2(x,y: single): V2D;
+begin
+  result := V2D.create(x,y);
+end;
+
+{-----------------------------------------}
 
 function V2D.Abs2: single;
 begin

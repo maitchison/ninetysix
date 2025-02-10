@@ -3,6 +3,7 @@ program destruct;
 uses
   debug, test,
   graph32, vga, vesa, screen,
+  terrain, objects,
   myMath,
   timer,
   crt, //todo: remove
@@ -13,8 +14,6 @@ uses
 
 var
   screen: tScreen;
-
-  terrain: array[0..255, 0..255] of byte;
 
 procedure titleScreen();
 var
@@ -100,7 +99,7 @@ begin
   cy := page.height * 5;
   for y := 0 to page.height-1 do begin
     for x := 0 to page.width-1 do begin
-      if (x < 32) or (x > page.width-31) then begin
+      if (x < 32) or (x >= page.width-32) then begin
         page.setPixel(x,y, RGB(0,0,0));
         continue;
       end;
@@ -125,35 +124,11 @@ begin
   end;
 end;
 
-procedure generateTerrain();
-var
-  mapHeight: array[0..255] of integer;
-  x,y: integer;
-begin
-  fillchar(terrain, sizeof(terrain), 0);
-  for x := 0 to 255 do
-    mapHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
-  for y := 0 to 255 do
-    for x := 0 to 255 do begin
-      if y > mapHeight[x] then terrain[y,x] := 1;
-    end;
-end;
-
-procedure drawTerrain();
-var
-  c: RGBA;
-  x,y: integer;
-begin
-  c.from32($8d7044);
-  for y := 0 to 255 do
-    for x := 0 to 255 do
-      if terrain[y,x] <> 0 then screen.canvas.setPixel(32+x,y,c);
-end;
-
-
 procedure battleScreen();
 var
   exitFlag: boolean;
+  tank1, tank2: tTank;
+  tanks: tObjectList;
 begin
 
   {music}
@@ -170,6 +145,13 @@ begin
 
   generateTerrain();
 
+  {setup players}
+  tanks := tObjectList.create();
+  tank1 := tTank.create(100, 100);
+  tank2 := tTank.create(200, 100);
+  tanks.append(tank1);
+  tanks.append(tank2);
+
   {main loop}
   repeat
 
@@ -178,7 +160,11 @@ begin
     startTimer('main');
 
     screen.clearAll();
-    drawTerrain();
+    drawTerrain(screen);
+
+    tanks.update(0.01);
+    tanks.draw(screen);
+
     screen.flipAll();
 
     stopTimer('main');
