@@ -58,6 +58,7 @@ type
     function  eof(): boolean;
     function  readLine(): string;
     function  peekLine(): string;
+    function  peekKey(): string;
     function  nextLine(): string;
     function  readKey(key: string): string;
 
@@ -195,6 +196,17 @@ function tINIReader.peekLine(): string;
 begin
   if eof then result := '';
   result := trim(lines[lineOn]);
+end;
+
+function tINIReader.peekKey(): string;
+var
+  line: string;
+  lineKey, lineValue: string;
+begin
+  line := peekLine;
+  if line = '' then exit('');
+  split(line, '=', lineKey, lineValue);
+  result := lineKey.trim();
 end;
 
 {read next object from ini file}

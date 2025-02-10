@@ -19,6 +19,7 @@ type
   tBorder = record
     top, left, bottom, right: Integer;
     constructor create(aLeft, aTop, aRight, aBottom: Integer);
+    procedure setDefault();
     function  isDefault: boolean;
     function toString(): string;
     procedure writeToIni(ini: tIniWriter; tag: string='Border');
@@ -279,6 +280,11 @@ begin
   result := (left=0) and (right=0) and (top=0) and (bottom=0);
 end;
 
+procedure tBorder.setDefault();
+begin
+  left := 0; right := 0; top := 0; bottom := 0;
+end;
+
 function tBorder.toString(): string;
 begin
   result := format('(%d %d %d %d)', [left, top, right, bottom]);
@@ -445,7 +451,10 @@ procedure tSprite.readFromIni(ini: tIniReader);
 begin
   tag := ini.readString('Tag');
   rect := ini.readRect('Rect');
-  border.readFromIni(ini);
+  if ini.peekKey.toLower = 'border' then
+    border.readFromIni(ini)
+  else
+    border.setDefault();
 end;
 
 
@@ -482,7 +491,7 @@ begin
   assertEqual(sprite2.rect.toString, sprite1.rect.toString);
   assertEqual(sprite2.border.toString, sprite1.border.toString);
 
-  //fs.delFile('test.ini');
+  fs.delFile('test.ini');
 
   sprite1.free;
   sprite2.free;
