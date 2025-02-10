@@ -91,6 +91,7 @@ procedure masterGFX();
 begin
   convertPNG('title');
   convertPNG('title320');
+  convertPNG('title2_320');
   convertPNG('font');
 end;
 

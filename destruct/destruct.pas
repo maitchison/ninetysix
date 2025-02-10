@@ -24,17 +24,15 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     error('Requires 1MB video card.');
 
-  videoDriver.setTrueColor(320,200);
+  videoDriver.setTrueColor(320, 240);
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 
   {music}
   musicPlay('res\dance1.a96');
-  //musicReader := tLA96Reader.Create();
-  //musicReader.open('res\dance1.a96');
 
   {load background and refresh screen}
-  screen.background := tPage.Load('res\title320.p96');
+  screen.background := tPage.Load('res\title2_320.p96');
 
   screen.pageClear();
   screen.pageFlip();
