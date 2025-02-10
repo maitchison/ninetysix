@@ -51,6 +51,8 @@ type
     constructor Create(r,g,b: integer;a: integer=255);
 
     class function Random(): RGBA; static;
+    class function Lerp(a,b: RGBA; factor: single): RGBA; static;
+
 
     class operator add(a,b: RGBA): RGBA;
     class operator multiply(a: RGBA; b: single): RGBA;
@@ -65,6 +67,7 @@ type
     procedure toLinear();
     procedure toSRGB();
     procedure from16(value: uint16);
+    procedure from32(value: uint32);
     function to32(): uint32;
     function to16(): uint16;
     function to16_(): uint16;
@@ -135,8 +138,8 @@ type
 
   tImageLoaderProc = function(filename: string): tPage;
 
-
-function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
+function RGB(d: dword): RGBA; inline; overload;
+function RGB(r,g,b: integer;a: integer=255): RGBA; inline; overload;
 function loadBMP(const FileName: string): tPage;
 procedure makePageRandom(page: tPage);
 
@@ -159,6 +162,11 @@ var
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
 begin
   result := RGBA.create(r,g,b,a);
+end;
+
+function RGB(d: dword): RGBA; inline;
+begin
+  result.from32(d);
 end;
 
 function getImageLoader(aExtension: string): tImageLoaderProc; forward;
@@ -267,6 +275,14 @@ begin
   b += other.b;
 end;
 
+class function RGBA.lerp(a,b: RGBA; factor: single): RGBA;
+begin
+  result.r := round(a.r * (1-factor)) + round(b.r * factor);
+  result.g := round(a.g * (1-factor)) + round(b.g * factor);
+  result.b := round(a.b * (1-factor)) + round(b.b * factor);
+  result.a := round(a.a * (1-factor)) + round(b.a * factor);
+end;
+
 procedure RGBA.gammaAdjust(v: single);
 begin
   r := gammaCorrect(r, v);
@@ -292,6 +308,11 @@ begin
   g := ((value shr 5) and $3f) shl 2;
   b := ((value shr 0) and $1f) shl 3;
   a := 255;
+end;
+
+procedure RGBA.from32(value: uint32);
+begin
+  move(value, self, 4);
 end;
 
 function RGBA.to16(): uint16;
