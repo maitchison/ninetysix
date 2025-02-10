@@ -125,26 +125,27 @@ begin
   for i := 1 to length(s) do begin
     case s[i] of
       '[': continue;
+      ' ': continue;
       '0'..'9': inc(numberLength);
       ',': begin
         if numberLength = 0 then
-          error('Invalid tIntList string');
+          error('Invalid tIntList string: '+s);
         value := strToInt(copy(s,i-numberLength,numberLength));
         self.append(value);
         numberLength := 0;
       end;
       ']': begin
-        if i <> length(s) then error('Found characters after ]');
+        if i <> length(s) then error('Found characters after ]: '+s);
         {process final number (if any)}
         if numberLength = 0 then exit;
         value := strToInt(copy(s,i-numberLength,numberLength));
         self.append(value);
         exit;
       end;
-      else error('Invalid character "'+s[i]+'" in tIntList string.');
+      else error('Invalid character "'+s[i]+'" in tIntList string: '+s);
     end;
   end;
-  error('String missing ]');
+  error('String missing ]: '+s);
 end;
 
 function tIntList.deref(index: int32): int32; inline;

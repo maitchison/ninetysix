@@ -51,7 +51,24 @@ type
 
   end;
 
+  tSpriteSheet = class
+  protected
+    function getItem(tag: string): tSprite;
+  public
+    page: tPage;
+    sprites: array of tSprite;
+  public
+    constructor create(aPage: tPage);
+    procedure append(sprite: tSprite);
+    procedure load(filename: string);
+    property items[index: string]: tSprite read getItem; default;
+
+  end;
+
 implementation
+
+uses
+  filesystem;
 
 {-------------------------------------------------------------}
 
@@ -183,7 +200,7 @@ begin
     imageOfs *= srcPage.width * 4;
     imageOfs += dword(srcPage.Pixels);
     asm
-      pusha
+      pushad
 
       mov edi, screenOfs
       shl edi, 2
@@ -258,7 +275,7 @@ begin
       dec ecx
       jnz @LOOP
 
-      popa
+      popad
     end;
   end;
 
@@ -455,6 +472,48 @@ begin
     border.readFromIni(ini)
   else
     border.setDefault();
+end;
+
+{-----------------------------------------------------}
+
+constructor tSpriteSheet.create(aPage: tPage);
+begin
+  setLength(sprites, 0);
+  page := aPage;
+end;
+
+procedure tSpriteSheet.append(sprite: tSprite);
+begin
+  sprite.page := self.page;
+  setLength(sprites, length(sprites)+1);
+  sprites[length(sprites)-1] := sprite;
+end;
+
+procedure tSpriteSheet.load(filename: string);
+var
+  reader: tIniReader;
+  sprite: tSprite;
+begin
+  reader := tIniReader.create(filename);
+  while not reader.eof do begin
+    sprite := tSprite.create(page);
+    sprite.readFromIni(reader);
+    append(sprite);
+  end;
+  reader.free();
+  note(' - loaded sprite sheet %s with %d sprites.', [filename, length(sprites)]);
+end;
+
+{---------------}
+
+function tSpriteSheet.getItem(tag: string): tSprite;
+var
+  sprite: tSprite;
+begin
+  {linear scan for moment}
+  for sprite in sprites do
+    if sprite.tag = tag then exit(sprite);
+  error('Sprite sheet contains no sprite named "'+tag+'"');
 end;
 
 

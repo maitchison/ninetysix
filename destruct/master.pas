@@ -89,9 +89,10 @@ end;
 
 procedure masterGFX();
 begin
-  convertPNG('title');
-  convertPNG('title320');
-  convertPNG('title2_320');
+  convertPNG('title_320');
+  convertPNG('sprites');
+  convertPNG('netfont1');
+  convertPNG('netfont2');
   convertPNG('font');
 end;
 

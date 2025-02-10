@@ -3,6 +3,7 @@ program destruct;
 uses
   debug, test,
   graph32, vga, vesa, screen,
+  resources,
   sprite, inifile,
   terrain, objects,
   myMath,
@@ -21,11 +22,8 @@ var
   exitFlag: boolean;
 begin
 
-  {music}
-  musicPlay('res\dance1.a96');
-
   {load background and refresh screen}
-  screen.background := tPage.Load('res\title2_320.p96');
+  screen.background := titleGFX;
 
   screen.pageClear();
   screen.pageFlip();
@@ -72,6 +70,7 @@ procedure renderSky(page: tPage);
 var
   dx, dy, x, y, i, j: integer;
   cx,cy: integer;
+  c: RGBA;
   r: single;
   a: integer;
   theta: single;
@@ -113,14 +112,21 @@ begin
     end;
   end;
   {stars}
+  c := RGB(255,255,255);
   for i := 0 to 300 do begin
     x := cx + (rnd()-128)*2;
     y := rnd() mod 200;
     a := 255-(y*2);
-    page.putPixel(x,y,RGB(255,255,255,a));
+    if (x < 32) or (x >= page.width-32) then continue;
+
+    c := RGB(255-(rnd div 2), 255-(rnd div 4), 255, a);
+
+    page.putPixel(x,y,c);
+
+    c.a := c.a div 2;
     for j := -1 to 1 do begin
-      page.putPixel(x+j,y,RGB(255,255,255,a div 2));
-      page.putPixel(x,y+j,RGB(255,255,255,a div 2));
+      page.putPixel(x+j,y,c);
+      page.putPixel(x,y+j,c);
     end;
   end;
 end;
@@ -132,15 +138,11 @@ var
   tanks: tObjectList;
 begin
 
-  {music}
-  musicPlay('res\dance1.a96');
-
-  screen.background := tPage.Load('res\title2_320.p96');
+  screen.background := tPage.create(screen.width, screen.height);
   renderSky(screen.background);
 
   screen.pageClear();
   screen.pageFlip();
-
 
   exitFlag := false;
 
@@ -214,7 +216,10 @@ begin
   runTestSuites();
   initKeyboard();
 
+  loadResources();
+
   screenInit();
+  musicPlay('res\dance1.a96');
   battleScreen();
   screenDone();
 

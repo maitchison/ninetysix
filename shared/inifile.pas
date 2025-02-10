@@ -194,7 +194,7 @@ end;
 
 function tINIReader.peekLine(): string;
 begin
-  if eof then result := '';
+  if eof then exit('');
   result := trim(lines[lineOn]);
 end;
 
