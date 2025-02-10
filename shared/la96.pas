@@ -15,7 +15,7 @@ unit la96;
     - sign bit compression
   v0.4
     - added rice codes
-  [pending] v0.5:
+  v0.5:
     - new format with integrated sign bits
   [future] v0.6:
     - linear prediction
@@ -737,6 +737,8 @@ begin
   end else
     frameSize := FRAME_SIZE;
 
+  //note('%d/%d %d/%d', [frameOn, header.numFrames-1, frameSize, FRAME_SIZE]);
+
   {make a copy of the input, as we will modify it}
   fillchar(inBuffer[0], FRAME_SIZE*4, 0);
   move(samplePtr^, inBuffer[0], frameSize*4);
@@ -793,9 +795,16 @@ var
   i: integer;
   startPos, endPos: int32;
   framePtr: tDwords;
+  ownsSFX: boolean;
 begin
 
   if (profile.log2mu <> 8) then error('Values other than 8 for Log2MU are not currently supported');
+
+  if sfx.format <> AF_16_STEREO then begin
+    sfx := sfx.asFormat(AF_16_STEREO);
+    ownsSFX := true;
+  end else
+    ownsSFX := false;
 
   startPos := fs.pos;
 
@@ -807,7 +816,7 @@ begin
   header.format := 0; // this will be for stero / mono etc
   header.compressionMode := 0;
   header.numFrames := (sfx.length + FRAME_SIZE - 1) div FRAME_SIZE;
-  header.numSamples := sfx.length; // we don't know this yet
+  header.numSamples := sfx.length;
   header.frameSize := FRAME_SIZE;
   header.log2mu := profile.log2mu;
   header.postFilter := 0; // not used anymore
@@ -831,6 +840,9 @@ begin
   fs.seek(startPos+128);
   fs.writeBlock(framePtr[0], length(framePtr)*4);
   fs.seek(endPos);
+
+  if ownsSFX then
+    sfx.free;
 
 end;
 
