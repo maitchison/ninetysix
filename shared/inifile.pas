@@ -1,12 +1,16 @@
 {for handling reading / writing ini files}
 unit inifile;
 
+{$interfaces corba}
+
 interface
 
 uses
   debug,
   list,
-  utils;
+  utils,
+  sysTypes,
+  graph2d;
 
 type
 
@@ -14,22 +18,26 @@ type
   tINIReader = class;
 
   iIniSerializable = interface
-    ['{ff7cb00f-dbc4-4a26-a718-ec1b03d0f1e3}']
-    procedure writeToIni(const ini: tINIWriter);
-    procedure readFromIni(const ini: tINIReader);
+    procedure writeToIni(ini: tINIWriter);
+    procedure readFromIni(ini: tINIReader);
   end;
 
   tINIWriter = class
   private
     t: text;
   public
-
-    procedure writeInteger(name: string; value: int64);
-    procedure writeBool(name: string; value: boolean);
-    procedure writeFloat(name: string; value: double);
-    procedure writeString(name: string; value: string);
-    procedure writeSection(name: string);
+    {basic types}
+    procedure writeInteger(key: string; value: int64);
+    procedure writeBool(key: string; value: boolean);
+    procedure writeFloat(key: string; value: double);
+    procedure writeString(key: string; value: string);
+    {advanced types}
+    procedure writeArray(key: string; values: tInt32Array);
+    procedure writeRect(key: string; value: tRect);
+    {objects}
     procedure writeObject(sectionName: string; value: iIniSerializable);
+    {...}
+    procedure writeSection(key: string);
     procedure writeBlank();
 
     constructor Create(filename: string);
@@ -51,45 +59,60 @@ type
     function  readLine(): string;
     function  peekLine(): string;
     function  nextLine(): string;
+    function  readKey(key: string): string;
 
-    property currentSection: string read fCurrentSection;
+    property  currentSection: string read fCurrentSection;
 
     function  readObject(): tObject;
 
-    constructor Create(filename: string;aFactory: tObjectConstructorProc = nil);
-    destructor Destroy(); override;
+    function  readString(key: string): string;
+    function  readIntArray(key: string): tInt32Array;
+    function  readRect(key: string): tRect;
+
+    constructor create(filename: string;aFactory: tObjectConstructorProc = nil);
+    destructor destroy(); override;
   end;
 
 implementation
 
 {----------------------------------------------}
 
-procedure tINIWriter.writeInteger(name: string; value: int64);
+procedure tINIWriter.writeInteger(key: string; value: int64);
 begin
-  writeln(t, format('%s=%d', [name, value]));
+  writeln(t, format('%s=%d', [key, value]));
 end;
 
-procedure tINIWriter.writeBool(name: string; value: boolean);
+procedure tINIWriter.writeArray(key: string; values: tInt32Array);
+begin
+  writeln(t, format('%s=%s', [key, values.toString]));
+end;
+
+procedure tINIWriter.writeBool(key: string; value: boolean);
 begin
   if value then
-    writeln(t, name+'=true')
+    writeln(t, key+'=true')
   else
-    writeln(t, name+'=false');
+    writeln(t, key+'=false');
 end;
 
-procedure tINIWriter.writeFloat(name: string; value: double);
+procedure tINIWriter.writeFloat(key: string; value: double);
 begin
-  writeln(t, format('%s=%.9f', [name, value]));
+  writeln(t, format('%s=%.9f', [key, value]));
 end;
 
-procedure tINIWriter.writeString(name: string; value: string);
+procedure tINIWriter.writeString(key: string; value: string);
 begin
-  writeln(t, format('%s="%s"', [name, value]));
+  writeln(t, format('%s="%s"', [key, value]));
 end;
 
-procedure tINIWriter.writeSection(name: string);
+procedure tINIWriter.writeSection(key: string);
 begin
-  writeln(t, format('[%s]', [name]));
+  writeln(t, format('[%s]', [key]));
+end;
+
+procedure tINIWriter.writeRect(key: string; value: tRect);
+begin
+  writeArray(key, [value.x, value.y, value.width, value.height]);
 end;
 
 procedure tINIWriter.writeBlank();
@@ -132,6 +155,23 @@ begin
   lineOn += 1;
 end;
 
+{read until we find key}
+function tINIReader.readKey(key: string): string;
+var
+  line: string;
+  lineKey, lineValue: string;
+begin
+  result := '';
+  repeat
+    line := nextLine;
+    split(line, '=', lineKey, lineValue);
+    lineKey := lineKey.trim();
+    lineValue := lineValue.trim();
+    if lineKey.toLower() = key.toLower() then exit(lineValue);
+  until eof;
+  error('INI file missing key "'+key+'".');
+end;
+
 {read next content line}
 function tINIReader.nextLine(): string;
 var
@@ -164,7 +204,6 @@ var
   sectionName: string;
   obj: tObject;
   key, value: string;
-  so: iIniSerializable;
 begin
   line := readLine;
   if not line.startsWith('[') then error(format('Expected section header, but found "%s"', [line]));
@@ -178,8 +217,39 @@ begin
 
   if not assigned(obj) then error(format('Factory failed to construct object of type "%s"', [sectionName]));
 
-  if obj.getInterface(iIniSerializable, so) then
-    so.readFromIni(self);
+  if obj is iIniSerializable then
+    (obj as iIniSerializable).readFromIni(self);
+end;
+
+function tINIReader.readString(key: string): string;
+var
+  value: string;
+begin
+  value := readKey(key);
+  if length(value) < 2 then error('Invalid string format');
+  if not value.startsWith('"') or (not value.endsWith('"')) then error('Invalid string format');
+  result := copy(value, 2, length(value)-2);
+end;
+
+function tINIReader.readIntArray(key: string): tInt32Array;
+var
+  s: string;
+  intList: tIntList;
+begin
+  s := readKey(key);
+  intList.loadS(s);
+  result := intList.data;
+end;
+
+function tINIReader.readRect(key: string): tRect;
+var
+  values: tInt32Array;
+begin
+  values := readIntArray(key);
+  result.x := values[0];
+  result.y := values[1];
+  result.width := values[2];
+  result.height := values[3];
 end;
 
 constructor tINIReader.create(filename: string; aFactory: tObjectConstructorProc = nil);

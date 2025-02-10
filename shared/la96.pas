@@ -142,7 +142,7 @@ type
     header: tLA96FileHeader;
     ulawTable: array[1..8] of tULawLookup;
     midCodes, difCodes: tWords; {todo: make 16bit}
-    framePtr: tInt32s; {will be filled with -1 if no frame pointers}
+    framePtr: tInt32Array; {will be filled with -1 if no frame pointers}
     frameOn: int32;
     cLeft, cRight: single; {used for EMA}
   protected

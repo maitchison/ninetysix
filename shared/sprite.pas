@@ -6,22 +6,28 @@ interface
 
 uses
   test,
-  utils,
   debug,
+  utils,
+  sysTypes,
   vga,
+  iniFile,
   graph2d,
   graph32;
 
 type
 
   tBorder = record
-    Top, Left, Bottom, Right: Integer;
-    constructor Create(ALeft, ATop, ARight, ABottom: Integer);
+    top, left, bottom, right: Integer;
+    constructor create(aLeft, aTop, aRight, aBottom: Integer);
+    function  isDefault: boolean;
+    function toString(): string;
+    procedure writeToIni(ini: tIniWriter; tag: string='Border');
+    procedure readFromIni(ini: tIniReader; tag: string='Border');
   end;
 
+  tSprite = class(iIniSerializable)
 
-  tSprite = class
-
+    tag: string;
     page: tPage;
     rect: tRect;
     border: tBorder;
@@ -37,6 +43,10 @@ type
     procedure draw(dstPage: tPage; atX, atY: int32);
     procedure drawStretched(DstPage: TPage; dest: TRect);
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
+
+    {iIniSerializable}
+    procedure writeToIni(ini: tIniWriter);
+    procedure readFromIni(ini: tIniReader);
 
   end;
 
@@ -256,55 +266,81 @@ end;
 
 {---------------------------------------------------------------------}
 
-constructor TBorder.Create(ALeft, ATop, ARight, ABottom: Integer);
+constructor tBorder.create(aLeft, aTop, aRight, aBottom: Integer);
 begin
-  self.Left := ALeft;
-  self.Top := ATop;
-  self.Right := ARight;
-  self.Bottom := ABottom;
+  self.left := aLeft;
+  self.top := aTop;
+  self.right := aRight;
+  self.bottom := aBottom;
+end;
+
+function tBorder.isDefault: boolean;
+begin
+  result := (left=0) and (right=0) and (top=0) and (bottom=0);
+end;
+
+function tBorder.toString(): string;
+begin
+  result := format('(%d %d %d %d)', [left, top, right, bottom]);
+end;
+
+procedure tBorder.writeToIni(ini: tIniWriter; tag: string='Border');
+begin
+  ini.writeArray(tag, [left, top, right, bottom]);
+end;
+
+procedure tBorder.readFromIni(ini: tIniReader; tag: string='Border');
+var
+  data: tInt32Array;
+begin
+  data := ini.readIntArray(tag);
+  left := data[0];
+  top := data[1];
+  right := data[2];
+  bottom := data[3];
 end;
 
 {---------------------------------------------------------------------}
 
-constructor TSprite.Create(APage: TPage);
+constructor tSprite.Create(APage: TPage);
 begin
+  self.Tag := 'sprite';
   self.Page := APage;
   self.Rect.Create(0, 0, APage.Width, APage.Height);
   self.Border.Create(0, 0, 0, 0);
 end;
-
 
 function TSprite.Width: int32;
 begin
   result := self.Rect.Width;
 end;
 
-function TSprite.Height: int32;
+function tSprite.Height: int32;
 begin
   result := Self.Rect.Height;
 end;
 
 
 {Draw sprite to screen at given location, with alpha etc}
-procedure TSprite.draw(dstPage: tPage; atX, atY: Integer);
+procedure tSprite.draw(dstPage: tPage; atX, atY: Integer);
 begin
   blit_REF(dstPage, self.page, self.rect, atX, atY);
 end;
 
 {Copy sprite to screen at given location, no alpha blending}
-procedure TSprite.blit(dstPage: tPage; atX, atY: Integer);
+procedure tSprite.blit(dstPage: tPage; atX, atY: Integer);
 begin
   blit_ASM(dstPage, self.page, self.rect, atX, atY);
 end;
 
 {Draws sprite stetched to cover destination rect}
-procedure TSprite.DrawStretched(DstPage: TPage; dest: TRect);
+procedure tSprite.DrawStretched(DstPage: TPage; dest: TRect);
 begin
   stretchBlit_ASM(DstPage, Self.Page, Self.Rect, dest);
 end;
 
 {Draw sprite using nine-slice method}
-procedure TSprite.NineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
+procedure tSprite.NineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 var
   Sprite: TSprite;
   DrawRect: TRect;
@@ -394,5 +430,66 @@ begin
   result.border := self.border;
 end;
 
+{---------------------}
+
+procedure tSprite.writeToIni(ini: tIniWriter);
 begin
+  ini.writeString('Tag', tag);
+  ini.writeRect('Rect', rect);
+  // todo: support skipping default values
+  //if not border.isDefault then
+  border.writeToIni(ini);
+end;
+
+procedure tSprite.readFromIni(ini: tIniReader);
+begin
+  tag := ini.readString('Tag');
+  rect := ini.readRect('Rect');
+  border.readFromIni(ini);
+end;
+
+
+{-----------------------------------------------------}
+
+type
+  tSpriteTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tSpriteTest.run();
+var
+  sprite1, sprite2: tSprite;
+  iniWriter: tIniWriter;
+  iniReader: tIniReader;
+  page: tPage;
+begin
+  page := tPage.create(64,64);
+  sprite1 := tSprite.create(page);
+  sprite1.tag := 'Fish';
+  sprite1.rect := Rect(8,12,30,34);
+  sprite1.border := tBorder.create(2,3,4,1);
+
+  iniWriter := tIniWriter.create('test.ini');
+  iniWriter.writeObject('Sprite', sprite1);
+  iniWriter.free();
+
+  sprite2 := tSprite.create(page);
+  iniReader := tIniReader.create('test.ini');
+  sprite2.readFromINI(iniReader);
+  iniReader.free();
+
+  assertEqual(sprite2.tag, sprite1.tag);
+  assertEqual(sprite2.rect.toString, sprite1.rect.toString);
+  assertEqual(sprite2.border.toString, sprite1.border.toString);
+
+  //fs.delFile('test.ini');
+
+  sprite1.free;
+  sprite2.free;
+  page.free;
+
+end;
+
+initialization
+  tSpriteTest.create('Sprite');
 end.
