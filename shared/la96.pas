@@ -445,7 +445,7 @@ begin
     exit;
   end;
 
-  //writeln('processing frame ',frameOn);
+  //note('Processing frame %d/%d',[frameOn, header.numFrames-1]);
 
   startTimer('LA96_FRAME');
 

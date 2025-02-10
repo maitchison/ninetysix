@@ -272,9 +272,6 @@ begin
   if not (segmentType in [ST_PACK0..ST_PACK0+31]) then
     s.writeVLC8(segmentLen);
 
-  //stub:
-  if segmentType = ST_VLC1 then error('Writing VLC1');
-
   postHeaderPos := s.pos;
   case segmentType of
     ST_VLC1: VLC1_Write(s, values);
@@ -295,6 +292,29 @@ begin
 
 end;
 
+procedure convert32to16(buffer32: array of dword; buffer16: array of word; n: int32);
+var
+  i: integer;
+begin
+  if n > length(buffer32) then error('Invalid parameter N');
+  for i := 0 to n-1 do begin
+    {$ifdef debug}
+    if clamp16(int32(buffer32[i])) <> buffer32[i] then error(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, n-1]));
+    {$endif}
+    buffer16[i] := buffer32[i];
+  end;
+end;
+
+procedure readSegmentAndLength(s: tStream; n: int32;out segmentType: byte;out segmentLen: dword);
+begin
+  segmentType := s.readByte();
+  if segmentType in [ST_PACK0..ST_PACK0+31] then
+    segmentLen := bytesForBits(n*(segmentType-ST_PACK0))
+  else
+    segmentLen := s.readVLC8();
+end;
+
+
 function readSegment(s: tStream; n: int32;outBuffer: tDwords=nil): tDWords;
 var
   segmentType: byte;
@@ -304,11 +324,7 @@ begin
   if not assigned(outBuffer) then
     system.setLength(outBuffer, n);
 
-  segmentType := s.readByte();
-  if segmentType in [ST_PACK0..ST_PACK0+31] then
-    segmentLen := bytesForBits(n*(segmentType-ST_PACK0))
-  else
-    segmentLen := s.readVLC8();
+  readSegmentAndLength(s, n, segmentType, segmentLen);
 
   if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
@@ -328,19 +344,6 @@ begin
   exit(outBuffer);
 end;
 
-procedure convert32to16(buffer32: array of dword; buffer16: array of word; n: int32);
-var
-  i: integer;
-begin
-  if n > length(buffer32) then error('Invalid parameter N');
-  for i := 0 to n-1 do begin
-    {$ifdef debug}
-    if clamp16(int32(buffer32[i])) <> buffer32[i] then error(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, n-1]));
-    {$endif}
-    buffer16[i] := buffer32[i];
-  end;
-end;
-
 {16bit word version of read segment. Can be a little faster}
 function readSegment16(s: tStream; n: int32;outBuffer: tWords=nil): tWords;
 var
@@ -351,8 +354,7 @@ begin
   if not assigned(outBuffer) then
     system.setLength(outBuffer, n);
 
-  segmentType := s.readByte();
-  segmentLen := s.readVLC8();
+  readSegmentAndLength(s, n, segmentType, segmentLen);
 
   if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
@@ -360,9 +362,6 @@ begin
   {todo: allow zero copy but looking at bytes ptr then incrementing...
    note: this means setting requiredBytes to segmentLength}
   s.readBlock(IN_BUFFER[0], segmentLen);
-
-  //stub:
-  write(getSegmentTypeName(segmentType)+' ');
 
   case segmentType of
     ST_VLC1: begin
