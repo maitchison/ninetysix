@@ -4,12 +4,20 @@ unit inifile;
 interface
 
 uses
-  typinfo, //typInfo imports sysUtils, so remove it.
   debug,
   list,
   utils;
 
 type
+
+  tINIWriter = class;
+  tINIReader = class;
+
+  iIniSerializable = interface
+    ['{ff7cb00f-dbc4-4a26-a718-ec1b03d0f1e3}']
+    procedure writeToIni(const ini: tINIWriter);
+    procedure readFromIni(const ini: tINIReader);
+  end;
 
   tINIWriter = class
   private
@@ -21,7 +29,7 @@ type
     procedure writeFloat(name: string; value: double);
     procedure writeString(name: string; value: string);
     procedure writeSection(name: string);
-    procedure writeObject(sectionName: string; value: tObject);
+    procedure writeObject(sectionName: string; value: iIniSerializable);
     procedure writeBlank();
 
     constructor Create(filename: string);
@@ -90,40 +98,10 @@ begin
 end;
 
 {writes object out to text file}
-procedure tINIWriter.writeObject(sectionName: string; value: tObject);
-var
-  i: integer;
-  propCount: integer;
-  propInfo: pPropInfo;
-
-  pt: pTypeData;
-  pi: pTypeInfo;
-  pp: pPropList;
-
+procedure tINIWriter.writeObject(sectionName: string; value: iINISerializable);
 begin
   writeSection(sectionName);
-
-  pi := value.ClassInfo;
-  pt := getTypeData(pi);
-
-  try
-    getMem(pp, pt^.propCount * sizeof(pointer));
-    propCount := getPropList(value, pp);
-    for i := 0 to propCount-1 do begin
-      propInfo := pp^[i];
-
-      case propInfo^.propType^.kind of
-        tkInteger, tkInt64: writeInteger(propInfo^.name, getOrdProp(value, propInfo));
-        tkFloat: writeFloat(propInfo^.name, getFloatProp(value, propInfo));
-        tkString, tkLString, tkWString, tkUString, tkAString: writeString(propInfo^.name, getStrProp(value, propInfo));
-        tkBool: writeBool(propInfo^.name, getOrdProp(value, propInfo) < 0);
-        else warning(format('unknown property type %s on %s.%s', [propInfo^.propType^.kind, sectionName, propInfo^.name]));
-      end;
-    end;
-  finally
-    freeMem(pp);
-  end;
-
+  value.writeToINI(self);
   writeBlank();
 end;
 
@@ -179,54 +157,6 @@ begin
   result := trim(lines[lineOn]);
 end;
 
-{writes value published property of an object}
-procedure writeProperty(obj: tObject; key, value: string);
-var
-  pt: pTypeData;
-  pi: pTypeInfo;
-  pp: pPropList;
-  propInfo: pPropInfo;
-  i, propCount: int32;
-begin
-  {there must be a better way than this!}
-
-  pi := obj.ClassInfo;
-  pt := getTypeData(pi);
-
-  try
-    getMem(pp, pt^.propCount * sizeof(pointer));
-    propCount := getPropList(obj, pp);
-    for i := 0 to propCount-1 do begin
-      propInfo := pp^[i];
-      if propInfo.name <> key then continue;
-      case propInfo^.propType^.kind of
-        tkInteger, tkInt64:
-          setOrdProp(obj, propInfo, strToInt(value));
-        tkFloat:
-          setFloatProp(obj, propInfo, strToFlt(value));
-        tkString, tkLString, tkWString, tkUString, tkAString: begin
-          // strings should be in quotes
-          value := value.trim();
-          if not value.startsWith('"') or not value.endsWith('"') then error(format('String property not quoted %s=%s', [key, value]));
-          value := copy(value, 2, length(value)-2);
-          setStrProp(obj, propInfo, value);
-        end;
-        tkBool:
-          setOrdProp(obj, propInfo, ord(strToBool(value)));
-        else
-          warning(format('unknown property type %s on %s.%s', [propInfo^.propType^.kind, pi^.name, propInfo^.name]));
-      end;
-      exit;
-    end;
-
-    error(format('No propery named %s found on %s', [key, pi.name]));
-
-  finally
-    freeMem(pp);
-  end;
-end;
-
-
 {read next object from ini file}
 function tINIReader.readObject(): tObject;
 var
@@ -234,6 +164,7 @@ var
   sectionName: string;
   obj: tObject;
   key, value: string;
+  so: iIniSerializable;
 begin
   line := readLine;
   if not line.startsWith('[') then error(format('Expected section header, but found "%s"', [line]));
@@ -247,23 +178,8 @@ begin
 
   if not assigned(obj) then error(format('Factory failed to construct object of type "%s"', [sectionName]));
 
-  while not eof do begin
-
-    {check if we're at the start of a new section}
-    if peekLine.startsWith('[') then exit;
-
-    line := readLine();
-
-    {ignore comments and blank lines}
-    if line = '' then continue;
-    if line.startsWith('#') then continue;
-
-    {read properties}
-    if not split(line, '=', key, value) then
-      error(format('Could not process line "%s", expecting key=value', [line]));
-
-    writeProperty(obj, key, value);
-  end;
+  if obj.getInterface(iIniSerializable, so) then
+    so.readFromIni(self);
 end;
 
 constructor tINIReader.create(filename: string; aFactory: tObjectConstructorProc = nil);

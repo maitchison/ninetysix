@@ -14,7 +14,7 @@ uses
 
 type
 
-  TBorder = record
+  tBorder = record
     Top, Left, Bottom, Right: Integer;
     constructor Create(ALeft, ATop, ARight, ABottom: Integer);
   end;
@@ -35,8 +35,8 @@ type
 
     procedure blit(dstPage: tPage; atX, atY: int32);
     procedure draw(dstPage: tPage; atX, atY: int32);
-    procedure DrawStretched(DstPage: TPage; dest: TRect);
-    procedure NineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
+    procedure drawStretched(DstPage: TPage; dest: TRect);
+    procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
   end;
 

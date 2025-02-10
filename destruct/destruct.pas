@@ -3,6 +3,7 @@ program destruct;
 uses
   debug, test,
   graph32, vga, vesa, screen,
+  sprite, inifile,
   terrain, objects,
   myMath,
   timer,
