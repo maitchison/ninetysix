@@ -42,7 +42,8 @@ var
 
 procedure Log(s: string; level: tLogLevel=llNote);
 procedure Debug(s: string);
-procedure Note(s: string);
+procedure Note(s: string); overload;
+procedure Note(fmt: string; args: array of Const); overload;
 procedure Info(s: string);
 procedure Warning(s: string);
 procedure Error(s: string;code: byte=100);
@@ -147,6 +148,11 @@ end;
 procedure Note(s: string);
 begin
   Log(s, llNote);
+end;
+
+procedure Note(fmt: string; args: array of Const);
+begin
+  Log(format(fmt, args), llNote);
 end;
 
 procedure Debug(s: string);

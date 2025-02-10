@@ -269,8 +269,12 @@ begin
   {write out the data}
   startPos := s.pos;
   s.writeByte(segmentType);
-  if not segmentType in [ST_PACK0..ST_PACK0+31] then
+  if not (segmentType in [ST_PACK0..ST_PACK0+31]) then
     s.writeVLC8(segmentLen);
+
+  //stub:
+  if segmentType = ST_VLC1 then error('Writing VLC1');
+
   postHeaderPos := s.pos;
   case segmentType of
     ST_VLC1: VLC1_Write(s, values);
@@ -306,9 +310,6 @@ begin
   else
     segmentLen := s.readVLC8();
 
-  //stub:
-  //note('Segment length is ',
-
   if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
   {todo: block read here}
@@ -327,12 +328,17 @@ begin
   exit(outBuffer);
 end;
 
-procedure convert32to16(buffer32: array of dword; buffer16: array of word);
+procedure convert32to16(buffer32: array of dword; buffer16: array of word; n: int32);
 var
   i: integer;
 begin
-  for i := 0 to length(buffer32) do
+  if n > length(buffer32)-1 then error('Invalid parameter N');
+  for i := 0 to n do begin
+    {$ifdef debug}
+    if clamp16(int32(buffer32[i])) <> buffer32[i] then error(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, length(buffer32)-1]));
+    {$endif}
     buffer16[i] := buffer32[i];
+  end;
 end;
 
 {16bit word version of read segment. Can be a little faster}
@@ -355,16 +361,19 @@ begin
    note: this means setting requiredBytes to segmentLength}
   s.readBlock(IN_BUFFER[0], segmentLen);
 
+  //stub:
+  write(getSegmentTypeName(segmentType)+' ');
+
   case segmentType of
     ST_VLC1: begin
       {convert for compatability... slower than readSegment32}
       readVLC1Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
-      convert32to16(OUT_BUFFER, outBuffer);
+      convert32to16(OUT_BUFFER, outBuffer, n);
     end;
     ST_VLC2: begin
       {convert for compatability... slower than readSegment32}
       readVLC2Sequence_ASM(@IN_BUFFER[0], @OUT_BUFFER[0], n);
-      convert32to16(OUT_BUFFER, outBuffer);
+      convert32to16(OUT_BUFFER, outBuffer, n);
     end;
     ST_PACK0..ST_PACK0+31:
       unpack16(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
@@ -896,9 +905,6 @@ begin
   for k := 4 to 8 do begin
     s.reset();
     s.writeSegment(testData1, ST_RICE0+k);
-
-    //stub:
-    writeln(s.len);
 
     {32bit}
     s.seek(0);
