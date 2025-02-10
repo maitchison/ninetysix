@@ -130,6 +130,8 @@ function  sign(x: single): single; overload;
 function  bytesForBits(x: int32): int32;
 function  toBytes(x: array of dword): tBytes; overload;
 function  toBytes(x: array of word): tBytes; overload;
+function  toDWords(x: array of word): tDWords; overload;
+function  toDWords(x: array of dword): tDWords; overload;
 
 procedure Wait(ms: integer);
 function  RND(): byte; assembler; register;
@@ -713,6 +715,26 @@ begin
 end;
 
 function toBytes(x: array of word): tBytes; overload;
+var
+  i: int32;
+begin
+  result := nil;
+  setLength(result, length(x));
+  for i := 0 to length(x)-1 do
+    result[i] := x[i];
+end;
+
+function toDWords(x: array of word): tDWords;
+var
+  i: int32;
+begin
+  result := nil;
+  setLength(result, length(x));
+  for i := 0 to length(x)-1 do
+    result[i] := x[i];
+end;
+
+function toDWords(x: array of dword): tDWords;
 var
   i: int32;
 begin

@@ -893,6 +893,7 @@ end;
 procedure tVLCTest.testRice();
 const
   testData1: array of dword = [100, 0, 127, 32, 15, 16, 17];
+  testData2: array of dword = [1, 2, 65535, 1000, 0];
 var
   s: tStream;
   k: integer;
@@ -923,6 +924,22 @@ begin
     assertEqual(s.pos, 2+bytesForBits(RICE_bits(testData1, k)));
   end;
 
+  {test exceptions}
+  s.reset();
+  s.writeSegment(testData2, ST_RICE0+8);
+  {32bit}
+  s.seek(0);
+  setLength(outData, length(testData2));
+  s.readSegment(length(testData2), @outData[0]);
+  assertEqual(outData.toString, toDWords(testData2).toString);
+  {16bit}
+  s.seek(0);
+  setLength(outData16, length(testData2));
+  vlc.readSegment16(s, length(testData2), @outData16[0]);
+  assertEqual(toDWords(outData16).toString, toDWords(testData2).toString);
+  {make sure size is ok}
+  {+2 is for header}
+  assertEqual(s.pos, 2+bytesForBits(RICE_bits(testData2, k)));
   s.free;
 end;
 
@@ -945,6 +962,7 @@ const
   testData4: array of dword = [31, 31, 31, 31, 31, 31, 31];
   {for VLC testing}
   testData5: array of dword = [14, 12, 1, 2, 100];
+  {for exception testing}
 begin
 
   {check pack and unpack}
