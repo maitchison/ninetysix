@@ -14,6 +14,8 @@ unit LC96;
   v0.1 - first version
   v0.2 - support for larger images (numPatchs now dword)
   v0.3 - Switch to VLC2 (faster loading, and slightly (~1%) more efficent).
+  v0.4 - Uses RICE
+  v0.5 - switch from negEncode to zigZag
 }
 
 interface
@@ -40,10 +42,10 @@ uses
 
 const
   VER_BIG = 0;
-  VER_SMALL = 3;
+  VER_SMALL = 5;
 
 var
-  {stores byte(negDecode(x))}
+  {stores byte(zagZig(x))}
   BYTE_DELTA_LOOKUP: array[0..255] of byte;
 
 {-------------------------------------------------------}
@@ -65,7 +67,7 @@ var
   delta: integer;
 begin
   {$R-}
-  result := byte(a)+byte(negDecode(code));
+  result := byte(a)+byte(zagZig(code));
   {$R+}
 end;
 
@@ -655,7 +657,7 @@ initialization
   fillChar(gDeltas, 16, 0);
 
   for i := 0 to 255 do
-    BYTE_DELTA_LOOKUP[i] := byte(negDecode(i));
+    BYTE_DELTA_LOOKUP[i] := byte(zagZig(i));
 
   tLC96Test.create('LC96');
 

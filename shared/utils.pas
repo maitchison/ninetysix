@@ -120,8 +120,6 @@ function nextWholeWord(line: string;var pos:integer; out len:integer): boolean;
 function subStringMatch(s: string; sOfs: integer; subString: string): boolean;
 function join(lines: array of string;seperator: string=#13#10): string;
 
-function  negDecode(x: dword): int32; inline;
-function  negEncode(x: int32): dword; inline;
 function  zigZag(x: int32): dword; inline;
 function  zagZig(y: dword): int32; inline;
 function  encodeByteDelta(a,b: byte): byte; inline;
@@ -854,28 +852,6 @@ end;
 
 {interleave pos and negative numbers into a whole number
  0 -> 0
-+1 -> 1
--1 -> 2
-...
-}
-{this is the old system, which has the issue that -32768 -> 65536 and
- therefore 17bits are needed to encode uint16 values}
-{todo: remove this and just use zigZag}
-function negEncode(x: int32): dword; inline;
-begin
-  result := abs(x)*2;
-  if x > 0 then dec(result);
-end;
-
-{interleave pos and negative numbers into a whole number}
-function negDecode(x: dword): int32; inline;
-begin
-  result := ((x+1) shr 1);
-  if x and $1 = $0 then result := -result;
-end;
-
-{interleave pos and negative numbers into a whole number
- 0 -> 0
 -1 -> 1
 +1 -> 2
 ...
@@ -908,12 +884,12 @@ var
 begin
   {take advantage of 256 wrap around on bytes}
   delta := int32(b)-a;
-  if delta > 128 then
-    exit(negEncode(delta-256))
-  else if delta < -127 then
-    exit(negEncode(delta+256))
+  if delta > 127 then
+    exit(zigZag(delta-256))
+  else if delta < -128 then
+    exit(zigZag(delta+256))
   else
-    exit(negEncode(delta));
+    exit(zigZag(delta));
 end;
 
 {-------------------------------------------------------}
@@ -1288,10 +1264,6 @@ begin
   split('fish=good', '=', a, b);
   assertEqual(a,'fish');
   assertEqual(b,'good');
-
-  {test negEncode neg}
-  for i := -256 to +256 do
-    assertEqual(negDecode(negEncode(i)), i);
 
   {test zigZag}
   for i := -256 to +256 do

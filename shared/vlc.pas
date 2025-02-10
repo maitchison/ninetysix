@@ -332,10 +332,10 @@ procedure convert32to16(buffer32: array of dword; buffer16: array of word; n: in
 var
   i: integer;
 begin
-  if n > length(buffer32)-1 then error('Invalid parameter N');
-  for i := 0 to n do begin
+  if n > length(buffer32) then error('Invalid parameter N');
+  for i := 0 to n-1 do begin
     {$ifdef debug}
-    if clamp16(int32(buffer32[i])) <> buffer32[i] then error(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, length(buffer32)-1]));
+    if clamp16(int32(buffer32[i])) <> buffer32[i] then error(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, n-1]));
     {$endif}
     buffer16[i] := buffer32[i];
   end;
