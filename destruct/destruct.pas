@@ -135,7 +135,7 @@ procedure battleScreen();
 var
   exitFlag: boolean;
   tank1, tank2: tTank;
-  tanks: tObjectList;
+  tanks: tGameObjectList;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -149,7 +149,7 @@ begin
   generateTerrain();
 
   {setup players}
-  tanks := tObjectList.create();
+  tanks := tGameObjectList.create();
   tank1 := tTank.create(100, 100);
   tank2 := tTank.create(200, 100);
   tanks.append(tank1);

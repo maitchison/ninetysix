@@ -11,37 +11,53 @@ uses
 
 type
 
-  tObjectStatus = (OS_EXPIRED, OS_ACTIVE);
+  tGameObjectStatus = (GO_EXPIRED, GO_ACTIVE);
 
-  tObject = class
+  tGameObject = class
   public
     pos, vel: V2D;
-    sprite: tSprite;
+    bounds: tRect;
+    offset: V2D;
+    fSprite: tSprite;
     col: RGBA;
     ttl: single;
-    status: tObjectStatus;
+    status: tGameObjectStatus;
+  protected
+    function getX: integer;
+    function getY: integer;
+    procedure setSprite(aSprite: tSprite);
   public
     constructor create(); overload;
     constructor create(x,y: single); overload;
     procedure draw(screen: tScreen); virtual;
     procedure update(elapsed: single); virtual;
-    function bounds: tRect;
+    procedure markAsDeleted();
+
+    property sprite: tSprite read fSprite write setSprite;
+    property x: integer read getX;
+    property y: integer read getY;
   end;
 
-  tTank = class(tObject)
+  tTank = class(tGameObject)
     constructor create(x,y: single);
     procedure draw(screen: tScreen); override;
   end;
 
-  tBullet = class(tObject)
+  tBullet = class(tGameObject)
+    constructor create(x,y: single);
+    procedure update(elapsed: single); override;
+    procedure draw(screen: tScreen); override;
   end;
 
-  tObjectList = class
-    objects: array of tObject;
-    procedure append(o: tObject);
+  tGameObjectList = class
+    objects: array of tGameObject;
+    procedure append(o: tGameObject);
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
   end;
+
+{may as well put globals here}
+{...}
 
 implementation
 
@@ -49,69 +65,88 @@ uses
   resources, terrain;
 
 {----------------------------------------------------------}
-{ tObjects }
+{ tGameObjects }
 {----------------------------------------------------------}
 
-procedure tObjectList.append(o: tObject);
+procedure tGameObjectList.append(o: tGameObject);
 begin
   setLength(objects, length(objects)+1);
   objects[length(objects)-1] := o;
 end;
 
-procedure tObjectList.draw(screen: tScreen);
+procedure tGameObjectList.draw(screen: tScreen);
 var
-  o: tObject;
+  go: tGameObject;
 begin
-  for o in objects do o.draw(screen);
+  for go in objects do if go.status = GO_ACTIVE then go.draw(screen);
 end;
 
-procedure tObjectList.update(elapsed: single);
+procedure tGameObjectList.update(elapsed: single);
 var
-  o: tObject;
+  go: tGameObject;
 begin
-  for o in objects do o.update(elapsed);
+  for go in objects do if go.status = GO_ACTIVE then go.update(elapsed);
 end;
 
 {----------------------------------------------------------}
-{ tObject }
+{ tGameObject }
 {----------------------------------------------------------}
 
-constructor tObject.create();
+constructor tGameObject.create();
 begin
   ttl := 0;
-  status := OS_ACTIVE;
+  status := GO_ACTIVE;
   col := RGB(255,0,255);
   sprite := nil;
+  offset := V2(0, 0);
 end;
 
-constructor tObject.create(x,y: single);
+constructor tGameObject.create(x,y: single);
 begin
   create();
   pos := V2(x,y);
+  bounds := rect(round(x), round(y), 1, 1);
 end;
 
-function tObject.bounds: tRect; inline;
+procedure tGameObject.markAsDeleted();
 begin
-  if not assigned(sprite) then
-    result.init(round(pos.x),round(pos.y),1,1)
-  else
-    result.init(round(pos.x),round(pos.y),sprite.width,sprite.height);
+  status := GO_EXPIRED;
 end;
 
+procedure tGameObject.setSprite(aSprite: tSprite);
+begin
+  fSprite := aSprite;
+  if assigned(fSprite) then begin
+    bounds.width := fSprite.width;
+    bounds.height := fSprite.height;
+  end;
+end;
 
-procedure tObject.draw(screen: tScreen);
+function tGameObject.getX: integer; inline;
+begin
+  result := round(pos.x);
+end;
+
+function tGameObject.getY: integer; inline;
+begin
+  result := round(pos.y);
+end;
+
+procedure tGameObject.draw(screen: tScreen);
 begin
   screen.canvas.putPixel(round(pos.x), round(pos.y), col);
 end;
 
-procedure tObject.update(elapsed: single);
+procedure tGameObject.update(elapsed: single);
 begin
   pos := pos + (vel * elapsed);
   if ttl > 0 then begin
     ttl -= elapsed;
     if ttl < 0 then
-      status := OS_EXPIRED;
+      status := GO_EXPIRED;
   end;
+  bounds.x := round(pos.x+offset.x);
+  bounds.y := round(pos.y+offset.y);
 end;
 
 {----------------------------------------------------------}
@@ -120,7 +155,7 @@ end;
 
 constructor tTank.create(x,y: single);
 begin
-  inherited create(x,y );
+  inherited create(x,y);
   col := RGB(255,0,0);
   sprite := sprites['Tank'];
 end;
@@ -134,6 +169,46 @@ end;
 {----------------------------------------------------------}
 { tBullet }
 {----------------------------------------------------------}
+
+constructor tBullet.create(x,y: single);
+begin
+  inherited create(x,y);
+  col := RGB($ffffff86);
+  offset.x := -1;
+  offset.y := -1;
+  bounds.width := 3;
+  bounds.height := 3;
+end;
+
+procedure tBullet.update(elapsed: single);
+begin
+  {gravity}
+  vel.y += 5.8 * elapsed;
+  {move}
+  inherited update(elapsed);
+  {see if we're out of bounds}
+  if (x < -32) or (x > 256+32) then
+    markAsDeleted();
+end;
+
+
+procedure tBullet.draw(screen: tScreen);
+var
+  i: integer;
+  c: RGBA;
+begin
+  c := self.col;
+  c.a := c.a div 2;
+  for i := -1 to 1 do begin
+    screen.canvas.putPixel(x+i, y, c);
+    screen.canvas.putPixel(x, y+i, c);
+  end;
+  screen.markRegion(bounds);
+end;
+
+
+{----------------------------------------------------------}
+
 
 begin
 end.
