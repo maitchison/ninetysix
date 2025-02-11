@@ -2,17 +2,19 @@ program destruct;
 
 uses
   debug, test,
-  graph32, vga, vesa, screen,
-  resLib,
+  {game specific}
+  res, obj, terrain,
+  {general}
+  graph2d, graph32, vga, vesa, screen,
   sprite, inifile,
   vertex,
-  terrain, gameObj,
   myMath,
   timer,
+  ui,
   crt, //todo: remove
   keyboard,
-  lc96,
-  la96, mixlib,
+  lc96, la96,
+  mixlib,
   utils;
 
 var
@@ -138,6 +140,8 @@ var
   bullet: tBullet;
   tank1, tank2: tTank;
   elapsed: single;
+  gui: tGuiComponents;
+  fps: tGuiLabel;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -158,6 +162,11 @@ begin
   tanks.append(tank1);
   tanks.append(tank2);
 
+  {setup gui}
+  gui := tGuiComponents.create();
+  fps := tGuiLabel.create(Point(10, 10));
+  gui.append(fps);
+
   {main loop}
   repeat
 
@@ -166,6 +175,10 @@ begin
     startTimer('main');
 
     elapsed := clamp(getTimer('main').elapsed, 0.01, 0.10);
+
+    {update ui}
+    if elapsed > 0 then
+      fps.text := format('%.1f', [1/elapsed]);
 
     {input}
     if keyDown(key_space) then
@@ -186,6 +199,10 @@ begin
     bullets.update(elapsed);
     tanks.draw(screen);
     bullets.draw(screen);
+
+    {gui}
+    gui.update(elapsed);
+    gui.draw(screen);
 
     screen.flipAll();
 

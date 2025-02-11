@@ -36,7 +36,8 @@ function textExtents(s: string): tRect; overload;
 
 implementation
 
-uses filesystem;
+uses
+  filesystem, bmp;
 
 var
   font1: TFont;

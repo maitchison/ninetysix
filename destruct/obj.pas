@@ -1,4 +1,4 @@
-unit gameObj;
+unit obj;
 
 interface
 
@@ -81,7 +81,7 @@ var
 implementation
 
 uses
-  resLib, terrain;
+  res, terrain;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 var
@@ -294,7 +294,6 @@ procedure tBullet.draw(screen: tScreen);
 begin
   drawMarker(screen, x, y, col);
 end;
-
 
 {----------------------------------------------------------}
 

@@ -1,121 +1,144 @@
-{A simple immedate mode gui}
-{$MODE delphi}
+{A simple retained mode gui}
+unit ui;
 
+interface
 
 uses
-  sysUtils,
-  crt,
-  math,
-  other,
+  debug, test,
   font,
+  graph2d,
   graph32,
-  sprite,
-  resources,
-  screen,
-  time,
-  go32,
-  mouse;
+  screen;
 
-var i: dword;
+type
+  {todo: bounds at component level}
+  tGuiComponent = class
+    pos: tPoint;
+    alpha: single;
+    targetAlpha: single;
+    showForSeconds: single;
+    visible: boolean;
+    autoFade: boolean;
+  protected
+    procedure doDraw(screen: tScreen); virtual;
+  public
+    procedure draw(screen: tScreen);
+    procedure update(elapsed: single); virtual;
+    constructor create(aPos: tPoint);
+  end;
 
+  tGuiComponents = class
+    elements: array of tGuiComponent;
+    procedure append(x: tGuiComponent);
+    procedure draw(screen: tScreen);
+    procedure update(elapsed: single);
+  end;
 
+  tGuiLabel = class(tGuiComponent)
+    textColor: RGBA;
+    text: string;
+    centered: boolean;
+  protected
+    procedure doDraw(screen: tScreen); override;
+  public
+    constructor create(aPos: tPoint);
+  end;
+
+implementation
+
+{--------------------------------------------------------}
+{ tGuiComponents }
+
+procedure tGuiComponents.append(x: tGuiComponent);
+begin
+  setLength(elements, length(elements)+1);
+  elements[length(elements)-1] := x;
+end;
+
+procedure tGuiComponents.draw(screen: tScreen);
 var
-  {setup screen}
+  gc: tGuiComponent;
+begin
+  for gc in elements do gc.draw(screen);
+end;
+
+procedure tGuiComponents.update(elapsed: single);
+var
+  gc: tGuiComponent;
+begin
+  for gc in elements do gc.update(elapsed);
+end;
+
+{--------------------------------------------------------}
+{ UI Components }
+
+constructor tGuiComponent.create(aPos: tPoint);
+begin
+  inherited create();
+  self.pos := aPos;
+  self.alpha := 1;
+  self.targetAlpha := 1;
+  self.showForSeconds := 0;
+  self.autoFade := false;
+  self.visible := true;
+end;
+
+procedure tGuiComponent.update(elapsed: single);
+const
+  FADE_IN = 0.04;
+  FADE_OUT = 0.03;
+var
+  delta: single;
+begin
+  if autoFade then begin
+    if showForSeconds > 0 then
+      targetAlpha := 1.0
+    else
+      targetAlpha := 0.0;
+    showForSeconds -= elapsed;
+    // todo: respect elapsed
+    delta := targetAlpha - alpha;
+    if delta < 0 then
+      alpha += delta * FADE_OUT
+    else
+      alpha += delta * FADE_IN
+  end;
+end;
+
+procedure tGuiComponent.draw(screen: tScreen);
+begin
+  if not visible then exit;
+  doDraw(screen);
+end;
+
+procedure tGuiComponent.doDraw(screen: tScreen);
+begin
+  //pass
+end;
+
+{-----------------------}
+
+constructor tGuiLabel.create(aPos: tPoint);
+begin
+  inherited create(aPos);
+  self.centered := false;
+  self.textColor := RGB(250, 250, 250);
+  self.text := '';
+end;
+
+procedure tGuiLabel.doDraw(screen: tScreen);
+var
+  bounds: tRect;
   c: RGBA;
+begin
+  c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
+  if c.a = 0 then exit;
+  bounds := textExtents(text, pos);
+  if centered then bounds.x -= bounds.width div 2;
+  textOut(screen.canvas, bounds.x, bounds.y, text, c);
+  screen.markRegion(bounds);
+end;
 
-  StartTime: Double;
-  EndTime: Double;
-
-  CallsPerSecond: Double;
-  Buffer: TPage;
-
-  za,zb,zc,zd: dword;
-  zx: dword;
 
 begin
-
-  {LoadGFX();}
-
-  SetMode(640, 480, 32);
-
-  Buffer := TPage.Create(640, 480);
-
-  {InitMouse();}
-
-  c := RGBA.Create(255,255,255);
-
-  StartTime := GetSec;
-
-  Buffer.Clear(RGBA.Create(128,128,128,128));
-
-  {
-
-    putPixel, solid, buffer = 2.30M
-      -> 28.25M (switch to fillchar, rep stosd is the same)
-    putPixel, solid, screen = 1.83M
-      -> 6.8M
-
-    putPixel, alpha, buffer = 1.1M
-      -> 18.28M (switched to MMX, wow! this is fast)
-
-    putPixel, alpha, screen = 0.30M
-      -> 0.73M (switch to MMX, I think we're bandwidth capped)
-
-  }
-  {
-  for i := 0 to 65535 do begin
-    c.a := i and $FF;
-    Screen.PutPixel(i and $FF, i shr 8, c);
-  end;}
-
-  EndTime := GetSec;
-
-
-
-{  PanelSprite.NineSlice(10,10,200,200);
-
-
-  ButtonSprite.NineSlice(100,100,150,40);
-
-  cursorX := 100+(150-Extents('Start').width) div 2;
-  cursorY := 111;
-  cursorCol := RGBA.Create(250,250,250,127);
-  printShadow('Start');
-
-  FrameSprite.NineSlice(50,50,50,50);}
-
-  i := 0;
-
-  (*
-
-  while True do begin
-
-    i := i + 1;
-
-    SetDisplayStart(Mouse_X, Mouse_Y);
-
-{    PanelSprite.NineSlice(5,205,150,25);
-    cursorX := 10;
-    cursorY := 208;
-    cursorCol := RGBA.create(20,20,20,200);
-    print(IntToStr(Mouse_X)+','+IntToStr(Mouse_Y)+' '+IntToStr(Mouse_B)+' '+IntToStr(i*640));
- }
-    sleep(10);
-
-    if (Mouse_B) = 3 then break;
-
-  end;
-                 *)
-  {CloseMouse();}
-
-  readkey;
-
-  TextMode();
-
-  CallsPerSecond := 640*480 / (EndTime-StartTime);
-
-  writeln((CallsPerSecond/1000/1000):0:2);
-  readkey;
-
-
 end.

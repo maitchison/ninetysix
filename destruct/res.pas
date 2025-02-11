@@ -1,4 +1,4 @@
-unit reslib;
+unit res;
 
 interface
 

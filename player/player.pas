@@ -19,6 +19,7 @@ uses
   sndViz,
   sprite,
   lc96,
+  ui,
   vlc,
   hdr,
   font,
@@ -51,34 +52,6 @@ type
   end;
 
   tTracks = array of tTrack;
-
-  {todo: bounds at component level}
-  tGuiComponent = class
-    pos: tPoint;
-    alpha: single;
-    targetAlpha: single;
-    showForSeconds: single;
-    visible: boolean;
-    autoFade: boolean;
-  protected
-    procedure doDraw(screen: tScreen); virtual;
-  public
-    procedure draw(screen: tScreen);
-    procedure update(elapsed: single); virtual;
-    constructor create(aPos: tPoint);
-  end;
-
-  tGuiComponents = array of tGuiComponent;
-
-  tGuiLabel = class(tGuiComponent)
-    textColor: RGBA;
-    text: string;
-    centered: boolean;
-  protected
-    procedure doDraw(screen: tScreen); override;
-  public
-    constructor create(aPos: tPoint);
-  end;
 
   tGuiBuffer = class(tGuiComponent)
     valueMin, valueMax, value: integer;
@@ -117,108 +90,6 @@ var
   guiBuffer: tGUIBuffer;
   guiFPS: tGUILabel;
 
-
-{--------------------------------------------------------}
-{ Helpers }
-
-procedure tGuiComponentsHelper.append(x: tGuiComponent);
-begin
-  setLength(self, length(self)+1);
-  self[length(self)-1] := x;
-end;
-
-procedure tGuiComponentsHelper.draw(screen: tScreen);
-var
-  c: tGuiComponent;
-begin
-  for c in self do c.draw(screen);
-end;
-
-procedure tGuiComponentsHelper.update(elapsed: single);
-var
-  c: tGuiComponent;
-begin
-  for c in self do c.update(elapsed);
-end;
-
-{----------------}
-
-procedure tTracksHelper.append(x: tTrack);
-begin
-  setLength(self, length(self)+1);
-  self[length(self)-1] := x;
-end;
-
-{--------------------------------------------------------}
-{ UI Components }
-
-constructor tGuiComponent.create(aPos: tPoint);
-begin
-  inherited create();
-  self.pos := aPos;
-  self.alpha := 1;
-  self.targetAlpha := 1;
-  self.showForSeconds := 0;
-  self.autoFade := false;
-  self.visible := true;
-end;
-
-procedure tGuiComponent.update(elapsed: single);
-const
-  FADE_IN = 0.04;
-  FADE_OUT = 0.03;
-var
-  delta: single;
-begin
-  if autoFade then begin
-    if showForSeconds > 0 then
-      targetAlpha := 1.0
-    else
-      targetAlpha := 0.0;
-    showForSeconds -= elapsed;
-    // todo: respect elapsed
-    delta := targetAlpha - alpha;
-    if delta < 0 then
-      alpha += delta * FADE_OUT
-    else
-      alpha += delta * FADE_IN
-  end;
-end;
-
-procedure tGuiComponent.draw(screen: tScreen);
-begin
-  if not visible then exit;
-  doDraw(screen);
-end;
-
-procedure tGuiComponent.doDraw(screen: tScreen);
-begin
-  //pass
-end;
-
-{-----------------------}
-
-constructor tGuiLabel.create(aPos: tPoint);
-begin
-  inherited create(aPos);
-  self.centered := false;
-  self.textColor := RGB(250, 250, 250);
-  self.text := '';
-end;
-
-procedure tGuiLabel.doDraw(screen: tScreen);
-var
-  bounds: tRect;
-  c: RGBA;
-begin
-  c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
-  if c.a = 0 then exit;
-  bounds := textExtents(text, pos);
-  if centered then bounds.x -= bounds.width div 2;
-  textOut(screen.canvas, bounds.x, bounds.y, text, c);
-  screen.markRegion(bounds);
-end;
-
 {--------------------------------------------------------}
 
 procedure tGuiBuffer.doDraw(screen: tScreen);
@@ -247,6 +118,14 @@ begin
   valueMin := aMin;
   valueMax := aMax;
   value := 0;
+end;
+
+{----------------}
+
+procedure tTracksHelper.append(x: tTrack);
+begin
+  setLength(self, length(self)+1);
+  self[length(self)-1] := x;
 end;
 
 {--------------------------------------------------------}
