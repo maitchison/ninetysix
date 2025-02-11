@@ -262,7 +262,7 @@ end;
 procedure tTank.adjust(deltaAngle, deltaPower: single);
 begin
   angle := clamp(angle + deltaAngle, -90, 90);
-  power := clamp(power + deltaPower, 2, 10);
+  power := clamp(power + deltaPower, 2, 16);
 end;
 
 {----------------------------------------------------------}
@@ -282,7 +282,7 @@ end;
 procedure tBullet.update(elapsed: single);
 begin
   {gravity}
-  vel.y += 5.8 * elapsed;
+  vel.y += 58 * elapsed;
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}

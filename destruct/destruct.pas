@@ -174,11 +174,11 @@ begin
 
     startTimer('main');
 
-    elapsed := clamp(getTimer('main').elapsed, 0.01, 0.10);
+    elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
 
     {update ui}
     if elapsed > 0 then
-      fps.text := format('%.1f', [1/elapsed]);
+      fps.text := format('%f', [1/elapsed]);
 
     {input}
     if keyDown(key_space) then
@@ -193,6 +193,7 @@ begin
       tank2.adjust(0, -10*elapsed);
 
     screen.clearAll();
+
     drawTerrain(screen);
 
     tanks.update(elapsed);
