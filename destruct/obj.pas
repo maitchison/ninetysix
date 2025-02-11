@@ -235,7 +235,7 @@ begin
     screen,
     x + sin(angle*DEG2RAD) * power * 2,
     y - cos(angle*DEG2RAD) * power * 2,
-    RGB(128,128,128)
+    RGB(255,128,128)
   );
 
 end;
@@ -287,6 +287,9 @@ begin
   inherited update(elapsed);
   {see if we're out of bounds}
   if (x < -32) or (x > 256+32) or (y > 256) then
+    markAsDeleted();
+  {check if we collided with terrain}
+  if terrain.terrain.getPixel(x-32, y).a > 0 then
     markAsDeleted();
 end;
 

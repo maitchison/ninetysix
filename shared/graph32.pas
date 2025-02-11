@@ -526,9 +526,9 @@ begin
 end;
 
 
-procedure TPage.Clear(c: RGBA);
+procedure TPage.clear(c: RGBA);
 begin
-  self.FillRect(TRect.Create(0, 0, self.Width, self.Height), c);
+  filldword(pixels^, width*height, c.to32);
 end;
 
 
