@@ -81,7 +81,7 @@ var
 implementation
 
 uses
-  res, terrain;
+  res, terra;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 var

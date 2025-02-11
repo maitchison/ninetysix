@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   {game specific}
-  res, obj, terrain,
+  res, obj, terra,
   {general}
   graph2d, graph32, vga, vesa, screen,
   sprite, inifile,
@@ -152,7 +152,8 @@ begin
 
   exitFlag := false;
 
-  generateTerrain();
+  terrain := tTerrain.create();
+  terrain.generate();
 
   {setup players}
   tank1 := tTank.create();
@@ -194,7 +195,7 @@ begin
 
     screen.clearAll();
 
-    drawTerrain(screen);
+    terrain.draw(screen);
 
     tanks.update(elapsed);
     bullets.update(elapsed);
@@ -214,6 +215,8 @@ begin
     idle();
 
   until exitFlag;
+
+  terrain.free();
 
 end;
 
