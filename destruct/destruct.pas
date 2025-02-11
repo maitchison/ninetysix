@@ -134,8 +134,6 @@ end;
 procedure battleScreen();
 var
   exitFlag: boolean;
-  tank1, tank2: tTank;
-  tanks: tGameObjectList;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -149,11 +147,8 @@ begin
   generateTerrain();
 
   {setup players}
-  tanks := tGameObjectList.create();
-  tank1 := tTank.create(100, 100);
-  tank2 := tTank.create(200, 100);
-  tanks.append(tank1);
-  tanks.append(tank2);
+  tanks.append(tTank.create(100, 100));
+  tanks.append(tTank.create(200, 100));
 
   {main loop}
   repeat
@@ -161,6 +156,10 @@ begin
     musicUpdate();
 
     startTimer('main');
+
+    {input}
+    if keyDown(key_space) then begin
+    end;
 
     screen.clearAll();
     drawTerrain(screen);

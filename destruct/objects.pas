@@ -49,15 +49,18 @@ type
     procedure draw(screen: tScreen); override;
   end;
 
-  tGameObjectList = class
-    objects: array of tGameObject;
-    procedure append(o: tGameObject);
+  tGameObjectList<T> = class
+    objects: array of T;
+    procedure append(o: T);
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
   end;
 
 {may as well put globals here}
-{...}
+var
+  tanks: tGameObjectList<tTank>;
+  bullets: tGameObjectList<tBullet>;
+
 
 implementation
 
@@ -68,20 +71,20 @@ uses
 { tGameObjects }
 {----------------------------------------------------------}
 
-procedure tGameObjectList.append(o: tGameObject);
+procedure tGameObjectList<T>.append(o: T);
 begin
   setLength(objects, length(objects)+1);
   objects[length(objects)-1] := o;
 end;
 
-procedure tGameObjectList.draw(screen: tScreen);
+procedure tGameObjectList<T>.draw(screen: tScreen);
 var
   go: tGameObject;
 begin
   for go in objects do if go.status = GO_ACTIVE then go.draw(screen);
 end;
 
-procedure tGameObjectList.update(elapsed: single);
+procedure tGameObjectList<T>.update(elapsed: single);
 var
   go: tGameObject;
 begin
@@ -210,5 +213,20 @@ end;
 {----------------------------------------------------------}
 
 
+procedure initObjects;
 begin
+  tanks := tGameObjectList<tTank>.create();
+  bullets := tGameObjectList<tBullet>.create();
+end;
+
+procedure closeObjects;
+begin
+  tanks.free;
+  bullets.free;
+end;
+
+initialization
+  initObjects();
+finalization
+  closeObjects();
 end.
