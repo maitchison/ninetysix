@@ -15,7 +15,8 @@ type
   public
     constructor create();
     destructor destroy(); override;
-    function isSolid(x,y: integer): boolean;
+    function  isSolid(x,y: integer): boolean;
+    procedure burn(atX,atY: integer;r: integer);
     procedure generate();
     procedure draw(screen: tScreen);
   end;
@@ -26,7 +27,10 @@ var
 implementation
 
 const
-  TC_DIRT: RGBA = (b:$44; g:$80; r:$8d; a: $ff);
+  TC_DIRT: RGBA =  (b:$44; g:$80; r:$8d; a: $ff);
+  TC_ROCK: RGBA =  (b:$44; g:$44; r:$44; a: $ff);
+  TC_GRASS: RGBA = (b:$5d; g:$80; r:$0d; a: $ff);
+  TC_SKY: RGBA =   (b:$00; g:$00; r:$00; a: $00);
 
 {-----------------------------------------------------------}
 
@@ -44,25 +48,68 @@ end;
 
 function tTerrain.isSolid(x,y: integer): boolean;
 begin
-  x -= 32;
   if y > 240 then exit(true);
   if (x < 0) or (x > 255) or (y < 0) then exit(false);
   result := terrain.getPixel(x, y).a > 0;
 end;
 
+{removes terrain in given radius, and burns edges}
+procedure tTerrain.burn(atX,atY: integer;r: integer);
+var
+  dx, dy: integer;
+  x,y: integer;
+  dst2: integer;
+  r2: integer;
+  rExtended: integer;
+  rEdge2: integer;
+  emptyC, burntC: RGBA;
+begin
+  emptyC := RGB(0,0,0,0);
+  burntC := RGB(50,0,0,128);
+
+  r2 := r*r;
+  rExtended := r+1;
+  rEdge2 := rExtended*rExtended;
+  for dy := -rExtended to +rExtended do begin
+    for dx := -rExtended to +rExtended do begin
+      dst2 := (dx*dx)+(dy*dy);
+      x := atX+dx;
+      y := atY+dy;
+      if (dst2 <= r2) then
+        terrain.setPixel(x, y, emptyC)
+      else if (dst2 <= rEdge2) then
+        if isSolid(x, y) then terrain.putPixel(x, y, burntC);
+    end;
+  end;
+end;
+
 procedure tTerrain.generate();
 var
-  mapHeight: array[0..255] of integer;
+  dirtHeight: array[0..255] of integer;
+  rockHeight: array[0..255] of integer;
   x,y: integer;
   c: RGBA;
 begin
   terrain.clear(RGB(0, 0, 0, 0));
-  for x := 0 to 255 do
-    mapHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
+
+  for x := 0 to 255 do begin
+    dirtHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
+    rockHeight[x] := 200 + round(30*sin(30+x*0.0197) - 67*cos(20+x*0.003) + 15*sin(10+x*0.023)) div 4;
+  end;
+
   for y := 0 to 255 do
     for x := 0 to 255 do begin
-      c.init(TC_DIRT.r + (rnd-128) div 8, TC_DIRT.g, TC_DIRT.b);
-      if y > mapHeight[x] then terrain.setPixel(x,y, c);
+
+      if y > rockHeight[x] then
+        c := TC_ROCK
+      else if y > dirtHeight[x] then
+        c := TC_DIRT
+      else
+        continue;
+
+      c *= 0.9+(0.1*(rnd/255));
+      terrain.setPixel(x, y, c);
+
     end;
 end;
 

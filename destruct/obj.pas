@@ -128,6 +128,7 @@ var
   z: single;
   angle: single;
 begin
+
   n := round(power * power);
   radius := power;
   for i := 0 to n-1 do begin
@@ -141,6 +142,8 @@ begin
       2: p.col := RGB($FFC5361D);
     end;
     p.vel := V2Polar(angle, (0.5+z)*radius/2);
+    {edit the terrain}
+    terrain.burn(p.x-32, p.y, 1);
   end;
 end;
 
@@ -333,7 +336,7 @@ begin
   if (x < 32) or (x > 256+32) or (y > 256) then
     markAsDeleted();
   {check if we collided with terrain}
-  if terrain.isSolid(x, y) then begin
+  if terrain.isSolid(x-32, y) then begin
     makeExplosion(x, y, 10);
     mixer.play(explodeSFX);
     markAsDeleted();

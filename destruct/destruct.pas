@@ -195,10 +195,9 @@ begin
 
     screen.clearAll();
 
-    terrain.draw(screen);
-
     updateAll(elapsed);
     drawAll(screen);
+    terrain.draw(screen);
 
     {gui}
     gui.update(elapsed);
