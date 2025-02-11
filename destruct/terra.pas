@@ -15,8 +15,9 @@ type
   public
     constructor create();
     destructor destroy(); override;
+    function  isEmpty(x,y: integer): boolean;
     function  isSolid(x,y: integer): boolean;
-    procedure burn(atX,atY: integer;r: integer);
+    procedure burn(atX,atY: integer;r: integer;power:integer=255);
     procedure generate();
     procedure draw(screen: tScreen);
   end;
@@ -27,9 +28,9 @@ var
 implementation
 
 const
-  TC_DIRT: RGBA =  (b:$44; g:$80; r:$8d; a: $ff);
+  TC_DIRT: RGBA =  (b:$44; g:$80; r:$8d; a: $20);
   TC_ROCK: RGBA =  (b:$44; g:$44; r:$44; a: $ff);
-  TC_GRASS: RGBA = (b:$5d; g:$80; r:$0d; a: $ff);
+  TC_GRASS: RGBA = (b:$5d; g:$80; r:$0d; a: $0f);
   TC_SKY: RGBA =   (b:$00; g:$00; r:$00; a: $00);
 
 {-----------------------------------------------------------}
@@ -48,37 +49,43 @@ end;
 
 function tTerrain.isSolid(x,y: integer): boolean;
 begin
-  if y > 240 then exit(true);
+  if y > 255 then exit(true);
   if (x < 0) or (x > 255) or (y < 0) then exit(false);
-  result := terrain.getPixel(x, y).a > 0;
+  result := terrain.getPixel(x, y).a > $07;
+end;
+
+function tTerrain.isEmpty(x,y: integer): boolean;
+begin
+  if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit(true);
+  result := terrain.getPixel(x, y).a = 0;
 end;
 
 {removes terrain in given radius, and burns edges}
-procedure tTerrain.burn(atX,atY: integer;r: integer);
+procedure tTerrain.burn(atX,atY: integer;r: integer;power:integer=255);
 var
   dx, dy: integer;
   x,y: integer;
+  v: integer;
   dst2: integer;
   r2: integer;
-  rExtended: integer;
-  rEdge2: integer;
   emptyC, burntC: RGBA;
+  tc: RGBA;
 begin
-  emptyC := RGB(0,0,0,0);
-  burntC := RGB(50,0,0,128);
-
   r2 := r*r;
-  rExtended := r+1;
-  rEdge2 := rExtended*rExtended;
-  for dy := -rExtended to +rExtended do begin
-    for dx := -rExtended to +rExtended do begin
+  for dy := -r to +r do begin
+    for dx := -r to +r do begin
       dst2 := (dx*dx)+(dy*dy);
       x := atX+dx;
       y := atY+dy;
-      if (dst2 <= r2) then
-        terrain.setPixel(x, y, emptyC)
-      else if (dst2 <= rEdge2) then
-        if isSolid(x, y) then terrain.putPixel(x, y, burntC);
+      if (dst2 > r2) then continue;
+      if isEmpty(x, y) then continue;
+      v := round((1-(dst2/r2)) * power);
+      tc := terrain.getPixel(x, y);
+      tc.a := clamp(tc.a - v, 0, 255);
+      tc.r := clamp(tc.r - (v div 2), 0, 255);
+      tc.g := clamp(tc.g - (v div 2), 0, 255);
+      tc.b := clamp(tc.b - (v div 2), 0, 255);
+      terrain.setPixel(x, y, tc);
     end;
   end;
 end;
@@ -89,6 +96,7 @@ var
   rockHeight: array[0..255] of integer;
   x,y: integer;
   c: RGBA;
+  v: single;
 begin
   terrain.clear(RGB(0, 0, 0, 0));
 
@@ -104,10 +112,15 @@ begin
         c := TC_ROCK
       else if y > dirtHeight[x] then
         c := TC_DIRT
+      else if y > dirtHeight[x]-1 then
+        c := RGB(TC_DIRT.r-10, TC_DIRT.g-10, TC_DIRT.b-10, TC_DIRT.a-10)
       else
         continue;
-
-      c *= 0.9+(0.1*(rnd/255));
+      v := 0.9+(0.1*(rnd/255));
+      c.r := round(c.r * v);
+      c.g := round(c.g * v);
+      c.b := round(c.r * v);
+      c.a := round(c.a * v);
       terrain.setPixel(x, y, c);
 
     end;
@@ -129,8 +142,10 @@ begin
       mov ecx, 255
     @XLOOP:
       mov eax, dword ptr [esi]
+      bswap eax
       test al, al
       jz @SKIP
+      bswap eax
       mov dword ptr [edi], eax
     @SKIP:
       add esi, 4

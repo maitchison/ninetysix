@@ -131,6 +131,7 @@ begin
 
   n := round(power * power);
   radius := power;
+  terrain.burn(round(atX-32), round(atY), round(radius+3), 25);
   for i := 0 to n-1 do begin
     p := particles.nextFree();
     z := (rnd/255);
@@ -143,7 +144,7 @@ begin
     end;
     p.vel := V2Polar(angle, (0.5+z)*radius/2);
     {edit the terrain}
-    terrain.burn(p.x-32, p.y, 1);
+    terrain.burn(p.x-32, p.y, 3, 5);
   end;
 end;
 
