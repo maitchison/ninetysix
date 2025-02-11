@@ -197,10 +197,8 @@ begin
 
     terrain.draw(screen);
 
-    tanks.update(elapsed);
-    bullets.update(elapsed);
-    tanks.draw(screen);
-    bullets.draw(screen);
+    updateAll(elapsed);
+    drawAll(screen);
 
     {gui}
     gui.update(elapsed);

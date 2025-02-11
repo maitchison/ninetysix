@@ -32,7 +32,7 @@ type
     procedure setSprite(aSprite: tSprite);
   public
     constructor create(); virtual;
-    procedure clear(); virtual;
+    procedure reset(); virtual;
     procedure draw(screen: tScreen); virtual;
     procedure update(elapsed: single); virtual;
     procedure markAsDeleted();
@@ -58,7 +58,7 @@ type
     power: single;
   public
     constructor create(); override;
-    procedure clear(); override;
+    procedure reset(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
     procedure adjust(deltaAngle, deltaPower: single);
@@ -67,7 +67,16 @@ type
   end;
 
   tBullet = class(tGameObject)
-    procedure clear(); override;
+    procedure reset(); override;
+    procedure update(elapsed: single); override;
+    procedure draw(screen: tScreen); override;
+  end;
+
+  tParticle = class(tGameObject)
+  public
+    radius: single;
+  public
+    procedure reset(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
   end;
@@ -76,12 +85,19 @@ type
 var
   tanks: tGameObjectList<tTank>;
   bullets: tGameObjectList<tBullet>;
+  particles: tGameObjectList<tParticle>;
 
+procedure updateAll(elapsed: single);
+procedure drawAll(screen: tScreen);
 
 implementation
 
 uses
   res, terra;
+
+{----------------------------------------------------------}
+{ helpers }
+{----------------------------------------------------------}
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 var
@@ -101,6 +117,31 @@ begin
   screen.canvas.putPixel(x, y+1, c);
 
   screen.markRegion(rect(x-1, y-1, 3, 3));
+end;
+
+procedure makeExplosion(atX, atY: single; power: single);
+var
+  i: integer;
+  p: tParticle;
+  radius: single;
+  n: integer;
+  z: single;
+  angle: single;
+begin
+  n := round(power * power);
+  radius := power;
+  for i := 0 to n-1 do begin
+    p := particles.nextFree();
+    z := (rnd/255);
+    angle := rnd/255*360;
+    p.pos := V2Polar(angle, z*radius/2) + V2(atX, atY);
+    case clamp(round(z*3), 0, 2) of
+      0: p.col := RGB($FFFEC729);
+      1: p.col := RGB($FFF47817);
+      2: p.col := RGB($FFC5361D);
+    end;
+    p.vel := V2Polar(angle, (0.5+z)*radius/2);
+  end;
 end;
 
 {----------------------------------------------------------}
@@ -136,7 +177,7 @@ begin
    expired elements. For small lists it's no problem though.}
   for go in objects do begin
     if go.status = GO_EXPIRED then begin
-      go.clear();
+      go.reset();
       exit(go);
     end;
   end;
@@ -152,10 +193,10 @@ end;
 
 constructor tGameObject.create();
 begin
-  clear();
+  reset();
 end;
 
-procedure tGameObject.clear();
+procedure tGameObject.reset();
 begin
   ttl := 0;
   status := GO_ACTIVE;
@@ -221,9 +262,9 @@ begin
   sprite := sprites['Tank'];
 end;
 
-procedure tTank.clear();
+procedure tTank.reset();
 begin
-  inherited clear();
+  inherited reset();
   cooldown := 0;
   angle := 0;
   power := 10;
@@ -272,9 +313,9 @@ end;
 { tBullet }
 {----------------------------------------------------------}
 
-procedure tBullet.clear();
+procedure tBullet.reset();
 begin
-  inherited clear();
+  inherited reset();
   col := RGB($ffffff86);
   offset.x := -1;
   offset.y := -1;
@@ -293,8 +334,7 @@ begin
     markAsDeleted();
   {check if we collided with terrain}
   if terrain.isSolid(x, y) then begin
-    // todo:
-    // makeExplosion(x, y);
+    makeExplosion(x, y, 10);
     mixer.play(explodeSFX);
     markAsDeleted();
   end;
@@ -307,17 +347,55 @@ end;
 
 {----------------------------------------------------------}
 
+procedure tParticle.reset();
+begin
+  inherited reset();
+  radius := 0;
+  ttl := 1;
+  col := RGB(255,0,0);
+  radius := 1;
+end;
+
+procedure tParticle.update(elapsed: single);
+begin
+  inherited update(elapsed);
+  col.a := clamp(round(255*ttl), 0, 255);
+end;
+
+procedure tParticle.draw(screen: tScreen);
+begin
+  drawMarker(screen, x, y, col);
+end;
+
+procedure updateAll(elapsed: single);
+begin
+  tanks.update(elapsed);
+  bullets.update(elapsed);
+  particles.update(elapsed);
+end;
+
+procedure drawAll(screen: tScreen);
+begin
+  tanks.draw(screen);
+  bullets.draw(screen);
+  particles.draw(screen);
+end;
+
+{----------------------------------------------------------}
+
 
 procedure initObjects;
 begin
   tanks := tGameObjectList<tTank>.create();
   bullets := tGameObjectList<tBullet>.create();
+  particles := tGameObjectList<tParticle>.create();
 end;
 
 procedure closeObjects;
 begin
   tanks.free;
   bullets.free;
+  particles.free;
 end;
 
 initialization

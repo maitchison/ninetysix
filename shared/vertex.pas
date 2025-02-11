@@ -9,6 +9,7 @@ uses
   test,
   debug,
   utils,
+  myMath,
   graph2d;
 
 type V2D = packed record
@@ -27,7 +28,6 @@ type V2D = packed record
     class operator Multiply(a: V2D; b:single): V2D;
 
     end;
-
 
 type
   V3D = packed record
@@ -106,6 +106,7 @@ type
   end;
 
 function V2(x,y: single): V2D;
+function V2Polar(degree,r: single): V2D;
 
 implementation
 
@@ -114,6 +115,12 @@ implementation
 function V2(x,y: single): V2D;
 begin
   result := V2D.create(x,y);
+end;
+
+{point in polar coordinates}
+function V2Polar(degree,r: single): V2D;
+begin
+  result := V2D.create(sin(degree*DEG2RAD)*r,-cos(degree*DEG2RAD)*r);
 end;
 
 {-----------------------------------------}
