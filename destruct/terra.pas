@@ -4,6 +4,7 @@ interface
 
 uses
   test, debug,
+  utils,
   graph32, screen;
 
 type
@@ -44,13 +45,15 @@ procedure tTerrain.generate();
 var
   mapHeight: array[0..255] of integer;
   x,y: integer;
+  c: RGBA;
 begin
   terrain.clear(RGB(0, 0, 0, 0));
   for x := 0 to 255 do
     mapHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
   for y := 0 to 255 do
     for x := 0 to 255 do begin
-      if y > mapHeight[x] then terrain.setPixel(x,y, TC_DIRT);
+      c.init(TC_DIRT.r + (rnd-128) div 8, TC_DIRT.g, TC_DIRT.b);
+      if y > mapHeight[x] then terrain.setPixel(x,y, c);
     end;
 end;
 
