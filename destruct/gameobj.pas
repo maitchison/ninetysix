@@ -8,6 +8,7 @@ uses
   sprite,
   utils,
   mixLib,
+  myMath,
   graph2d,
   graph32,
   screen;
@@ -53,11 +54,15 @@ type
   tTank = class(tGameObject)
   public
     cooldown: single;
+    angle: single;
+    power: single;
   public
     constructor create(); override;
     procedure clear(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
+    procedure adjust(deltaAngle, deltaPower: single);
+
     procedure fire();
   end;
 
@@ -77,6 +82,23 @@ implementation
 
 uses
   resLib, terrain;
+
+procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
+var
+  x,y: integer;
+  c: RGBA;
+begin
+  c := col;
+  c.a := c.a div 2;
+  x := round(atX);
+  y := round(atY);
+  screen.canvas.putPixel(x, y, col);
+  screen.canvas.putPixel(x-1, y, c);
+  screen.canvas.putPixel(x, y-1, c);
+  screen.canvas.putPixel(x+1, y, c);
+  screen.canvas.putPixel(x, y+1, c);
+  screen.markRegion(rect(x-1, y-1, 3, 3));
+end;
 
 {----------------------------------------------------------}
 { tGameObjects }
@@ -153,6 +175,8 @@ begin
   if assigned(fSprite) then begin
     bounds.width := fSprite.width;
     bounds.height := fSprite.height;
+    offset.x := -fSprite.width div 2;
+    offset.y := -fSprite.height div 2;
   end;
 end;
 
@@ -198,12 +222,22 @@ procedure tTank.clear();
 begin
   inherited clear();
   cooldown := 0;
+  angle := 0;
+  power := 10;
 end;
 
 procedure tTank.draw(screen: tScreen);
 begin
   sprite.draw(screen.canvas, bounds.x, bounds.y);
   screen.markRegion(bounds);
+  {draw target}
+  drawMarker(
+    screen,
+    x + sin(angle*DEG2RAD) * power * 2,
+    y - cos(angle*DEG2RAD) * power * 2,
+    RGB(128,128,128)
+  );
+
 end;
 
 procedure tTank.update(elapsed: single);
@@ -219,10 +253,16 @@ begin
   if cooldown <= 0 then begin
     bullet := bullets.nextFree();
     bullet.pos := pos;
-    bullet.vel := V2(-100, 0);
+    bullet.vel := V2(sin(angle*DEG2RAD) * power * 10, -cos(angle*DEG2RAD) * power * 10);
     cooldown := 0.25;
     mixer.play(shootSFX);
   end;
+end;
+
+procedure tTank.adjust(deltaAngle, deltaPower: single);
+begin
+  angle := clamp(angle + deltaAngle, -90, 90);
+  power := clamp(power + deltaPower, 2, 10);
 end;
 
 {----------------------------------------------------------}
@@ -246,23 +286,13 @@ begin
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}
-  if (x < -32) or (x > 256+32) then
+  if (x < -32) or (x > 256+32) or (y > 256) then
     markAsDeleted();
 end;
 
 procedure tBullet.draw(screen: tScreen);
-var
-  i: integer;
-  c: RGBA;
 begin
-  c := self.col;
-  c.a := c.a div 2;
-  for i := -1 to 1 do begin
-    screen.canvas.putPixel(x+i, y, c);
-    screen.canvas.putPixel(x, y+i, c);
-  end;
-  note(bounds.toString);
-  screen.markRegion(bounds);
+  drawMarker(screen, x, y, col);
 end;
 
 

@@ -21,6 +21,10 @@ function floor(x: tFloat): int64;
 function arccos(x: tFloat): tFloat;
 function arctan2(y,x: tFloat): tFloat;
 
+const
+  DEG2RAD = pi / 180;
+  RAD2DEG = 180 / pi;
+
 implementation
 
 function degToRad(x: tFloat): tFloat;

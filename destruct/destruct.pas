@@ -137,6 +137,7 @@ var
   exitFlag: boolean;
   bullet: tBullet;
   tank1, tank2: tTank;
+  elapsed: single;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -164,15 +165,25 @@ begin
 
     startTimer('main');
 
+    elapsed := clamp(getTimer('main').elapsed, 0.01, 0.10);
+
     {input}
     if keyDown(key_space) then
       tank2.fire();
+    if keyDown(key_left) then
+      tank2.adjust(-90*elapsed, 0);
+    if keyDown(key_right) then
+      tank2.adjust(+90*elapsed, 0);
+    if keyDown(key_up) then
+      tank2.adjust(0, +10*elapsed);
+    if keyDown(key_down) then
+      tank2.adjust(0, -10*elapsed);
 
     screen.clearAll();
     drawTerrain(screen);
 
-    tanks.update(0.02);
-    bullets.update(0.02);
+    tanks.update(elapsed);
+    bullets.update(elapsed);
     tanks.draw(screen);
     bullets.draw(screen);
 
