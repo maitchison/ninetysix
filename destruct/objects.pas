@@ -5,6 +5,7 @@ interface
 uses
   vertex,
   sprite,
+  utils,
   graph2d,
   graph32,
   screen;
@@ -27,8 +28,9 @@ type
     function getY: integer;
     procedure setSprite(aSprite: tSprite);
   public
-    constructor create(); overload;
-    constructor create(x,y: single); overload;
+    constructor create(); virtual; overload;
+    constructor create(x,y: single); virtual; overload;
+    procedure clear(); virtual;
     procedure draw(screen: tScreen); virtual;
     procedure update(elapsed: single); virtual;
     procedure markAsDeleted();
@@ -38,22 +40,30 @@ type
     property y: integer read getY;
   end;
 
-  tTank = class(tGameObject)
-    constructor create(x,y: single);
-    procedure draw(screen: tScreen); override;
-  end;
-
-  tBullet = class(tGameObject)
-    constructor create(x,y: single);
-    procedure update(elapsed: single); override;
-    procedure draw(screen: tScreen); override;
-  end;
-
-  tGameObjectList<T> = class
+  tGameObjectList<T: tGameObject> = class
+  public
     objects: array of T;
     procedure append(o: T);
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
+    function  nextFree(): T;
+  end;
+
+  tTank = class(tGameObject)
+  public
+    cooldown: single;
+  public
+    constructor create(x,y: single); override;
+    procedure clear(); override;
+    procedure update(elapsed: single); override;
+    procedure draw(screen: tScreen); override;
+    procedure fire();
+  end;
+
+  tBullet = class(tGameObject)
+    constructor create(x,y: single); override;
+    procedure update(elapsed: single); override;
+    procedure draw(screen: tScreen); override;
   end;
 
 {may as well put globals here}
@@ -91,24 +101,51 @@ begin
   for go in objects do if go.status = GO_ACTIVE then go.update(elapsed);
 end;
 
+{returns the next free object, or creats a new one of there are none free}
+function tGameObjectList<T>.nextFree(): T;
+var
+  go: T;
+begin
+  {note: we could make this much faster by maintaining a list of known
+   expired elements. For small lists it's no problem though.}
+  for go in objects do begin
+    if go.status = GO_EXPIRED then begin
+      go.clear();
+      exit(go);
+    end;
+  end;
+
+  {ok we had none free, so create one}
+  result := T.create();
+  append(result);
+end;
+
 {----------------------------------------------------------}
 { tGameObject }
 {----------------------------------------------------------}
 
 constructor tGameObject.create();
 begin
-  ttl := 0;
-  status := GO_ACTIVE;
-  col := RGB(255,0,255);
-  sprite := nil;
-  offset := V2(0, 0);
+  clear();
 end;
 
 constructor tGameObject.create(x,y: single);
 begin
   create();
   pos := V2(x,y);
-  bounds := rect(round(x), round(y), 1, 1);
+  bounds.x := getX; bounds.y := getY;
+end;
+
+procedure tGameObject.clear();
+begin
+  ttl := 0;
+  status := GO_ACTIVE;
+  col := RGB(255,0,255);
+  sprite := nil;
+  pos := V2(0,0);
+  vel := V2(0,0);
+  offset := V2(0, 0);
+  bounds := rect(0, 0, 0, 0);
 end;
 
 procedure tGameObject.markAsDeleted();
@@ -159,14 +196,38 @@ end;
 constructor tTank.create(x,y: single);
 begin
   inherited create(x,y);
-  col := RGB(255,0,0);
+  col := RGB(255,255,255);
   sprite := sprites['Tank'];
+end;
+
+procedure tTank.clear();
+begin
+  inherited clear();
+  cooldown := 0;
 end;
 
 procedure tTank.draw(screen: tScreen);
 begin
   sprite.draw(screen.canvas, bounds.x, bounds.y);
   screen.markRegion(bounds);
+end;
+
+procedure tTank.update(elapsed: single);
+begin
+  inherited update(elapsed);
+  if cooldown > 0 then cooldown -= elapsed;
+end;
+
+procedure tTank.fire();
+var
+  bullet: tBullet;
+begin
+  if cooldown <= 0 then begin
+    bullet := bullets.nextFree();
+    bullet.pos := pos;
+    bullet.vel := V2(-100, 0);
+    cooldown := 1;
+  end;
 end;
 
 {----------------------------------------------------------}
@@ -176,7 +237,7 @@ end;
 constructor tBullet.create(x,y: single);
 begin
   inherited create(x,y);
-  col := RGB($ffffff86);
+  col := RGB($ffff86ff);
   offset.x := -1;
   offset.y := -1;
   bounds.width := 3;
@@ -193,7 +254,6 @@ begin
   if (x < -32) or (x > 256+32) then
     markAsDeleted();
 end;
-
 
 procedure tBullet.draw(screen: tScreen);
 var

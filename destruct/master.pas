@@ -27,7 +27,7 @@ end;
 procedure masterSongs();
 var
   verbose: boolean;
-  sourceFiles: array of string = ['dance1'];
+  sourceFiles: array of string = ['dance1', 'explode', 'shoot'];
   writer: tLA96Writer;
   filename: string;
   srcPath, dstPath: string;

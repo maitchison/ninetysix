@@ -5,6 +5,7 @@ uses
   graph32, vga, vesa, screen,
   resources,
   sprite, inifile,
+  vertex,
   terrain, objects,
   myMath,
   timer,
@@ -134,6 +135,8 @@ end;
 procedure battleScreen();
 var
   exitFlag: boolean;
+  bullet: tBullet;
+  tank1, tank2: tTank;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -147,8 +150,10 @@ begin
   generateTerrain();
 
   {setup players}
-  tanks.append(tTank.create(100, 100));
-  tanks.append(tTank.create(200, 100));
+  tank1 := tTank.create(100, 100);
+  tank2 := tTank.create(200, 100);
+  tanks.append(tank1);
+  tanks.append(tank2);
 
   {main loop}
   repeat
@@ -158,14 +163,16 @@ begin
     startTimer('main');
 
     {input}
-    if keyDown(key_space) then begin
-    end;
+    if keyDown(key_space) then
+      tank2.fire();
 
     screen.clearAll();
     drawTerrain(screen);
 
     tanks.update(0.01);
+    bullets.update(0.01);
     tanks.draw(screen);
+    bullets.draw(screen);
 
     screen.flipAll();
 

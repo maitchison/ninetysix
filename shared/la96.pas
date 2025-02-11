@@ -77,6 +77,7 @@ uses
   utils,
   sysTypes,
   filesystem,
+  resource,
   lz4,
   dos,
   go32,
@@ -195,6 +196,7 @@ type
     procedure writeA96(sfx: tSoundEffect); overload;
   end;
 
+function loadA96(filename: string): tSoundEffect;
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 
@@ -922,8 +924,20 @@ end;
 
 {--------------------------------------------------------}
 
+function loadA96(filename: string): tSoundEffect;
+var
+  fs: tFileStream;
+begin
+  fs := tFileStream.Create(filename);
+  result := decodeLA96(fs);
+  fs.free;
+end;
+
+{--------------------------------------------------------}
+
 initialization
   tLA96Test.create('LA96');
+  registerResourceLoader('A96', @loadA96);
 finalization
 
 end.

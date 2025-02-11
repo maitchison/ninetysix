@@ -26,6 +26,7 @@ uses
   utils,
   sysTypes,
   stream,
+  resource,
   graph2d,
   graph32;
 
@@ -661,7 +662,7 @@ initialization
 
   tLC96Test.create('LC96');
 
-  registerImageLoader('p96', @loadLC96);
+  registerResourceLoader('p96', @loadLC96);
 
 finalization
 

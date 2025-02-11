@@ -17,6 +17,7 @@ interface
 uses
   test,
   debug,
+  resource,
   utils,
   dos,
   sbDriver;
@@ -90,7 +91,7 @@ type
   tAudioSample = tAudioSample16S;
   pAudioSample = ^tAudioSample;
 
-  tSoundEffect = class
+  tSoundEffect = class(tResource)
 
     tag: string;
     data: pointer;
@@ -111,10 +112,8 @@ type
     function getSample(pos: int32): tAudioSample;
     procedure setSample(pos: int32;sample: tAudioSample);
 
-    procedure saveToWave(filename: string);
-
-    class function loadFromWave(filename: string;maxSamples: int32=-1): tSoundEffect;
     class function createNoise(duration: single): tSoundEffect;
+    class function Load(filename: string): tSoundEffect;
 
     property items[index: int32]: tAudioSample read getSample write setSample; default;
 
@@ -123,27 +122,10 @@ type
 implementation
 
 uses
-  mixLib;
+  mixLib,
+  la96;
 
-type
-  tWaveFileHeader = packed record
-    fileTypeBlockID: array[0..3] of char;
-    fileSize: dword;
-    fileFormatId: array[0..3] of char;
-    formatBlockID: array[0..3] of char;
-    blockSize: dword;
-    audioFormat: word;
-    numChannels: word;
-    frequency: dword;
-    bytePerSec: dword;
-    bytePerBlock: word;
-    bitsPerSample: word;
-  end;
-
-  tChunkHeader = packed record
-    chunkBlockID: array[0..3] of char;
-    chunkSize: dword;
-  end;
+{--------------------------------------------------------}
 
 function getAudioFormat(bitsPerChannel: integer; numChannels: integer): tAudioFormat;
 begin
@@ -354,156 +336,25 @@ begin
   result.tag := 'noise';
 end;
 
-class function tSoundEffect.loadFromWave(filename: string;maxSamples: int32=-1): tSoundEffect;
-const
-  BLOCK_SIZE = 16*1024;
+class function tSoundEffect.Load(filename: string): tSoundEffect;
 var
-  f: file;
-  fileHeader: tWaveFileHeader;
-  chunkHeader: tChunkHeader;
-  samples: int32;
-  i,j: integer;
-  ioError: word;
-  bytesRemaining: dWord;
-  blockSize: int32;
-  dataPtr: pointer;
-  af: tAudioFormat;
-  samplesToRead: dword;
-
-function wordAlign(x: int32): int32;
-  begin
-    result := (x+1) div 2 * 2;
-  end;
-
+  proc: tResourceLoadProc;
+  res: tResource;
+  startTime: double;
 begin
-
-  try
-    fileMode := 0;
-    {$I-}
-    assign(f, filename);
-    reset(f,1);
-    {$I+}
-
-    IOError := IOResult;
-    if IOError <> 0 then
-      error('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
-
-    blockread(f, fileHeader, sizeof(fileHeader));
-
-    with fileHeader do begin
-      if fileTypeBlockID <> 'RIFF' then
-        Error('Invalid BlockID '+fileTypeBLockID);
-
-      if fileFormatID <> 'WAVE' then
-        Error('Invalid FormatID '+fileFormatID);
-
-      if formatBlockID <> 'fmt ' then
-        Error('Invalid formatBlockID '+formatBlockID);
-
-      if frequency <> 44100 then
-        error(utils.format('frequency must be 44100 but was %d', [frequency]));
-
-      if audioFormat <> 1 then
-        error(utils.format('format must be 1 (PCM) but was %d', [audioFormat]));
-
-      af := getAudioFormat(bitsPerSample, numChannels);
-      if af = AF_INVALID then
-        error(utils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));
-    end;
-
-    {process the chunks}
-    while True do begin
-      blockRead(f, chunkHeader, sizeof(chunkHeader));
-      with chunkHeader do begin
-        if chunkBlockID <> 'data' then begin
-          seek(f, wordAlign(filePos(f) + chunkSize));
-          continue;
-        end;
-
-        samplesToRead := chunkSize div AF_SIZE[af];
-        if maxSamples > 0 then samplesToRead := min(samplesToRead, maxSamples);
-
-        result := tSoundEffect.create(af, samplesToRead, filename);
-
-        bytesRemaining := samplesToRead * AF_SIZE[af];
-        dataPtr := result.data;
-
-        {reading in blocks stop interrupts from being blocked for too
-         long on larger files}
-        while bytesRemaining > 0 do begin
-          blockSize := min(BLOCK_SIZE, bytesRemaining);
-          blockRead(f, dataPtr^, blockSize);
-          dataPtr += blockSize;
-          bytesRemaining -= blocksize;
-        end;
-
-        break;
-      end;
-    end;
-
-  finally
-    close(f);
-  end;
-
+  proc := getResourceLoader(extractExtension(filename));
+  if assigned(proc) then begin
+    startTime := getSec;
+    res := proc(filename);
+    if not (res is tSoundEffect) then error('Resources is of invalid type');
+    result := tSoundEffect(proc(filename));
+    note(' - loaded %s (%fs) in %.2fs', [filename, result.length/44100, getSec-startTime]);
+  end else
+    debug.error('No sound loader for file "'+filename+'"');
 end;
 
-{saves sound file to a wave file}
-procedure tSoundEffect.saveToWave(filename: string);
-var
-  f: file;
-  fileHeader: tWaveFileHeader;
-  chunkHeader: tChunkHeader;
-  chunkBytes: int32;
-  IOError: word;
-begin
-
-  fileMode := 0;
-  {$I-}
-  assign(f, filename);
-  rewrite(f,1);
-  {$I+}
-
-  IOError := IOResult;
-  if IOError <> 0 then
-    error('Could not open file "'+FileName+'" for output.'+getIOErrorString(IOError));
-
-  chunkBytes := length * 4;
-
-  with fileHeader do begin
-    fileTypeBlockID := 'RIFF';
-    fileSize        := 36 + chunkBytes;
-    fileFormatId    := 'WAVE';
-    formatBlockID   := 'fmt ';
-    blockSize       := 16;
-    audioFormat     := 1; {PCM}
-    numChannels     := 2;
-    frequency       := 44100;
-    bytePerSec      := chunkBytes*2;
-    bytePerBlock    := 4; // chanels * bitsPerSample / 8
-    bitsPerSample   := 16;
-  end;
-
-  with chunkHeader do begin
-    chunkBlockID := 'data';
-    chunkSize := chunkBytes;
-  end;
-
-  blockwrite(f, fileHeader, sizeof(fileHeader));
-  blockwrite(f, chunkHeader, sizeof(chunkHeader));
-  blockwrite(f, data^, chunkBytes);
-
-  close(f);
-
-end;
-
-{----------------------------------------------------------}
-
-procedure runTests();
-begin
-end;
 
 {----------------------------------------------------------}
 
 begin
-  runTests();
 end.

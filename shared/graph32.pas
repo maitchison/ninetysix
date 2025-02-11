@@ -2,7 +2,6 @@
 
 {$MODE delphi}
 
-
 unit graph32;
 
 interface
@@ -11,36 +10,11 @@ uses
   test,
   debug,
   vga,
+  resource,
   sysTypes,
   sysInfo,
   utils,
   graph2d;
-
-type
-  TBMPHeader = packed record
-    FileType: Word;
-    FileSize: Cardinal;
-    Reserved1: Word;
-    Reserved2: Word;
-    Offset: Cardinal;
-  end;
-
-  TBitmapInfoHeader = packed record
-    Size: Cardinal;
-    Width: Integer;
-    Height: Integer;
-    Planes: Word;
-    BitsPerPixel: Word;
-    Compression: Cardinal;
-    SizeImage: Cardinal;
-    XPelsPerMeter: Integer;
-    YPelsPerMeter: Integer;
-    ClrUsed: Cardinal;
-    ClrImportant: Cardinal;
-
-    function ByteCount(): Cardinal;
-    function PixelCount(): Cardinal;
-  end;
 
 type
 
@@ -105,33 +79,33 @@ const
 
 type
 
-  tPage = class
+  tPage = class(tResource)
     width, height,bpp: Word;
     isRef: boolean;
     pixels: pointer;
     defaultColor: RGBA;
 
-    destructor  Destroy(); override;
-    constructor Create(); overload;
-    constructor Create(AWidth, AHeight: word); overload;
-    constructor CreateAsReference(AWidth, AHeight: word;PixelData: Pointer);
+    destructor  destroy(); override;
+    constructor create(); overload;
+    constructor create(AWidth, AHeight: word); overload;
+    constructor createAsReference(AWidth, AHeight: word;PixelData: Pointer);
 
-    function GetPixel(x, y: integer): RGBA; inline; overload;
-    function GetPixel(fx,fy: single): RGBA; overload;
-    function GetPixelScaled(x, y, s: integer;doGamma: boolean=False): RGBA;
+    function  getPixel(x, y: integer): RGBA; inline; overload;
+    function  getPixel(fx,fy: single): RGBA; overload;
+    function  getPixelScaled(x, y, s: integer;doGamma: boolean=False): RGBA;
     procedure hLine(x1, y, x2: int16;c: RGBA); pascal;
     procedure vLine(x, y1, y2: int16;c: RGBA); pascal;
-    procedure PutPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
-    procedure SetPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
-    procedure Clear(c: RGBA);
-    procedure FillRect(aRect: TRect; c: RGBA);
-    procedure DrawRect(aRect: TRect; c: RGBA);
-    function clone(): TPage;
-    function asBytes: tBytes;
-    function asRGBBytes: tBytes;
+    procedure putPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
+    procedure setPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
+    procedure clear(c: RGBA);
+    procedure fillRect(aRect: TRect; c: RGBA);
+    procedure drawRect(aRect: TRect; c: RGBA);
+    function  clone(): TPage;
+    function  asBytes: tBytes;
+    function  asRGBBytes: tBytes;
     procedure setTransparent(col: RGBA);
 
-    function checkForAlpha: boolean;
+    function  checkForAlpha: boolean;
 
     class function Load(filename: string): tPage;
   end;
@@ -140,24 +114,15 @@ type
 
 function RGB(d: dword): RGBA; inline; overload;
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline; overload;
-function loadBMP(const FileName: string): tPage;
 procedure makePageRandom(page: tPage);
 
 procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 procedure assertEqual(a, b: tPage); overload;
 
-procedure registerImageLoader(aExtension: string; aProc: tImageLoaderProc);
-
 implementation
 
-type
-  tImageLoaderEntry = record
-    extension: string;
-    proc: tImageLoaderProc;
-  end;
-
-var
-  imageLoaderRegistery: array of tImageLoaderEntry;
+uses
+  bmp;
 
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
 begin
@@ -168,8 +133,6 @@ function RGB(d: dword): RGBA; inline;
 begin
   result.from32(d);
 end;
-
-function getImageLoader(aExtension: string): tImageLoaderProc; forward;
 
 {returns value v at brightness b [0..1] with gamma correction}
 function gammaCorrect(v: byte; b: single): byte;
@@ -429,113 +392,12 @@ end;
 
 {----------------------------------------------}
 
-{SizeImage is often zero, so calculate the number of bytes here.}
-function TBitmapInfoHeader.ByteCount(): Cardinal;
-begin
-  result := PixelCount * BitsPerPixel div 8;
-end;
-
-{SizeImage is often zero, so calculate the number of bytes here.}
-function TBitmapInfoHeader.PixelCount(): Cardinal;
-begin
-  result := Width * Height;
-end;
-
-{----------------------------------------------}
-
 function intToStr(x: integer): String;
 var s: string;
 begin
   str(x, s);
   result := s;
 end;
-
-function LoadBMP(const FileName: string): TPage;
-var
-  FileHeader: TBMPHeader;
-  InfoHeader: TBitmapInfoHeader;
-  f: File;
-
-  lineWidth: integer;
-  x, y, i: integer;
-  c: RGBA;
-  linePadding: integer;
-  lineData: Array of byte;
-
-  BytesPerPixel: integer;
-
-  BytesRead: int32;
-  IOError: word;
-begin
-
-  result := tPage.create();
-
-  FileMode := 0; {read only}
-  Assign(F, FileName);
-  {$I-}
-  Reset(F, 1);
-  {$I+}
-  IOError := IOResult;
-  if IOError <> 0 then
-    Error('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
-
-  BlockRead(F, FileHeader, SizeOf(TBMPHeader), BytesRead);
-  if BytesRead <> SizeOf(TBMPHeader) then
-    Error('Error reading BMP Headed.');
-
-  BlockRead(F, InfoHeader, SizeOf(TBitmapInfoHeader), BytesRead);
-  if BytesRead <> Sizeof(TBitmapInfoHeader) then
-    Error('Error reading BMP Info Header.');
-
-  if (FileHeader.FileType <> $4D42) then
-    Error(Format('Not a valid BMP file, found $%h, expected $%h', [FileHeader.FileType, $4D42]));
-
-  if not (InfoHeader.BitsPerPixel in [8, 24, 32]) then
-    Error(
-      'Only 8, 24, and 32-bit BMP images are supported, but "'+FileName+'" is '+
-      intToStr(InfoHeader.BitsPerPixel)+'-bit');
-
-  result.Width := InfoHeader.Width;
-  result.Height := InfoHeader.Height;
-  result.BPP := InfoHeader.BitsPerPixel;
-
-  BytesPerPixel := result.BPP div 8;
-  LineWidth := result.Width * BytesPerPixel;
-  while LineWidth mod 4 <> 0 do
-    inc(LineWidth);
-
-  Seek(F, FileHeader.Offset);
-
-  SetLength(LineData, LineWidth);
-
-  result.Pixels := getMem(InfoHeader.PixelCount * 4);
-  fillchar(result.pixels^, InfoHeader.PixelCount * 4, 255);
-
-  for y := result.Height-1 downto 0 do begin
-    BlockRead(F, LineData[0], LineWidth, BytesRead);
-    for x := 0 to result.Width-1 do begin
-      {ignore alpha for the moment}
-      case Result.BPP of
-        8:
-          {assume 8bit is monochrome}
-          c.init(LineData[x], LineData[x], LineData[x], 255);
-        24:
-          c.init(LineData[x*3+2], LineData[x*3+1], LineData[x*3+0], 255);
-        32:
-          c.init(LineData[x*4+2], LineData[x*4+1], LineData[x*4+0], LineData[x*4+3]);
-        else
-          Error('Invalid Bitmap depth '+IntToStr(Result.BPP));
-      end;
-      result.PutPixel(x, y, c);
-    end;
-  end;
-
-  Close(F);
-
-  {todo: don't store bitmap depth in result.bpp}
-  result.BPP := 32;
-end;
-
 
 {----------------------------------------------------------------}
 { TPage }
@@ -1020,14 +882,17 @@ end;
 
 class function tPage.Load(filename: string): tPage;
 var
-  proc: tImageLoaderProc;
+  proc: tResourceLoadProc;
+  res: tResource;
   startTime: double;
 begin
-  proc := getImageLoader(extractExtension(filename));
+  proc := getResourceLoader(extractExtension(filename));
   if assigned(proc) then begin
     startTime := getSec;
-    result := proc(filename);
-    note(format(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]));
+    res := proc(filename);
+    if not (res is tPage) then error('Resources is of invalid type');
+    result := tPage(proc(filename));
+    note(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]);
   end else
     debug.error('No image loader for file "'+filename+'"');
 end;
@@ -1067,30 +932,6 @@ end;
 
 {-------------------------------------------------}
 
-{returns imageLoader for extension, or nil if none assigned.}
-function getImageLoader(aExtension: string): tImageLoaderProc;
-var
-  i: integer;
-begin
-  aExtension := toLowerCase(aExtension);
-  for i := 0 to length(imageLoaderRegistery)-1 do
-    with imageLoaderRegistery[i] do
-      if aExtension = extension then
-        exit(proc);
-  exit(nil);
-end;
-
-procedure registerImageLoader(aExtension: string; aProc: tImageLoaderProc);
-begin
-  setLength(imageLoaderRegistery, length(imageLoaderRegistery)+1);
-  with imageLoaderRegistery[length(imageLoaderRegistery)-1] do begin
-    extension := toLowerCase(aExtension);
-    proc := aProc;
-  end;
-end;
-
-{--------------------------------------------------------}
-
 type
   tGraph32Test = class(tTestSuite)
     procedure run; override;
@@ -1110,5 +951,4 @@ end;
 
 initialization
   tGraph32Test.create('Graph32');
-  registerImageLoader('bmp', @loadBMP);
 end.
