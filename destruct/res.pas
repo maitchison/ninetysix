@@ -24,7 +24,7 @@ begin
   titleGFX := tPage.Load('res\title_320.p96');
 
   shootSFX := tSoundEffect.Load('res\shoot.a96');
-  //explodeSFX := tSoundEffect.Load('res\explode.a96');
+  explodeSFX := tSoundEffect.Load('res\explode.a96');
 
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
   sprites.load('sprites.ini');

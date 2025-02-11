@@ -92,11 +92,14 @@ begin
   c.a := c.a div 2;
   x := round(atX);
   y := round(atY);
+
   screen.canvas.putPixel(x, y, col);
+
   screen.canvas.putPixel(x-1, y, c);
-  screen.canvas.putPixel(x, y-1, c);
   screen.canvas.putPixel(x+1, y, c);
+  screen.canvas.putPixel(x, y-1, c);
   screen.canvas.putPixel(x, y+1, c);
+
   screen.markRegion(rect(x-1, y-1, 3, 3));
 end;
 
@@ -286,11 +289,15 @@ begin
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}
-  if (x < -32) or (x > 256+32) or (y > 256) then
+  if (x < 32) or (x > 256+32) or (y > 256) then
     markAsDeleted();
   {check if we collided with terrain}
-  if terrain.terrain.getPixel(x-32, y).a > 0 then
+  if terrain.isSolid(x, y) then begin
+    // todo:
+    // makeExplosion(x, y);
+    mixer.play(explodeSFX);
     markAsDeleted();
+  end;
 end;
 
 procedure tBullet.draw(screen: tScreen);

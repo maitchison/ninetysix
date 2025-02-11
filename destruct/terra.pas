@@ -15,6 +15,7 @@ type
   public
     constructor create();
     destructor destroy(); override;
+    function isSolid(x,y: integer): boolean;
     procedure generate();
     procedure draw(screen: tScreen);
   end;
@@ -39,6 +40,14 @@ destructor tTerrain.destroy();
 begin
   terrain.free();
   inherited destroy();
+end;
+
+function tTerrain.isSolid(x,y: integer): boolean;
+begin
+  x -= 32;
+  if y > 240 then exit(true);
+  if (x < 0) or (x > 255) or (y < 0) then exit(false);
+  result := terrain.getPixel(x, y).a > 0;
 end;
 
 procedure tTerrain.generate();

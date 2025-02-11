@@ -1,20 +1,6 @@
-procedure postProcessEMA(samplePtr: pAudioSample16S; out left: single; out right: single; count: int32; alpha: single);
-var
-  i: integer;
-  sample: tAudioSample16S;
-begin
-  for i := 0 to count-1 do begin
-    left := (alpha) * left + ((alpha-1) * samplePtr^.left);
-    right := (alpha) * right + ((alpha-1) * samplePtr^.right);
-    samplePtr^.left := round(left);
-    samplePtr^.right := round(right);
-    inc(samplePtr);
-  end;
-end;
-
 function generateSample(midValue, difValue: int16;frameSpec: pFrameSpec): tAudioSample16S;
 var
-  mid, dif: int16;
+  mid, dif: int32;
   left,right: int32;
   shift: byte;
 begin
@@ -42,7 +28,7 @@ end;
 
 procedure process_REF(sfxSamplePtr: pAudioSample16S; midValue, difValue: int16; midCodes,difCodes: tWords; frameSpec: pFrameSpec);
 var
-  i: int16;
+  i: int32;
 begin
   for i := 0 to (frameSpec^.length-1)-1 do begin
     {note: codes should wrap}
@@ -51,5 +37,19 @@ begin
     frameSpec^.idx := i+1;
     sfxSamplePtr^ := generateSample(midValue, difValue, frameSpec);
     inc(sfxSamplePtr);
+  end;
+end;
+
+procedure postProcessEMA(samplePtr: pAudioSample16S; out left: single; out right: single; count: int32; alpha: single);
+var
+  i: integer;
+  sample: tAudioSample16S;
+begin
+  for i := 0 to count-1 do begin
+    left := (alpha) * left + ((alpha-1) * samplePtr^.left);
+    right := (alpha) * right + ((alpha-1) * samplePtr^.right);
+    samplePtr^.left := round(left);
+    samplePtr^.right := round(right);
+    inc(samplePtr);
   end;
 end;
