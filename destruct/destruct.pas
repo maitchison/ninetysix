@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   graph32, vga, vesa, screen,
-  resources,
+  resLib,
   sprite, inifile,
   vertex,
   terrain, objects,
