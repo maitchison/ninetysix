@@ -501,7 +501,7 @@ begin
     append(sprite);
   end;
   reader.free();
-  note(' - loaded sprite sheet %s with %d sprites.', [filename, length(sprites)]);
+  note(' - loaded sprite sheet "%s" with %d sprites.', [filename, length(sprites)]);
 end;
 
 {---------------}
@@ -512,10 +512,9 @@ var
 begin
   {linear scan for moment}
   for sprite in sprites do
-    if sprite.tag = tag then exit(sprite);
+    if assigned(sprite) and (sprite.tag = tag) then exit(sprite);
   error('Sprite sheet contains no sprite named "'+tag+'"');
 end;
-
 
 {-----------------------------------------------------}
 

@@ -3,9 +3,11 @@ unit gameObj;
 interface
 
 uses
+  debug, test,
   vertex,
   sprite,
   utils,
+  mixLib,
   graph2d,
   graph32,
   screen;
@@ -28,8 +30,7 @@ type
     function getY: integer;
     procedure setSprite(aSprite: tSprite);
   public
-    constructor create(); virtual; overload;
-    constructor create(x,y: single); virtual; overload;
+    constructor create(); virtual;
     procedure clear(); virtual;
     procedure draw(screen: tScreen); virtual;
     procedure update(elapsed: single); virtual;
@@ -53,7 +54,7 @@ type
   public
     cooldown: single;
   public
-    constructor create(x,y: single); override;
+    constructor create(); override;
     procedure clear(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
@@ -61,7 +62,7 @@ type
   end;
 
   tBullet = class(tGameObject)
-    constructor create(x,y: single); override;
+    procedure clear(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
   end;
@@ -75,7 +76,7 @@ var
 implementation
 
 uses
-  resources, terrain;
+  resLib, terrain;
 
 {----------------------------------------------------------}
 { tGameObjects }
@@ -127,13 +128,6 @@ end;
 constructor tGameObject.create();
 begin
   clear();
-end;
-
-constructor tGameObject.create(x,y: single);
-begin
-  create();
-  pos := V2(x,y);
-  bounds.x := getX; bounds.y := getY;
 end;
 
 procedure tGameObject.clear();
@@ -193,9 +187,9 @@ end;
 { tTank }
 {----------------------------------------------------------}
 
-constructor tTank.create(x,y: single);
+constructor tTank.create();
 begin
-  inherited create(x,y);
+  inherited create();
   col := RGB(255,255,255);
   sprite := sprites['Tank'];
 end;
@@ -226,7 +220,8 @@ begin
     bullet := bullets.nextFree();
     bullet.pos := pos;
     bullet.vel := V2(-100, 0);
-    cooldown := 1;
+    cooldown := 0.25;
+    mixer.play(shootSFX);
   end;
 end;
 
@@ -234,10 +229,10 @@ end;
 { tBullet }
 {----------------------------------------------------------}
 
-constructor tBullet.create(x,y: single);
+procedure tBullet.clear();
 begin
-  inherited create(x,y);
-  col := RGB($ffff86ff);
+  inherited clear();
+  col := RGB($ffffff86);
   offset.x := -1;
   offset.y := -1;
   bounds.width := 3;
@@ -266,6 +261,7 @@ begin
     screen.canvas.putPixel(x+i, y, c);
     screen.canvas.putPixel(x, y+i, c);
   end;
+  note(bounds.toString);
   screen.markRegion(bounds);
 end;
 

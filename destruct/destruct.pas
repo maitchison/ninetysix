@@ -6,7 +6,7 @@ uses
   resLib,
   sprite, inifile,
   vertex,
-  terrain, objects,
+  terrain, gameObj,
   myMath,
   timer,
   crt, //todo: remove
@@ -150,8 +150,10 @@ begin
   generateTerrain();
 
   {setup players}
-  tank1 := tTank.create(100, 100);
-  tank2 := tTank.create(200, 100);
+  tank1 := tTank.create();
+  tank2 := tTank.create();
+  tank1.pos := V2(100, 150);
+  tank2.pos := V2(200, 150);
   tanks.append(tank1);
   tanks.append(tank2);
 
@@ -169,8 +171,8 @@ begin
     screen.clearAll();
     drawTerrain(screen);
 
-    tanks.update(0.01);
-    bullets.update(0.01);
+    tanks.update(0.02);
+    bullets.update(0.02);
     tanks.draw(screen);
     bullets.draw(screen);
 
