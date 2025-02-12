@@ -125,7 +125,7 @@ function keyDown(code: byte): boolean;
 function keyDownNoCheck(code: byte): boolean; inline;
 function readkey: char;
 procedure waitkey();
-function anyKeyDown:boolean;
+function anyKeyDown: boolean;
 function keyPressed: boolean;
 function getKey: tKeyPair;
 

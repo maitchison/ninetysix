@@ -38,6 +38,7 @@ type
     textColor: RGBA;
     text: string;
     centered: boolean;
+    halfSize: boolean;
   protected
     procedure doDraw(screen: tScreen); override;
   public
@@ -124,6 +125,7 @@ begin
   self.centered := false;
   self.textColor := RGB(250, 250, 250);
   self.text := '';
+  self.halfSize := false;
 end;
 
 procedure tGuiLabel.doDraw(screen: tScreen);
@@ -133,9 +135,16 @@ var
 begin
   c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
   if c.a = 0 then exit;
-  bounds := textExtents(text, pos);
-  if centered then bounds.x -= bounds.width div 2;
-  textOut(screen.canvas, bounds.x, bounds.y, text, c);
+  if halfSize then begin
+    {todo: remove half size and use a font}
+    bounds := textExtentsHalf(text, pos);
+    if centered then bounds.x -= bounds.width div 2;
+    textOutHalf(screen.canvas, bounds.x, bounds.y, text, c);
+  end else begin
+    bounds := textExtents(text, pos);
+    if centered then bounds.x -= bounds.width div 2;
+    textOut(screen.canvas, bounds.x, bounds.y, text, c);
+  end;
   screen.markRegion(bounds);
 end;
 

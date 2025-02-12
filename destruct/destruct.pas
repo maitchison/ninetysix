@@ -23,10 +23,30 @@ var
 procedure titleScreen();
 var
   exitFlag: boolean;
+  gui: tGuiComponents;
+  startLabel,verLabel: tGuiLabel;
+  elapsed: single;
 begin
 
   {load background and refresh screen}
-  screen.background := titleGFX;
+  screen.background := tPage.create(320,240);
+  tSprite.create(titleGFX).blit(screen.background, 0, -16);
+
+  screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
+  screen.background.fillRect(Rect(0,240-24,320,24),RGB(0,0,0));
+
+  {setup gui}
+  gui := tGuiComponents.create();
+  startLabel := tGuiLabel.create(Point(160, 218));
+  startLabel.centered := true;
+  startLabel.text := 'Press any key to start';
+  gui.append(startLabel);
+
+  verLabel := tGuiLabel.create(Point(320-75, 26));
+  verLabel.text := '0.1a (12/02/1996)';
+  verLabel.halfSize := true;
+  verLabel.textColor := RGB(255,255,255);
+  gui.append(verLabel);
 
   screen.pageClear();
   screen.pageFlip();
@@ -37,16 +57,24 @@ begin
   repeat
 
     musicUpdate();
-
     startTimer('main');
-
     screen.clearAll();
+
+    elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
+
+    startLabel.textColor := RGB(
+      round((sin(getSec)*64)+196),
+      round((sin(2*getSec)*32)+128),
+      20
+    );
+    gui.update(elapsed);
+    gui.draw(screen);
 
     screen.flipAll();
 
     stopTimer('main');
 
-    if keyDown(key_esc) then exitFlag := true;
+    if anyKeyDown then exitFlag := true;
 
     idle();
 
@@ -159,13 +187,12 @@ begin
   fps := tGuiLabel.create(Point(10, 10));
   gui.append(fps);
 
+
   {main loop}
   repeat
 
     musicUpdate();
-
     startTimer('main');
-
     elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
 
     {update ui}
@@ -241,6 +268,7 @@ begin
 
   screenInit();
   musicPlay('res\dance1.a96');
+  titleScreen();
   battleScreen();
   screenDone();
 
