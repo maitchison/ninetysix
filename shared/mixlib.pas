@@ -722,7 +722,7 @@ begin
     SCS_FIXED2: exit(channels[2]);
     SCS_FIXED3: exit(channels[3]);
     SCS_FIXED4: exit(channels[4]);
-    else error('Invalid sound channel selection strategoy');
+    else fatal('Invalid sound channel selection strategoy');
   end;
 end;
 
@@ -744,7 +744,7 @@ begin
 
   {for the moment lock onto the first channel}
   if not assigned(sfx) then
-    error('Tried to play invalid sound file');
+    fatal('Tried to play invalid sound file');
 
   {find a slot to use}
   result := getFreeChannel(sfx, channelSelection);

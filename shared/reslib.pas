@@ -72,7 +72,7 @@ end;
 procedure tResourceLibrary.addResource(res: tResource);
 begin
   if numResources = length(resource) then
-    error('Too many resources, limit is '+intToStr(length(resource)));
+    fatal('Too many resources, limit is '+intToStr(length(resource)));
   resource[numResources] := res;
   inc(numResources);
 end;
@@ -111,7 +111,7 @@ begin
   rewrite(t);
   {$I+}
   ioError := ioResult;
-  if ioError <> 0 then error('Error writing '+fileName+' (error:'+intToStr(ioError)+')');
+  if ioError <> 0 then fatal('Error writing '+fileName+' (error:'+intToStr(ioError)+')');
 
   {todo: update to new inifile unit}
   try
@@ -141,7 +141,7 @@ begin
   reset(t);
   {$I+}
   ioError := ioResult;
-  if ioError <> 0 then error('Error reading '+fileName+' (error:'+intToStr(ioError)+')');
+  if ioError <> 0 then fatal('Error reading '+fileName+' (error:'+intToStr(ioError)+')');
 
   try
 

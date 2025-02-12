@@ -39,7 +39,7 @@ end;
 procedure addWatch(watch: tWatch);
 begin
   if length(WATCHES) > 1000 then
-    error('Too many watches');
+    fatal('Too many watches');
   setLength(WATCHES, length(WATCHES)+1);
   WATCHES[length(WATCHES)-1] := watch;
 end;

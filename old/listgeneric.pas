@@ -121,7 +121,7 @@ begin
     inc(endPos);
   end else begin
     {cannot append to non-trivial slice}
-    error(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
+    fatal(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
   end;
 
 end;

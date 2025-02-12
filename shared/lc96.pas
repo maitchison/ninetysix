@@ -411,7 +411,7 @@ begin
 
   for i := 1 to 4 do
     if s.readByte <> ord(CODE_4CC[i]) then
-      Error('Not an LC96 file.');
+      fatal('Not an LC96 file.');
 
   {todo: make this a record}
   width := s.readWord;
@@ -428,26 +428,26 @@ begin
     s.readByte();
 
   if (verBig <> VER_BIG) and (verSmall <> VER_SMALL) then
-    error(format('Invalid version, expecting %d.%d, but found %d.%d',[VER_BIG, VER_SMALL, verBig, verSmall]));
+    fatal(format('Invalid version, expecting %d.%d, but found %d.%d',[VER_BIG, VER_SMALL, verBig, verSmall]));
 
   result := tPage.Create(width, height);
 
   if not (bpp in [24,32]) then
-    Error('Invalid BitPerPixel '+intToStr(bpp));
+    fatal('Invalid BitPerPixel '+intToStr(bpp));
 
   hasAlpha := bpp = 32;
 
   {make sure limits are sort of ok}
   {typically this occurs with a corrupt file}
   if width > 16384 then
-    error(format('Image width too large (%d > 16k)', [width]));
+    fatal(format('Image width too large (%d > 16k)', [width]));
   if height > 16384 then
-    error(format('Image height too large (%d > 16k)', [height]));
+    fatal(format('Image height too large (%d > 16k)', [height]));
   if numPatches > 256*1024 then
-    error(format('Image patches too large (%d > 256k)', [numPatches]));
+    fatal(format('Image patches too large (%d > 256k)', [numPatches]));
 
   if uncompressedSize > 16*1024*1024 then
-    error(format('Image size too large (%d > 16MB)', [uncompressedSize]));
+    fatal(format('Image size too large (%d > 16MB)', [uncompressedSize]));
 
   {This is not great, it would be nice to be able decompress from
    part way in a stream.
@@ -493,9 +493,9 @@ var
 begin
 
   if (page.width <= 0) or (page.height <= 0) then
-    error('Invalid page dims');
+    fatal('Invalid page dims');
   if (not page.bpp in [24,32]) then
-    error('Invalid page bits-per-pixel');
+    fatal('Invalid page bits-per-pixel');
 
   if not assigned(s) then
     s := tMemoryStream.Create();

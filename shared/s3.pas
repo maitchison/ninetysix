@@ -746,7 +746,7 @@ begin
   info('[init] S3');
   {todo: implement s3 detection}
 {  if not detectS3() then
-    Error('No S3 detected');}
+    fatal('No S3 detected');}
   fgColor.init(255,255,255);
   bgColor.init(0,0,0);
 

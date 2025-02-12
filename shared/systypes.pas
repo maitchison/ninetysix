@@ -99,27 +99,27 @@ begin
   for i := 1 to length(s) do begin
     case s[i] of
       '[': continue;
-      '-': if numberLength > 0 then error('Invalid placement of "-" in :'+s) else inc(numberLength);
+      '-': if numberLength > 0 then fatal('Invalid placement of "-" in :'+s) else inc(numberLength);
       '0'..'9': inc(numberLength);
       ',': begin
         if numberLength = 0 then
-          error('Invalid tInt32Array string: '+s);
+          fatal('Invalid tInt32Array string: '+s);
         value := strToInt(copy(s,i-numberLength,numberLength));
         result.append(value);
         numberLength := 0;
       end;
       ']': begin
-        if i <> length(s) then error('Found characters after ]: '+s);
+        if i <> length(s) then fatal('Found characters after ]: '+s);
         {process final number (if any)}
         if numberLength = 0 then exit;
         value := strToInt(copy(s,i-numberLength,numberLength));
         result.append(value);
         exit;
       end;
-      else error('Invalid character "'+s[i]+'" in tInt32Array string: '+s);
+      else fatal('Invalid character "'+s[i]+'" in tInt32Array string: '+s);
     end;
   end;
-  error('String missing ]');
+  fatal('String missing ]');
 end;
 
 {-------------------------------------------------------------}

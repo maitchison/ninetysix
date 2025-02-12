@@ -837,7 +837,7 @@ end;
 {make a copy of page using RGBA}
 function tPage.asBytes: tBytes;
 begin
-  if BPP <> 32 then Error('As bytes only supports BPP=32bit');
+  if BPP <> 32 then fatal('As bytes only supports BPP=32bit');
   result := nil;
   setLength(result, width*height*4);
   move(pixels^, result[0], width*height*4);
@@ -848,7 +848,7 @@ function tPage.asRGBBytes: tBytes;
 var
   i: int32;
 begin
-  if BPP <> 32 then Error('As bytes only supports BPP=32bit');
+  if BPP <> 32 then fatal('As bytes only supports BPP=32bit');
   result := nil;
   setLength(result, width*height*3);
   for i := 0 to width*height-1 do begin
@@ -890,11 +890,11 @@ begin
   if assigned(proc) then begin
     startTime := getSec;
     res := proc(filename);
-    if not (res is tPage) then error('Resources is of invalid type');
+    if not (res is tPage) then fatal('Resources is of invalid type');
     result := tPage(proc(filename));
     note(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]);
   end else
-    debug.error('No image loader for file "'+filename+'"');
+    debug.fatal('No image loader for file "'+filename+'"');
 end;
 
 {-------------------------------------------------}

@@ -50,6 +50,9 @@ const
   WORKSPACE = 'c:\dev\';
   REPO_PATH = 'c:\dev\';
 
+  {ignores modified date}
+  FORCE = true;
+
 type
   tDiffStatsHelper = record helper for tDiffStats
     procedure print();
@@ -192,7 +195,7 @@ begin
   outputDiv();
   outputLn();
 
-  repo.generateCheckpointDiff(old, new).showStatus;
+  repo.generateCheckpointDiff(old, new, FORCE).showStatus;
 
   new.author := 'Matthew';
   new.date := now();
@@ -441,7 +444,7 @@ begin
   repo := tCheckpointRepo.create(REPO_PATH);
   old := repo.loadHead();
   new := tCheckpoint.create(repo, WORKSPACE);
-  checkpointDiff := repo.generateCheckpointDiff(old, new);
+  checkpointDiff := repo.generateCheckpointDiff(old, new, FORCE);
   checkpointDiff.showChanges();
 
   new.free;
@@ -458,7 +461,7 @@ begin
   repo := tCheckpointRepo.create(REPO_PATH);
   old := repo.loadHead();
   new := tCheckpoint.create(repo, WORKSPACE);
-  checkpointDiff := repo.generateCheckpointDiff(old, new);
+  checkpointDiff := repo.generateCheckpointDiff(old, new, FORCE);
   checkpointDiff.showStatus();
 
   new.free;
@@ -578,7 +581,7 @@ begin
       didSkip := false;
     end;
 
-    stats := repo.generateCheckpointDiff(old, new).getLineStats();
+    stats := repo.generateCheckpointDiff(old, new, FORCE).getLineStats();
     stats.printShort(6);
     dayTotal += stats;
     writeln();
@@ -684,7 +687,7 @@ begin
   outputDiv();
   textAttr := LIGHTGRAY;
   code := dosExecute('fpc @fp.cfg -dDEBUG -v1 _runtest.pas', true);
-  if code <> 0 then error('Failed to build test cases.');
+  if code <> 0 then fatal('Failed to build test cases.');
 
   {run it}
   textAttr := LIGHTGREEN;
@@ -694,7 +697,7 @@ begin
   outputDiv();
   textAttr := LIGHTGRAY;
   code := dosExecute('_runtest.exe', true);
-  if code <> 0 then error('Failed to run unit tests.');
+  if code <> 0 then fatal('Failed to run unit tests.');
 
   fs.delFile('_runtest.pas');
   fs.delFile('_runtest.exe');
@@ -784,10 +787,10 @@ begin
     textAttr := WHITE;
     outputDiv();
     case fileDiff.diffType of
-      FD_MODIFIED: outputX (' Modified ', fileDiff.old.path, '', YELLOW);
-      FD_ADDED:    outputX (' Added ',   fileDiff.new.path, '', LIGHTGREEN);
-      FD_REMOVED:  outputX (' Removed ', fileDiff.old.path, '', LIGHTRED);
-      FD_RENAMED:  outputX (' Renamed ', fileDiff.old.path+' -> '+fileDiff.new.path, '', LIGHTBLUE);
+      FD_MODIFIED: outputX(' Modified ', fileDiff.old.path, '', YELLOW);
+      FD_ADDED:    outputX(' Added ',   fileDiff.new.path, '', LIGHTGREEN);
+      FD_REMOVED:  outputX(' Removed ', fileDiff.old.path, '', LIGHTRED);
+      FD_RENAMED:  outputX(' Renamed ', fileDiff.old.path+' -> '+fileDiff.new.path, '', LIGHTBLUE);
     end;
     outputDiv();
 
@@ -855,7 +858,7 @@ begin
   else if command = 'verify' then
     doVerify()
   else
-    Error('Invalid command "'+command+'"');
+    fatal('Invalid command "'+command+'"');
 
   textAttr := WHITE;
 

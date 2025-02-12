@@ -28,7 +28,7 @@ implementation
 procedure GUILabel(page: tPage; atX, atY: integer; s: string);
 begin
   if not assigned(panelSprite) or not assigned(frameSprite) then
-    error('Tried to draw gui component before InitGUI called.');
+    fatal('Tried to draw gui component before InitGUI called.');
 
   FrameSprite.NineSlice(page, atX, atY, 320, 24);
   atX += panelSprite.border.left;
@@ -65,7 +65,7 @@ end;
 procedure GUIText(page: tPage; atX, atY: integer; s: string;shadow:boolean=false);
 begin
   if not assigned(panelSprite) or not assigned(frameSprite) then
-    error('Tried to draw gui component before InitGUI called.');
+    fatal('Tried to draw gui component before InitGUI called.');
   if shadow then
     textOut(page, atX+1, atY+1, s, RGBA.create(10, 10, 10, 100));
   textOut(page, atX, atY, s, RGBA.create(245, 250, 253, 240));

@@ -244,7 +244,7 @@ begin
     16: videoDepth := VD_16;
     24: videoDepth := VD_24;
     32: videoDepth := VD_32;
-    else debug.error(format('Bit depth %d not supported',[videoDriver.bitsPerPixel]));
+    else debug.fatal(format('Bit depth %d not supported',[videoDriver.bitsPerPixel]));
   end;
 
   fillchar(flagGrid, sizeof(flagGrid), 0);
@@ -289,7 +289,7 @@ begin
       srcX := rect.x; srcY := rect.y;
       dstX := rect.x; dstY := rect.y;
     end;
-    else error('Invalid scroll mode');
+    else fatal('Invalid scroll mode');
   end;
 
   if (rect.width <= 0) or (rect.height <= 0) then exit;
@@ -344,9 +344,9 @@ var
 begin
 
   if not assigned(background) then
-    error('background not assigned');
+    fatal('background not assigned');
   if background.width <> canvas.width then
-    error(format('background width must match canvas, %d != %d ', [background.width, canvas.width]));
+    fatal(format('background width must match canvas, %d != %d ', [background.width, canvas.width]));
 
   if (y < 0) or (y >= canvas.height) then exit;
 
@@ -485,7 +485,7 @@ begin
       end;
       flipBounds.init(256,256,-256,-256);
     end;
-    else Error('Invalid copy mode');
+    else fatal('Invalid copy mode');
   end;
   stopTimer('flip');
 end;

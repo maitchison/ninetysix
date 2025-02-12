@@ -233,9 +233,9 @@ begin
   {set video}
   enableVideoDriver(tVesaDriver.create());
   if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
-    error('Requires VESA 2.0 or greater.');
+    fatal('Requires VESA 2.0 or greater.');
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
-    error('Requires 1MB video card.');
+    fatal('Requires 1MB video card.');
 
   videoDriver.setTrueColor(320, 240);
   screen := tScreen.create();

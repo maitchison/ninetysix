@@ -270,7 +270,7 @@ begin
       result.left := int32(pAudioSample8M(data + (pos * 1))^.value) * 256 - 32768;
       result.right := int32(pAudioSample8M(data + (pos * 1))^.value) * 256 - 32768;
     end;
-    else error('Invalid format');
+    else fatal('Invalid format');
   end;
 end;
 
@@ -316,7 +316,7 @@ begin
       pAudioSample8S(data + (pos * bytesPerSample))^.left := (sample.left div 256) + 128;
       pAudioSample8S(data + (pos * bytesPerSample))^.right := (sample.right div 256) + 128;
     end;
-    else error('Invalid format');
+    else fatal('Invalid format');
   end;
 end;
 
@@ -346,11 +346,11 @@ begin
   if assigned(proc) then begin
     startTime := getSec;
     res := proc(filename);
-    if not (res is tSoundEffect) then error('Resources is of invalid type');
+    if not (res is tSoundEffect) then fatal('Resources is of invalid type');
     result := tSoundEffect(proc(filename));
     note(' - loaded %s (%fs) in %.2fs', [filename, result.length/44100, getSec-startTime]);
   end else
-    debug.error('No sound loader for file "'+filename+'"');
+    debug.fatal('No sound loader for file "'+filename+'"');
 end;
 
 

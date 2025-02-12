@@ -39,7 +39,7 @@ procedure tBitStream.writeBits(value: word; bits: byte); inline;
 begin
   {$IFDEF debug}
   if value >= (dword(1) shl bits) then
-    error(format('Value %d in segment exceeds expected bound of %d', [value, dword(1) shl bits]));
+    fatal(format('Value %d in segment exceeds expected bound of %d', [value, dword(1) shl bits]));
   {$ENDIF}
   buffer := buffer or (dword(value) shl pos);
   pos += bits;

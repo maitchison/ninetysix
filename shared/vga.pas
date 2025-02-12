@@ -132,7 +132,7 @@ end;
 procedure tVideoDriver.setMode(width, height, bpp: word);
 begin
   if not tryMode(width, height, bpp) then
-    error(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
+    fatal(format('Mode %dx%dx%d not supported by VGA driver',[width, height, bpp]));
 end;
 
 {this will select the best true color mode}
@@ -142,7 +142,7 @@ begin
   if (maxBPP >= 32) and tryMode(width, height, 32) then exit;
   if (maxBPP >= 16) and tryMode(width, height, 16) then exit;
   if (maxBPP >= 15) and tryMode(width, height, 15) then exit;
-  error(format('Could not set true color video mode (%dx%d) [maxBPP=%d]', [width, height, maxBPP]));
+  fatal(format('Could not set true color video mode (%dx%d) [maxBPP=%d]', [width, height, maxBPP]));
 end;
 
 {--------------------------------------------------------------}

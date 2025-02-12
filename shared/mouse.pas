@@ -347,7 +347,7 @@ begin
   { mouse driver reset }
   r.eax := $0; realintr(mouseint, r);
   if (r.eax <> $FFFF) then begin
-    error(format('Microsoft compatible mouse not found code:%d',[r.eax]));
+    fatal(format('Microsoft compatible mouse not found code:%d',[r.eax]));
   end;
   { obtain number of mouse buttons }
   if (r.bx = $ffff) then mouse_numbuttons := 2

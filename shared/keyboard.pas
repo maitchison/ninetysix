@@ -180,7 +180,7 @@ var
 
 function keyDown(code: byte): boolean;
 begin
-  if dosKey then Error('Key query without keyboard init.');
+  if dosKey then fatal('Key query without keyboard init.');
   exit(keyPress[code]);
 end;
 

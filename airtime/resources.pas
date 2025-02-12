@@ -72,7 +72,7 @@ begin
   startTime := getSec;
 
   srcPath := joinPath('res', tag+'.a96');
-  if not fs.exists(srcPath) then error(format('Missing audio file "%s".', [srcPath]));
+  if not fs.exists(srcPath) then fatal(format('Missing audio file "%s".', [srcPath]));
   reader := tLA96Reader.create();
   reader.open(srcPath);
   result := reader.readSFX();

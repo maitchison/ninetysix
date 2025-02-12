@@ -94,8 +94,8 @@ begin
   outFilename := aFilename;
 
   {checks}
-  if aWidth mod 4 <> 0 then error('Width must be a multiple of 8');
-  if aHeight mod 4 <> 0 then error('Height must be a multiple of 8');
+  if aWidth mod 4 <> 0 then fatal('Width must be a multiple of 8');
+  if aHeight mod 4 <> 0 then fatal('Height must be a multiple of 8');
 
   {header}
   fillchar(fileHeader, sizeof(fileHeader), 0);
@@ -151,7 +151,7 @@ begin
    to center them}
 
   {checks}
-  if not assigned(outStream) then error('VideoWriter not open, but writeFrame called.');
+  if not assigned(outStream) then fatal('VideoWriter not open, but writeFrame called.');
   assertEqual(page.width, fileHeader.width);
   assertEqual(page.height, fileHeader.height);
 
@@ -223,9 +223,9 @@ begin
   {header}
   inStream.readBlock(fileHeader, sizeof(fileHeader));
 
-  if fileHeader.tag <> 'VC96' then error(format('File header tag incorrect, was %s, but expected VC96', [fileHeader.tag]));
-  if fileHeader.width mod 4 <> 0 then error(format('Expecting width to be a multiple of 4, but was %d', [fileHeader.width]));
-  if fileHeader.height mod 4 <> 0 then error(format('Expecting height to be a multiple of 4, but was %d', [fileHeader.height]));
+  if fileHeader.tag <> 'VC96' then fatal(format('File header tag incorrect, was %s, but expected VC96', [fileHeader.tag]));
+  if fileHeader.width mod 4 <> 0 then fatal(format('Expecting width to be a multiple of 4, but was %d', [fileHeader.width]));
+  if fileHeader.height mod 4 <> 0 then fatal(format('Expecting height to be a multiple of 4, but was %d', [fileHeader.height]));
 
   inStream.seek(128);
 end;
@@ -247,7 +247,7 @@ var
 begin
 
   {checks}
-  if not assigned(inStream) then error('VideoReader not open, but readFrame called.');
+  if not assigned(inStream) then fatal('VideoReader not open, but readFrame called.');
   assertEqual(page.width, fileHeader.width);
   assertEqual(page.height, fileHeader.height);
 

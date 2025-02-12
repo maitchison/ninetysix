@@ -82,21 +82,21 @@ begin
   {$I+}
   IOError := IOResult;
   if IOError <> 0 then
-    Error('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
+    fatal('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
 
   BlockRead(F, FileHeader, SizeOf(TBMPHeader), BytesRead);
   if BytesRead <> SizeOf(TBMPHeader) then
-    Error('Error reading BMP Headed.');
+    fatal('Error reading BMP Headed.');
 
   BlockRead(F, InfoHeader, SizeOf(TBitmapInfoHeader), BytesRead);
   if BytesRead <> Sizeof(TBitmapInfoHeader) then
-    Error('Error reading BMP Info Header.');
+    fatal('Error reading BMP Info Header.');
 
   if (FileHeader.FileType <> $4D42) then
-    Error(format('Not a valid BMP file, found $%h, expected $%h', [FileHeader.FileType, $4D42]));
+    fatal(format('Not a valid BMP file, found $%h, expected $%h', [FileHeader.FileType, $4D42]));
 
   if not (InfoHeader.BitsPerPixel in [8, 24, 32]) then
-    Error(
+    fatal(
       'Only 8, 24, and 32-bit BMP images are supported, but "'+FileName+'" is '+
       intToStr(InfoHeader.BitsPerPixel)+'-bit');
 
@@ -129,7 +129,7 @@ begin
         32:
           c.init(LineData[x*4+2], LineData[x*4+1], LineData[x*4+0], LineData[x*4+3]);
         else
-          Error('Invalid Bitmap depth '+IntToStr(Result.BPP));
+          fatal('Invalid Bitmap depth '+IntToStr(Result.BPP));
       end;
       result.PutPixel(x, y, c);
     end;

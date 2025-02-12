@@ -63,29 +63,29 @@ begin
 
     IOError := IOResult;
     if IOError <> 0 then
-      error('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
+      fatal('Could not open file "'+FileName+'" '+getIOErrorString(IOError));
 
     blockread(f, fileHeader, sizeof(fileHeader));
 
     with fileHeader do begin
       if fileTypeBlockID <> 'RIFF' then
-        Error('Invalid BlockID '+fileTypeBLockID);
+        fatal('Invalid BlockID '+fileTypeBLockID);
 
       if fileFormatID <> 'WAVE' then
-        Error('Invalid FormatID '+fileFormatID);
+        fatal('Invalid FormatID '+fileFormatID);
 
       if formatBlockID <> 'fmt ' then
-        Error('Invalid formatBlockID '+formatBlockID);
+        fatal('Invalid formatBlockID '+formatBlockID);
 
       if frequency <> 44100 then
-        error(utils.format('frequency must be 44100 but was %d', [frequency]));
+        fatal(utils.format('frequency must be 44100 but was %d', [frequency]));
 
       if audioFormat <> 1 then
-        error(utils.format('format must be 1 (PCM) but was %d', [audioFormat]));
+        fatal(utils.format('format must be 1 (PCM) but was %d', [audioFormat]));
 
       af := getAudioFormat(bitsPerSample, numChannels);
       if af = AF_INVALID then
-        error(utils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));
+        fatal(utils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));
     end;
 
     {process the chunks}
@@ -142,7 +142,7 @@ begin
 
   IOError := IOResult;
   if IOError <> 0 then
-    error('Could not open file "'+FileName+'" for output.'+getIOErrorString(IOError));
+    fatal('Could not open file "'+FileName+'" for output.'+getIOErrorString(IOError));
 
   chunkBytes := length * 4;
 

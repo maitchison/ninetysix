@@ -158,7 +158,7 @@ begin
     ST_VLC2: result := bytesForBits(VLC2_Bits(values));
     ST_PACK0..ST_PACK0+31: result := bytesForBits((segmentType - ST_PACK0) * length(values));
     ST_RICE0..ST_RICE0+15: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
-    else error('Invalid segment type '+intToStr(segmentType));
+    else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 end;
 
@@ -281,13 +281,13 @@ begin
     ST_VLC2: VLC2_Write(s, values);
     ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, s);
     ST_RICE0..ST_RICE0+15: RICE_Write(s, values, segmentType - ST_RICE0);
-    else error('Invalid segment type '+intToStr(segmentType));
+    else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 
   result := s.pos-startPos; // includes header
 
   {$ifdef DEBUG}
-  if s.pos-postHeaderPos <> segmentLen then error(format(
+  if s.pos-postHeaderPos <> segmentLen then fatal(format(
     'Segment length error, expecting %d but found %d on type %s (calc=%d)',
     [segmentLen, s.pos-postHeaderPos, getSegmentTypeName(segmentType), getSegmentLength(values, segmentType)]
   ));
@@ -299,10 +299,10 @@ procedure convert32to16(buffer32: array of dword; buffer16: array of word; n: in
 var
   i: integer;
 begin
-  if n > length(buffer32) then error('Invalid parameter N');
+  if n > length(buffer32) then fatal('Invalid parameter N');
   for i := 0 to n-1 do begin
     {$ifdef debug}
-    if clamp16(int32(buffer32[i])) <> buffer32[i] then error(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, n-1]));
+    if clamp16(int32(buffer32[i])) <> buffer32[i] then fatal(format('Value %d too large for int16 at position %d/%d', [buffer32[i], i, n-1]));
     {$endif}
     buffer16[i] := buffer32[i];
   end;
@@ -329,7 +329,7 @@ begin
 
   readSegmentAndLength(s, n, segmentType, segmentLen);
 
-  if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
+  if segmentLen > length(IN_BUFFER) then fatal(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
   {todo: block read here}
   {todo: allow zero copy but looking at bytes ptr then incrementing...
@@ -341,7 +341,7 @@ begin
     ST_VLC2: readVLC2Sequence_ASM(@IN_BUFFER[0], @outBuffer[0], n);
     ST_PACK0..ST_PACK0+31: unpack32(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
     ST_RICE0..ST_RICE0+15: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
-    else error('Invalid segment type '+intToStr(segmentType));
+    else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 
   exit(outBuffer);
@@ -359,7 +359,7 @@ begin
 
   readSegmentAndLength(s, n, segmentType, segmentLen);
 
-  if segmentLen > length(IN_BUFFER) then error(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
+  if segmentLen > length(IN_BUFFER) then fatal(format('Segment too large (%, > %,)', [segmentLen, length(IN_BUFFER)]));
 
   {todo: block read here}
   {todo: allow zero copy but looking at bytes ptr then incrementing...
@@ -382,7 +382,7 @@ begin
     ST_RICE0..ST_RICE0+15: begin
       ReadRice16_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
     end;
-    else error('Invalid segment type '+intToStr(segmentType));
+    else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 
   exit(outBuffer);
@@ -464,7 +464,7 @@ begin
   if d < 4096+512+64+8 then exit(4);
   if d < 32768+4096+512+64+8 then exit(5);
   if d < 262144+32768+4096+512+64+8 then exit(6);
-  error('Can not encode VLC value, too large.');
+  fatal('Can not encode VLC value, too large.');
   exit(255);
 end;
 
@@ -615,7 +615,7 @@ begin
   {$IFDEF Debug}
   for i := 0 to length(values)-1 do
     if values[i] >= (dword(1) shl bits) then
-      Error(format('Value %d in segment exceeds expected bound of %d', [values[i], dword(1) shl bits]));
+      fatal(format('Value %d in segment exceeds expected bound of %d', [values[i], dword(1) shl bits]));
   {$ENDIF}
 
   if bits = 0 then exit;
@@ -693,7 +693,7 @@ procedure unpack16(inBuf: pByte;outBuf: pWord; n: int32;bitsPerCode: byte);
 var
   i: integer;
 begin
-  if bitsPerCode > 16 then error(format('Can not unpack %d bits with unpack16', [bitsPerCode]));
+  if bitsPerCode > 16 then fatal(format('Can not unpack %d bits with unpack16', [bitsPerCode]));
   case bitsPerCode of
     0: fillword(outBuf^, n, 0);
     1: begin
@@ -773,7 +773,7 @@ var
   numEntries: int32;
 
 begin
-  if RICE_TABLE_BITS > 16 then error('RICE_TABLE_BITS is limited to 16 due to how we read bitStreams');
+  if RICE_TABLE_BITS > 16 then fatal('RICE_TABLE_BITS is limited to 16 due to how we read bitStreams');
   fillchar(RICE_TABLE, sizeof(RICE_TABLE), 0);
   numEntries := (1 shl RICE_TABLE_BITS);
   for k := 0 to 15 do begin
@@ -791,7 +791,7 @@ begin
       for fluff := 0 to (dword(1) shl fluffBits)-1 do begin
         input := code or (fluff shl codeLength);
         if RICE_TABLE[k, input] <> 0 then
-          error(format('Overlap at %d %d<-%d', [input, output and $ffff, RICE_TABLE[k, input] and $ffff]));
+          fatal(format('Overlap at %d %d<-%d', [input, output and $ffff, RICE_TABLE[k, input] and $ffff]));
         RICE_TABLE[k, input] := output;
       end;
     end;
@@ -826,7 +826,7 @@ begin
     for fluff := 0 to (dword(1) shl fluffBits)-1 do begin
       input := code or (fluff shl codeLength);
       if RICE_TABLE[16, input] <> 0 then
-        error(format('Overlap at %d: %d->%d', [input, output and $ffff, RICE_TABLE[16, input] and $ffff]));
+        fatal(format('Overlap at %d: %d->%d', [input, output and $ffff, RICE_TABLE[16, input] and $ffff]));
       RICE_TABLE[16, input] := output;
     end;
   end;

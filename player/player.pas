@@ -440,9 +440,9 @@ begin
   {set video}
   enableVideoDriver(tVesaDriver.create());
   if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
-    error('Requires VESA 2.0 or greater.');
+    fatal('Requires VESA 2.0 or greater.');
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
-    error('Requires 1MB video card.');
+    fatal('Requires 1MB video card.');
 
   videoDriver.setTrueColor(640,480);
   screen := tScreen.create();
@@ -482,7 +482,7 @@ begin
   for filename in files do begin
     tracks.append(tTrack.init(joinPath('music', filename)));
   end;
-  if length(tracks) = 0 then error('No music found');
+  if length(tracks) = 0 then fatal('No music found');
 
   {start playing}
   musicReader := tLA96Reader.Create();
@@ -624,7 +624,7 @@ begin
   else if mode = 'fast' then
     testCompression(true)
   else
-    error('Invalid mode '+mode);
+    fatal('Invalid mode '+mode);
 
   textAttr := LIGHTGRAY;
 

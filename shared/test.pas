@@ -41,7 +41,7 @@ var
 
 procedure assertError(msg: string); overload;
 begin
-  error(msg);
+  fatal(msg);
 end;
 
 procedure assert(condition: boolean;msg: string); overload;
@@ -133,7 +133,7 @@ end;
 
 procedure tTestSuite.run();
 begin
-  error('Empty test suite!');
+  fatal('Empty test suite!');
 end;
 
 var i: integer;

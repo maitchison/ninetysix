@@ -319,12 +319,12 @@ end;
 }
 procedure tLA96Reader.seek(frameNumber: integer);
 begin
-  if not isLoaded then error('Can not seek on file, as it is not loaded');
+  if not isLoaded then fatal('Can not seek on file, as it is not loaded');
   if looping then frameNumber := frameNumber mod header.numFrames;
   if (frameNumber < 0) or (frameNumber >= header.numFrames) then
-    error(format('Tried to seek to frame %d/%d', [frameNumber+1, header.numFrames]));
+    fatal(format('Tried to seek to frame %d/%d', [frameNumber+1, header.numFrames]));
   if framePtr[frameNumber] < 0 then
-    error(format('Can not seek to position %d, as file has no framePtrs.', [frameNumber]));
+    fatal(format('Can not seek to position %d, as file has no framePtrs.', [frameNumber]));
   fs.seek(framePtr[frameNumber]);
   frameOn := frameNumber;
 end;
@@ -417,7 +417,7 @@ begin
   if bits in [1..8] then
     result := @ulawTable[bits]
   else
-    error(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
+    fatal(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
 end;
 
 {decodes the next frame into sfx at given sample position.
@@ -720,7 +720,7 @@ begin
   if bits in [1..8] then
     result := @ulawTable[bits]
   else
-    error(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
+    fatal(format('Invalid ulaw bits %d, expecting (1..8)', [bits]));
 end;
 
 procedure tLA96Writer.writeNextFrame(samplePtr: pAudioSample16S);
@@ -800,7 +800,7 @@ var
   ownsSFX: boolean;
 begin
 
-  if (profile.log2mu <> 8) then error('Values other than 8 for Log2MU are not currently supported');
+  if (profile.log2mu <> 8) then fatal('Values other than 8 for Log2MU are not currently supported');
 
   if sfx.format <> AF_16_STEREO then begin
     sfx := sfx.asFormat(AF_16_STEREO);

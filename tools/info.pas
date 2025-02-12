@@ -15,7 +15,7 @@ var
   timerEndTime: double = -1;
 
 {hide debug.error for the moment}
-procedure error(s: string);
+procedure fatal(s: string);
 begin
   writeln(s);
   halt;
@@ -67,8 +67,8 @@ end;
 
 function tTimer.elapsed(): double; inline;
 begin
-  if startTime = -1 then error('Please call timer.start first');
-  if endTime = -1 then error('Please call timer.stop first');
+  if startTime = -1 then fatal('Please call timer.start first');
+  if endTime = -1 then fatal('Please call timer.stop first');
   result := (endTime - startTime) - bias;
 end;
 
@@ -95,7 +95,7 @@ begin
     TM_MIPS:   writeln(mips);
     TM_MIPS_CYCLES: writeln(cycles + ' ' + mips);
     TM_MBPS:   writeln(format('%f MB/S '+POSTFIX, [(value / elapsed) / 1000 / 1000]));
-    else error('Invalid timer mode');
+    else fatal('Invalid timer mode');
   end;
 end;
 
@@ -281,7 +281,7 @@ var
 begin
   tick := getTickCount();
   while getTickCount() = tick do;
-  if getTickCount() <> tick+1 then error('tick incremented by more than 1');
+  if getTickCount() <> tick+1 then fatal('tick incremented by more than 1');
 end;
 
 {emulators tend to give inaccurate results for RDTSC}
@@ -301,7 +301,7 @@ begin
   waitForNextTick();
   endTSC := getTSC;
 
-  if endTSC = startTSC then error('TSC did not update');
+  if endTSC = startTSC then fatal('TSC did not update');
 
   estimatedMHZ := (endTSC - startTSC) / (1/18.2065);
 

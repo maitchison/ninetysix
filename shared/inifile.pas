@@ -59,6 +59,7 @@ type
     function  readLine(): string;
     function  peekLine(): string;
     function  peekKey(): string;
+    function  nextKeyLine(): string;
     function  nextLine(): string;
     function  readKey(key: string): string;
 
@@ -67,6 +68,8 @@ type
     function  readObject(): tObject;
 
     function  readString(key: string): string;
+    function  readInteger(key: string): int32;
+    function  readFloat(key: string): double;
     function  readIntArray(key: string): tInt32Array;
     function  readRect(key: string): tRect;
 
@@ -164,13 +167,30 @@ var
 begin
   result := '';
   repeat
-    line := nextLine;
+    line := nextKeyLine;
     split(line, '=', lineKey, lineValue);
     lineKey := lineKey.trim();
     lineValue := lineValue.trim();
     if lineKey.toLower() = key.toLower() then exit(lineValue);
   until eof;
-  error('INI file missing key "'+key+'".');
+  fatal('INI file missing key "'+key+'".');
+end;
+
+{read next content line}
+function tINIReader.nextKeyLine(): string;
+var
+  line: string;
+begin
+  while not eof do begin
+    line := nextLine();
+    if line.startsWith('[') then begin
+      fCurrentSection := copy(line, 2, length(line)-2);
+      continue;
+    end;
+    exit(line);
+  end;
+  {eof}
+  result := '';
 end;
 
 {read next content line}
@@ -182,10 +202,6 @@ begin
     line := readLine();
     if line = '' then continue;
     if line.startsWith('#') then continue;
-    if line.startsWith('[') then begin
-      fCurrentSection := copy(line, 2, length(line)-2);
-      continue;
-    end;
     exit(line);
   end;
   {eof}
@@ -217,20 +233,24 @@ var
   obj: tObject;
   key, value: string;
 begin
-  line := readLine;
-  if not line.startsWith('[') then error(format('Expected section header, but found "%s"', [line]));
+  if eof then exit(nil);
+  line := nextLine;
+  if line = '' then exit(nil);
+  if not line.startsWith('[') then fatal(format('Expected section header, but found "%s"', [line]));
 
-  if not assigned(factory) then error('Must assign a factory to read objects.');
+  if not assigned(factory) then fatal('Must assign a factory to read objects.');
 
   sectionName := copy(line, 2, length(line)-2);
 
   obj := factory(sectionName);
   result := obj;
 
-  if not assigned(obj) then error(format('Factory failed to construct object of type "%s"', [sectionName]));
+  if not assigned(obj) then fatal(format('Factory failed to construct object of type "%s"', [sectionName]));
 
   if obj is iIniSerializable then
-    (obj as iIniSerializable).readFromIni(self);
+    (obj as iIniSerializable).readFromIni(self)
+  else
+    warning('Ignoring unknown section tag ['+sectionName+']');
 end;
 
 function tINIReader.readString(key: string): string;
@@ -238,9 +258,25 @@ var
   value: string;
 begin
   value := readKey(key);
-  if length(value) < 2 then error('Invalid string format');
-  if not value.startsWith('"') or (not value.endsWith('"')) then error('Invalid string format');
+  if length(value) < 2 then fatal('Invalid string format');
+  if not value.startsWith('"') or (not value.endsWith('"')) then fatal('Invalid string format');
   result := copy(value, 2, length(value)-2);
+end;
+
+function tINIReader.readInteger(key: string): int32;
+var
+  value: string;
+begin
+  value := readKey(key);
+  result := strToInt(value);
+end;
+
+function tINIReader.readFloat(key: string): double;
+var
+  value: string;
+begin
+  value := readKey(key);
+  result := strToFlt(value);
 end;
 
 function tINIReader.readIntArray(key: string): tInt32Array;

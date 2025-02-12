@@ -155,7 +155,7 @@ constructor tStream.create();
 begin
   inherited create();
   if self.classType = tStream then
-    error('Attempted to instantiate an abstract class: tStream');
+    fatal('Attempted to instantiate an abstract class: tStream');
   fPos := 0;
   fLen := 0;
 end;
@@ -251,7 +251,7 @@ begin
   result := nil;
   if n = 0 then exit;
   if n > (len-fPos) then
-    error(Format('Read over end of stream, requested, %d bytes but %d remain.', [n,  len - fpos]));
+    fatal(Format('Read over end of stream, requested, %d bytes but %d remain.', [n,  len - fpos]));
   setLength(result, n);
   readBlock(result[0], n);
 end;
@@ -260,7 +260,7 @@ procedure tStream.writeBytes(aBytes: tBytes;aLen:int32=-1);
 begin
   if aLen < 0 then aLen := length(aBytes);
   if aLen = 0 then exit;
-  if aLen > length(aBytes) then error('tried writing too many bytes');
+  if aLen > length(aBytes) then fatal('tried writing too many bytes');
   expandLen(fPos + aLen);
   writeBlock(aBytes[0], aLen);
 end;
@@ -410,13 +410,13 @@ begin
 
   {quick check to make sure everythings ok}
   if assigned(bytes) <> (fCapacity > 0) then
-    error('Looks like stream was not initialized.');
+    fatal('Looks like stream was not initialized.');
 
   if blocks=0 then begin
     freeMem(bytes);
   end else begin
     reallocMem(bytes, blocks*1024);
-    if bytes = nil then error('Could not allocate memory block');
+    if bytes = nil then fatal('Could not allocate memory block');
   end;
 
   fCapacity := blocks*1024;
@@ -428,7 +428,7 @@ end;
 
 procedure tMemoryStream.seek(aPos: int32);
 begin
-  if aPos > fLen then error(format('Seek past end of file (seek to %,/%,).', [aPos, fLen]));
+  if aPos > fLen then fatal(format('Seek past end of file (seek to %,/%,).', [aPos, fLen]));
   fPos := aPos;
 end;
 
@@ -494,7 +494,7 @@ procedure tMemoryStream.readBlock(out x;numBytes: int32);
 begin
   if numBytes = 0 then exit;
   if numBytes > (len-fPos) then
-    error(Format('Read over end of stream, requested, %d bytes but %d remain.', [numBytes,  len-fPos]));
+    fatal(Format('Read over end of stream, requested, %d bytes but %d remain.', [numBytes,  len-fPos]));
   move(bytes[fPos], x, numBytes);
   fPos += numBytes;
 end;
@@ -535,7 +535,7 @@ begin
       bytesToRead := min(blockSize, bytesRemaining);
       blockread(f, bytes[fPos], bytesToRead, bytesRead);
       if bytesRead <> bytesToRead then
-        error(format('Error reading from file "%s", expected to read %d bytes but read %d', [bytesToRead, bytesRead]));
+        fatal(format('Error reading from file "%s", expected to read %d bytes but read %d', [bytesToRead, bytesRead]));
       bytesRemaining -= bytesRead;
       fPos += bytesRead;
     end;
@@ -555,10 +555,10 @@ begin
   {$i-}
   assignFile(f, fileName);
   rewrite(f,1);
-  ioError := IORESULT; if ioError <> 0 then error(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
+  ioError := IORESULT; if ioError <> 0 then fatal(format('Could not open file for writing "%s", Error:%s', [filename, getIOErrorString(ioError)]));
   bytesWritten := 0;
   blockWrite(f, bytes[0], len, bytesWritten);
-  ioError := IORESULT; if ioError <> 0 then error(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
+  ioError := IORESULT; if ioError <> 0 then fatal(format('Could not write to file "%s", Error:%s', [filename, getIOErrorString(ioError)]));
   close(f);
   {$i+}
 end;
@@ -579,7 +579,7 @@ begin
   case fileMode of
     FM_READ: begin
       {open file for read only}
-      if not fs.exists(aFilename) then error('Could not open "'+aFilename+'" for reading');
+      if not fs.exists(aFilename) then fatal('Could not open "'+aFilename+'" for reading');
       system.assign(f, aFilename);
       system.reset(f,1);
       fLen := filesize(f);
@@ -604,7 +604,7 @@ begin
         fLen := 0;
       end;
     end;
-    else error(format('Invalid fileMode %d', [fileMode]));
+    else fatal(format('Invalid fileMode %d', [fileMode]));
   end;
 
   system.fileMode := oldFileMode;

@@ -1,14 +1,14 @@
 unit fileref;
 
-
 interface
 
 uses
   {$I baseunits.inc},
+  iniFile,
   md5;
 
 type
-  tFileRef = class
+  tFileRef = class(iIniSerializable)
   protected
 
     {ok some documentation... I might need to rename some of these
@@ -57,12 +57,14 @@ type
     property fileSize: int64 read getFileSize write fSize;
     property root: string read fRoot write fRoot;
 
-  published
-
+  public
+    {iIniSerializable}
+    procedure writeToIni(ini: tINIWriter);
+    procedure readFromIni(ini: tINIReader);
+  public
     property path: string read fPath write fPath;
     property hash: string read getHash write fHash;
     property modified: int32 read getModified write fModified;
-
   public
 
     constructor create(); overload;
@@ -105,6 +107,20 @@ begin
   create();
   fPath := aPath;
   fRoot := aRoot;
+end;
+
+procedure tFileRef.writeToIni(ini: tINIWriter);
+begin
+  ini.writeString('path', path);
+  ini.writeString('hash', hash);
+  ini.writeInteger('modified', modified);
+end;
+
+procedure tFileRef.readFromIni(ini: tINIReader);
+begin
+  path := ini.readString('path');
+  hash := ini.readString('hash');
+  modified := ini.readInteger('modified');
 end;
 
 {full path to file}
@@ -164,11 +180,11 @@ begin
   try
     reset(f, 1);
     if (fileSize > MAX_FILESIZE) then
-      error(format('Tried to process file that was too large. File size: %fkb File name: %s', [fileSize/1024, fqn]));
+      fatal(format('Tried to process file that was too large. File size: %fkb File name: %s', [fileSize/1024, fqn]));
     setLength(buffer, fileSize);
     blockread(f, buffer[0], fileSize, bytesRead);
     if bytesRead <> fileSize then
-      error(format('Did not read the correct number of bytes. Expecting %d but read %d', [fileSize, bytesRead]));
+      fatal(format('Did not read the correct number of bytes. Expecting %d but read %d', [fileSize, bytesRead]));
     fHash := MD5.hash(buffer).toHex;
   finally
     close(f);

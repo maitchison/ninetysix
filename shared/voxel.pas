@@ -171,7 +171,7 @@ var
   d: byte;
 begin
   if (sdf.width <> vox.width) or (sdf.height <> vox.height) then
-    error('SDF dims must match page dims');
+    fatal('SDF dims must match page dims');
   for y := 0 to vox.height-1 do
     for x := 0 to vox.width-1 do begin
       d := sdf.getPixel(x,y).g;
@@ -200,9 +200,9 @@ begin
   fHeight := height;
   fDepth := page.height div height;
   if not fWidth in [1,2,4,8,16,32,64,128] then
-    error(format('Invalid voxel width %d, must be power of 2, and < 256', [fWidth]));
+    fatal(format('Invalid voxel width %d, must be power of 2, and < 256', [fWidth]));
   if not fHeight in [1,2,4,8,16,32,64,128] then
-    error(format('Invalid voxel height %d, must be power of 2, and < 256', [fHeight]));
+    fatal(format('Invalid voxel height %d, must be power of 2, and < 256', [fHeight]));
   fLog2Width := round(log2(fWidth));
   fLog2Height := round(log2(fHeight));
 end;
@@ -503,7 +503,7 @@ var
 
 begin
 
-  if not assigned(self) then error('Tried to call draw on an assigned vox.');
+  if not assigned(self) then fatal('Tried to call draw on an assigned vox.');
 
   VX_TRACE_COUNT := 0;
   if scale = 0 then exit;

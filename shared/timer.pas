@@ -71,7 +71,7 @@ var
 begin
   timer := getTimer(aTag);
   if not assigned(timer) then
-    error('No timer called '+aTag);
+    fatal('No timer called '+aTag);
   timer.stop(iterations);
 end;
 

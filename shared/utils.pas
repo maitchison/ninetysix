@@ -292,7 +292,7 @@ begin
         '.': begin
             // very basic for the moment
             if (i = length(fmt)) or (not (fmt[i+1] in ['0'..'9']))  then
-              error('invalid formatting, decimal expected after "."');
+              debug.fatal('invalid formatting, decimal expected after "."');
             inPlaceholder := true;
           end;
         '0'..'9': begin
@@ -305,7 +305,7 @@ begin
             vtInteger: result += IntToStr(a.VInteger);
             vtInt64: result += IntToStr(a.VInt64^);
             vtExtended: result += IntToStr(trunc(a.VExtended^));
-            else Error('Invalid type for %d:'+IntToStr(a.VType));
+            else fatal('Invalid type for %d:'+IntToStr(a.VType));
           end;
         end;
         'b': begin
@@ -314,7 +314,7 @@ begin
             vtInteger: result += binToStr(a.VInteger);
             vtInt64: result += binToStr(a.VInt64^);
             vtExtended: result += binToStr(trunc(a.VExtended^));
-            else Error('Invalid type for %d:'+IntToStr(a.VType));
+            else fatal('Invalid type for %d:'+IntToStr(a.VType));
           end;
         end;
         ',': begin
@@ -323,14 +323,14 @@ begin
             vtInteger: result += comma(a.VInteger);
             vtInt64: result += comma(a.VInt64^);
             vtExtended: result += comma(trunc(a.VExtended^));
-            else Error('Invalid type for %,:'+IntToStr(a.VType));
+            else fatal('Invalid type for %,:'+IntToStr(a.VType));
           end;
         end;
         'f': begin
           // float
           case a.VType of
             vtExtended: Str(args[ArgIndex].VExtended^:0:places, s);
-            else Error('Invalid type for %f:'+IntToStr(a.VType));
+            else fatal('Invalid type for %f:'+IntToStr(a.VType));
           end;
           result += s;
         end;
@@ -339,7 +339,7 @@ begin
             vtInteger: result += IntToStr(args[ArgIndex].VInteger);
             vtString: result += string(args[ArgIndex].VString^);
             vtAnsiString: result += AnsiString(args[ArgIndex].VAnsiString);
-            else Error('Invalid type for %s:'+IntToStr(a.VType));
+            else fatal('Invalid type for %s:'+IntToStr(a.VType));
           end;
         end;
         'h': begin
@@ -347,7 +347,7 @@ begin
             vtInteger: result += hexToStr(a.VInteger);
             vtInt64: result += hexToStr(a.VInt64^);
             vtExtended: result += hexToStr(trunc(a.VExtended^));
-            else Error('Invalid type for %h:'+IntToStr(a.VType));
+            else fatal('Invalid type for %h:'+IntToStr(a.VType));
           end;
         end;
         else
@@ -605,7 +605,7 @@ function binToStr(value: int64; width: word; padding: char='0'): string;
 begin
   if (value < 0) then
     {todo: support this}
-    Error('value for binary was negative');
+    fatal('value for binary was negative');
   if value = 0 then result := '0' else result := '';
   while value > 0 do begin
     if value and 1 = 1 then
@@ -630,7 +630,7 @@ var
 begin
   {todo: better way to handle errors}
   val(s, value, code);
-  if code <> 0 then debug.Error(Format('Invalid integer "%s"', [s]));
+  if code <> 0 then debug.fatal(Format('Invalid integer "%s"', [s]));
   result := value;
 end;
 
@@ -641,7 +641,7 @@ var
 begin
   {todo: better way to handle errors}
   val(s, value, code);
-  if code <> 0 then debug.Error(Format('Invalid float "%s"', [s]));
+  if code <> 0 then debug.fatal(Format('Invalid float "%s"', [s]));
   result := value;
 end;
 
@@ -654,7 +654,7 @@ begin
   s := s.toLower;
   if s = 'false' then exit(false);
   if s = 'true' then exit(true);
-  error(format('Invalid boolean literal %s expecting [true, false]', [s]));
+  fatal(format('Invalid boolean literal %s expecting [true, false]', [s]));
 end;
 
 {remove whitespace from begining and end of string.}

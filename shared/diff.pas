@@ -130,7 +130,7 @@ begin
 
   slnLen := getScore(i,j);
   if slnLen < 0 then
-    Error('Call solve first');
+    fatal('Call solve first');
 
   sln := tIntList.create(slnLen);
 
@@ -166,7 +166,7 @@ begin
   a := newLines;
   b := oldLines;
   if (b.len > 4*1024) or (b.len > 4*1024) then
-    Error('Max length for diff is 4k');
+    fatal('Max length for diff is 4k');
   scores := nil;
   setLength(scores, a.len*b.len);
   if a.len*b.len > 0 then

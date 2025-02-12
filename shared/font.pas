@@ -88,7 +88,7 @@ begin
   else if fs.exists(filename+'.bmp') then
     result.bitmap := LoadBMP(filename+'.bmp')
   else
-    error('File not found "'+filename+'.[p96|bmp]"');
+    fatal('File not found "'+filename+'.[p96|bmp]"');
 
   {$I-}
   Assign(TextFile, filename+'.fnt');
@@ -96,7 +96,7 @@ begin
   {$I+}
 
   if IOResult <> 0 then
-    error('Error loading '+filename+'.fnt');
+    fatal('Error loading '+filename+'.fnt');
 
   while not Eof(TextFile) do begin
     ReadLn(TextFile, Line);

@@ -129,23 +129,23 @@ begin
       '0'..'9': inc(numberLength);
       ',': begin
         if numberLength = 0 then
-          error('Invalid tIntList string: '+s);
+          fatal('Invalid tIntList string: '+s);
         value := strToInt(copy(s,i-numberLength,numberLength));
         self.append(value);
         numberLength := 0;
       end;
       ']': begin
-        if i <> length(s) then error('Found characters after ]: '+s);
+        if i <> length(s) then fatal('Found characters after ]: '+s);
         {process final number (if any)}
         if numberLength = 0 then exit;
         value := strToInt(copy(s,i-numberLength,numberLength));
         self.append(value);
         exit;
       end;
-      else error('Invalid character "'+s[i]+'" in tIntList string: '+s);
+      else fatal('Invalid character "'+s[i]+'" in tIntList string: '+s);
     end;
   end;
-  error('String missing ]: '+s);
+  fatal('String missing ]: '+s);
 end;
 
 function tIntList.deref(index: int32): int32; inline;
@@ -220,7 +220,7 @@ begin
     inc(endPos);
   end else begin
     {cannot append to non-trivial slice}
-    error(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
+    fatal(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
   end;
 end;
 
@@ -335,7 +335,7 @@ begin
     inc(endPos);
   end else begin
     {cannot append to non-trivial slice}
-    error(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
+    fatal(format('Tried to append to a non-trival slice. (%d, %d) length:%d ',[startPos, endPos, len]));
   end;
 end;
 

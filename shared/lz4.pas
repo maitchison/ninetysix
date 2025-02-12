@@ -126,7 +126,7 @@ var
   a: int32;
 begin
   if length(literals) < 1 then
-    error('Must end on a literal');
+    fatal('Must end on a literal');
 
   a := length(literals);
   WriteByte(min(a, 15));
@@ -297,7 +297,7 @@ begin
   map := tHashMap.create(level.maxBinSize);
   srcLen := length(data);
 
-  if srcLen > MAX_BLOCK_SIZE then error('LZ4 max block size is '+intToStr(MAX_BLOCK_SIZE)+'.');
+  if srcLen > MAX_BLOCK_SIZE then fatal('LZ4 max block size is '+intToStr(MAX_BLOCK_SIZE)+'.');
 
   {greedy approach}
 
@@ -324,7 +324,7 @@ begin
 
     {check for last byte}
     if pos > srcLen-1 then
-      error('Processed too many bytes');
+      fatal('Processed too many bytes');
     if pos >= srcLen-1 then begin
       {we reached the end, just dump the buffer}
       while pos < srcLen do begin
@@ -447,7 +447,7 @@ begin
       {... If not, add a literal and keep going}
       if pos > length(data)-1 then begin
         writeln(length(data), ' ', srcLen, ' ', pos, ' ',literalBuffer.len);
-        error('ops');
+        fatal('ops');
       end;
 
       literalBuffer.writeByte(data[pos]);
@@ -596,9 +596,9 @@ begin
     {copy literals}
 
     if (inPos + numLiterals) >= length(bytes) then
-      error('overran input by '+intToStr((inPos + numLiterals)-length(bytes)+1)+' bytes');
+      fatal('overran input by '+intToStr((inPos + numLiterals)-length(bytes)+1)+' bytes');
     if (outPos + numLiterals) >= length(buffer) then
-      error('overran output by '+intToStr((outPos + numLiterals)-length(buffer)+1)+' bytes');
+      fatal('overran output by '+intToStr((outPos + numLiterals)-length(buffer)+1)+' bytes');
 
     move(bytes[inPos], buffer[outPos], numLiterals);
     inc(inPos, numLiterals);
@@ -778,9 +778,9 @@ begin
   end;
 
   if bufferLen > length(buffer) then
-    Error(Format('Supplied buffer did not have enough bytes, wanted %d but only had %d', [bufferLen, length(buffer)]));
+    fatal(Format('Supplied buffer did not have enough bytes, wanted %d but only had %d', [bufferLen, length(buffer)]));
   if hadBuffer and (bufferLen < length(buffer)) then
-    Error(Format('Supplied buffer did not match decode length, expected %d but only had %d', [length(buffer), bufferLen]));
+    fatal(Format('Supplied buffer did not match decode length, expected %d but only had %d', [length(buffer), bufferLen]));
 
   if not hadBuffer then
     setLength(buffer, bufferLen);

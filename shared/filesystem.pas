@@ -124,8 +124,8 @@ end;
 {checks if two files share the same modified timestamp}
 function tFileSystem.wasModified(fileA, fileB: string): boolean;
 begin
-  if not exists(fileA) then error('File not found '+fileA);
-  if not exists(fileB) then error('File not found '+fileB);
+  if not exists(fileA) then fatal('File not found '+fileA);
+  if not exists(fileB) then fatal('File not found '+fileB);
   result := getModified(fileA) <> getModified(fileB);
 end;
 
@@ -201,7 +201,7 @@ begin
   if getFileSize(fileA) <> getFileSize(fileB) then exit(false);
 
   assign(t1, fileA);
-  assign(t2, fileA);
+  assign(t2, fileB);
 
   reset(t1);
   reset(t2);
@@ -219,7 +219,6 @@ begin
 
   close(t1);
   close(t2);
-
 end;
 
 function tFileSystem.readText(filename: string): tStringList;
@@ -232,7 +231,7 @@ begin
 
   if filename = '' then exit;
 
-  if not self.exists(filename) then error(format('File "%s" not found.', [filename]));
+  if not self.exists(filename) then fatal(format('File "%s" not found.', [filename]));
 
   assign(t, filename);
   reset(t);

@@ -43,9 +43,7 @@ type
     procedure append(fileDiff: tFileDiff);
     function  getFileStats(): tDiffStats;
     function  getLineStats(): tDiffStats;
-
   end;
-
 
   tCheckpointRepo = class;
 
@@ -96,7 +94,7 @@ type
 
     function  repoDataPath: string;
 
-    function  generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
+    function  generateCheckpointDiff(old, new: tCheckpoint;force:boolean=false): tCheckpointDiff;
 
     function  hasCheckpoint(checkpointName: string): boolean;
     function  getCheckpointPath(checkpointName: string): string;
@@ -129,7 +127,7 @@ constructor tCheckpoint.Create(aRepo: tCheckpointRepo); overload;
 begin
   inherited Create();
   fileList := nil;
-  if not assigned(aRepo) then error('Repo must be assigned');
+  if not assigned(aRepo) then fatal('Repo must be assigned');
   repo := aRepo;
   clear();
 end;
@@ -227,14 +225,21 @@ var
   fr: tFileRef;
 begin
 
-  if not checkpoint.endsWith('.txt', true) then error(format('Checkpoint must be a .txt file but was "%s"', [checkpoint]));
+  if not checkpoint.endsWith('.txt', true) then fatal(format('Checkpoint must be a .txt file but was "%s"', [checkpoint]));
 
   if not fs.exists(checkpoint) then
-    error(format('Checkpoint "%s" does not exist.', [checkpoint]));
+    fatal(format('Checkpoint "%s" does not exist.', [checkpoint]));
 
   clear();
 
   reader := tINIReader.create(checkpoint, objectFactory);
+
+  {read commit}
+  assertEqual(reader.readLine(), '[commit]');
+  fMessage := reader.readString('message');
+  fID := reader.readString('id');
+  fAuthor := reader.readString('author');
+  fDate := reader.readFloat('date');
 
   while not reader.eof do begin
     obj := reader.readObject();
@@ -257,7 +262,7 @@ var
   i: integer;
 begin
 
-  if not checkpoint.endsWith('.txt', true) then error('Checkpoint must be a .txt file');
+  if not checkpoint.endsWith('.txt', true) then fatal('Checkpoint must be a .txt file');
 
   self.writeObjects();
 
@@ -307,7 +312,7 @@ begin
   inherited create();
 
   self.repoRoot := aRepoRoot;
-  if not fs.folderExists(self.repoDataPath) then error(format('No repo found at "%s"', [self.repoDataPath]));
+  if not fs.folderExists(self.repoDataPath) then fatal(format('No repo found at "%s"', [self.repoDataPath]));
 
   objectStore := tObjectStore.create(joinPath(self.repoDataPath, 'store'));
   glob := tGlob.create();
@@ -379,7 +384,7 @@ begin
   result := joinPath(repoRoot, '$repo');
 end;
 
-function tCheckpointRepo.generateCheckpointDiff(old, new: tCheckpoint): tCheckpointDiff;
+function tCheckpointRepo.generateCheckpointDiff(old, new: tCheckpoint;force:boolean=false): tCheckpointDiff;
 var
   fr, oldFr: tFileRef;
   fd: tFileDiff;
@@ -430,7 +435,7 @@ begin
     if renamedFiles.contains(fr) then continue;
     oldFr := oldFiles.lookup(fr.path);
     if not oldFr.assigned then continue;
-    if not fs.wasModified(fr.fqn, oldFr.fqn) then continue;
+    if (not force) and (not fs.wasModified(fr.fqn, oldFr.fqn)) then continue;
     {unfortunately we need to do a full comparision here as sometimes
      modified is changed but file is not}
     if fs.compareText(fr.fqn, oldFr.fqn) then continue;
@@ -466,7 +471,7 @@ var
   checkpointNames: tStringList;
 begin
   checkpointNames := getCheckpointNames();
-  if checkpointNames.len = 0 then error('Repo has no head, as it is empty.');
+  if checkpointNames.len = 0 then fatal('Repo has no head, as it is empty.');
   result := load(checkpointNames[0]);
 end;
 
@@ -509,7 +514,7 @@ begin
       exit(FD_RENAMED);
   if self.old.assigned then exit(FD_REMOVED);
   if self.new.assigned then exit(FD_ADDED);
-  error('Neither old nor new was assigned, file as no diff type.');
+  fatal('Neither old nor new was assigned, file as no diff type.');
 end;
 
 class function tFileDiff.MakeRenamed(aOld, aNew: tFileRef): tFileDiff;
@@ -532,8 +537,8 @@ end;
 
 class function tFileDiff.MakeModified(aOld, aNew: tFileRef): tFileDiff;
 begin
-  if aOld.path <> aNew.path then error('Modified diff should have paths match.');
-  if aOld.fqn = aNew.fqn then error('Modified diff have two different files.');
+  if aOld.path <> aNew.path then fatal('Modified diff should have paths match.');
+  if aOld.fqn = aNew.fqn then fatal('Modified diff have two different files.');
   result.old := aOld;
   result.new := aNew;
 end;
@@ -553,7 +558,7 @@ end;
 
 function tCheckpointDiff.getFileStats(): tDiffStats;
 begin
-  error('NIY');
+  fatal('NIY');
 end;
 
 function tCheckpointDiff.getLineStats(): tDiffStats;

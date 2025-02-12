@@ -161,7 +161,7 @@ var
 begin
   {todo: implement proper clipping}
   if (src.height <= 0) or (src.width <= 0) then
-    error('Tried drawing sprite with invalid bounds: '+ShortString(src));
+    fatal('Tried drawing sprite with invalid bounds: '+ShortString(src));
 
   if (dst.height <= 0) or (dst.width <= 0) then exit;
 
@@ -378,7 +378,7 @@ var
 begin
 
   if not assigned(self) then
-    error('Tried drawing unassigned sprite');
+    fatal('Tried drawing unassigned sprite');
 
   sprite := self.clone();
 
@@ -521,7 +521,7 @@ begin
   {linear scan for moment}
   for sprite in sprites do
     if assigned(sprite) and (sprite.tag = tag) then exit(sprite);
-  error('Sprite sheet contains no sprite named "'+tag+'"');
+  fatal('Sprite sheet contains no sprite named "'+tag+'"');
 end;
 
 {-----------------------------------------------------}

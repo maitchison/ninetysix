@@ -105,7 +105,7 @@ var
 
 begin
 
-  if sampleMax > 16*1024 then error('Buffers larger than 16K are not supported.');
+  if sampleMax > 16*1024 then fatal('Buffers larger than 16K are not supported.');
 
   {this is how far we can shift in each direction}
   padding := (sampleMax - sampleLen) div 2;

@@ -52,7 +52,7 @@ implementation
 constructor tHDRPage.create(aWidth, aHeight: integer);
 begin
   inherited create();
-  if aWidth mod 4 <> 0 then debug.error('Width must be a multiple of 4');
+  if aWidth mod 4 <> 0 then debug.fatal('Width must be a multiple of 4');
   fWidth := aWidth;
   fHeight := aHeight;
   data := getMem(fWidth*fHeight*2);

@@ -213,9 +213,9 @@ begin
   {Set Permissions}
   fLFB_SEG := Allocate_LDT_Descriptors(1);
   if not set_segment_base_address(fLFB_SEG, LinearAddress) then
-    error('Error setting LFB segment base address.');
+    fatal('Error setting LFB segment base address.');
   if not set_segment_limit(fLFB_SEG, LFBSize-1) then
-    error('Error setting LFB segment limit.');
+    fatal('Error setting LFB segment limit.');
 
   info('Mapped LFB to segment $' + HexStr(fLFB_SEG, 4));
   mappedPhysicalAddress := physicalAddress;
@@ -306,7 +306,7 @@ begin
 
   if physicalAddress = 0 then begin
     setText();
-    error('Could not find LFB address.');
+    fatal('Could not find LFB address.');
   end;
 
   info('Physical address found at $'+HexStr(PhysicalAddress, 8));
@@ -336,7 +336,7 @@ var
   actualWidth: word;
 begin
   if (width * height * bitsPerPixel div 8) > videoMemory then
-    error(format('Logical size (%dx%dx%d) too large for video memory (%dKB)', [width, height, bitsPerPixel, videoMemory div 1024]));
+    fatal(format('Logical size (%dx%dx%d) too large for video memory (%dKB)', [width, height, bitsPerPixel, videoMemory div 1024]));
   info(format('Setting logical size: %dx%d', [width, height]));
   asm
     pusha
@@ -360,7 +360,7 @@ begin
     mov [actualWidth], cx
     popa
   end;
-  if actualWidth <> width then error(format(
+  if actualWidth <> width then fatal(format(
     'Could not set logical size %d, instead got %d', [width, actualWidth]
     ));
 end;

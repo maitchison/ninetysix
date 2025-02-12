@@ -383,8 +383,8 @@ begin
   else
     startK := 0;
   for k := startK to self.len-1 do begin
-    if keys[k].contains('=') then error('Serialized keys can not contain "="');
-    if values[k].contains('=') then error('Serialized values can not contain "="');
+    if keys[k].contains('=') then fatal('Serialized keys can not contain "="');
+    if values[k].contains('=') then fatal('Serialized values can not contain "="');
     line := keys[k]+'='+values[k];
     writeln(t, line);
   end;
@@ -418,7 +418,7 @@ var
   i,j,k: integer;
 begin
   if not lookupKey(aKey, i, j) then
-    error(format('No such key %s', [aKey]))
+    fatal(format('No such key %s', [aKey]))
   else begin
     k := bins[i][j];
     result := values[k];
@@ -525,8 +525,8 @@ end;
 
 function tShortList.getItem(index: int32): dword; inline;
 begin
-  //if index >= len then error('Bounds error on small list');
-  //if index < 0 then error('Bounds error on small list');
+  //if index >= len then fatal('Bounds error on small list');
+  //if index < 0 then fatal('Bounds error on small list');
   if fLen = 1 then
     result := self.fData.value
   else
@@ -535,8 +535,8 @@ end;
 
 procedure tShortList.setItem(index: int32; x: dword); inline;
 begin
-  //if index >= fLen then error('Bounds error on small list');
-  //if index < 0 then error('Bounds error on small list');
+  //if index >= fLen then fatal('Bounds error on small list');
+  //if index < 0 then fatal('Bounds error on small list');
   if fLen = 1 then
     self.fData.value := x
   else

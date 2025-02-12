@@ -126,7 +126,7 @@ var
 begin
   timeLimit := getSec+timeout;
   while not DSPReadyToWrite do
-    if (getSec > timeLimit) then Error('Timeout waiting for DSPWrite');
+    if (getSec > timeLimit) then fatal('Timeout waiting for DSPWrite');
 end;
 
 procedure DSPWrite(command: byte);
@@ -148,7 +148,7 @@ var
 begin
   timeout := getSec+1;
   while not DSPDataAvailable do
-    if (getSec > timeout) then Error('Timeout waiting for DSPRead');
+    if (getSec > timeout) then fatal('Timeout waiting for DSPRead');
   result := port[DSP_READ_DATA];
 end;
 
@@ -391,7 +391,7 @@ begin
   case irq of
     0..7: SB_INT := $08+irq;
     8..15: SB_INT := $70+irq-8;
-    else error('Invalid IRQ for SB');
+    else fatal('Invalid IRQ for SB');
   end;
   SB_IRQ := irq;
 
@@ -505,11 +505,11 @@ var
 begin
 
   if IS_DMA_ACTIVE then
-    error('DMA transfer is already active');
+    fatal('DMA transfer is already active');
 
   note(' - Setting up DMA transfer.');
   if not assigned(mixer) then
-    error('A mixer has not yet been assigned.');
+    fatal('A mixer has not yet been assigned.');
 
   DSPReset();
 
@@ -530,7 +530,7 @@ begin
 
   {check address does not span 64K}
   if (addr shr 16) <> ((addr + words*2) shr 16) then
-    error('DMA destination buffer spans 64k boundary');
+    fatal('DMA destination buffer spans 64k boundary');
 
   {1. reset}
   DSPReset();
@@ -596,16 +596,16 @@ begin
   end;
 
   if BUFFER_SIZE > 32*1024 then
-    error('Invalid BUFFER_SIZE, must be <= 32k');
+    fatal('Invalid BUFFER_SIZE, must be <= 32k');
   if (BUFFER_SIZE and $f) <> 0 then
-    error('Invalid BUFFER_SIZE, must be a multiple of 16');
+    fatal('Invalid BUFFER_SIZE, must be a multiple of 16');
 
   {allocate twice the memory, this way atleast one half will not be split across segment boundaries}
   res := Global_Dos_Alloc(BUFFER_SIZE*2);
   dosSelector := word(res);
   dosSegment := word(res shr 16);
   if dossegment = 0 then
-    error('Failed to allocate dos memory');
+    fatal('Failed to allocate dos memory');
 
   addr := (dosSegment shl 4);
   if getPage(addr) <> getPage(addr + BUFFER_SIZE) then begin
