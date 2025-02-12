@@ -15,7 +15,10 @@ uses
 
 type
 
-  tGameObjectStatus = (GO_EXPIRED, GO_ACTIVE);
+  tGameObjectStatus = (GO_EMPTY, GO_PENDING_DELETE, GO_ACTIVE);
+
+  tParticle = class;
+  tBullet = class;
 
   tGameObject = class
   public
@@ -60,6 +63,7 @@ type
     angle: single;
     power: single;
     health: integer;
+    lastBullet: tBullet;
   public
     constructor create(); override;
     procedure reset(); override;
@@ -236,6 +240,11 @@ procedure tGameObjectList<T>.update(elapsed: single);
 var
   go: tGameObject;
 begin
+  {remove tagged objects}
+  {note: in the future we'll add these to a stack of 'free' slots}
+  for go in objects do if go.status = GO_PENDING_DELETE then
+    go.status := GO_EMPTY;
+  {update}
   for go in objects do if go.status = GO_ACTIVE then go.update(elapsed);
 end;
 
@@ -247,7 +256,7 @@ begin
   {note: we could make this much faster by maintaining a list of known
    expired elements. For small lists it's no problem though.}
   for go in objects do begin
-    if go.status = GO_EXPIRED then begin
+    if go.status = GO_EMPTY then begin
       go.reset();
       exit(go);
     end;
@@ -276,7 +285,7 @@ end;
 
 procedure tGameObject.markAsDeleted();
 begin
-  status := GO_EXPIRED;
+  status := GO_PENDING_DELETE;
 end;
 
 procedure tGameObject.setSprite(aSprite: tSprite);
@@ -320,7 +329,7 @@ begin
   age += elapsed;
   if ttl > 0 then begin
     if age >= ttl then
-      status := GO_EXPIRED;
+      status := GO_PENDING_DELETE;
   end;
   bounds.x := round(pos.x+offset.x);
   bounds.y := round(pos.y+offset.y);
@@ -383,20 +392,19 @@ begin
       {weaken blocks holding us up}
       yPos := bounds.bottom;
       for xPos:= bounds.left+1 to bounds.right-1 do begin
-        if terrain.isSolid(xPos-32, yPos) then begin
-          {make a little cloud}
-          for i := 1 to 3 do begin
-            p := particles.nextFree();
-            p.pos := V2(xPos, yPos);
-            p.vel := V2(rnd-128, rnd-128) * 0.2;
-            p.solid := true;
-            p.col := terrain.terrain.getPixel(xPos-32, yPos);
-            p.ttl := 0.5;
-            p.radius := 2;
-          end;
-          {burn it}
-          terrain.burn(xlp-32, bounds.bottom, 3, round(hitPower/support));
+        {make a little cloud}
+        for i := 1 to 3 do begin
+          p := particles.nextFree();
+          p.pos := V2(xPos, yPos);
+          p.vel := V2(rnd-128, rnd-128) * 0.2;
+          p.solid := true;
+          p.col := terrain.terrain.getPixel(xPos-32, yPos);
+          if p.col.a = 0 then p.col := RGB(200,200,200);
+          p.ttl := 0.5;
+          p.radius := 2;
         end;
+        {burn it}
+        terrain.burn(xlp-32, bounds.bottom, 2, round(hitPower/(bounds.width-2)));
       end;
       vel.y := 0;
     end;
@@ -431,12 +439,13 @@ begin
     bullet.owner := self;
     cooldown := 0.25;
     mixer.play(shootSFX, 0.2);
+    lastBullet := bullet;
   end;
 end;
 
 procedure tTank.explode();
 begin
-  if status = GO_EXPIRED then exit;
+  if status <> GO_ACTIVE then exit;
   mixer.play(explodeSFX, 1.0);
   makeExplosion(xPos, yPos, 20);
   markAsDeleted();

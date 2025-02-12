@@ -147,7 +147,7 @@ begin
   tank2 := tTank.create();
   tank1.id := 1;
   tank2.id := 2;
-  control1 := tNullController.create(tank1);
+  control1 := tAIController.create(tank1);
   control2 := tHumanController.create(tank2);
   tank1.pos := V2(100, 130);
   tank2.pos := V2(200, 160);
