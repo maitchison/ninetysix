@@ -354,7 +354,7 @@ begin
   if lastChunkTime > maxChunkTime then
     maxChunkTime := lastChunkTime;
 
-  // end of interupt
+  // end of interrupt
   // apparently I need to send EOI to slave and master PIC when I'm on IRQ 10
   if SB_IRQ >= 8 then
     port[$A0] := $20;
@@ -386,7 +386,7 @@ var
 
 procedure install_ISR(irq: byte);
 begin
-  note(' - Installing music interupt on IRQ'+intToStr(irq));
+  note(' - Installing music interrupt on IRQ'+intToStr(irq));
 
   case irq of
     0..7: SB_INT := $08+irq;
@@ -416,7 +416,7 @@ end;
 procedure uninstall_ISR;
 begin
   if not hasInstalledInt then exit;
-  note(' - Removing music interupt');
+  note(' - Removing music interrupt');
   if SB_IRQ >= 8 then
     port[$A1] := port[$A1] or IRQStopMask
   else
@@ -522,7 +522,7 @@ begin
 
   DMA should the setup to transfer the entire buffer.
   SB should be told to use half the buffer as the blocksize, this way
-  we get an interupt halfway through the block}
+  we get an interrupt halfway through the block}
 
   words := BUFFER_SIZE div 2;           // number of words in buffer.
   halfWords := HALF_BUFFER_SIZE div 2;  // number of words in halfbuffer.

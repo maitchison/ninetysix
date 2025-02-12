@@ -124,7 +124,7 @@ var
   masterMusicReader: tLA96Reader; {another reference to musicReader (which might get modified)}
   musicTimer: tTimer;
 
-  // debug registers, used to indicate errors during interupt.
+  // debug registers, used to indicate errors during interrupt.
   MIX_COUNTER: dword;
   MIX_ERRORS: dword;
   MIX_ERROR_STR: shortstring;
@@ -138,7 +138,7 @@ var
   DR4: int64 = 0;
   MIX_CLICK_DETECTION: dword;
 
-{Mixer is called during interupt, so stack might be invalid,
+{Mixer is called during interrupt, so stack might be invalid,
  also, make sure to not throw any errors. These will get turned
  back on below}
 {$S-,R-,Q-}
@@ -609,7 +609,7 @@ begin
   end;
 
   musicReader := reader;
-  {quickly get a sample (incase interupt fires on next line}
+  {quickly get a sample (incase interrupt fires on next line}
   note(format('about to generate samples %d %d/%d', [mbWritePos div 1024, getMusicStats().bufferFramesFilled, getMusicStats().bufferFramesFree]));
   musicUpdate(4);
   note(format('done generating samples %d %d/%d', [mbWritePos div 1024, getMusicStats().bufferFramesFilled, getMusicStats().bufferFramesFree]));
@@ -761,7 +761,7 @@ begin
 
   ticksOffset := round(timeOffset*44100);
 
-  // we don't want channel to be in an invalid state when interupt occurs.
+  // we don't want channel to be in an invalid state when interrupt occurs.
   asm
     cli
   end;

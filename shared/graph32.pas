@@ -709,7 +709,7 @@ begin
   {MMX blending path}
   asm
 
-    // if mixer interupt runs during thi timer then we'll have
+    // if mixer interrupt runs during thi timer then we'll have
     // fpu in invalid state, so block them during the hline
     cli
 
