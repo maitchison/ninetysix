@@ -70,6 +70,7 @@ var
   r2: integer;
   emptyC, burntC: RGBA;
   tc: RGBA;
+  dimFactor: integer;
 begin
   if power <= 0 then exit;
   if r <= 0 then exit;
@@ -83,10 +84,12 @@ begin
       if isEmpty(x, y) then continue;
       v := round((1-(dst2/r2)) * power);
       tc := terrain.getPixel(x, y);
+      dimFactor := round(50 * v / (tc.a+1));
       tc.a := clamp(tc.a - v, 0, 255);
-      tc.r := clamp(tc.r - (v div 2), 0, 255);
-      tc.g := clamp(tc.g - (v div 2), 0, 255);
-      tc.b := clamp(tc.b - (v div 2), 0, 255);
+
+      tc.r := clamp(tc.r - dimFactor, 0, 255);
+      tc.g := clamp(tc.g - dimFactor, 0, 255);
+      tc.b := clamp(tc.b - dimFactor, 0, 255);
       terrain.setPixel(x, y, tc);
     end;
   end;

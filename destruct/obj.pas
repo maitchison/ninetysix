@@ -348,7 +348,7 @@ begin
   cooldown := 0;
   angle := 0;
   power := 10;
-  health := 1000;
+  health := 750;
 end;
 
 procedure tTank.draw(screen: tScreen);
