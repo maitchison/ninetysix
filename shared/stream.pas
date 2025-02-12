@@ -10,15 +10,13 @@ uses
   debug,
   myMath,
   sysTypes,
+  filesystem,
   test;
 
 const
   FS_READBUFFER_SIZE = 16*1024;
 
 type
-  {file mode, from DOS I think}
-  tFileMode = (FM_READ=0, FM_WRITE=1, FM_READWRITE=2);
-
   tStream = class
 
   protected
@@ -147,7 +145,6 @@ type
 implementation
 
 uses
-  filesystem,
   vlc;
 
 {------------------------------------------------------}
@@ -521,32 +518,31 @@ var
   ioError: word;
 begin
 
-  {$i-}
-  assignFile(f, fileName);
-  system.reset(f,1);
-  ioError := IOResult; if ioError <> 0 then error(format('Could not open file "%s" for reading, Error:%s', [filename, getIOErrorString(ioError)]));
-  {$i+}
+  fs.openFile(filename, f, FM_READ);
 
-  {work out how much to read}
-  if maxSize > 0 then
-    bytesToRead := min(maxSize, filesize(f))
-  else
-    bytesToRead := filesize(f);
-  bytesRemaining := bytesToRead;
-  setCapacity(bytesToRead);
-  flen := bytesToRead;
+  try
+    {work out how much to read}
+    if maxSize > 0 then
+      bytesToRead := min(maxSize, filesize(f))
+    else
+      bytesToRead := filesize(f);
+    bytesRemaining := bytesToRead;
+    setCapacity(bytesToRead);
+    flen := bytesToRead;
 
-  fPos := 0;
-  while bytesRemaining > 0 do begin
-    bytesToRead := min(blockSize, bytesRemaining);
-    blockread(f, bytes[fPos], bytesToRead, bytesRead);
-    if bytesRead <> bytesToRead then
-      error(format('Error reading from file "%s", expected to read %d bytes but read %d', [bytesToRead, bytesRead]));
-    bytesRemaining -= bytesRead;
-    fPos += bytesRead;
+    fPos := 0;
+    while bytesRemaining > 0 do begin
+      bytesToRead := min(blockSize, bytesRemaining);
+      blockread(f, bytes[fPos], bytesToRead, bytesRead);
+      if bytesRead <> bytesToRead then
+        error(format('Error reading from file "%s", expected to read %d bytes but read %d', [bytesToRead, bytesRead]));
+      bytesRemaining -= bytesRead;
+      fPos += bytesRead;
+    end;
+    seek(0);
+  finally
+    close(f);
   end;
-  close(f);
-  seek(0);
 end;
 
 {writes memory stream to file}
@@ -579,6 +575,7 @@ begin
   oldFileMode := system.fileMode;
   system.fileMode := byte(fileMode);
 
+  {todo: use filesystem for this...}
   case fileMode of
     FM_READ: begin
       {open file for read only}

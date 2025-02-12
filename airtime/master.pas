@@ -140,7 +140,7 @@ var
 begin
 
   if extractExtension(srcPath).toLower() <> 'wav' then
-    error(format('Source file should be .wav file, but was %s', [srcPath]));
+    fatal(format('Source file should be .wav file, but was %s', [srcPath]));
 
   dstPath := 'res\'+filename+'.a96';
 

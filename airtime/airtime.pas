@@ -551,7 +551,7 @@ begin
   log('---------------------------', llImportant);
 
   if cpuInfo.ram < 30*1024*1024 then
-    error('Application required 30MB of ram.');
+    fatal('Application required 30MB of ram.');
 
   if cpuInfo.ram < 40*1024*1024 then begin
     warning(format('Low memory detected. (%.1fMB)', [cpuInfo.ram/1024/1024]));
@@ -570,9 +570,9 @@ begin
   enableVideoDriver(vd);
 
   if (vd.vesaVersion) < 2.0 then
-    error('Requires VESA 2.0 or greater.');
+    fatal('Requires VESA 2.0 or greater.');
   if (vd.videoMemory) < 1*1024*1024 then
-    error('Requires 1MB video card.');
+    fatal('Requires 1MB video card.');
 
   runTestSuites();
 

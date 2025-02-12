@@ -40,13 +40,14 @@ var
   LogFile: Text;
   LogFileOpen: Boolean = False;
 
-procedure Log(s: string; level: tLogLevel=llNote);
-procedure Debug(s: string);
-procedure Note(s: string); overload;
-procedure Note(fmt: string; args: array of Const); overload;
-procedure Info(s: string);
-procedure Warning(s: string);
-procedure Error(s: string;code: byte=100);
+procedure log(s: string; level: tLogLevel=llNote);
+procedure debug(s: string);
+procedure note(s: string); overload;
+procedure note(fmt: string; args: array of Const); overload;
+procedure info(s: string);
+procedure warning(s: string);
+procedure error(s: string);
+procedure fatal(s: string; code: byte=100);
 
 function GetLogLevelColor(level: tLogLevel): byte;
 
@@ -55,9 +56,9 @@ procedure PrintLog(maxEntries: integer=20);
 
 function GetIOErrorString(code: word): string;
 
-procedure Assert(condition: boolean; msg: string='');
-procedure RunError(code: word);
-procedure RunErrorSkipFrame(code: word);
+procedure assert(condition: boolean; msg: string='');
+procedure runError(code: word);
+procedure runErrorSkipFrame(code: word);
 
 const
   IO_FILE_NOT_FOUND = 2;
@@ -70,17 +71,21 @@ var
   VERBOSE_LOG: tLogLevel = {$ifdef debug} llDebug; {$else} llNote; {$endif}
 
 type
-  Exception = class
+  Exception = class(tObject)
   private
     fMessage: string;
   public
-    constructor create(const msg: string);
-    property message: string read fMessage;
+    constructor create(const msg: string); overload;
+    constructor create(const fmt: string; const args: array of const); overload;
+    function toString(): string; override;
+    property message: string read fMessage write fMessage;
   end;
 
-  ValueError = class(Exception)
-  end;
-
+  GeneralError = class(Exception);
+  ValueError = class(Exception);
+  IOError = class(Exception);
+  FileNotFoundError = class(Exception);
+  AssertionError = class(Exception);
 
 implementation
 
@@ -96,6 +101,16 @@ begin
   fMessage := msg;
 end;
 
+constructor Exception.create(const fmt: string; const args: array of const);
+begin
+  create(format(fmt, args));
+end;
+
+function Exception.toString(): string;
+begin
+  result := ClassName+': ' + fMessage;
+end;
+
 {------------------------------------------------}
 
 function tLogEntry.toString(): String;
@@ -104,7 +119,7 @@ begin
 end;
 
 {write entry to log}
-procedure Log(s: string; level: tLogLevel=llNote);
+procedure log(s: string; level: tLogLevel=llNote);
 var
   entry: TLogEntry;
   isText: boolean;
@@ -134,44 +149,50 @@ begin
   Inc(LogCount);
 end;
 
-procedure Warning(s: string);
+procedure warning(s: string);
 begin
-  Log(s, llWarning);
+  log(s, llWarning);
 end;
 
-procedure Error(s: string; code: byte=100); noreturn;
+procedure error(s: string);
 begin
-  Log(s, llError);
-  RunErrorSkipFrame(code);
+  log(s, llError);
+end;
+
+{todo: remove this and have caller use raise GeneralError instead}
+procedure fatal(s: string; code: byte=100); noreturn;
+begin
+  log(s, llError);
+  raise GeneralError.create(s);
 end;
 
 procedure Note(s: string);
 begin
-  Log(s, llNote);
+  log(s, llNote);
 end;
 
-procedure Note(fmt: string; args: array of Const);
+procedure note(fmt: string; args: array of Const);
 begin
-  Log(format(fmt, args), llNote);
+  log(format(fmt, args), llNote);
 end;
 
-procedure Debug(s: string);
+procedure debug(s: string);
 begin
-  Log(s, llDebug);
+  log(s, llDebug);
 end;
 
-procedure Info(s: string);
+procedure info(s: string);
 begin
-  Log(s, llInfo);
+  log(s, llInfo);
 end;
 
-procedure Assert(condition: boolean; msg: string='');
+procedure assert(condition: boolean; msg: string='');
 begin
   if not condition then
-    Error('Assertion failure:' + msg);
+    raise AssertionError(msg);
 end;
 
-procedure PrintLog(MaxEntries: integer = 20);
+procedure printLog(MaxEntries: integer = 20);
 var
   i: integer;
   oldTextAttr: byte;
@@ -236,10 +257,10 @@ begin
   prevfp := get_frame;
   i := 0;
   while true do begin
-    if (fp < prevfp) then begin
+    {if (fp < prevfp) then begin
       warning('Stack frame corrupted');
       exit;
-    end;
+    end;}
     if (fp = prevfp) then begin
       warning('Stack frame has loop');
       exit;
@@ -285,6 +306,7 @@ begin
   case ErrNo of
     100: RunError := 'General Error (100)';
     215: RunError := 'Arithmetic Overflow (215)';
+    216: RunError := 'General Protection Fault (216)';
     else RunError := 'Runtime error '+IntToStr(ErrNo);
   end;
 
@@ -342,9 +364,36 @@ begin
 end;
 
 
-procedure CustomExceptProc(obj: TObject; Address:CodePointer; Frame: Pointer);
+{this is called for any uncaught exceptions}
+procedure CustomExceptProc(obj: tObject; address:codePointer; frame: Pointer);
+var
+  CallerAddr: Pointer;
+  FramePtr: Pointer;
+  InfoStr: string;
+  FrameCount: integer;
+  RunError: string;
+
+  func, source: shortstring;
+  line: longint;
+
+const
+  MAX_FRAMES = 16;
 begin
-  CustomErrorProc(255, Address, Frame);
+
+  if assigned(videoDriver) then begin
+    if not videoDriver.isText then begin
+      videoDriver.setText();
+      clrscr;
+    end;
+  end;
+
+  PrintLog(5);
+
+  error(obj.toString);
+  note(backTraceStrFunc(address));
+  dumpStack(frame);
+
+  Halt(255);
 end;
 
 procedure ShutdownLog();

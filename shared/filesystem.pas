@@ -12,6 +12,10 @@ uses
   dos;
 
 type
+  {file mode, from DOS I think}
+  tFileMode = (FM_READ=0, FM_WRITE=1, FM_READWRITE=2);
+
+type
   tFileSystem = class
 
     function  folderExists(path: string): boolean;
@@ -33,6 +37,8 @@ type
     function  mkDir(path: string): boolean;
     function  listFiles(path: string): tStringList;
     function  listFolders(path: string): tStringList;
+
+    procedure openFile(path: string;var f: file; fileMode: tFileMode=FM_READ);
   end;
 
 var
@@ -237,6 +243,54 @@ begin
   close(t);
 end;
 
+{opens file, raises exception on error}
+procedure tFileSystem.openFile(path: string;var f: file; fileMode: tFileMode=FM_READ);
+var
+  oldFileMode: word;
+  errorCode: word;
+begin
 
+  oldFileMode := system.fileMode;
+  system.fileMode := byte(fileMode);
+
+  system.IOResult; // clear previous error, if any.
+
+  {$i-}
+  case fileMode of
+    FM_READ: begin
+      system.assign(f, path);
+      system.reset(f,1);
+    end;
+    FM_WRITE: begin
+      system.assign(f, path);
+      system.rewrite(f,1);
+    end;
+    FM_READWRITE: begin
+      if self.exists(path) then begin
+        system.assign(f, path);
+        system.rewrite(f,1);
+        system.reset(f,1);
+      end else begin
+        system.assign(f, path);
+        system.rewrite(f,1);
+      end;
+    end;
+    else raise GeneralError.create('Invalid fileMode %d', [fileMode]);
+  end;
+
+  system.fileMode := oldFileMode;
+  errorCode := system.IOResult;
+
+  {$i+}
+
+  case errorCode of
+    0: ;
+    2: raise FileNotFoundError.create('File not found "%s"', [path]);
+    else raise IOError.create('Could not open file "%s", Error:%s', [path, getIOErrorString(errorCode)]);
+  end;
+
+end;
+
+{--------------------------------------------------------------}
 begin
 end.
