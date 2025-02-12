@@ -51,7 +51,7 @@ const
   REPO_PATH = 'c:\dev\';
 
   {ignores modified date}
-  FORCE = true;
+  FORCE = false;
 
 type
   tDiffStatsHelper = record helper for tDiffStats
