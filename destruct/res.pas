@@ -21,7 +21,7 @@ procedure loadResources();
 begin
   info('Loading resources');
 
-  titleGFX := tPage.Load('res\title.p96');
+  titleGFX := tPage.Load('res\title2.p96');
 
   shootSFX := tSoundEffect.Load('res\shoot.a96');
   explodeSFX := tSoundEffect.Load('res\explode.a96');

@@ -21,7 +21,8 @@ type
     llInfo=2,
     llImportant=3,
     llWarning=4,
-    llError=5
+    llError=5,
+    llNone=6
   );
 
 type
@@ -203,14 +204,16 @@ var
   firstEntry := LogCount-MaxEntries;
   if firstEntry < 0 then firstEntry := 0;
 
+  textAttr := LightGray;
   if firstEntry > 0 then
     writeln('...');
 
   oldTextAttr := textAttr and $0F;
-  for i := firstEntry to LogCount-1 do begin
+  for i := firstEntry to logCount-1 do begin
     textAttr := getLogLevelColor(LogEntries[i].level);
     writeln(LogEntries[i].ToString());
   end;
+
   textAttr := oldTextAttr;
 end;
 
@@ -257,10 +260,10 @@ begin
   prevfp := get_frame;
   i := 0;
   while true do begin
-    {if (fp < prevfp) then begin
+    if (fp < prevfp) then begin
       warning('Stack frame corrupted');
       exit;
-    end;}
+    end;
     if (fp = prevfp) then begin
       warning('Stack frame has loop');
       exit;
@@ -365,36 +368,68 @@ end;
 
 
 {this is called for any uncaught exceptions}
-procedure CustomExceptProc(obj: tObject; address:codePointer; frame: Pointer);
+{$push}
+{$s-}
+procedure CustomExceptProc(obj: tObject; address:codePointer; frameCount: longint; frames: PCodePointer);
 var
   CallerAddr: Pointer;
   FramePtr: Pointer;
   InfoStr: string;
-  FrameCount: integer;
   RunError: string;
 
   func, source: shortstring;
-  line: longint;
+  i: integer;
 
 const
+  BG_COLOR = Black;
   MAX_FRAMES = 16;
+
+  procedure textColor(b: byte);
+  begin
+    textAttr := BG_COLOR * 16 + b;
+  end;
+
 begin
 
   if assigned(videoDriver) then begin
     if not videoDriver.isText then begin
       videoDriver.setText();
-      clrscr;
     end;
   end;
 
-  PrintLog(5);
+  VERBOSE_SCREEN := llWarning;
 
-  error(obj.toString);
+  textColor(White);
+  clrscr;
+
+  textColor(White);
+  writeln('An error has occured:');
+  writeln();
+  writeln(obj.toString);
+
+  textColor(White);
+  writeln();
+  writeln('Stack Trace:');
+  writeln(backTraceStrFunc(address));
+  for i := 0 to framecount-1 do
+    writeln(backTraceStrFunc(frames[i]));
+
+  textColor(White);
+  writeln();
+  writeln('Log:');
+  PrintLog(MAX_FRAMES);
+
+  {also write to log, but only after we have shown it}
+  note(obj.toString);
   note(backTraceStrFunc(address));
-  dumpStack(frame);
+  for i := 0 to framecount-1 do
+    note(backTraceStrFunc(frames[i]));
+
+  note('Halting program');
 
   Halt(255);
 end;
+{$pop}
 
 procedure ShutdownLog();
 begin
@@ -432,10 +467,10 @@ begin
   if HOOK_EXIT then begin
 
     // Install Error Hooks
-    ErrorProc := @CustomErrorProc;
+    ErrorProc := CustomErrorProc;
     {This shouldn't be needed, but will help in the future if we want to
      support exceptions.}
-    ExceptProc := @CustomExceptProc;
+    ExceptProc := CustomExceptProc;
 
     // Make sure to clean up log when we shutdow.
     AddExitProc(@shutdownLog);
