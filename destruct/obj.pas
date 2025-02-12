@@ -102,6 +102,9 @@ implementation
 uses
   res, terra;
 
+var
+  updateAccumlator: single;
+
 {----------------------------------------------------------}
 { helpers }
 {----------------------------------------------------------}
@@ -534,10 +537,16 @@ begin
 end;
 
 procedure updateAll(elapsed: single);
+const
+  stepSize = 0.01;
 begin
-  tanks.update(elapsed);
-  bullets.update(elapsed);
-  particles.update(elapsed);
+  updateAccumlator += elapsed;
+  while updateAccumlator >= stepSize do begin
+    tanks.update(stepSize);
+    bullets.update(stepSize);
+    particles.update(stepSize);
+    updateAccumlator -= stepSize;
+  end;
 end;
 
 procedure drawAll(screen: tScreen);
@@ -552,6 +561,7 @@ end;
 
 procedure initObjects;
 begin
+  updateAccumlator := 0;
   tanks := tGameObjectList<tTank>.create();
   bullets := tGameObjectList<tBullet>.create();
   particles := tGameObjectList<tParticle>.create();
