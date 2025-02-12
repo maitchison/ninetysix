@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   {game specific}
-  res, obj, terra,
+  res, obj, terra, controller,
   {general}
   graph2d, graph32, vga, vesa, screen,
   sprite, inifile,
@@ -159,8 +159,12 @@ begin
   {setup players}
   tank1 := tTank.create();
   tank2 := tTank.create();
-  tank1.pos := V2(100, 150);
-  tank2.pos := V2(200, 150);
+  tank1.id := 1;
+  tank2.id := 2;
+  tank1.control := tNullController.create();
+  tank2.control := tHumanController.create();
+  tank1.pos := V2(100, 130);
+  tank2.pos := V2(200, 160);
   tanks.append(tank1);
   tanks.append(tank2);
 
@@ -182,17 +186,8 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-    {input}
-    if keyDown(key_space) then
-      tank2.fire();
-    if keyDown(key_left) then
-      tank2.adjust(-90*elapsed, 0);
-    if keyDown(key_right) then
-      tank2.adjust(+90*elapsed, 0);
-    if keyDown(key_up) then
-      tank2.adjust(0, +10*elapsed);
-    if keyDown(key_down) then
-      tank2.adjust(0, -10*elapsed);
+    tank1.control.process();
+    tank2.control.process();
 
     screen.clearAll();
 

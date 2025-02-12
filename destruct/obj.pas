@@ -4,6 +4,7 @@ interface
 
 uses
   debug, test,
+  controller,
   vertex,
   sprite,
   utils,
@@ -55,6 +56,8 @@ type
 
   tTank = class(tGameObject)
   public
+    id: integer;
+    control: tController;
     cooldown: single;
     angle: single;
     power: single;
@@ -268,15 +271,9 @@ end;
 
 procedure tGameObject.reset();
 begin
-  age := 0;
-  ttl := 0;
+  fillchar((pByte(self) + sizeof(Pointer))^, self.InstanceSize - sizeof(Pointer), 0);
   status := GO_ACTIVE;
   col := RGB(255,0,255);
-  sprite := nil;
-  pos := V2(0,0);
-  vel := V2(0,0);
-  offset := V2(0, 0);
-  bounds := rect(0, 0, 0, 0);
 end;
 
 procedure tGameObject.markAsDeleted();
@@ -345,8 +342,6 @@ end;
 procedure tTank.reset();
 begin
   inherited reset();
-  cooldown := 0;
-  angle := 0;
   power := 10;
   health := 750;
 end;
@@ -362,7 +357,6 @@ begin
     yPos - cos(angle*DEG2RAD) * power * 2,
     RGB(255,128,128)
   );
-
 end;
 
 procedure tTank.update(elapsed: single);
@@ -374,8 +368,15 @@ var
   xPos, yPos: integer;
   i: integer;
 begin
+
+  {process controls}
+  if control.fire then fire();
+  adjust(control.xVel * elapsed, control.yVel *elapsed);
+
+  {inherited update stuff}
   inherited update(elapsed);
   if cooldown > 0 then cooldown -= elapsed;
+
   {falling}
   support := 0;
   for xlp := bounds.left+1 to bounds.right-1 do
@@ -447,7 +448,6 @@ begin
   markAsDeleted();
 end;
 
-
 procedure tTank.adjust(deltaAngle, deltaPower: single);
 begin
   if status <> GO_ACTIVE then exit;
@@ -467,7 +467,6 @@ begin
   offset.y := -1;
   bounds.width := 3;
   bounds.height := 3;
-  owner := nil;
 end;
 
 procedure tBullet.explode();
