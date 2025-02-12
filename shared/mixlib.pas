@@ -62,7 +62,7 @@ type
     destructor destroy(); override;
     function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
     function playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
-    function play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+    function play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel; overload;
   end;
 
 type
@@ -730,13 +730,13 @@ function tSoundMixer.playRepeat(sfx: tSoundEffect; channelSelection: tSoundChann
 var
   channel: tSoundChannel;
 begin
-  channel := play(sfx, channelSelection, volume, pitch, timeOffset);
+  channel := play(sfx, volume, channelSelection, pitch, timeOffset);
   if assigned(channel) then
     channel.looping := true;
   result := channel;
 end;
 
-function tSoundMixer.play(sfx: tSoundEffect; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   ticksOffset: int32;
   offsetString: string;

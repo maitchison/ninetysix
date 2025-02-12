@@ -66,7 +66,7 @@ type
     procedure draw(screen: tScreen); override;
     procedure adjust(deltaAngle, deltaPower: single);
     procedure takeDamage(atX,atY: integer; damage: integer;sender: tTank=nil);
-
+    procedure explode();
     procedure fire();
   end;
 
@@ -419,7 +419,7 @@ begin
   v := (V2(atX, atY) - pos).normed() * 70;
 
   if health < 0 then begin
-    //todo;
+    explode();
   end;
 end;
 
@@ -427,6 +427,7 @@ procedure tTank.fire();
 var
   bullet: tBullet;
 begin
+  if status <> GO_ACTIVE then exit;
   if cooldown <= 0 then begin
     bullet := bullets.nextFree();
     bullet.pos := pos;
@@ -434,12 +435,22 @@ begin
     bullet.pos += bullet.vel.normed*6;
     bullet.owner := self;
     cooldown := 0.25;
-    mixer.play(shootSFX);
+    mixer.play(shootSFX, 0.2);
   end;
 end;
 
+procedure tTank.explode();
+begin
+  if status = GO_EXPIRED then exit;
+  mixer.play(explodeSFX, 1.0);
+  makeExplosion(xPos, yPos, 20);
+  markAsDeleted();
+end;
+
+
 procedure tTank.adjust(deltaAngle, deltaPower: single);
 begin
+  if status <> GO_ACTIVE then exit;
   angle := clamp(angle + deltaAngle, -90, 90);
   power := clamp(power + deltaPower, 2, 16);
 end;
@@ -461,7 +472,7 @@ end;
 
 procedure tBullet.explode();
 begin
-  mixer.play(explodeSFX);
+  mixer.play(explodeSFX, 0.3);
   makeExplosion(xPos, yPos, 10);
   //terrain.burn(xPos-32, yPos, 3, 30); // for bullets
   markAsDeleted();
@@ -483,6 +494,7 @@ begin
   end;
   {check if we collided with tank}
   for tank in tanks.objects do begin
+    if tank.status <> GO_ACTIVE then continue;
     {make sure we don't collide with ourself as soon as we fire}
     if (tank = self.owner) and (age < 0.10) then continue;
     c := tank.getWorldPixel(xPos, yPos);
