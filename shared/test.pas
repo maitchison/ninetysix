@@ -122,7 +122,7 @@ begin
     timer.start();
     testSuites[i].run();
     timer.stop();
-    if timer.elapsed > 0.5 then
+    if timer.elapsed > 1.0 then
       warning(format('Test look %fs to complete', [timer.elapsed]));
   end;
   timer.free();

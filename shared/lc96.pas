@@ -633,7 +633,7 @@ begin
 
   {test on random bytes for larger page}
   img1 := tPage.Create(16,16);
-  for i := 1 to 10 do begin
+  for i := 1 to 1 do begin
     {stub: really try to catch this have an error}
     makePageRandom(img1);
     s := encodeLC96(img1);

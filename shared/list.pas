@@ -91,7 +91,9 @@ type
 
 implementation
 
-uses utils;
+uses
+  filesystem,
+  utils;
 
 {----------------------------------------------------}
 { tIntList }
@@ -552,6 +554,7 @@ begin
   s1.save('test.txt');
   s2.load('test.txt');
   assertEqual(s2.toString, '["202","103","101"]');
+  fs.delFile('test.txt');
 
 end;
 

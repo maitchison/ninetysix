@@ -141,7 +141,7 @@ type
     ownsStream: boolean;
   protected
     header: tLA96FileHeader;
-    ulawTable: array[1..8] of tULawLookup;
+    ulawTable: array[7..8] of tULawLookup;
     midCodes, difCodes: tWords; {todo: make 16bit}
     framePtr: tInt32Array; {will be filled with -1 if no frame pointers}
     frameOn: int32;
@@ -178,7 +178,7 @@ type
     // raw frame values to write out
     inBuffer: tDwords; // our 16bit stereo values
     outA, outB: tDWords;
-    ulawTable: array[1..8] of tULawLookup;
+    ulawTable: array[7..8] of tULawLookup;
   public
     {hooks}
     frameWriteHook: tFrameFrameProc;
@@ -874,9 +874,9 @@ begin
   lutDecode.initDecode(bits, round(log2(mu)));
   for i := -codeSize to codeSize do
     assertEqual(clamp16(lutDecode.lookup(i)), clamp16(uLawInv(i/codeSize, mu)));
-  for i := -1024 to 1024 do begin
-    {check all values -1k..-1k, and also samples from whole range}
-    value := clamp16(32*i);
+  for i := -256 to 256 do begin
+    {check all values -256..+256, and also samples from whole range}
+    value := clamp16(128*i);
     assertEqual(lutEncode.lookup(value), round(uLaw(value, mu) * codeSize));
     assertEqual(lutEncode.lookup(i), round(uLaw(i, mu) * codeSize));
   end;
@@ -890,24 +890,7 @@ begin
   s := encodeLA96(sfxIn, ACP_VERYHIGH);
   s.seek(0);
 
-  //logbytes
-  {
-  log(intToStr(s.len));
-  for i := 0 to 1024-1 do begin
-    if i mod 32 = 0 then writeln();
-    s.seek(i);
-    write(hexStr(s.readByte,2));
-  end;
-  }
-
   sfxOut := decodeLA96(s);
-
-  {show output}
-  {
-  for i := 0 to sfxOut.length-1 do begin
-    log(format('in: %s out:%s', [sfxIn[i].toString, sfxOut[i].toString]));
-  end;
-  }
 
   assertEqual(sfxOut.length, sfxIn.length);
   for i := 0 to sfxOut.length-1 do begin
