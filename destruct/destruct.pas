@@ -142,6 +142,7 @@ var
   elapsed: single;
   gui: tGuiComponents;
   fps: tGuiLabel;
+  xlp,ylp: integer;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);

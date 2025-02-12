@@ -40,6 +40,7 @@ type
 
     function clone(): tSprite;
 
+    function  getPixel(atX, atY: integer): RGBA;
     procedure blit(dstPage: tPage; atX, atY: int32);
     procedure draw(dstPage: tPage; atX, atY: int32);
     procedure drawStretched(DstPage: TPage; dest: TRect);
@@ -348,6 +349,13 @@ end;
 procedure tSprite.draw(dstPage: tPage; atX, atY: Integer);
 begin
   blit_REF(dstPage, self.page, self.rect, atX, atY);
+end;
+
+function tSprite.getPixel(atX, atY: integer): RGBA;
+begin
+  fillchar(result, sizeof(result), 0);
+  if (atX < 0) or (atY < 0) or (atX >= rect.width) or (atY >= rect.height) then exit;
+  result := page.getPixel(atX+rect.x, atY+rect.y);
 end;
 
 {Copy sprite to screen at given location, no alpha blending}

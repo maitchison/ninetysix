@@ -19,6 +19,7 @@ type V2D = packed record
 
     function Abs2: single;
     function Abs: single;
+    function normed(): V2D;
     function ToString(): shortstring;
 
     constructor Create(x, y: single);
@@ -128,6 +129,14 @@ end;
 function V2D.Abs2: single;
 begin
     result := x*x + y*y;
+end;
+
+function V2D.normed: V2D;
+begin
+  if self.abs2 = 0 then
+    result := V2(0,0)
+  else
+    result := self * (1/self.abs());
 end;
 
 function V2D.Abs: single;
