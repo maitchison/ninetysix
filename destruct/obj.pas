@@ -74,6 +74,7 @@ type
 
   tParticle = class(tGameObject)
   public
+    solid: boolean;
     radius: single;
   public
     procedure reset(); override;
@@ -145,6 +146,36 @@ begin
     p.vel := V2Polar(angle, (0.5+z)*radius/2);
     {edit the terrain}
     terrain.burn(p.x-32, p.y, 3, 5);
+  end;
+end;
+
+procedure makeSmoke(atX, atY: single; power: single; vel: single=10;yStretch: single=1);
+var
+  i: integer;
+  p: tParticle;
+  radius: single;
+  n: integer;
+  z: single;
+  angle: single;
+begin
+  n := round(power * power);
+  radius := power;
+  for i := 0 to n-1 do begin
+    p := particles.nextFree();
+    z := (rnd/255);
+    angle := rnd/255*360;
+    p.pos := V2Polar(angle, z*radius);
+    p.pos.y := p.pos.y * yStretch;
+    p.pos += V2(atX, atY);
+    case clamp(round(z*3), 0, 2) of
+      0: p.col := RGB($FF3F3F3F);
+      1: p.col := RGB($FFAFAFAF);
+      2: p.col := RGB($FF7F7F7F);
+    end;
+    p.vel := V2Polar(angle, (vel+z));
+    p.vel.y *= yStretch;
+    p.ttl := 0.5;
+    p.solid := true;
   end;
 end;
 
@@ -289,9 +320,33 @@ begin
 end;
 
 procedure tTank.update(elapsed: single);
+var
+  xlp: integer;
+  support: integer;
+  hitPower: integer;
 begin
   inherited update(elapsed);
   if cooldown > 0 then cooldown -= elapsed;
+  {falling}
+  support := 0;
+  for xlp := bounds.left+1 to bounds.right-1 do
+    if terrain.isSolid(xlp-32, bounds.bottom) then inc(support);
+  if support = 0 then
+    vel.y := clamp(vel.y + 100 * elapsed, -800, 800)
+  else begin
+    if vel.y > 0 then begin
+      hitPower := round(vel.y);
+      {weaken blocks holding us up}
+      for xlp := bounds.left+1 to bounds.right-1 do begin
+        if terrain.isSolid(xlp-32, bounds.bottom) then begin
+          terrain.burn(xlp-32, bounds.bottom, 2, round(hitPower/support));
+          makeSmoke(xlp, bounds.bottom, 2, 2);
+        end;
+      end;
+      vel.y := 0;
+    end;
+  end;
+
 end;
 
 procedure tTank.fire();
@@ -358,12 +413,18 @@ begin
   ttl := 1;
   col := RGB(255,0,0);
   radius := 1;
+  solid := false;
 end;
 
 procedure tParticle.update(elapsed: single);
 begin
   inherited update(elapsed);
   col.a := clamp(round(255*ttl), 0, 255);
+  if solid and terrain.isSolid(x-32, y) then begin
+    pos -= vel * elapsed;
+    vel.x := -vel.x * 0.8;
+    vel.y := -vel.y * 0.8;
+  end;
 end;
 
 procedure tParticle.draw(screen: tScreen);

@@ -71,6 +71,8 @@ var
   emptyC, burntC: RGBA;
   tc: RGBA;
 begin
+  if power <= 0 then exit;
+  if r <= 0 then exit;
   r2 := r*r;
   for dy := -r to +r do begin
     for dx := -r to +r do begin
