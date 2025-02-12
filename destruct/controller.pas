@@ -101,7 +101,7 @@ end;
 
 procedure tAIController.process();
 var
-  delta: single;
+  delta, deltaX, deltaY: single;
 begin
   inherited process();
 
@@ -161,8 +161,9 @@ begin
             if solutionX < 0 then solutionX += 10 else solutionX -= 10;
           end else begin
             // we collided on the way down so just adjust angle.
-            delta := target.xPos - tank.lastBullet.xPos;
-            solutionX += clamp(delta/3, -10, 10);
+            deltaX := target.xPos - tank.lastBullet.xPos;
+            deltaY := target.yPos - tank.lastBullet.yPos;
+            solutionX += clamp(deltax/3 + deltay/5, -10, 10);
           end;
           state := AI_AIMX;
         end;
