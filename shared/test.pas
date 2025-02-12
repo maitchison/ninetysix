@@ -34,6 +34,7 @@ implementation
 
 uses
   utils,
+  timer,
   debug;
 
 var
@@ -112,12 +113,19 @@ end;
 procedure runTestSuites();
 var
   i: int32;
+  timer: tTimer;
 begin
   info('Running test cases...');
+  timer := tTimer.create('test');
   for i := 0 to length(testSuites)-1 do begin
     note('  [test] '+testSuites[i].tag);
+    timer.start();
     testSuites[i].run();
+    timer.stop();
+    if timer.elapsed > 0.5 then
+      warning(format('Test look %fs to complete', [timer.elapsed]));
   end;
+  timer.free();
   note('  (finished running test cases)');
 end;
 

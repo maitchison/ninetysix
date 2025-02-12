@@ -382,7 +382,7 @@ var
 
 const
   BG_COLOR = Black;
-  MAX_FRAMES = 16;
+  MAX_FRAMES = 32;
 
   procedure textColor(b: byte);
   begin
