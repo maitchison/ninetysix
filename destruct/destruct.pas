@@ -42,21 +42,6 @@ begin
 
     screen.clearAll();
 
-    {fps:}
-    {
-    if assigned(getTimer('main')) then
-      elapsed := getTimer('main').avElapsed
-    else
-      elapsed := -1;
-    guiFPS.text := format('%f', [1/elapsed]);
-    }
-
-    {gui stuff}
-    {
-    gui.update(elapsed);
-    gui.draw(screen);
-    }
-
     screen.flipAll();
 
     stopTimer('main');
@@ -143,6 +128,7 @@ var
   gui: tGuiComponents;
   fps: tGuiLabel;
   xlp,ylp: integer;
+  control1, control2: tController;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -161,8 +147,8 @@ begin
   tank2 := tTank.create();
   tank1.id := 1;
   tank2.id := 2;
-  tank1.control := tNullController.create();
-  tank2.control := tHumanController.create();
+  control1 := tNullController.create(tank1);
+  control2 := tHumanController.create(tank2);
   tank1.pos := V2(100, 130);
   tank2.pos := V2(200, 160);
   tanks.append(tank1);
@@ -186,8 +172,10 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-    tank1.control.process();
-    tank2.control.process();
+    control1.process();
+    control2.process();
+    control1.apply(elapsed);
+    control2.apply(elapsed);
 
     screen.clearAll();
 

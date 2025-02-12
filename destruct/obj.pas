@@ -4,7 +4,6 @@ interface
 
 uses
   debug, test,
-  controller,
   vertex,
   sprite,
   utils,
@@ -57,7 +56,6 @@ type
   tTank = class(tGameObject)
   public
     id: integer;
-    control: tController;
     cooldown: single;
     angle: single;
     power: single;
@@ -103,7 +101,7 @@ procedure drawAll(screen: tScreen);
 implementation
 
 uses
-  res, terra;
+  res, terra, controller;
 
 var
   updateAccumlator: single;
@@ -368,10 +366,6 @@ var
   xPos, yPos: integer;
   i: integer;
 begin
-
-  {process controls}
-  if control.fire then fire();
-  adjust(control.xVel * elapsed, control.yVel *elapsed);
 
   {inherited update stuff}
   inherited update(elapsed);

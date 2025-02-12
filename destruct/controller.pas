@@ -2,11 +2,18 @@ unit controller;
 
 interface
 
+uses
+  obj;
+
 type
   tController = class
   public
-    fire: boolean;
+    doFire: boolean;
     xVel, yVel: single;
+    tank: tTank;
+    target: tTank;
+    constructor create(aTank: tTank);
+    procedure apply(elapsed: single);
     procedure process(); virtual;
   end;
 
@@ -17,6 +24,11 @@ type
     procedure process(); override;
   end;
 
+  tAIController = class(tController)
+    target: tGameObject;
+    procedure process(); override;
+  end;
+
 implementation
 
 uses
@@ -24,9 +36,20 @@ uses
 
 {--------------------------------------------}
 
+constructor tController.create(aTank: tTank);
+begin
+  tank := aTank;
+end;
+
+procedure tController.apply(elapsed: single);
+begin
+  if doFire then tank.fire();
+  tank.adjust(xVel * elapsed, yVel *elapsed);
+end;
+
 procedure tController.process();
 begin
-  fire := false;
+  doFire := false;
   xVel := 0;
   yVel := 0;
 end;
@@ -36,7 +59,7 @@ end;
 procedure tHumanController.process();
 begin
   inherited process();
-  if keyDown(key_space) then fire := true;
+  if keyDown(key_space) then doFire := true;
   if keyDown(key_left) then xVel := -100;
   if keyDown(key_right) then xVel := +100;
   if keyDown(key_up) then yVel := +10;
@@ -44,6 +67,13 @@ begin
 end;
 
 {--------------------------------------------}
+
+procedure tAIController.process();
+begin
+  inherited process();
+
+  {work on an iterative firing solution}
+end;
 
 begin
 end.
