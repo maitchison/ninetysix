@@ -1258,8 +1258,17 @@ var
 begin
   freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
   freeMemMB := clamp(freeMemMB, 1, 64);
-  log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
+  //stub:
+  {$ifdef debug}
+  logFullHeapStatus();
+  {$endif}
+  note('Allocating fixed heap with size %d MB', [freeMemMB]);
+  note(' - sysRam:%, used:%, free:%, total:%,', [getFreeSystemMemory, getUsedMemory, getFreeMemory, getTotalMemory]);
   setFixedHeapSize(freeMemMB*1024*1024);
+  {$ifdef debug}
+  logFullHeapStatus();
+  {$endif}
+
 end;
 
 procedure freeAndNil(var obj);

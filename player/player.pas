@@ -601,8 +601,7 @@ var
 
 begin
 
-  // this seems to cause problems for the P200?
-  //autoHeapSize();
+  autoHeapSize();
 
   textAttr := White + Blue*16;
   clrscr;

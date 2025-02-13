@@ -548,6 +548,8 @@ end;
 
 begin
 
+  autoHeapSize();
+
   watches.ENABLE_WATCHES := config.DEBUG;
   debug.VERBOSE_SCREEN := llNote; // startup should have done this?
 
