@@ -140,13 +140,14 @@ begin
   @X15:
 
     {todo: mmx 2pixels at a time (is it any faster on real hardware?}
+    {also, we could pair this by processing two colors at a time and using ebx}
 
     mov eax, dword ptr ds:[esi]       // aaaaaaaarrrrrrrrggggggggbbbbbbbb
 
     shr ah, 3                         // aaaaaaaarrrrrrrr000gggggbbbbbbbb
     shr ax, 3                         // aaaaaaaarrrrrrrr000000gggggbbbbb
     ror eax, 10                       //           aaaaaaaarrrrrrrr000000gggggbbbbb
-    shr ax, 6                         //                    aaaaaaaarrrrrgggggbbbbb
+    shr ax, 9                         //                    aaaaaaaarrrrrgggggbbbbb
     rol eax, 10                       //         aaaaaaaarrrrrggggggbbbbb
 
     mov word ptr es:[edi], ax
@@ -154,7 +155,7 @@ begin
     add esi, 4
     add edi, 2
     dec ecx
-    jnz @X16
+    jnz @X15
 
     jmp @Done
 

@@ -29,7 +29,7 @@ var
 begin
 
   {load background and refresh screen}
-  screen.background := tPage.create(320,240);
+  screen.background := tPage.create(640,480);
   tSprite.create(titleGFX).blit(screen.background, 0, -16);
 
   screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
@@ -187,7 +187,6 @@ begin
   fps := tGuiLabel.create(Point(10, 10));
   gui.append(fps);
 
-
   {main loop}
   repeat
 
@@ -237,7 +236,7 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     fatal('Requires 1MB video card.');
 
-  videoDriver.setTrueColor(320, 240);
+  videoDriver.setTrueColor(640, 480);
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 end;

@@ -49,6 +49,8 @@ begin
       config.FORCE_COPY := true;
     if toLowerCase(paramStr(i)) = '--bpp=8' then
       config.BPP := 8;
+    if toLowerCase(paramStr(i)) = '--bpp=15' then
+      config.BPP := 15;
     if toLowerCase(paramStr(i)) = '--bpp=16' then
       config.BPP := 16;
     if toLowerCase(paramStr(i)) = '--bpp=24' then
