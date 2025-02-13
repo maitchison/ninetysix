@@ -13,6 +13,7 @@ unit sysPng;
 interface
 
 uses
+  resource,
   graph32;
 
 function loadPNG(const FileName: string): tPage;
@@ -62,5 +63,5 @@ begin
 end;
 
 initialization
-  registerImageLoader('png', @loadPNG);
+  registerResourceLoader('png', @loadPNG);
 end.

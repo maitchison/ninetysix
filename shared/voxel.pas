@@ -216,16 +216,8 @@ begin
 
   result := tVoxelSprite.create();
 
-  {Right now this is hard-coded to preprocess the car sprite.
-   Eventually we will so this somewhere else, and perform
-   a single image load}
+  img := tPage.Load(filename+'.p96');
 
-  if fs.exists(filename+'.p96') then
-    img := loadLC96(filename+'.p96')
-  else begin
-    img := loadBMP(filename+'.bmp');
-    saveLC96(filename+'.p96', img);
-  end;
   img.setTransparent(RGBA.create(255,255,255));
 
   note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));

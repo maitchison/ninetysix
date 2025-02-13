@@ -119,10 +119,13 @@ type
 
   end;
 
+function getAudioFormat(bitsPerChannel: integer; numChannels: integer): tAudioFormat;
+
 implementation
 
 uses
   mixLib,
+  wave,
   la96;
 
 {--------------------------------------------------------}

@@ -3,10 +3,12 @@ unit wave;
 interface
 
 uses
+  debug, test,
+  utils,
   resource,
   sound;
 
-procedure loadWave(filename: string): tSoundEffect;
+function  loadWave(filename: string): tSoundEffect;
 procedure saveWave(filename: string;sfx: tSoundEffect);
 
 implementation
@@ -81,7 +83,7 @@ begin
         fatal(utils.format('frequency must be 44100 but was %d', [frequency]));
 
       if audioFormat <> 1 then
-        fatal(utils.format('format must be 1 (PCM) but was %d', [audioFormat]));
+        fatal(format('format must be 1 (PCM) but was %d', [audioFormat]));
 
       af := getAudioFormat(bitsPerSample, numChannels);
       if af = AF_INVALID then
@@ -98,7 +100,6 @@ begin
         end;
 
         samplesToRead := chunkSize div AF_SIZE[af];
-        if maxSamples > 0 then samplesToRead := min(samplesToRead, maxSamples);
 
         result := tSoundEffect.create(af, samplesToRead, filename);
 
@@ -134,6 +135,8 @@ var
   IOError: word;
 begin
 
+  {todo: switch to tFileStream}
+
   fileMode := 0;
   {$I-}
   assign(f, filename);
@@ -144,7 +147,7 @@ begin
   if IOError <> 0 then
     fatal('Could not open file "'+FileName+'" for output.'+getIOErrorString(IOError));
 
-  chunkBytes := length * 4;
+  chunkBytes := sfx.length * 4;
 
   with fileHeader do begin
     fileTypeBlockID := 'RIFF';
@@ -167,7 +170,7 @@ begin
 
   blockwrite(f, fileHeader, sizeof(fileHeader));
   blockwrite(f, chunkHeader, sizeof(chunkHeader));
-  blockwrite(f, data^, chunkBytes);
+  blockwrite(f, sfx.data^, chunkBytes);
 
   close(f);
 end;

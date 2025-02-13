@@ -9,7 +9,7 @@ uses
   resource,
   graph32;
 
-function loadBMP(const fileName: string): tPage;
+function loadBMP(fileName: string): tPage;
 
 implementation
 
@@ -55,7 +55,7 @@ end;
 
 {----------------------------------------------}
 
-function LoadBMP(const fileName: string): tPage;
+function LoadBMP(fileName: string): tPage;
 var
   FileHeader: TBMPHeader;
   InfoHeader: TBitmapInfoHeader;

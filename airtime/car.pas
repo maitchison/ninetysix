@@ -353,7 +353,7 @@ begin
   if (terrainDelta < 0) then begin
     // play sound scrape for big impact
     if carVel.z > 100 then
-      mixer.play(landSFX, SCS_SELFOVERWRITE);
+      mixer.play(landSFX, 1.0, SCS_SELFOVERWRITE);
     pos.z += terrainDelta;
     if vel.z > 0 then
       vel.z := -vel.z * 0.33;

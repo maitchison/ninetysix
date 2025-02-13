@@ -20,6 +20,7 @@ uses
 const
   MASTER_FOLDER = 'c:\dev\masters';
   VERBOSE: boolean = true;
+  FORCE: boolean = false;
 
 type
   // apply some changes to a page, and output a new page
@@ -66,7 +67,7 @@ begin
 
   {check if this is already done}
   id := resourceLibrary.findResourceIndex(dstPath);
-  if id >= 0 then begin
+  if (id >= 0) and (not FORCE) then begin
     res := resourceLibrary.resource[id];
     if
       (res.srcFile = srcPath) and
@@ -145,7 +146,7 @@ begin
   dstPath := 'res\'+filename+'.a96';
 
   if preProcess(dstPath, srcPath) then begin
-    sfx := tSoundEffect.loadFromWave(srcPath);
+    sfx := tSoundEffect.Load(srcPath);
     ss := (sfx.length div 44100) mod 60;
     mm := (sfx.length div 44100 div 60) mod 60;
     s := encodeLA96(sfx, ACP_HIGH);
