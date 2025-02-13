@@ -1,6 +1,7 @@
 unit sprite;
 
 {$MODE delphi}
+{$Interfaces corba}
 
 interface
 
@@ -26,7 +27,7 @@ type
     procedure readFromIni(ini: tIniReader; tag: string='Border');
   end;
 
-  tSprite = class(iIniSerializable)
+  tSprite = class(tObject, iIniSerializable)
 
     tag: string;
     page: tPage;
@@ -34,11 +35,12 @@ type
     border: tBorder;
 
     constructor create(aPage: tPage);
+    destructor destroy(); override;
 
-    function width: int32;
-    function height: int32;
+    function  width: int32;
+    function  height: int32;
 
-    function clone(): tSprite;
+    function  clone(): tSprite;
 
     function  getPixel(atX, atY: integer): RGBA;
     procedure blit(dstPage: tPage; atX, atY: int32);
@@ -326,10 +328,11 @@ end;
 
 {---------------------------------------------------------------------}
 
-constructor tSprite.Create(APage: TPage);
+constructor tSprite.Create(aPage: TPage);
 begin
+  inherited create();
   self.Tag := 'sprite';
-  self.Page := APage;
+  self.Page := aPage;
   self.Rect.Create(0, 0, APage.Width, APage.Height);
   self.Border.Create(0, 0, 0, 0);
 end;
@@ -373,83 +376,49 @@ end;
 {Draw sprite using nine-slice method}
 procedure tSprite.NineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 var
-  Sprite: TSprite;
-  DrawRect: TRect;
+  oldRect: tRect;
+  drawRect: tRect;
 begin
 
   if not assigned(self) then
     fatal('Tried drawing unassigned sprite');
 
-  sprite := self.clone();
+  oldRect := self.rect;
 
-  DrawRect := TRect.Create(atX, atY, DrawWidth, DrawHeight);
+  drawRect := tRect.Create(atX, atY, DrawWidth, DrawHeight);
 
   {top part}
+  rect := tRect.Inset(oldRect, 0, 0, Border.Left, Border.Top);
+  self.draw(DstPage, atX, atY);
 
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    0, 0, Border.Left, Border.Top
-  );
-  Sprite.Draw(DstPage, atX, atY);
+  self.rect := tRect.Inset(oldRect,Border.Left, 0, -Border.Right, Border.Top);
+  self.drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, 0, -Border.Right, Border.Top));
 
-
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    Border.Left, 0, -Border.Right, Border.Top
-  );
-  Sprite.DrawStretched(DstPage, TRect.Inset(DrawRect,
-    Border.Left, 0, -Border.Right, Border.Top
-  ));
-
-
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    -Border.Right, 0, 0, Border.Top
-  );
-  Sprite.Draw(DstPage, atX+DrawWidth-Border.Right, atY);
+  self.rect := tRect.Inset(oldRect,-Border.Right, 0, 0, Border.Top);
+  self.draw(DstPage, atX+DrawWidth-Border.Right, atY);
 
   {middle part}
+  self.rect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
+  self.drawStretched(DstPage, TRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
 
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    0, Border.Top, Border.Left, -Border.Bottom
-  );
-  Sprite.DrawStretched(DstPage, TRect.Inset(DrawRect,
-    0, Border.Top, Border.Left, -Border.Bottom
-  ));
+  self.rect := tRect.Inset(oldRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom);
+  self.drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom));
 
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    Border.Left, Border.Top, -Border.Right, -Border.Bottom
-  );
-  Sprite.DrawStretched(DstPage, TRect.Inset(DrawRect,
-    Border.Left, Border.Top, -Border.Right, -Border.Bottom
-  ));
-
-
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    -Border.Right, Border.Top, 0, -Border.Bottom
-  );
-  Sprite.DrawStretched(DstPage, TRect.Inset(DrawRect,
-    -Border.Right, Border.Top, 0, -Border.Bottom
-  ));
+  self.rect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
+  self.drawStretched(DstPage, TRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 
   {bottom part}
 
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    0, -Border.Bottom, Border.Left, 0
-  );
-  Sprite.Draw(DstPage, atX, atY+DrawHeight-Border.Bottom);
+  self.rect := tRect.Inset(oldRect,0, -Border.Bottom, Border.Left, 0);
+  self.draw(DstPage, atX, atY+DrawHeight-Border.Bottom);
 
+  self.rect := tRect.Inset(oldRect,Border.Left, -Border.Bottom, -Border.Right, 0);
+  self.drawStretched(DstPage, TRect.Inset(DrawRect,Border.Left, -Border.Bottom, -Border.Right, 0));
 
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    Border.Left, -Border.Bottom, -Border.Right, 0
-  );
-  Sprite.DrawStretched(DstPage, TRect.Inset(DrawRect,
-    Border.Left, -Border.Bottom, -Border.Right, 0
-  ));
+  rect := tRect.Inset(oldRect,-Border.Right, -Border.Bottom, 0, 0);
+  draw(DstPage, atX+DrawWidth-Border.Right, atY+DrawHeight-Border.Bottom);
 
-
-  Sprite.Rect := TRect.Inset(Self.Rect,
-    -Border.Right, -Border.Bottom, 0, 0
-  );
-  Sprite.Draw(DstPage, atX+DrawWidth-Border.Right, atY+DrawHeight-Border.Bottom);
-
+  self.rect := oldRect;
 
 end;
 
@@ -457,8 +426,16 @@ end;
 function tSprite.clone(): tSprite;
 begin
   result := tSprite.create(self.page);
+  result.tag := self.tag;
   result.rect := self.rect;
   result.border := self.border;
+end;
+
+destructor tSprite.destroy();
+begin
+  self.tag := '';
+  self.page := nil;
+  inherited destroy();
 end;
 
 {---------------------}

@@ -25,7 +25,6 @@ var
   {todo: remove global resources, and instead get from resourceLibrary via a tag}
 
   {global resources}
-  titleBackground: tPage;
   startSFX: tSoundEffect;
 
   {car resources}
@@ -99,11 +98,6 @@ begin
 
   rl := tResourceLibrary.CreateOrLoad('resources.ini');
 
-  if config.XMAS then
-    titleBackground := tPage.Load('res\titleX.p96')
-  else
-    titleBackground := tPage.Load('res\title.p96');
-
   {setup chassis}
   {todo: have these as meta data}
   {also move this into car}
@@ -141,6 +135,16 @@ begin
   startSFX := loadSound('start');
 
   loadCarResources();
+end;
+
+procedure freeResources();
+begin
+  {todo: have some resource manager do this for me}
+  CC_RED.vox.free();
+  CC_POLICE.vox.free();
+  CC_BOX.vox.free();
+  CC_SANTA.vox.free();
+  startSFX.free();
 end;
 
 begin

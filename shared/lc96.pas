@@ -524,6 +524,7 @@ begin
   compressedData := LZ4Compress(data.asBytes);
   compressedSize := length(compressedData);
   unCompressedSize := length(data.asBytes);
+  data.free;
 
   {write header}
   s.writeChars('LC96');

@@ -49,7 +49,7 @@ var
   padLeft: integer;
   bounds: tRect;
 begin
-  buttonSprite.NineSlice(screen.canvas, atX, atY, WIDTH, HEIGHT);
+  buttonSprite.nineSlice(screen.canvas, atX, atY, WIDTH, HEIGHT);
   atX += panelSprite.border.left;
   atY += panelSprite.border.top;
   {Custom positioning}

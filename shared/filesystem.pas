@@ -57,8 +57,16 @@ begin
 end;
 
 procedure tFileSystem.delFile(path: string);
+var
+  f: file;
+  error: word;
 begin
-  dos.exec(getEnv('COMSPEC'), format('/C del %s > nul', [path]));
+  {$i-}
+  assign(f, path);
+  erase(f);
+  error := ioResult;
+  {$i+}
+  if error in [0,2] then exit else raise Exception.create('Error [%d] deleting file %s.', [error, path]);
 end;
 
 function tFileSystem.exists(filename: string): boolean;

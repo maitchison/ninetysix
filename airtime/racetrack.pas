@@ -26,8 +26,8 @@ type
     function sampleHeight(pos: V3D): single;
     function sampleTerrain(pos: V3D): tTerrainDef;
 
-    constructor Create(filename: string);
-    destructor Destroy(); override;
+    constructor create(filename: string);
+    destructor destroy(); override;
   end;
 
 const
@@ -118,10 +118,10 @@ end;
 
 destructor tRaceTrack.Destroy();
 begin
-  background.free;
-  heightMap.free;
-  terrainMap.free;
-  inherited Destroy();
+  background.free();
+  heightMap.free();
+  terrainMap.free();
+  inherited destroy();
 end;
 
 

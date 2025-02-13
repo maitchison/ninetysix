@@ -6,9 +6,9 @@ uses
   {other stuff}
   lc96,
   font,
-  s3,
   resLib,
   resources,
+  fileSystem,
   {airtime}
   raceTrack,
   car,
@@ -246,6 +246,7 @@ var
   i,j: integer;
   snow: tSnowField;
   verStr: string;
+  titleBackground: tPage;
 
 begin
 
@@ -255,15 +256,18 @@ begin
   benchmarkMode := false;
   carScale := 1.5;
 
+  if config.XMAS then
+    titleBackground := tPage.Load('res\titleX.p96')
+  else
+    titleBackground := tPage.Load('res\title.p96');
   titleBackground.fillRect(tRect.create(0, 360-25, 640, 50), RGBA.create(25,25,50,128));
   titleBackground.fillRect(tRect.create(0, 360-24, 640, 48), RGBA.create(25,25,50,128));
   titleBackground.fillRect(tRect.create(0, 360-23, 640, 46), RGBA.create(25,25,50,128));
+  screen.background := titleBackground;
 
-  verStr := 'v0.5.0 (19/01/1996)';
+  verStr := 'v0.6.0 (13/02/1996)';
   textOut(titleBackground, 640-140+1, 480-25+1, verStr, RGBA.create(0,0,0));
   textOut(titleBackground, 640-140, 480-25, verStr, RGBA.create(250,250,250,240));
-
-  screen.background := titleBackground;
 
   screen.pageClear();
   screen.pageFlip();
@@ -365,6 +369,8 @@ begin
   end;
 
   if assigned(snow) then snow.free;
+  screen.background := nil;
+  titleBackground.free();
 
 end;
 
@@ -416,9 +422,9 @@ var
   drawPos: tPoint;
 begin
 
-  note('Main loop started');
+  logHeapStatus('MainLoop Init');
 
-  track := tRaceTrack.Create('res/track2');
+  track := tRaceTrack.create('res/track2');
 
   if targetBPP <= 16 then
     info('Downgrading to 16-bit color mode due low to VRAM');
@@ -464,6 +470,8 @@ begin
 
   camX := 0;
   camY := 0;
+
+  logHeapStatus('MainLoop Start');
 
   while True do begin
 
@@ -535,6 +543,8 @@ begin
     stopTimer('frame');
   end;
 
+  {free up}
+  car.free;
   track.free;
 
 end;
@@ -547,7 +557,8 @@ begin
   textAttr := LightGray + Blue * 16;
   clrscr;
 
-  log('Starting AIRTIME', llImportant);
+  log('Starting AIRTIME'{$ifdef debug}+' [DEBUG]'{$endif}
+  , llImportant);
   log('---------------------------', llImportant);
 
   if cpuInfo.ram < 30*1024*1024 then
@@ -560,6 +571,7 @@ begin
 
   {setup heap logging before units start.}
   {$if declared(Heaptrc)}
+  if fs.exists('heaptrc.txt') then fs.delFile('heaptrc.txt');
   heaptrc.setHeapTraceOutput('heaptrc.txt');
   heaptrc.printfaultyblock := true;
   heaptrc.printleakedblock := true;
@@ -593,6 +605,10 @@ begin
   initKeyboard();
 
   titleScreen();
+
+  {free up}
+
+  screen.free();
 
   videoDriver.setText();
   printLog();
