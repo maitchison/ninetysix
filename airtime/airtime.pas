@@ -159,11 +159,9 @@ end;
 
 function targetBPP: byte;
 begin
-  if lowVRAM then
-    // we used to force 16bit, but there's no need
-    result := 32
-  else
-    result := 32;
+  if config.BPP = 0 then
+    if lowVRAM then exit(16) else exit(32);
+  result := config.BPP;
 end;
 
 {-------------------------------------------------}
@@ -424,9 +422,6 @@ begin
 
   track := tRaceTrack.create('res/track2');
 
-  if targetBPP <= 16 then
-    info('Downgrading to 16-bit color mode due low to VRAM');
-
   if not config.HIGHRES then
     videoDriver.setTrueColor(320, 240, targetBPP);
 
@@ -594,7 +589,7 @@ begin
   logHeapStatus('Resources loaded');
   info('Done.');
 
-  videoDriver.setTrueColor(640, 480);
+  videoDriver.setTrueColor(640, 480, targetBPP);
 
   screen := tScreen.create();
 

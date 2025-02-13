@@ -24,6 +24,7 @@ uses
   hdr,
   font,
   {other stuff}
+  wave,
   myMath,
   crt;
 
@@ -65,13 +66,6 @@ type
   tTracksHelper = record helper for tTracks
     procedure append(x: tTrack);
   end;
-
-  tGuiComponentsHelper = record helper for tGuiComponents
-    procedure append(x: tGuiComponent);
-    procedure draw(screen: tScreen);
-    procedure update(elapsed: single);
-  end;
-
 
 var
   tracks: tTracks;
@@ -236,7 +230,7 @@ begin
   writeln();
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.loadFromWave(joinPath('sample','sample.wav'));
+  music16 := tSoundEffect.Load(joinPath('sample','sample.wav'));
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   setLength(outSfx, length(outSFX)+1);
@@ -306,15 +300,15 @@ begin
     writeln(format('Decoded at %fx', [(curSFX.length/44100)/getTimer('decode').elapsed]));
     {export}
     if EXPORT_WAVE then begin
-      curSFX.saveToWave(tag+'.wav');
-      errSFX.saveToWave(tag+'_delta.wav');
+      saveWave(tag+'.wav', curSFX);
+      saveWave(tag+'_delta.wav', errSFX);
     end;
   end;
 
   printTimers();
 
   {start playing sound}
-  mixer.play(outSFX[0], SCS_FIXED1); writeln(outSFX[0].tag);
+  mixer.play(outSFX[0], 1.0, SCS_FIXED1); writeln(outSFX[0].tag);
   mixer.channels[1].looping := true;
   writeln('All done.');
 
@@ -452,7 +446,7 @@ begin
   oldBufferPos := 0;
 
   {setup gui}
-  setLength(gui, 0);
+  gui := tGuiComponents.create();
 
   guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-60));
   guiTitle.centered := true;
