@@ -55,7 +55,8 @@ end;
 
 function arccos(x: tFloat): tFloat;
 begin
-  result := arctan2(sqrt((1.0-x)*(1.0+x)), x);
+  x := clamp(x, -1, 1);
+  result := arctan2(sqrt(1.0-x*x), x);
 end;
 
 function arctan2(y,x: tFloat): tFloat;
