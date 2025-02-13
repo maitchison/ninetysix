@@ -103,6 +103,7 @@ implementation
 
 uses
   keyboard, {stub}
+  crt, {also stub}
   sbdriver;
 
 const
@@ -488,6 +489,12 @@ var
   timer: tTimer;
   framesFilled: integer;
 begin
+
+  {super dodgy, but consume the keyboard buffer here... otherwise get get beeps}
+  asm cli end;
+  while crt.keypressed do crt.readkey;
+  asm sti end;
+
   if not musicReader.isLoaded then begin
     //decay timer to zero
     musicTimer.avElapsed *= 0.90;
