@@ -49,7 +49,6 @@ const
 type
 
   tLZ4Stream = class(tMemoryStream)
-
   private
     procedure writeVLL(value: int32);
   public
@@ -291,8 +290,7 @@ begin
   {note: assume 5 <= blocksize <= 64k}
 
   {todo: special case for short TBytes (i.e length <= 5)}
-
-  if not assigned(data) then exit; {null input}
+  if not assigned(data) then exit(nil); {null input}
 
   map := tHashMap.create(level.maxBinSize);
   srcLen := length(data);
@@ -334,7 +332,9 @@ begin
        block.writeEndSequence(literalBuffer.asBytes);
       literalBuffer.free;
       map.free;
-      exit(block.asBytes);
+      result := block.asBytes;
+      block.free;
+      exit;
     end;
 
     fillchar(thisMatch, sizeof(thisMatch), 0);
@@ -872,7 +872,7 @@ begin
     inBytes.writeByte(ord(testString[i]));
   compressedData := lz4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData, inBytes.len);
-  AssertEqual(uncompressedData, inBytes.asBytes);
+  assertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free();
 
   inBytes := tMemoryStream.create();
@@ -880,7 +880,7 @@ begin
     inBytes.writeByte(ord('x'));
   compressedData := LZ4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData, inBytes.len);
-  AssertEqual(uncompressedData, inBytes.asBytes);
+  assertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free();
 
   {make sure we don't match on end sequence}
@@ -889,7 +889,7 @@ begin
     inBytes.writeByte(testCase1[i]);
   compressedData := lz4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData, inBytes.len);
-  AssertEqual(uncompressedData, inBytes.asBytes);
+  assertEqual(uncompressedData, inBytes.asBytes);
   inBytes.free();
 
 end;

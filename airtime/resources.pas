@@ -152,6 +152,8 @@ begin
   freeAndNil(landSFX);
   freeAndNil(boostSFX);
 
+  rl.free();
+
 end;
 
 begin

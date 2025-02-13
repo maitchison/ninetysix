@@ -452,6 +452,7 @@ begin
   map.setValue(1, 5);
   map.setValue(1, map.getValue(1) + 5);
   assertEqual(map.getvalue(1), 10);
+  map.free;
 
   {check hash atleast works}
   hashStr('hello');

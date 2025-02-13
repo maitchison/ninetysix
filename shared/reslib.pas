@@ -1,5 +1,7 @@
 unit resLib;
 
+{$mode delphi}
+
 interface
 
 uses
@@ -16,6 +18,7 @@ type
     srcFile: string;
     dstFile: string;
     modifiedTime: int64;
+    procedure clear();
   end;
 
   tResourceLibrary = class
@@ -43,30 +46,41 @@ type
 
 implementation
 
+{-----------------------------------------------}
+
+procedure tResource.clear();
+begin
+  srcFile := '';
+  dstFile := '';
+  modifiedTime := 0;
+end;
+
+{-----------------------------------------------}
+
 constructor tResourceLibrary.Create(); overload;
 begin
-  inherited Create();
+  inherited create();
   numResources := 0;
   fillchar(resource, sizeOf(resource), 0);
 end;
 
 constructor tResourceLibrary.Create(fileName: string); overload;
 begin
-  Create();
+  create();
   deserialize(fileName);
 end;
 
-constructor tResourceLibrary.CreateOrLoad(fileName: string);
+constructor tResourceLibrary.createOrLoad(fileName: string);
 begin
   if fs.exists(fileName) then
-    Create(fileName)
+    create(fileName)
   else
-    Create();
+    create();
 end;
 
-destructor tResourceLibrary.Destroy();
+destructor tResourceLibrary.destroy();
 begin
-  inherited Destroy();
+  inherited destroy();
 end;
 
 procedure tResourceLibrary.addResource(res: tResource);
@@ -132,7 +146,7 @@ end;
 procedure tResourceLibrary.deserialize(fileName: string);
 var
   t: text;
-  s,k,v: string;
+  s,k,v: ansistring;
   ioError: word;
   res: tResource;
 begin
@@ -153,7 +167,7 @@ begin
       if s = '[resource]' then begin
         if numResources > 0 then
           resource[numResources-1] := res;
-        fillchar(res, sizeof(res), 0);
+        res.clear();
         inc(numResources);
         continue;
       end;

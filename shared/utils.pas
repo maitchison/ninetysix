@@ -115,7 +115,7 @@ function strToBool(s: string): boolean;
 function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
 function lpad(s: string;len: int32;padding: char=' '): string;
-function split(s: string; c: char; out left: string; out right: string): boolean;
+function split(s: string; c: char; out left: ansistring; out right: ansistring): boolean;
 function nextWholeWord(line: string;var pos:integer; out len:integer): boolean;
 function subStringMatch(s: string; sOfs: integer; subString: string): boolean;
 function join(lines: array of string;seperator: string=#13#10): string;
@@ -688,18 +688,24 @@ begin
   result := s;
 end;
 
-function split(s: string; c: char; out left: string; out right: string): boolean;
+function split(s: string; c: char; out left: ansistring; out right: ansistring): boolean;
 var
   charPos: int32;
 begin
   charPos := pos(c, s);
+  left := '';
+  right := '';
   if charPos = 0 then begin
-    left := '';
-    right := '';
     exit(false);
   end;
-  left := copy(s, 1, charPos-1);
-  right := copy(s, charPos+1, length(s)-charPos);
+  if charPos-1 > 0 then
+    left := copy(s, 1, charPos-1);
+  if length(s)-charPos > 0 then begin
+    setLength(right, length(s)-charPos);
+    move(s[charPos + 1], right[1], length(right));
+    // memory leak for copy for some reason..
+    //right := copy(s, charPos+1, length(s)-charPos);
+  end;
   exit(true);
 end;
 
