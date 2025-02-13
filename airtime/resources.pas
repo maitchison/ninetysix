@@ -38,7 +38,7 @@ var
   CC_SANTA: tCarChassis;
 
 procedure loadResources();
-
+procedure freeResources();
 function loadSound(tag: string): tSoundEffect;
 
 {----------------------------}
@@ -48,7 +48,7 @@ implementation
 procedure loadCarResources();
 begin
 
-  wheelVox := tVoxelSprite.loadFromFile('res\wheel', 8);
+  wheelVox := tVoxelSprite.create('res\wheel', 8);
 
   {the sound engine is currently optimized for 16bit stereo sound}
   slideSFX := loadSound('skid');
@@ -105,26 +105,26 @@ begin
     setDefault();
     wheelPos := V3D.create(8, 7, 0);
     wheelOffset := V3D.create(-1, 0, 0);
-    vox := tVoxelSprite.loadFromFile('res\carRed', 16);;
+    vox := tVoxelSprite.create('res\carRed', 16);;
   end;
   with CC_POLICE do begin
     setDefault();
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
-    vox := tVoxelSprite.loadFromFile('res\carPol', 16);
+    vox := tVoxelSprite.create('res\carPol', 16);
   end;
   with CC_BOX do begin
     setDefault();
     wheelPos := V3D.create(9, 7, 0);
     wheelOffset := V3D.create(-1, 0, 1);
-    vox := tVoxelSprite.loadFromFile('res\carBox', 16);
+    vox := tVoxelSprite.create('res\carBox', 16);
   end;
   with CC_SANTA do begin
     setDefault();
     wheelPos := V3D.create(10, 7, 0);
     wheelOffset := V3D.create(+1, 0, 3);
     wheelSize := 0;
-    vox := tVoxelSprite.loadFromFile('res\carSan', 16);
+    vox := tVoxelSprite.create('res\carSan', 16);
   end;
 
   if config.XMAS then begin
@@ -140,11 +140,18 @@ end;
 procedure freeResources();
 begin
   {todo: have some resource manager do this for me}
-  CC_RED.vox.free();
-  CC_POLICE.vox.free();
-  CC_BOX.vox.free();
-  CC_SANTA.vox.free();
-  startSFX.free();
+  freeAndNil(CC_RED.vox);
+  freeAndNil(CC_POLICE.vox);
+  freeAndNil(CC_BOX.vox);
+  freeAndNil(CC_SANTA.vox);
+  freeAndNil(startSFX);
+  {car resources}
+  freeAndNil(wheelVox);
+  freeAndNil(slideSFX);
+  freeAndNil(engineSFX);
+  freeAndNil(landSFX);
+  freeAndNil(boostSFX);
+
 end;
 
 begin

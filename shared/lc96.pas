@@ -618,8 +618,8 @@ begin
   img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
-  img1.Destroy;
-  img2.Destroy;
+  img1.free();
+  img2.free();
 
   {test on random bytes for larger page}
   img1 := tPage.Create(4,4);
@@ -629,8 +629,8 @@ begin
   img2 := decodeLC96(s);
   assertEqual(img1, img2);
   s.free;
-  img1.Destroy;
-  img2.Destroy;
+  img1.free();
+  img2.free();
 
   {test on random bytes for larger page}
   img1 := tPage.Create(16,16);
@@ -641,10 +641,10 @@ begin
     s.seek(0);
     img2 := decodeLC96(s);
     assertEqual(img1, img2);
-    img2.Destroy;
-    s.free;
+    img2.free();
+    s.free();
   end;
-  img1.Destroy;
+  img1.free();
 
 end;
 

@@ -115,7 +115,7 @@ function strToBool(s: string): boolean;
 function trim(s: string): string;
 function pad(s: string;len: int32;padding: char=' '): string;
 function lpad(s: string;len: int32;padding: char=' '): string;
-function split(s: string; c: char; var left: string; var right: string): boolean;
+function split(s: string; c: char; out left: string; out right: string): boolean;
 function nextWholeWord(line: string;var pos:integer; out len:integer): boolean;
 function subStringMatch(s: string; sOfs: integer; subString: string): boolean;
 function join(lines: array of string;seperator: string=#13#10): string;
@@ -155,6 +155,7 @@ function  getMSCount(): int64;
 {heap stuff}
 procedure setFixedHeapSize(size: int64);
 procedure autoHeapSize();
+procedure freeAndNil(var obj);
 
 const
   WORD_CHARS: set of char = ['a'..'z','A'..'Z','0'..'9'];
@@ -687,14 +688,18 @@ begin
   result := s;
 end;
 
-function split(s: string; c: char; var left: string; var right: string): boolean;
+function split(s: string; c: char; out left: string; out right: string): boolean;
 var
   charPos: int32;
 begin
   charPos := pos(c, s);
-  if charPos < 0 then exit(false);
-  left := Copy(s, 1, charPos-1);
-  right := Copy(s, charPos+1, length(s)-charPos);
+  if charPos = 0 then begin
+    left := '';
+    right := '';
+    exit(false);
+  end;
+  left := copy(s, 1, charPos-1);
+  right := copy(s, charPos+1, length(s)-charPos);
   exit(true);
 end;
 
@@ -1249,6 +1254,13 @@ begin
   freeMemMB := clamp(freeMemMB, 1, 64);
   log(format('Allocating fixed heap with size %d MB', [freeMemMB]));
   setFixedHeapSize(freeMemMB*1024*1024);
+end;
+
+procedure freeAndNil(var obj);
+begin
+  if assigned(tObject(obj)) then
+    tObject(obj).free;
+  pointer(obj) := nil;
 end;
 
 {--------------------------------------------------------}

@@ -192,7 +192,6 @@ var
   res: tResource;
 begin
   rl := tResourceLibrary.Create();
-
   res.srcFile := 'a';
   res.dstFile := 'b';
   res.modifiedTime := 123;
@@ -202,7 +201,7 @@ begin
   res.modifiedTime := 321;
   rl.addResource(res);
   rl.serialize('_test.ini');
-  rl.Destroy;
+  rl.free();
 
   rl := tResourceLibrary.Create('_test.ini');
   assertEqual(rl.numResources, 2);
@@ -212,8 +211,7 @@ begin
   assertEqual(res.modifiedTime, 123);
   assertEqual(rl.findResourceIndex('b'), 0);
   assertEqual(rl.findResourceIndex('c'), -1);
-
-  rl.Destroy;
+  rl.free();
 end;
 
 {--------------------------------------------------}

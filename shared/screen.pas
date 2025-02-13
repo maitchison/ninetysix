@@ -63,6 +63,8 @@ type
   public
 
     constructor create();
+    destructor destroy(); override;
+
 
     function width: word;
     function height: word;
@@ -221,7 +223,7 @@ end;
 {-------------------------------------------------}
 
 
-constructor tScreen.Create();
+constructor tScreen.create();
 begin
   inherited create();
   backgroundColor.init(0,0,0,255);
@@ -233,11 +235,17 @@ begin
   resize(videoDriver.width, videoDriver.height);
 end;
 
+destructor tScreen.destroy();
+begin
+  if assigned(canvas) then canvas.free;
+  canvas := nil;
+  inherited destroy();
+end;
+
 {must be called whenever a resolution change occurs after creation.}
 procedure tScreen.resize(aWidth: word; aHeight: word);
 begin
-  {todo: if assigned(canvas) then canvas.done;}
-  if assigned(canvas) then canvas.destroy;
+  if assigned(canvas) then freeAndNil(canvas);
   canvas := tPage.create(aWidth, aHeight);
   case videoDriver.bitsPerPixel of
     15: videoDepth := VD_15;

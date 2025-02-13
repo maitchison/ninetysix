@@ -891,7 +891,7 @@ begin
     startTime := getSec;
     res := proc(filename);
     if not (res is tPage) then fatal('Resources is of invalid type');
-    result := tPage(proc(filename));
+    result := tPage(res);
     note(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]);
   end else
     debug.fatal('No image loader for file "'+filename+'"');

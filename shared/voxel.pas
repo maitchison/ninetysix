@@ -45,11 +45,14 @@ type
     function generateSDF(): tPage;
     procedure transferSDF(sdf: tPage);
 
+    procedure setPage(page: tPage; height: integer);
+    procedure loadFromFile(filename: string; height: integer);
+
   public
 
-    constructor create();
-    procedure setPage(page: tPage; height: integer);
-    class function loadFromFile(filename: string; height: integer): tVoxelSprite; static;
+    constructor create(filename: string; height: integer);
+    destructor destroy(); override;
+
     function getSize(): V3D16;
     function getVoxel(x,y,z:int32): RGBA;
     procedure setVoxel(x,y,z:int32;c: RGBA);
@@ -183,15 +186,42 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tVoxelSprite.create();
+constructor tVoxelSprite.create(filename: string; height: integer);
 begin
+  inherited create();
   fWidth := 0;
   fHeight := 0;
   fDepth := 0;
   fLog2Width := 0;
   fLog2Height := 0;
+  vox := nil;
+  loadFromFile(filename, height);
 end;
 
+destructor tVoxelSprite.destroy();
+begin
+  freeAndNil(vox);
+  inherited destroy();
+end;
+
+procedure tVoxelSprite.loadFromFile(filename: string; height: integer);
+var
+  img: tPage;
+  sdf: tPage;
+begin
+  img := tPage.Load(filename+'.p96');
+  img.setTransparent(RGBA.create(255,255,255));
+  note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
+  self.setPage(img, height);
+  if fs.exists(filename+'.sdf') then begin
+    sdf := loadLC96(filename+'.sdf');
+  end else begin
+    sdf := self.generateSDF();
+    saveLC96(filename+'.sdf', sdf);
+  end;
+  self.transferSDF(sdf);
+  sdf.free();
+end;
 
 procedure tVoxelSprite.setPage(page: tPage; height: integer);
 begin
@@ -206,33 +236,6 @@ begin
   fLog2Width := round(log2(fWidth));
   fLog2Height := round(log2(fHeight));
 end;
-
-class function tVoxelSprite.loadFromFile(filename: string; height: integer): tVoxelSprite;
-var
-  img: tPage;
-  sdf: tPage;
-
-begin
-
-  result := tVoxelSprite.create();
-
-  img := tPage.Load(filename+'.p96');
-
-  img.setTransparent(RGBA.create(255,255,255));
-
-  note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
-  result.setPage(img, height);
-
-  if fs.exists(filename+'.sdf') then begin
-    sdf := loadLC96(filename+'.sdf');
-  end else begin
-    sdf := result.generateSDF();
-    saveLC96(filename+'.sdf', sdf);
-  end;
-
-  result.transferSDF(sdf);
-end;
-
 
 {get size as 16bit vector}
 function tVoxelSprite.getSize(): V3D16;

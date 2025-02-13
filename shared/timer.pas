@@ -17,7 +17,7 @@ type
     procedure reset(aTag: string);
     procedure start();
     procedure stop(iterations: integer=1);
-    function  toString(): string;
+    function  toString(): string; override;
   end;
 
 procedure startTimer(aTag: string);

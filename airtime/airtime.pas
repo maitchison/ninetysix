@@ -28,9 +28,6 @@ var
 
   carDrawTime: double = 0;
 
-  {global vars}
-  track: tRaceTrack;
-
 var
   nextBellSound: double = 0;
   vd: tVesaDriver;
@@ -420,9 +417,10 @@ var
   car: tCar;
   camX, camY: single;
   drawPos: tPoint;
+  track: tRaceTrack;
 begin
 
-  logHeapStatus('MainLoop Init');
+  logHeapStatus('Main Loop Init');
 
   track := tRaceTrack.create('res/track2');
 
@@ -544,9 +542,8 @@ begin
   end;
 
   {free up}
-  car.free;
-  track.free;
-
+  freeAndNil(car);
+  freeAndNil(track);
 end;
 
 begin
@@ -607,7 +604,7 @@ begin
   titleScreen();
 
   {free up}
-
+  freeResources();
   screen.free();
 
   videoDriver.setText();

@@ -873,7 +873,7 @@ begin
   compressedData := lz4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData, inBytes.len);
   AssertEqual(uncompressedData, inBytes.asBytes);
-  inBytes.free;
+  inBytes.free();
 
   inBytes := tMemoryStream.create();
   for i := 0 to 100 do
@@ -881,7 +881,7 @@ begin
   compressedData := LZ4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData, inBytes.len);
   AssertEqual(uncompressedData, inBytes.asBytes);
-  inBytes.free;
+  inBytes.free();
 
   {make sure we don't match on end sequence}
   inBytes := tMemoryStream.create();
@@ -890,7 +890,7 @@ begin
   compressedData := lz4Compress(inBytes.asBytes);
   uncompressedData := lz4Decompress(compressedData, inBytes.len);
   AssertEqual(uncompressedData, inBytes.asBytes);
-  inBytes.free;
+  inBytes.free();
 
 end;
 

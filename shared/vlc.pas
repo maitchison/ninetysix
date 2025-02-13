@@ -977,6 +977,7 @@ begin
     unpack32(bs.getCurrentBytesPtr(0), @data[0], length(testData2), bits);
     for i := 0 to length(testData2)-1 do
       AssertEqual(data[i], testData2[i]);
+    bs.free();
   end;
 
   testUnpack();

@@ -13,7 +13,7 @@ type
       traction: single;
     end;
 
-  tRaceTrack = class
+  tRaceTrack = class(tObject)
 
     background: tPage;
     heightMap: tPage;
@@ -103,9 +103,8 @@ begin
   result.y := round(p.rotated(-0.615, 0, 0).y);
 end;
 
-
 {load a track file}
-constructor tRaceTrack.Create(filename: string);
+constructor tRaceTrack.create(filename: string);
 begin
   inherited create();
   {for the moment this is just a series of files}
@@ -116,11 +115,11 @@ begin
   if (heightMap.width <> background.width)  or (heightMap.height <> background.height) then fatal('HeightMap dims do not match background');
 end;
 
-destructor tRaceTrack.Destroy();
+destructor tRaceTrack.destroy();
 begin
-  background.free();
-  heightMap.free();
-  terrainMap.free();
+  freeAndNil(background);
+  freeAndNil(heightMap);
+  freeAndNil(terrainMap);
   inherited destroy();
 end;
 
