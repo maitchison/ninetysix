@@ -51,12 +51,12 @@ procedure error(s: string);
 procedure fatal(fmt: string; args: array of const); overload;
 procedure fatal(s: string; code: byte=255); overload;
 
-function GetLogLevelColor(level: tLogLevel): byte;
+function  getLogLevelColor(level: tLogLevel): byte;
 
 procedure BasicPrintLog();
 procedure PrintLog(maxEntries: integer=20);
 
-function GetIOErrorString(code: word): string;
+function  getIOErrorString(code: word): string;
 
 procedure assert(condition: boolean; msg: string='');
 procedure runError(code: word);
@@ -219,12 +219,11 @@ var
   if firstEntry > 0 then
     writeln('...');
 
-  oldTextAttr := textAttr and $0F;
+  oldTextAttr := textAttr;
   for i := firstEntry to logCount-1 do begin
-    textAttr := getLogLevelColor(LogEntries[i].level);
-    writeln(LogEntries[i].ToString());
+    textAttr := (textAttr and $f0) + getLogLevelColor(LogEntries[i].level);
+    writeln(LogEntries[i].toString());
   end;
-
   textAttr := oldTextAttr;
 end;
 
@@ -293,7 +292,7 @@ begin
   end;
 end;
 
-procedure CustomErrorProc(ErrNo: longint; address:CodePointer; frame: Pointer);
+procedure customErrorProc(ErrNo: longint; address:CodePointer; frame: Pointer);
 var
   CallerAddr: Pointer;
   FramePtr: Pointer;
@@ -381,7 +380,7 @@ end;
 {this is called for any uncaught exceptions}
 {$push}
 {$s-}
-procedure CustomExceptProc(obj: tObject; address:codePointer; frameCount: longint; frames: PCodePointer);
+procedure customExceptProc(obj: tObject; address:codePointer; frameCount: longint; frames: PCodePointer);
 var
   CallerAddr: Pointer;
   FramePtr: Pointer;
@@ -438,6 +437,7 @@ begin
 
   note('Halting program');
 
+  textColor(White);
   Halt(255);
 end;
 {$pop}
@@ -454,6 +454,8 @@ var
   programFilename: string;
 
 begin
+
+  textColor(White);
 
   if assigned(ExceptProc) then begin
     {
