@@ -490,7 +490,7 @@ begin
   hdrPhase := tHDRPage.create(64,64);
 
   {load background and refresh screen}
-  screen.background := tPage.Load('res\background.p96');
+  screen.background := tPage.Load('res\bg.p96');
 
   screen.pageClear();
   screen.pageFlip();

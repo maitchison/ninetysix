@@ -27,6 +27,9 @@ const
 
 implementation
 
+uses
+  utils;
+
 function degToRad(x: tFloat): tFloat;
 begin
   result := x / 180 * pi;
