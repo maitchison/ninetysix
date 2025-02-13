@@ -69,11 +69,13 @@ const
 var
   mainList: tStringList;
   auxList: tStringList;
+  files: tStringList;
 
 var
   outT: text;
   ref: string;
   token: string;
+  inputHook: procedure(s: string);
 
 type
   tSearchOptions = record
@@ -91,7 +93,7 @@ begin
   caseSensitive := false;
 end;
 
-procedure deleteFile();
+procedure deleteMessageFile();
 begin
   ioResult;
   info('Delete file');
@@ -101,23 +103,17 @@ begin
   ioResult;
 end;
 
-procedure openFile();
+procedure openMessageFile();
 begin
   ioResult;
   info('Open file');
-
-  (*
-  assign(outT, OUT_T);
-  {$i-} Erase(outT); {$i+}
-  ioResult;
-  *)
 
   assign(outT, OUT_T);
   rewrite(outT);
   write(outT, SIGNATURE);
 end;
 
-procedure closeFile();
+procedure closeMessageFile();
 begin
   info('Close file');
   write(outT, #127);
@@ -143,7 +139,7 @@ procedure fatalMessage(error: byte;s: string);
 begin
   warning('Error: '+s);
   writeMessage(s);
-  closeFile();
+  closeMessageFile();
   halt(error);
 end;
 
@@ -174,23 +170,43 @@ begin
   end;
 end;
 
+{message format for FPC}
+function messageRef(filename: string;lineNo: integer;msg: string): string;
+var
+  filePart, refPart: string;
+begin
+  filePart := #0 + filename + #0;
+  refPart := #1 + code(lineNo) + code(1) + msg + #0;
+  result := filePart + refPart;
+end;
+
+function getExtensionScore(ext: string): integer;
+begin
+  ext := ext.toLower();
+  result := 0;
+  if ext = 'pas' then result := 3;
+  if ext = 'inc' then result := 2;
+  if ext = 'bat' then result := 1;
+  if ext = 'txt' then result := 1;
+  if ext = 'log' then result := 1;
+end;
+
 {search all source files in root folder and report lines containing that string
 if detectDeclarations is true then lines that looks like function or procedure
 declarations will be put into an auxilary list.
 }
 procedure globalFind(subStr: string;so: tSearchOptions);
 var
-  files: tStringList;
   lines: tStringList;
   lineNo: int32;
   filePath: string;
-  glob: tGlob;
   line,searchLine: string;
   ignoreFilename: string;
   first: boolean;
   msgString: string;
-  filePart, refPart: string;
   containsStr: boolean;
+  extension: string;
+  score: integer;
 begin
 
   subStr := subStr.toLower();
@@ -199,12 +215,9 @@ begin
   note(format('Performing search for "%s"', [subStr]));
   note('----------------------------------------');
 
-  glob := tGlob.create();
-  ignoreFilename := joinPath(ROOT, 'ignore.ini');
-  if fs.exists(ignoreFilename) then
-    glob.loadIgnoreFile(ignoreFilename);
-  files := glob.getFiles(ROOT, '*.pas');
   for filePath in files do begin
+    extension := extractExtension(filePath).toLower();
+    if getExtensionScore(extension) < 2 then continue;
     lines := fs.readText(joinPath(ROOT, filePath));
     lineNo := 0;
     first := true;
@@ -220,9 +233,8 @@ begin
       else
         containsStr := searchLine.contains(subStr);
       if containsStr then begin
-        filePart := #0 + joinPath(ROOT, filePath) + #0;
-        refPart := #1 + code(lineNo) + code(1) + line + #0;
-        msgString := filePart + refPart;
+        {todo: use a function to handle encoding of reference}
+        msgString := messageRef(joinPath(ROOT, filePath), lineNo, line);
         if so.detectDeclarations then begin
           if line.startsWith('procedure', true) or line.startsWith('function', true) then
             auxList.append(msgString)
@@ -233,12 +245,10 @@ begin
           mainList.append(msgString);
         // maybe this slows things down too much?
         note(line);
-
       end;
     end;
   end;
   note('<done>');
-  glob.free();
 end;
 
 {returns the word at given location. Might not work with tabs
@@ -272,6 +282,22 @@ begin
 end;
 
 {-----------------------------------------------------}
+
+procedure updateFilenameMatches(token: string);
+var
+  filename, extension: string;
+begin
+  mainList.clear();
+  auxList.clear();
+  for filename in files do begin
+    extension := extractExtension(filename).toLower();
+    if not filename.contains(token, true) then continue;
+    if getExtensionScore(extension) >= 3 then
+      mainList.append(filename)
+    else
+      auxList.append(filename);
+  end;
+end;
 
 procedure processRefs();
 var
@@ -309,11 +335,49 @@ begin
 
 end;
 
+procedure doSearchFeedback(s: string);
+var
+  oldX,oldY,oldAttr: integer;
+  filename: string;
+  counter: integer;
+
+  procedure displayLine(s: string);
+  begin
+    textAttr := White;
+    counter += 1;
+    if counter > 10 then exit;
+    gotoXY(10, oldY+counter);
+    write(pad(s, 40));
+  end;
+
+begin
+  oldX := crt.whereX;
+  oldY := crt.whereY;
+  oldAttr := crt.textAttr;
+
+  updateFilenameMatches(s);
+
+  textAttr := White;
+  gotoXY(10, oldY+1);
+  counter := 0;
+  for filename in mainList do
+    displayLine(filename);
+  for filename in auxList do
+    displayLine(filename);
+  while counter < 10 do
+    displayLine('');
+
+  crt.gotoXY(oldX, oldY);
+  crt.textAttr := oldAttr;
+
+end;
+
 function readInput(): string;
 var
   ch: char;
 begin
   result := '';
+  if assigned(inputHook) then inputHook(result);
   repeat
     ch := readkey;
     if ch = #27 then exit('');
@@ -321,10 +385,12 @@ begin
     if ch = #8 then begin
       if result = '' then continue;
       result := copy(result, 1, length(result)-1);
+      if assigned(inputHook) then inputHook(result);
       write(#8,' ',#8);
       continue;
     end;
     result += ch;
+    if assigned(inputHook) then inputHook(result);
     write(ch);
   until false;
 end;
@@ -348,8 +414,8 @@ begin
     token := readInput();
     if token = '' then begin
       {this way message box will not get focus (I hope!)}
-      closeFile();
-      deleteFile();
+      closeMessageFile();
+      deleteMessageFile();
       halt(0);
     end;
   end else if paramCount = 2 then begin
@@ -358,6 +424,7 @@ begin
     fatalMessage(55, 'Error, wrong number of parameters (found '+intToStr(paramCount)+', expected 2)');
 
   mainList.clear();
+  auxList.clear();
 
   startTimer('search');
   so.init;
@@ -369,7 +436,67 @@ begin
   writeMessage('---------------------------------------');
 
   for ref in mainList do write(outT, ref);
+  for ref in auxList do write(outT, ref);
+end;
 
+procedure getFileNames();
+var
+  glob: tGlob;
+  filename, extension: string;
+  ignoreFilename: string;
+begin
+  startTimer('scan');
+  glob := tGlob.create();
+  ignoreFilename := joinPath(ROOT, 'ignore.ini');
+  if fs.exists(ignoreFilename) then
+    glob.loadIgnoreFile(ignoreFilename);
+  files.clear();
+  for filename in glob.getFiles(ROOT, '*.*') do begin
+    extension := extractExtension(filename).toLower();
+    if getExtensionScore(extension) <= 0 then continue;
+    files.append(filename);
+  end;
+  glob.free();
+  stopTimer('scan');
+  note('Scan took %fs', [getTimer('scan').elapsed]);
+end;
+
+procedure processOpen();
+var
+  so: tSearchOptions;
+  atX,atY: integer;
+  filename, extension: string;
+  priority: integer;
+
+begin
+  inputHook := doSearchFeedback;
+  if paramCount = 1 then begin
+    textAttr := LightGray*16 + White;
+    atX := 10; atY := 30;
+    gotoxy(atX, atY);
+    write('                                                               ');
+    gotoxy(atX, atY+1);
+    write(' File:                                            ');
+    gotoxy(atX, atY+2);
+    write('                                                               ');
+    gotoxy(atX+20, atY+1);
+    token := readInput();
+    if token = '' then begin
+      {this way message box will not get focus (I hope!)}
+      closeMessageFile();
+      deleteMessageFile();
+      halt(0);
+    end;
+  end else if paramCount = 2 then begin
+    token := paramStr(2);
+  end else
+    fatalMessage(55, 'Error, wrong number of parameters (found '+intToStr(paramCount)+', expected 2)');
+
+  updateFilenameMatches(token);
+  for filename in mainList do
+    write(outT, messageRef(filename, 1, '<-'));
+  for filename in auxList do
+    write(outT, messageRef(filename, 1, '<-'));
 end;
 
 {-----------------------------------------------------}
@@ -379,19 +506,24 @@ var
 
 begin
 
-  openFile();
+  inputHook := nil;
+  openMessageFile();
 
   if paramCount < 1 then fatalMessage(55, 'Usage: look.exe refs [filename] [line] [col]');
+
+  getFileNames();
 
   mode := paramStr(1).toLower();
   if mode = 'refs' then
     processRefs()
   else if mode = 'find' then
     processFind()
+  else if mode = 'open' then
+    processOpen()
   else
     fatalMessage(66, 'Invalid mode '+mode);
 
-  closeFile();
+  closeMessageFile();
 
   halt(0);
 end.
