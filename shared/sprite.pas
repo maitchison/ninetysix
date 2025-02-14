@@ -45,6 +45,7 @@ type
     function  getPixel(atX, atY: integer): RGBA;
     procedure blit(dstPage: tPage; atX, atY: int32);
     procedure draw(dstPage: tPage; atX, atY: int32);
+    procedure drawFlipped(dstPage: tPage; atX, atY: int32);
     procedure drawStretched(DstPage: TPage; dest: TRect);
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
@@ -77,7 +78,8 @@ uses
 {-------------------------------------------------------------}
 
 {draw an image segment, stretched}
-procedure stretchBlit_REF(DstPage, SrcPage: TPage; Src,Dst: TRect);
+{this might not support negative width / height}
+procedure stretchDraw_REF(DstPage, SrcPage: TPage; Src,Dst: TRect);
 var
   x, y: integer;
   u, v: single;
@@ -88,14 +90,15 @@ begin
     for x := Dst.Left to Dst.Right-1 do begin
       u := (x - Dst.Left) / Dst.Width;
       v := (y - Dst.Top) / Dst.Height;
-      c := SrcPage.GetPixel(Src.x+u*Src.Width, Src.y+v*Src.Height);
-      DstPage.PutPixel(x, y, c);
+      c := SrcPage.getPixel(Src.x+u*Src.Width, Src.y+v*Src.Height);
+      if c.a <> 0 then
+        dstPage.putPixel(x, y, c);
     end;
   end;
 end;
 
 {draw an image segment to screen}
-procedure blit_REF(dstPage, srcPage: TPage; srcRect: tRect; atX,atY: int16);
+procedure draw_REF(dstPage, srcPage: TPage; srcRect: tRect; atX,atY: int16);
 var
   x,y: int32;
   xMin,xMax,yMin,yMax: int32;
@@ -148,9 +151,11 @@ end;
 
 
 {draw an image segment, stretched}
-procedure stretchBlit_ASM(dstPage, srcPage: TPage; Src, Dst: TRect);
+{todo: needs a bit rewrite, I think just make it a generic stretch like
+ voxel does (with scanline)}
+procedure stretchDraw_ASM(dstPage, srcPage: TPage; src, dst: tRect);
 var
-  deltaX, deltaY: uint32;
+  deltaX, deltaY: int32;
   x,y: uint32;
   v: single;
   sx, sy: uint32;
@@ -158,51 +163,57 @@ var
   imageOfs: uint32;
   cnt: uint16;
   dstPixels: pointer;
-
-  sx1,sx2,dx1,dx2,sy1,sy2,dy1,dy2: integer;
+  dx1,dx2: integer;
+  dy1,dy2: integer;
 
 begin
   {todo: implement proper clipping}
   if (src.height <= 0) or (src.width <= 0) then
     fatal('Tried drawing sprite with invalid bounds: '+ShortString(src));
 
-  if (dst.height <= 0) or (dst.width <= 0) then exit;
-
-  {Mapping from new parameters to the legacy ones,
-   avoids having to rewrite the code}
-  sx1 := Src.left;
-  sy1 := Src.top;
-  sx2 := Src.right;
-  sy2 := Src.bottom;
-
-  dx1 := Dst.left;
-  dy1 := Dst.top;
-  dx2 := Dst.right;
-  dy2 := Dst.bottom;
-
   {for debugging...}
-  {Info(ShortString(src)+' '+ShortString(dst));}
+  Info(ShortString(src)+' '+ShortString(dst));
 
   {todo: maybe only support power of 2 images...}
   {todo: linear interpolation with MMX, if we can...}
-  {todo: support transpariency}
-  deltaX := trunc(65536.0 * (sx2-sx1) / (dx2-dx1));
-  deltaY := round(65536.0 * (sy2-sy1) / (dy2-dy1));
-  sx := sx1 * 65536;
-  sy := sy1 * 65536;
+  deltaX := round(65536.0 * src.width / dst.width);
+  deltaY := round(65536.0 * src.height / dst.height);
 
-  cnt := (dx2 - dx1);
+  if deltaX >= 0 then
+    sx := src.left * 65536 + (65536 div 2)
+  else
+    sx := src.right * 65536  - (65536 div 2);
+  if deltaY >= 0 then
+    sy := src.top * 65536
+  else
+    sy := src.bottom * 65536;
+
+  dx1 := min(dst.left, dst.right);
+  dx2 := max(dst.left, dst.right);
+  dy1 := min(dst.top, dst.bottom);
+  dy2 := max(dst.top, dst.bottom);
+
+  {clipping}
+  if dx1 < 0 then begin
+    sx += deltaX * -dx1;
+    dx1 := 0;
+  end;
+
+  cnt := (dx2-dx1)-1;
   if cnt <= 0 then exit;
 
   dstPixels := dstPage.Pixels;
 
+  note('%d %d %d', [deltaX, deltaY, cnt]);
+
   for y := dy1 to dy2-1 do begin
     if y > videoDriver.height then exit;
+    if y < 0 then continue;
     v := (y - dy1) / (dy2 - dy1);
     screenOfs := y * videoDriver.width + dx1;
-    imageOfs := sy1 + round((sy2-sy1) * v);
+    imageOfs := min(src.top, src.bottom) + round(src.height * v);
     imageOfs *= srcPage.width * 4;
-    imageOfs += dword(srcPage.Pixels);
+    imageOfs += dword(srcPage.pixels);
     asm
       pushad
 
@@ -273,7 +284,6 @@ begin
     @Skip:
 
       add edi, 4
-
       add edx, deltaX
 
       dec ecx
@@ -350,9 +360,16 @@ end;
 
 
 {Draw sprite to screen at given location, with alpha etc}
-procedure tSprite.draw(dstPage: tPage; atX, atY: Integer);
+procedure tSprite.draw(dstPage: tPage; atX, atY: integer);
 begin
-  blit_REF(dstPage, self.page, self.rect, atX, atY);
+  draw_REF(dstPage, self.page, self.rect, atX, atY);
+end;
+
+{Draws sprite flipped on x-axis}
+procedure tSprite.drawFlipped(dstPage: tPage; atX, atY: integer);
+begin
+  {a bit inefficent, but ok for the moment}
+  drawStretched(dstPage, graph2d.Rect(atX+self.rect.width, atY, -self.rect.width, self.rect.height));
 end;
 
 function tSprite.getPixel(atX, atY: integer): RGBA;
@@ -369,9 +386,9 @@ begin
 end;
 
 {Draws sprite stetched to cover destination rect}
-procedure tSprite.DrawStretched(DstPage: TPage; dest: TRect);
+procedure tSprite.drawStretched(dstPage: tPage; dest: tRect);
 begin
-  stretchBlit_ASM(DstPage, Self.Page, Self.Rect, dest);
+  stretchDraw_ASM(dstPage, Self.page, Self.rect, dest);
 end;
 
 {Draw sprite using nine-slice method}

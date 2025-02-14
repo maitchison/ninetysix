@@ -360,7 +360,11 @@ end;
 
 procedure tTank.draw(screen: tScreen);
 begin
-  sprite.draw(screen.canvas, bounds.x, bounds.y);
+  if angle < 0 then
+    sprite.drawFlipped(screen.canvas, bounds.x, bounds.y)
+  else
+    sprite.draw(screen.canvas, bounds.x, bounds.y);
+
   screen.markRegion(bounds);
   {draw target}
   drawMarker(

@@ -49,7 +49,6 @@ begin
   gui.append(verLabel);
 
   screen.pageClear();
-  screen.pageFlip();
 
   exitFlag := false;
 
@@ -214,6 +213,7 @@ begin
     gui.draw(screen);
 
     screen.flipAll();
+    screen.pageFlip();
 
     stopTimer('main');
 
@@ -267,8 +267,10 @@ begin
 
   screenInit();
   musicPlay('res\dance1.a96');
-  titleScreen();
+  //titleScreen();
   battleScreen();
   screenDone();
+
+  printLog();
 
 end.
