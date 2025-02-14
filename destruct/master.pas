@@ -59,7 +59,7 @@ begin
     {compress it}
     writeln();
     write(filename+': ');
-    srcMusic := tSoundEffect.loadFromWave(srcPath);
+    srcMusic := tSoundEffect.Load(srcPath);
     writer.open(dstPath);
     writer.frameWriteHook := updateEncodeProgress();
     writer.writeA96(srcMusic, ACP_HIGH);
@@ -89,7 +89,7 @@ end;
 
 procedure masterGFX();
 begin
-  convertPNG('title_320');
+  convertPNG('title');
   convertPNG('sprites');
   convertPNG('netfont1');
   convertPNG('netfont2');

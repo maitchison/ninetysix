@@ -494,9 +494,9 @@ begin
 
   updateFilenameMatches(token);
   for filename in mainList do
-    write(outT, messageRef(filename, 1, '<-'));
+    write(outT, messageRef(filename, 1, extractPath(filename)));
   for filename in auxList do
-    write(outT, messageRef(filename, 1, '<-'));
+    write(outT, messageRef(filename, 1, extractPath(filename)));
 end;
 
 {-----------------------------------------------------}
