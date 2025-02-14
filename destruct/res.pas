@@ -27,7 +27,8 @@ begin
   explodeSFX := tSoundEffect.Load('res\explode.a96');
 
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
-  sprites.load('res\sprites.ini');
+  sprites.page.setTransparent(RGB(255,0,255));
+  sprites.grid(12,14);
 
 end;
 

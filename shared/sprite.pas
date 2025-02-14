@@ -56,7 +56,8 @@ type
 
   tSpriteSheet = class
   protected
-    function getItem(tag: string): tSprite;
+    function getByTag(tag: string): tSprite;
+    function getByIndex(idx: integer): tSprite;
   public
     page: tPage;
     sprites: array of tSprite;
@@ -64,8 +65,8 @@ type
     constructor create(aPage: tPage);
     procedure append(sprite: tSprite);
     procedure load(filename: string);
-    property items[index: string]: tSprite read getItem; default;
-
+    procedure grid(cellWidth, cellHeight: word);
+    property items[tag: string]: tSprite read getByTag; default;
   end;
 
 implementation
@@ -489,9 +490,24 @@ begin
   note(' - loaded sprite sheet "%s" with %d sprites.', [filename, length(sprites)]);
 end;
 
+{create sprites using a grid}
+procedure tSpriteSheet.grid(cellWidth,cellHeight: word);
+var
+  sprite: tSprite;
+  x, y: integer;
+begin
+  for y := 0 to (page.height div cellHeight)-1 do begin
+    for x := 0 to (page.width div cellWidth)-1 do begin
+      sprite := tSprite.create(page);
+      sprite.rect := Rect(x*cellWidth, y*cellHeight, cellWidth, cellHeight);
+      append(sprite);
+    end;
+  end;
+end;
+
 {---------------}
 
-function tSpriteSheet.getItem(tag: string): tSprite;
+function tSpriteSheet.getByTag(tag: string): tSprite;
 var
   sprite: tSprite;
 begin
@@ -499,6 +515,11 @@ begin
   for sprite in sprites do
     if assigned(sprite) and (sprite.tag = tag) then exit(sprite);
   fatal('Sprite sheet contains no sprite named "'+tag+'"');
+end;
+
+function tSpriteSheet.getByIndex(idx: integer): tSprite;
+begin
+  result := sprites[idx];
 end;
 
 {-----------------------------------------------------}

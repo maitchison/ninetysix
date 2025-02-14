@@ -48,8 +48,8 @@ procedure note(fmt: string; args: array of const); overload;
 procedure info(s: string);
 procedure warning(s: string);
 procedure error(s: string);
-procedure fatal(fmt: string; args: array of const); overload;
 procedure fatal(s: string; code: byte=255); overload;
+procedure fatal(fmt: string; args: array of const); overload;
 
 function  getLogLevelColor(level: tLogLevel): byte;
 
@@ -162,14 +162,14 @@ begin
 end;
 
 {todo: remove this and have caller use raise GeneralError instead}
-procedure fatal(s: string; code: byte=255); noreturn;
+procedure fatal(s: string; code: byte=255);
 begin
   log(s, llError);
   raise GeneralError.create(s);
 end;
 
 {todo: remove this and have caller use raise GeneralError instead}
-procedure fatal(fmt: string; args: array of const); overload; noreturn;
+procedure fatal(fmt: string; args: array of const);
 var
   s: string;
 begin

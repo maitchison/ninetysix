@@ -57,6 +57,9 @@ type
   end;
 
   tTank = class(tGameObject)
+  protected
+    spriteSheet: tSpriteSheet;
+    spriteIdx: word;
   public
     id: integer;
     cooldown: single;
@@ -343,7 +346,9 @@ constructor tTank.create();
 begin
   inherited create();
   col := RGB(255,255,255);
-  sprite := sprites['Tank'];
+  spriteSheet := res.sprites;
+  spriteIdx := 0;
+  sprite := spriteSheet.sprites[spriteIdx]; // will be set on update
 end;
 
 procedure tTank.reset();
@@ -379,6 +384,9 @@ begin
   {inherited update stuff}
   inherited update(elapsed);
   if cooldown > 0 then cooldown -= elapsed;
+
+  {animation}
+  sprite := spriteSheet.sprites[spriteIdx + clamp(round((90-abs(angle)) * 5 / 90), 0, 4)];
 
   {falling}
   support := 0;
