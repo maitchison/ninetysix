@@ -23,6 +23,8 @@ type
   protected
     spriteSheet: tSpriteSheet;
     spriteIdx: word;
+    procedure fireBullet();
+    procedure fireLaser();
   public
     chassis: tChassis;
     id: integer;
@@ -165,6 +167,15 @@ begin
 end;
 
 procedure tTank.fire();
+begin
+  // stub: hard code laser for me
+  if chassis.ctype=CT_LAUNCHER then
+    fireLaser()
+  else
+    fireBullet();
+end;
+
+procedure tTank.fireBullet();
 var
   bullet: tBullet;
 begin
@@ -179,6 +190,20 @@ begin
     mixer.play(shootSFX, 0.2);
     lastBullet := bullet;
   end;
+end;
+
+procedure tTank.fireLaser();
+var
+  hit: tHitInfo;
+begin
+  {need to do the following...}
+  {1. find hit position}
+  hit := traceRay(xPos, yPos, angle, 100, self);
+  if hit.didHit then begin
+    makeSparks(hit.x, hit.y, 3, 5, 0, 0);
+    terrain.burn(hit.x-32, hit.y, 2, 10);
+  end;
+  {1. stretch draw the line}
 end;
 
 procedure tTank.explode();

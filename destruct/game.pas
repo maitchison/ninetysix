@@ -6,6 +6,14 @@ uses
   {$i units},
   uBullet, uTank, obj;
 
+type
+  tHitInfo = record
+    obj: tObject;     // nil if no hit, or we hit terrain.
+    didHit: boolean;
+    x,y: integer;
+    procedure clear();
+  end;
+
 procedure updateAll(elapsed: single);
 procedure drawAll(screen: tScreen);
 
@@ -13,10 +21,19 @@ function  nextBullet: tBullet;
 function  nextParticle: tParticle;
 function  getTank(id: integer;team: integer): tTank;
 
+function  getObjectAtPos(x,y: integer): tGameObject;
+function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
+
+var
+  screen: tScreen;
+
 var
   tanks: tGameObjectList;
 
 implementation
+
+uses
+  terra;
 
 var
   updateAccumlator: single;
@@ -26,6 +43,86 @@ var
   bullets: tGameObjectList;
 
 {----------------------------------------------------------}
+
+procedure tHitInfo.clear();
+begin
+  self.didHit := false;
+  self.obj := nil;
+  self.x := 0;
+  self.y := 0;
+end;
+
+{returns first object that ray intersects with}
+function traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
+var
+  x,y: single;
+  rx,ry: integer;
+  dx, dy: single;
+  i: integer;
+  go: tGameObject;
+  p: tParticle;
+begin
+
+  note('trace');
+  result.clear();
+  dx := sin(angle*DEG2RAD);
+  dy := -cos(angle*DEG2RAD);
+  x := x1+0.5; y := y1+0.5;
+  for i := 0 to maxDistance do begin
+    {stub...}
+
+    rx := round(x); ry := round(y);
+
+    //stub:
+    // why no work?
+
+    p := nextParticle();
+    if assigned(p) then begin
+      p.pos.x := x;
+      p.pos.y := y;
+      p.vel.x := (rnd-128)/16;
+      p.vel.y := (rnd-128)/16;
+      p.ttl := 0.1;
+    end;
+
+    if not terrain.isEmpty(rx-32, ry) then begin
+      result.didHit := true;
+      result.obj := nil;
+      result.x := rx;
+      result.y := ry;
+      exit;
+    end;
+    go := getObjectAtPos(rx, ry);
+    if assigned(go) and (go <> ignore) then begin
+      result.didHit := true;
+      result.obj := go;
+      result.x := rx;
+      result.y := ry;
+      exit;
+    end;
+    x += dx;
+    y += dy;
+  end;
+end;
+
+{returns the object at given location}
+function getObjectAtPos(x,y: integer): tGameObject;
+var
+  go: tGameObject;
+  tank: tTank;
+  c: RGBA;
+begin
+  result := nil;
+  {todo: we should implement a grid system, and maybe bounding rects as well}
+  {note: this would enable bullet collisions too}
+  for go in tanks.objects do begin
+    tank := tTank(go);
+    if tank.status <> GO_ACTIVE then continue;
+    c := tank.getWorldPixel(x, y);
+    if c.a > 0 then
+      exit(tank);
+  end;
+end;
 
 function nextBullet: tBullet;
 var

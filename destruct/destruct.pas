@@ -17,9 +17,6 @@ uses
   mixlib,
   utils;
 
-var
-  screen: tScreen;
-
 procedure titleScreen();
 var
   exitFlag: boolean;
@@ -29,11 +26,11 @@ var
 begin
 
   {load background and refresh screen}
-  screen.background := tPage.create(320,240);
-  tSprite.create(titleGFX).blit(screen.background, 0, -16);
+  game.screen.background := tPage.create(320,240);
+  tSprite.create(titleGFX).blit(game.screen.background, 0, -16);
 
-  screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
-  screen.background.fillRect(Rect(0,240-24,320,24),RGB(0,0,0));
+  game.screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
+  game.screen.background.fillRect(Rect(0,240-24,320,24),RGB(0,0,0));
 
   {setup gui}
   gui := tGuiComponents.create();
@@ -48,7 +45,7 @@ begin
   verLabel.textColor := RGB(255,255,255);
   gui.append(verLabel);
 
-  screen.pageClear();
+  game.screen.pageClear();
 
   exitFlag := false;
 
@@ -57,7 +54,7 @@ begin
 
     musicUpdate();
     startTimer('main');
-    screen.clearAll();
+    game.screen.clearAll();
 
     elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
 
@@ -67,9 +64,9 @@ begin
       20
     );
     gui.update(elapsed);
-    gui.draw(screen);
+    gui.draw(game.screen);
 
-    screen.flipAll();
+    game.screen.flipAll();
 
     stopTimer('main');
 
@@ -158,11 +155,11 @@ var
   control1, control2: tController;
 begin
 
-  screen.background := tPage.create(screen.width, screen.height);
-  renderSky(screen.background);
+  game.screen.background := tPage.create(game.screen.width, game.screen.height);
+  renderSky(game.screen.background);
 
-  screen.pageClear();
-  screen.pageFlip();
+  game.screen.pageClear();
+  game.screen.pageFlip();
 
   exitFlag := false;
 
@@ -202,18 +199,18 @@ begin
     control1.apply(elapsed);
     control2.apply(elapsed);
 
-    screen.clearAll();
+    game.screen.clearAll();
 
     updateAll(elapsed);
-    drawAll(screen);
-    terrain.draw(screen);
+    drawAll(game.screen);
+    terrain.draw(game.screen);
 
     {gui}
     gui.update(elapsed);
-    gui.draw(screen);
+    gui.draw(game.screen);
 
-    screen.flipAll();
-    screen.pageFlip();
+    game.screen.flipAll();
+    game.screen.pageFlip();
 
     stopTimer('main');
 
@@ -237,8 +234,8 @@ begin
     fatal('Requires 1MB video card.');
 
   videoDriver.setTrueColor(320, 240);
-  screen := tScreen.create();
-  screen.scrollMode := SSM_COPY;
+  game.screen := tScreen.create();
+  game.screen.scrollMode := SSM_COPY;
 end;
 
 procedure screenDone();

@@ -172,7 +172,7 @@ begin
     fatal('Tried drawing sprite with invalid bounds: '+ShortString(src));
 
   {for debugging...}
-  Info(ShortString(src)+' '+ShortString(dst));
+  //Info(ShortString(src)+' '+ShortString(dst));
 
   {todo: maybe only support power of 2 images...}
   {todo: linear interpolation with MMX, if we can...}
@@ -203,8 +203,6 @@ begin
   if cnt <= 0 then exit;
 
   dstPixels := dstPage.Pixels;
-
-  note('%d %d %d', [deltaX, deltaY, cnt]);
 
   for y := dy1 to dy2-1 do begin
     if y > videoDriver.height then exit;
