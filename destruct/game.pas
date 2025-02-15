@@ -61,9 +61,21 @@ var
   i: integer;
   go: tGameObject;
   p: tParticle;
+
+  {mu=0, var=~1}
+  function fakeGausian: single;
+  var
+    i: integer;
+  begin
+    result := 0;
+    for i := 1 to 6 do
+      result += rnd;
+    result *= (1/256);
+    result -= 3;
+  end;
+
 begin
 
-  note('trace');
   result.clear();
   dx := sin(angle*DEG2RAD);
   dy := -cos(angle*DEG2RAD);
@@ -73,16 +85,15 @@ begin
 
     rx := round(x); ry := round(y);
 
-    //stub:
-    // why no work?
-
-    p := nextParticle();
-    if assigned(p) then begin
-      p.pos.x := x;
-      p.pos.y := y;
-      p.vel.x := (rnd-128)/16;
-      p.vel.y := (rnd-128)/16;
-      p.ttl := 0.1;
+    if rnd > 128 then begin
+      p := nextParticle();
+      if assigned(p) then begin
+        p.pos.x := x;
+        p.pos.y := y;
+        p.vel.x := fakeGausian * 20;
+        p.vel.y := fakeGausian * 20;
+        p.ttl := 0.1;
+      end;
     end;
 
     if not terrain.isEmpty(rx-32, ry) then begin
