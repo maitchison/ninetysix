@@ -4,20 +4,21 @@ unit graph2d;
 interface
 
 {
-Rect co-ords are inclusive...
+Rect co-ords are inclusive-exclusive...
 
 
 e.g.
 
-0123456789
+01234567890
 1
 2
 3    #---#
 4    |   |
 5    #---#
+6
 
 topLeft     = (5,3)
-bottomRight = (9,5)
+bottomRight = (10,6)
 width  = 5
 height = 3
 
@@ -48,29 +49,40 @@ type
     class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
 
   public
+    function  getTop: int32; inline;
+    function  getLeft: int32; inline;
+    function  getBottom: int32; inline;
+    function  getRight: int32; inline;
+    procedure moveTop(value: int32); inline;
+    procedure moveLeft(value: int32); inline;
+    procedure moveBottom(value: int32); inline;
+    procedure moveRight(value: int32); inline;
 
-    function getTopLeft: tPoint;
-    function getBottomRight: tPoint;
-    function getBottomLeft: tPoint;
-    function getTopRight: tPoint;
+    function  getTopLeft: tPoint;
+    function  getBottomRight: tPoint;
+    function  getBottomLeft: tPoint;
+    function  getTopRight: tPoint;
+    procedure moveTopLeft(p: tPoint);
+    procedure moveBottomRight(p: tPoint);
+    procedure moveBottomLeft(p: tPoint);
+    procedure moveTopRight(p: tPoint);
 
   public
 
     function area: int32;
 
-    function top: int32; inline;
-    function left: int32; inline;
-    function bottom: int32; inline;
-    function right: int32; inline;
-
     procedure clear();
     procedure clipTo(const other: tRect);
 
-    {todo: setters}
-    property topLeft: tPoint read getTopLeft;
-    property topRight: tPoint read getTopRight;
-    property bottomLeft: tPoint read getBottomLeft;
-    property bottomRight: tPoint read getBottomRight;
+    property topLeft: tPoint read getTopLeft write moveTopLeft;
+    property topRight: tPoint read getTopRight write moveTopRight;
+    property bottomLeft: tPoint read getBottomLeft write moveBottomLeft;
+    property bottomRight: tPoint read getBottomRight write moveBottomRight;
+
+    property left: int32 read getLeft write moveLeft;
+    property right: int32 read getRight write moveRight;
+    property top: int32 read getTop write moveTop;
+    property bottom: int32 read getBottom write moveBottom;
 
     function toString(): string;
 
@@ -178,8 +190,8 @@ end;
 
 function tRect.mid: tPoint;
 begin
-  result.x := x+(width div 2);
-  result.y := y+(height  div 2);
+  result.x := (left+right+1) div 2;
+  result.y := (top+bottom+1) div 2;
 end;
 
 {----------------------------------}
@@ -187,6 +199,50 @@ end;
 function tRect.area: int32;
 begin
   result := width * height;
+end;
+
+{---------------------------------------}
+
+function tRect.getTop: int32; inline;
+begin
+  result := y;
+end;
+
+function tRect.getLeft: int32; inline;
+begin
+  result := x;
+end;
+
+function tRect.getBottom: int32; inline;
+begin
+  result := y + height;
+end;
+
+function tRect.getRight: int32; inline;
+begin
+  result := x + width;
+end;
+
+procedure tRect.moveTop(value: int32); inline;
+begin
+  height += y - value;
+  y := value;
+end;
+
+procedure tRect.moveLeft(value: int32); inline;
+begin
+  width += x - value;
+  x := value;
+end;
+
+procedure tRect.moveRight(value: int32); inline;
+begin
+  width -= x - value;
+end;
+
+procedure tRect.moveBottom(value: int32); inline;
+begin
+  height -= y - value;
 end;
 
 function tRect.getTopLeft: tPoint;
@@ -213,25 +269,32 @@ begin
   result.y := top;
 end;
 
-function tRect.top: int32; inline;
+{moves top left without moving bottom right}
+procedure tRect.moveTopLeft(p: tPoint);
 begin
-  result := y;
+  left := p.x;
+  top := p.y;
 end;
 
-function tRect.left: int32; inline;
+procedure tRect.moveBottomRight(p: tPoint);
 begin
-  result := x;
+  right := p.x;
+  bottom := p.y;
 end;
 
-function tRect.bottom: int32; inline;
+procedure tRect.moveBottomLeft(p: tPoint);
 begin
-  result := y + height;
+  left := p.x;
+  bottom := p.y;
 end;
 
-function tRect.right: int32; inline;
+procedure tRect.moveTopRight(p: tPoint);
 begin
-  result := x + width;
+  right := p.x;
+  top := p.y;
 end;
+
+{---------------------------------}
 
 procedure tRect.clear();
 begin
