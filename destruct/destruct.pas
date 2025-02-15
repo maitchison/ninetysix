@@ -253,6 +253,8 @@ var
 
 begin
 
+  CALL_OLD_KBH := false;
+
   autoHeapSize();
 
   textAttr := White + Blue*16;

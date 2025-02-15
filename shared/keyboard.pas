@@ -129,6 +129,11 @@ function anyKeyDown: boolean;
 function keyPressed: boolean;
 function getKey: tKeyPair;
 
+var
+  {if true old CRT keyboard functions will work, but you'll get
+   beeping if you don't consume the keypresses}
+  CALL_OLD_KBH: boolean = true;
+
 implementation
 
 type
@@ -138,6 +143,7 @@ var
   KeyPress: TAllkeys;
   oldint9h: tseginfo;
   newint9h: tseginfo;
+
 
 {some bios keys}
 const BIOS_CONTROL = #255;
@@ -249,7 +255,9 @@ asm
 @skipterminate:
 
     // Best to call old handler I guess?
-    {todo: check if I should be calling the old handler...}
+    mov al, CALL_OLD_KBH
+    test al, al
+    jz @standardReturn
     jmp @callOld
 @standardReturn:
     pop edi
