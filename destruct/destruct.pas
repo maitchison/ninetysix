@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   {game specific}
-  res, obj, terra, controller,
+  uTank, uBullet, game, res, obj, terra, controller,
   {general}
   graph2d, graph32, vga, vesa, screen,
   sprite, inifile,

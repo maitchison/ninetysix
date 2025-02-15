@@ -3,10 +3,8 @@ unit res;
 interface
 
 uses
-  debug, utils, test,
-  sound,
-  sprite,
-  graph32;
+  {$i units}
+  ;
 
 procedure loadResources();
 

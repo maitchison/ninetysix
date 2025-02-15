@@ -3,6 +3,8 @@ unit controller;
 interface
 
 uses
+  {$i units},
+  uTank,
   obj;
 
 type
@@ -46,8 +48,7 @@ type
 implementation
 
 uses
-  utils,
-  keyboard;
+  game;
 
 {--------------------------------------------}
 
