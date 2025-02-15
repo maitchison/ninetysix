@@ -81,8 +81,6 @@ begin
   dy := -cos(angle*DEG2RAD);
   x := x1+0.5; y := y1+0.5;
   for i := 0 to maxDistance do begin
-    {stub...}
-
     rx := round(x); ry := round(y);
 
     if rnd > 128 then begin

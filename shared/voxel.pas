@@ -21,7 +21,6 @@ var
   {debugging stuff}
   VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
-  VX_SHOW_CORNERS: boolean = false;
   VX_GHOST_MODE: boolean = false;
   VX_UVW_MODE: boolean = false;
 
@@ -61,7 +60,9 @@ type
 
 implementation
 
-uses keyboard; {for debugging}
+uses
+  poly,
+  keyboard; {for debugging}
 
 const
   MAX_SAMPLES = 64;
@@ -73,32 +74,6 @@ var
 {$I voxel_ref.inc}
 {$I voxel_asm.inc}
 {$I voxel_mmx.inc}
-
-{----------------------------------------------------}
-{ Poly drawing }
-{----------------------------------------------------}
-
-type
-  tScreenLine = record
-    xMin, xMax: int32;
-    procedure reset(width: integer);
-    procedure adjust(x: int16);
-  end;
-
-procedure tScreenLine.reset(width: integer); inline;
-begin
-  xMax := 0;
-  xMin := width-1;
-end;
-
-procedure tScreenLine.adjust(x: int16); inline;
-begin
-  xMin := min(x, xMin);
-  xMax := max(x, xMax);
-end;
-
-var
-  screenLines: array[0..1024-1] of tScreenLine;
 
 {-----------------------------------------------------}
 { Signed distance calculations }
@@ -275,7 +250,7 @@ var
   size: V3D; {half size of cuboid}
   cameraX, cameraY, cameraZ, cameraDir: V3D;
   p: array[1..8] of V3D; {world space}
-
+  ps: tPolyStats;
 
   {view is identity as we have no camera}
   model, projection: tMatrix4X4;
@@ -286,42 +261,6 @@ var
   isometricTransform : tMatrix4x4;
   lastTraceCount: int32;
   i: integer;
-
-  procedure scanSide(a, b: tPoint);
-  var
-    tmp: tPoint;
-    y: int32;
-    x: single;
-    deltaX: single;
-    yMin, yMax: integer;
-  begin
-    if a.y = b.y then begin
-      {special case}
-      y := a.y;
-      if (y >= 0) and (y < canvas.height) then begin
-        screenLines[y].adjust(a.x);
-        screenLines[y].adjust(b.x);
-      end;
-      exit;
-    end;
-
-    if a.y > b.y then begin
-      tmp := a; a := b; b := tmp;
-    end;
-
-    x := a.x;
-    deltaX := (b.x-a.x) / (b.y-a.y);
-    yMin := a.y;
-    if yMin < 0 then begin
-      x += deltaX * -yMin;
-      yMin := 0;
-    end;
-    yMax := min(b.y, canvas.height-1);
-    for y := yMin to yMax do begin
-      screenLines[y].adjust(round(x));
-      x += deltaX;
-    end;
-  end;
 
   {traces all pixels within the given polygon.
   points are in world space
@@ -377,55 +316,18 @@ var
       if keyDown(key_6) and (faceID = 6) then exit;
     end;
 
-    {do not render back face}
-    cross := ((p2.x-p1.x) * (p3.y - p1.y)) - ((p2.y - p1.y) * (p3.x - p1.x));
-    if cross <= 0 then exit;
-
-    s1 := p1.toPoint;
-    s2 := p2.toPoint;
-    s3 := p3.toPoint;
-    s4 := p4.toPoint;
-
-    yMin := min(s1.y, s2.y);
-    yMin := min(yMin, s3.y);
-    yMin := min(yMin, s4.y);
-    yMin := max(0, yMin);
-
-    yMax := max(s1.y, s2.y);
-    yMax := max(yMax, s3.y);
-    yMax := max(yMax, s4.y);
-    yMax := min(canvas.height-1, yMax);
-
-    //do not render offscreen sides
-    if yMax < yMin then exit;
-
-    {debuging, show corners}
-    if VX_SHOW_CORNERS then begin
-      c.init(255,0,255);
-      canvas.putPixel(s1.x, s1.y, c);
-      canvas.putPixel(s2.x, s2.y, c);
-      canvas.putPixel(s3.x, s3.y, c);
-      canvas.putPixel(s4.x, s4.y, c);
-    end;
-
-    for y := yMin to yMax do
-      screenLines[y].reset(canvas.width);
-
     {scan the sides of the polygon}
-    scanSide(s1, s2);
-    scanSide(s2, s3);
-    scanSide(s3, s4);
-    scanSide(s4, s1);
+    if not scanPoly(p1.toPoint, p2.tPoint, p3.toPoint, p4.toPoint, ps) then exit;
 
     {alternative solid face render (for debugging)}
     if (faceID in []) then begin
-      for y := yMin to yMax do
+      for y := ps.yMin to ps.yMax do
         canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, faceColor[faceID]);
       exit;
     end;
 
     if asShadow then begin
-      for y := yMin to yMax do
+      for y := ps.yMin to ps.yMax do
         canvas.hline(
           screenLines[y].xMin, y, screenLines[y].xMax,
           rgba.create(0,0,0,48));

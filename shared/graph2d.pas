@@ -55,7 +55,6 @@ type
 function Rect(left, top, width, height: int32): tRect; inline;
 function Point(x, y: int32): tPoint; inline;
 
-
 implementation
 
 uses debug, utils;
