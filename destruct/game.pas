@@ -8,7 +8,13 @@ uses
 
 procedure updateAll(elapsed: single);
 procedure drawAll(screen: tScreen);
-function nextBullet: tBullet;
+
+function  nextBullet: tBullet;
+function  nextParticle: tParticle;
+function  getTank(id: integer;team: integer): tTank;
+
+var
+  tanks: tGameObjectList;
 
 implementation
 
@@ -16,15 +22,42 @@ var
   updateAccumlator: single;
 
 var
-  particles: tGameObjectList<tParticle>;
-  bullets: tGameObjectList<tBullet>;
-  tanks: tGameObjectList<tTank>;
+  particles: tGameObjectList;
+  bullets: tGameObjectList;
 
 {----------------------------------------------------------}
 
 function nextBullet: tBullet;
+var
+  go: tGameObject;
 begin
-  result := bullets.nextFree;
+  go := bullets.nextFree;
+  if assigned(go) then
+    result := tBullet(go)
+  else begin
+    result := tBullet.create();
+    bullets.append(result);
+  end;
+end;
+
+function nextParticle: tParticle;
+var
+  go: tGameObject;
+begin
+  go := particles.nextFree;
+  if assigned(go) then
+    result := tParticle(go)
+  else begin
+    result := tParticle.create();
+    particles.append(result);
+  end;
+end;
+
+function  getTank(id: integer;team: integer): tTank;
+begin
+  {todo: support multiple tanks per team}
+  assert(id = 0);
+  result := tTank(tanks.objects[team]);
 end;
 
 procedure updateAll(elapsed: single);
@@ -52,9 +85,9 @@ end;
 procedure initObjects;
 begin
   updateAccumlator := 0;
-  tanks := tGameObjectList<tTank>.create();
-  bullets := tGameObjectList<tBullet>.create();
-  particles := tGameObjectList<tParticle>.create();
+  tanks := tGameObjectList.create();
+  bullets := tGameObjectList.create();
+  particles := tGameObjectList.create();
 end;
 
 procedure closeObjects;

@@ -32,8 +32,7 @@ type
 implementation
 
 uses
-  fx, terra, res,
-  game;
+  fx, terra, res, game;
 
 constructor tTank.create();
 begin
@@ -98,9 +97,8 @@ begin
       yPos := bounds.bottom;
       for xPos:= bounds.left+1 to bounds.right-1 do begin
         {make a little cloud}
-        (*
         for i := 1 to 3 do begin
-          p := particles.nextFree();
+          p := nextParticle();
           p.pos := V2(xPos, yPos);
           p.vel := V2(rnd-128, rnd-128) * 0.2;
           p.solid := true;
@@ -109,8 +107,6 @@ begin
           p.ttl := 0.5;
           p.radius := 2;
         end;
-        *)
-        //stub: include game
         {burn it}
         terrain.burn(xlp-32, bounds.bottom, 2, round(hitPower/(bounds.width-2)));
 

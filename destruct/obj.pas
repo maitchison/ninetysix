@@ -36,13 +36,13 @@ type
     property yPos: integer read getY;
   end;
 
-  tGameObjectList<tGameObject> = class
+  tGameObjectList = class
   public
-    objects: array of T;
-    procedure append(o: T);
+    objects: array of tGameObject;
+    procedure append(o: tGameObject);
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
-    function  nextFree(): T;
+    function  nextFree(): tGameObject;
   end;
 
   tParticle = class(tGameObject)
@@ -64,20 +64,20 @@ uses
 { tGameObjects }
 {----------------------------------------------------------}
 
-procedure tGameObjectList<T>.append(o: T);
+procedure tGameObjectList.append(o: tGameObject);
 begin
   setLength(objects, length(objects)+1);
   objects[length(objects)-1] := o;
 end;
 
-procedure tGameObjectList<T>.draw(screen: tScreen);
+procedure tGameObjectList.draw(screen: tScreen);
 var
   go: tGameObject;
 begin
   for go in objects do if go.status = GO_ACTIVE then go.draw(screen);
 end;
 
-procedure tGameObjectList<T>.update(elapsed: single);
+procedure tGameObjectList.update(elapsed: single);
 var
   go: tGameObject;
 begin
@@ -89,11 +89,12 @@ begin
   for go in objects do if go.status = GO_ACTIVE then go.update(elapsed);
 end;
 
-{returns the next free object, or creats a new one of there are none free}
-function tGameObjectList<T>.nextFree(): T;
+{returns the next free object, or nill if there are none free}
+function tGameObjectList.nextFree(): tGameObject;
 var
-  go: T;
+  go: tGameObject;
 begin
+  result := nil;
   {note: we could make this much faster by maintaining a list of known
    expired elements. For small lists it's no problem though.}
   for go in objects do begin
@@ -102,10 +103,6 @@ begin
       exit(go);
     end;
   end;
-
-  {ok we had none free, so create one}
-  result := T.create();
-  append(result);
 end;
 
 {----------------------------------------------------------}

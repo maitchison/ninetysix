@@ -18,7 +18,7 @@ type
 implementation
 
 uses
-  fx, res, uTank;
+  fx, res, uTank, game, terra;
 
 procedure tBullet.reset();
 begin
@@ -41,6 +41,7 @@ end;
 procedure tBullet.update(elapsed: single);
 var
   c: RGBA;
+  go: tGameObject;
   tank: tTank;
 begin
   {gravity}
@@ -53,12 +54,11 @@ begin
     exit;
   end;
   {check if we collided with tank}
-  //stub
-  (*
-  for tank in tanks.objects do begin
-    if t.status <> GO_ACTIVE then continue;
+  for go in tanks.objects do begin
+    tank := tTank(go);
+    if tank.status <> GO_ACTIVE then continue;
     {make sure we don't collide with ourself as soon as we fire}
-    if (ankt= self.owner) and (age < 0.10) then continue;
+    if (tank = self.owner) and (age < 0.10) then continue;
     c := tank.getWorldPixel(xPos, yPos);
     if c.a > 0 then begin
       tank.takeDamage(xPos, yPos, 100, owner);
@@ -67,14 +67,11 @@ begin
       exit;
     end;
   end;
-  *)
   {check if we collided with terrain}
-  {
   if terrain.isSolid(xPos-32, yPos) then begin
     explode();
     exit;
   end;
-  }
 end;
 
 procedure tBullet.draw(screen: tScreen);

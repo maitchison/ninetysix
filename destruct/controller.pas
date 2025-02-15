@@ -124,7 +124,7 @@ begin
   case state of
     AI_SELECT_TARGET: begin
       {hard code to tank2 for the moment}
-      target := tanks.objects[1];
+      target := getTank(0, 1);
       if target.xPos > tank.xPos then solutionX := 45 else solutionX := -45;
       solutionY := 10;
       state := AI_AIMX;

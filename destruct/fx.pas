@@ -55,7 +55,7 @@ begin
   radius := power;
   terrain.burn(round(atX-32), round(atY), round(radius+3), 25);
   for i := 0 to n-1 do begin
-    p := particles.nextFree();
+    p := nextParticle();
     z := (rnd/255);
     angle := rnd/255*360;
     p.pos := V2Polar(angle, z*radius/2) + V2(atX, atY);
@@ -82,7 +82,7 @@ begin
   n := round(power * power);
   radius := power;
   for i := 0 to n-1 do begin
-    p := particles.nextFree();
+    p := nextParticle();
     z := (rnd/255);
     angle := rnd/255*360;
     p.pos := V2Polar(angle, z*radius);
@@ -109,7 +109,7 @@ var
 begin
   n := round(radius * radius);
   for i := 0 to n-1 do begin
-    p := particles.nextFree();
+    p := nextParticle();
     z := (rnd/255);
     angle := rnd/255*360;
     p.pos := V2Polar(angle, z*radius);
