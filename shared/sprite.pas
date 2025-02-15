@@ -147,14 +147,14 @@ end;
 procedure tSprite.draw(dstPage: tPage; atX, atY: integer);
 begin
   {stub:}
-  if not keyDown(key_z) then
+  if keyDown(key_z) then
     draw_REF(dstPage, self.page, self.rect, atX, atY)
   else
     polyDraw_REF(dstPage, page, rect,
     Point(atX, atY),
-    Point(atX + rect.width, atY),
-    Point(atX + rect.width, atY + rect.height),
-    Point(atX, atY + rect.height)
+    Point(atX + rect.width - 1, atY),
+    Point(atX + rect.width - 1, atY + rect.height - 1),
+    Point(atX, atY + rect.height - 1)
   );
 end;
 
@@ -163,10 +163,10 @@ procedure tSprite.drawFlipped(dstPage: tPage; atX, atY: integer);
 begin
   {a bit inefficent, but ok for the moment}
   polyDraw_REF(dstPage, page, rect,
-    Point(atX + rect.width, atY),
+    Point(atX + rect.width - 1, atY),
     Point(atX, atY),
-    Point(atX, atY + rect.height),
-    Point(atX + rect.width, atY + rect.height)
+    Point(atX, atY + rect.height - 1),
+    Point(atX + rect.width - 1, atY + rect.height - 1)
   );
 end;
 

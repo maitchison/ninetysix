@@ -32,20 +32,29 @@ var
   z: single;
   sl: tScanLine;
   width: integer;
+  t1,t2,t3,t4: tUVCoord;
+  b: tRect;
 begin
+
+  {src coords are inclusive-exclusive}
+  t1 := UVCoord(src.topLeft) + UVCoord(0.5,0.5);
+  t2 := UVCoord(src.topRight) + UVCoord(-0.5,0.5);
+  t3 := UVCoord(src.bottomRight) + UVCoord(-0.5,-0.5);
+  t4 := UVCoord(src.bottomLeft) + UVCoord(0.5,-0.5);
   polyDraw.scanTextured(
     dstPage,
     p1, p2, p3, p4,
-    UVCoord(src.topLeft), UVCoord(src.topRight), UVCoord(src.bottomRight), UVCoord(src.bottomLeft)
+    t1, t2, t3, t4
   );
-  if polyDraw.bounds.area = 0 then exit;
-  for y := polyDraw.bounds.top to polyDraw.bounds.bottom-1 do begin
+  b := polyDraw.bounds;
+  if b.area = 0 then exit;
+  for y := b.top to b.bottom-1 do begin
     sl := polyDraw.scanLine[y];
-    width := sl.xMax - sl.xMin;
+    width := (sl.xMax - sl.xMin) + 1;
     for x := 0 to width-1 do begin
-      z := x / width;
-      t.x := round(lerp(sl.t1.x, sl.t2.x, z) / 65536);
-      t.y := round(lerp(sl.t1.y, sl.t2.y, z) / 65536);
+      z := x / (width-1);
+      t.x := trunc(lerp(sl.t1.x, sl.t2.x, z) / 65536);
+      t.y := trunc(lerp(sl.t1.y, sl.t2.y, z) / 65536);
       dstPage.putPixel(x + sl.xMin, y, srcPage.getPixel(t.x, t.y));
     end;
   end;

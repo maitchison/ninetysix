@@ -18,6 +18,7 @@ type
     x, y: int32;
     class operator add(a,b: tUVCoord): tUVCoord;
     function toPoint(): tPoint;
+    function toString(): string;
   end;
 
   tScanLine = record
@@ -86,6 +87,11 @@ function tUVCoord.toPoint(): tPoint;
 begin
   result.x := shiftRight(x, 16);
   result.y := shiftRight(y, 16);
+end;
+
+function tUVCoord.toString(): string;
+begin
+  result := format('(%d,%d)', [x, y]);
 end;
 
 function UVCoord(x, y: single): tUVCoord;
@@ -183,9 +189,9 @@ begin
   yMax := max4(p1.y, p2.y, p3.y, p4.y);
 
   bounds.y := yMin;
-  bounds.height := yMax-yMin;
+  bounds.height := yMax-yMin+1;
   bounds.x := xMin;
-  bounds.width := xMax-xMin;
+  bounds.width := xMax-xMin+1;
 
   {do not render offscreen sides}
   if bounds.height <= 0 then exit;
@@ -251,7 +257,7 @@ var
   deltaX: single;
   yMin, yMax: integer;
   height: integer;
-  uv1,uv2, tmpUV: tUVCoord;
+  tmpUV: tUVCoord;
   deltaT: tUVCoord;
 begin
 
@@ -262,35 +268,35 @@ begin
     if a.x < b.x then begin
       scanLine[y].xMin := a.x;
       scanLine[y].xMax := b.x;
-      scanLine[y].t1 := uv1;
-      scanLine[y].t2 := uv2;
+      scanLine[y].t1 := t1;
+      scanLine[y].t2 := t2;
     end else begin
       scanLine[y].xMin := b.x;
       scanLine[y].xMax := a.x;
-      scanLine[y].t1 := uv2;
-      scanLine[y].t2 := uv1;
+      scanLine[y].t1 := t2;
+      scanLine[y].t2 := t1;
     end;
     exit;
   end;
 
   if a.y > b.y then begin
     tmp := a; a := b; b := tmp;
-    tmpUV := uv1; uv1 := uv2; uv2 := tmpUV;
+    tmpUV := t1; t1 := t2; t2 := tmpUV;
   end;
 
   {todo: switch to scaled integer for x (for relabiltiy more than speed)}
   x := a.x;
   height := (b.y-a.y);
   deltaX := (b.x-a.x) / height;
-  deltaT.x := (uv2.x - uv1.x) div height;
-  deltaT.y := (uv2.y - uv1.y) div height;
+  deltaT.x := (t2.x - t1.x) div height;
+  deltaT.y := (t2.y - t1.y) div height;
   yMin := a.y;
   if yMin < 0 then begin
     x += deltaX * -yMin;
     yMin := 0;
   end;
   yMax := min(b.y, page.height-1);
-  t := uv1;
+  t := t1;
   for y := yMin to yMax do begin
     scanLine[y].adjust(round(x), t);
     x += deltaX;
@@ -318,12 +324,8 @@ begin
     UVCoord(1,2), UVCoord(3,4), UVCoord(5,6), UVCoord(7,8)
   );
 
-  assertEqual(polyDraw.bounds.top, 0);
-  assertEqual(polyDraw.bounds.bottom, 2);
-  assertEqual(polyDraw.bounds.left, 0);
-  assertEqual(polyDraw.bounds.right, 2);
-  assertEqual(polyDraw.bounds.width, 2);
-  assertEqual(polyDraw.bounds.height, 2);
+  assertEqual(polyDraw.bounds.topLeft, Point(0, 0));
+  assertEqual(polyDraw.bounds.bottomRight, Point(2, 2));
 
   sl := polyDraw.scanLine[0];
   assertEqual(sl.xMin, 0);
@@ -334,7 +336,7 @@ begin
   assertEqual(sl.xMin, 0);
   assertEqual(sl.xMax, 1);
   assertEqual(sl.t1.toPoint, Point(7,8));
-  assertEqual(sl.t1.toPoint, Point(5,6));
+  assertEqual(sl.t2.toPoint, Point(5,6));
 
   page.free;
 end;

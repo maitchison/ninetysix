@@ -1265,7 +1265,6 @@ var
 begin
   freeMemMB := (getFreeSystemMemory-(512*1024)) div (1024*1024);
   freeMemMB := clamp(freeMemMB, 1, 64);
-  //stub:
   {$ifdef debug}
   logFullHeapStatus();
   {$endif}

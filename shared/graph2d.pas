@@ -4,8 +4,7 @@ unit graph2d;
 interface
 
 {
-Rect co-ords are inclusive-exclusive...
-
+Rect co-ords are inclusive-exclusive
 
 e.g.
 
@@ -368,6 +367,8 @@ begin
   assertEqual(r.top, 10);
   assertEqual(r.right, 18);
   assertEqual(r.bottom, 42);
+  assertEqual(r.width, 16);
+  assertEqual(r.height, 32);
 
   {check expand to include}
   r := Rect(12, 14, 0, 0);
@@ -378,6 +379,14 @@ begin
   assertEqual(r.top, 2);
   assertEqual(r.right, 22);
   assertEqual(r.bottom, 19);
+
+  {check corner moving}
+  r := Rect(4,4,8,10);
+  r.topLeft := Point(2,2);
+  assertEqual(r.topLeft, Point(2,2));
+  assertEqual(r.width, 10);
+  assertEqual(r.height, 12);
+  assertEqual(r.bottomRight, Point(12, 14));
 
 end;
 
