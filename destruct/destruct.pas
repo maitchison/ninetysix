@@ -170,8 +170,8 @@ begin
   terrain.generate();
 
   {setup players}
-  tank1 := tTank.create();
-  tank2 := tTank.create();
+  tank1 := tTank.FromChassis(CHASSIS_DEF[CD_TANK]);
+  tank2 := tTank.FromChassis(CHASSIS_DEF[CD_LAUNCHER]);
   tank1.id := 1;
   tank2.id := 2;
   control1 := tAIController.create(tank1);

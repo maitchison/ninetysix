@@ -111,6 +111,7 @@ end;
 
 constructor tGameObject.create();
 begin
+  inherited create();
   reset();
 end;
 

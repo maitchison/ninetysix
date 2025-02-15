@@ -7,11 +7,24 @@ uses
   uBullet, obj;
 
 type
+
+  tTank = class;
+
+  tChassisType = (CT_TANK, CT_LAUNCHER);
+
+  tChassis = record
+    tag: string;
+    cType: tChassisType;
+    health: integer;
+    spriteIdx: integer;
+  end;
+
   tTank = class(tGameObject)
   protected
     spriteSheet: tSpriteSheet;
     spriteIdx: word;
   public
+    chassis: tChassis;
     id: integer;
     cooldown: single;
     angle: single;
@@ -19,7 +32,7 @@ type
     health: integer;
     lastBullet: tBullet;
   public
-    constructor create(); override;
+    class function FromChassis(aChassis: tChassis): tTank; static;
     procedure reset(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
@@ -29,25 +42,45 @@ type
     procedure fire();
   end;
 
+const
+
+  CD_TANK = 0;
+  CD_LAUNCHER = 1;
+  CD_HEAVY = 2;
+
+  CHASSIS_DEF: array[0..2] of tChassis = (
+    (tag: 'Tank'; cType: CT_TANK; health: 750; spriteIdx: 0),
+    (tag: 'Launcher'; cType: CT_LAUNCHER; health: 500; spriteIdx: 5),
+    (tag: 'Heavy Tank'; cType: CT_TANK; health: 100; spriteIdx: 10)
+  );
+
 implementation
 
 uses
   fx, terra, res, game;
 
-constructor tTank.create();
+{-----------------------------------------------------------}
+
+class function tTank.FromChassis(aChassis: tChassis): tTank;
 begin
-  inherited create();
-  col := RGB(255,255,255);
-  spriteSheet := res.sprites;
-  spriteIdx := 0;
-  sprite := spriteSheet.sprites[spriteIdx]; // will be set on update
+  result := tTank.create();
+  result.reset();
+  result.chassis := aChassis;
+  result.health := aChassis.health;
+  result.spriteIdx := aChassis.spriteIdx;
 end;
 
 procedure tTank.reset();
 begin
   inherited reset();
+  angle := 0;
   power := 10;
-  health := 750;
+  spriteIdx := 0;
+  health := 500;
+  fillchar(chassis, sizeof(chassis), 0);
+  col := RGB(255,255,255);
+  spriteSheet := res.sprites;
+  sprite := spriteSheet.sprites[spriteIdx]; // will be set on update
 end;
 
 procedure tTank.draw(screen: tScreen);
