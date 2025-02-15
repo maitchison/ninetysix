@@ -36,7 +36,7 @@ begin
   polyDraw.scanTextured(
     dstPage,
     p1, p2, p3, p4,
-    src.topLeft, src.topRight, src.bottomRight, src.bottomLeft
+    UVCoord(src.topLeft), UVCoord(src.topRight), UVCoord(src.bottomRight), UVCoord(src.bottomLeft)
   );
   if polyDraw.bounds.area = 0 then exit;
   for y := polyDraw.bounds.top to polyDraw.bounds.bottom-1 do begin

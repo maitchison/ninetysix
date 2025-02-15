@@ -19,7 +19,7 @@ type
 
   tBorder = record
     top, left, bottom, right: Integer;
-    constructor create(aLeft, aTop, aRight, aBottom: Integer);
+    constructor init(aLeft, aTop, aRight, aBottom: Integer);
     procedure setDefault();
     function  isDefault: boolean;
     function toString(): string;
@@ -82,7 +82,7 @@ uses
 
 {---------------------------------------------------------------------}
 
-constructor tBorder.create(aLeft, aTop, aRight, aBottom: Integer);
+constructor tBorder.init(aLeft, aTop, aRight, aBottom: Integer);
 begin
   self.left := aLeft;
   self.top := aTop;
@@ -128,8 +128,8 @@ begin
   inherited create();
   self.tag := 'sprite';
   self.page := aPage;
-  self.rect.Create(0, 0, aPage.width, aPage.height);
-  self.border.Create(0, 0, 0, 0);
+  self.rect := graph2d.Rect(aPage.width, aPage.height);
+  self.border.init(0, 0, 0, 0);
 end;
 
 function TSprite.Width: int32;
@@ -201,7 +201,7 @@ begin
 
   oldRect := self.rect;
 
-  drawRect := tRect.Create(atX, atY, DrawWidth, DrawHeight);
+  drawRect := graph2d.Rect(atX, atY, DrawWidth, DrawHeight);
 
   {top part}
   rect := tRect.Inset(oldRect, 0, 0, Border.Left, Border.Top);
@@ -355,7 +355,7 @@ begin
   sprite1 := tSprite.create(page);
   sprite1.tag := 'Fish';
   sprite1.rect := Rect(8,12,30,34);
-  sprite1.border := tBorder.create(2,3,4,1);
+  sprite1.border.init(2,3,4,1);
 
   iniWriter := tIniWriter.create('test.ini');
   iniWriter.writeObject('Sprite', sprite1);

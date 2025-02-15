@@ -53,7 +53,7 @@ var
 begin
   {todo: implement proper clipping}
   if (src.height <= 0) or (src.width <= 0) then
-    fatal('Tried drawing sprite with invalid bounds: '+ShortString(src));
+    fatal('Tried drawing sprite with invalid bounds: '+src.toString);
 
   {for debugging...}
   //Info(ShortString(src)+' '+ShortString(dst));

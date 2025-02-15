@@ -12,12 +12,20 @@ uses
   screen;
 
 type
+
+  {16.16 scaled uv co-ord}
+  tUVCoord = record
+    x, y: int32;
+    class operator add(a,b: tUVCoord): tUVCoord;
+    function toPoint(): tPoint;
+  end;
+
   tScanLine = record
-    xMin, xMax: int32;
-    t1,t2: tScaledPoint;
+    xMin, xMax: int32; // inclusive
+    t1,t2: tUVCoord;
     procedure reset(width: integer);
     procedure adjust(x: int32); overload;
-    procedure adjust(x: int32; t: tScaledPoint); overload;
+    procedure adjust(x: int32; t: tUVCoord); overload;
   end;
 
 type
@@ -31,8 +39,8 @@ type
   public
     constructor create();
     procedure scanSide(page: tPage; a, b: tPoint);
-    procedure scanSideTextured(page: tPage; a, b, t1, t2: tPoint);
-    procedure scanTextured(page: tPage; p1, p2, p3, p4, t1, t2, t3, t4: tPoint);
+    procedure scanSideTextured(page: tPage; a, b: tPoint; t1, t2: tUVCoord);
+    procedure scanTextured(page: tPage; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
     procedure scanPoly(page: tPage; p1, p2, p3, p4: tPoint);
   end;
 
@@ -41,6 +49,9 @@ const
 
 var
   polyDraw: tScanLines;
+
+function UVCoord(x, y: single): tUVCoord; overload;
+function UVCoord(p: tPoint): tUVCoord; overload;
 
 implementation
 
@@ -64,6 +75,33 @@ end;
 
 {----------------------------------------------------}
 
+class operator tUVCoord.add(a,b: tUVCoord): tUVCoord;
+begin
+  result.x := a.x + b.x;
+  result.y := a.y + b.y;
+end;
+
+{convert to 16.16 scaled point}
+function tUVCoord.toPoint(): tPoint;
+begin
+  result.x := shiftRight(x, 16);
+  result.y := shiftRight(y, 16);
+end;
+
+function UVCoord(x, y: single): tUVCoord;
+begin
+  result.x := round(x * 65536);
+  result.y := round(y * 65536);
+end;
+
+function UVCoord(p: tPoint): tUVCoord;
+begin
+  result.x := p.x shl 16;
+  result.y := p.y shl 16;
+end;
+
+{----------------------------------------------------}
+
 procedure tScanLine.reset(width: integer); inline;
 begin
   xMax := 0;
@@ -77,7 +115,7 @@ begin
 end;
 
 {adjust with texture co-ord}
-procedure tScanLine.adjust(x: int32; t: tScaledPoint); inline;
+procedure tScanLine.adjust(x: int32; t: tUVCoord); inline;
 begin
   if x < xMin then begin
     xMin := x;
@@ -107,7 +145,14 @@ begin
   scanSide(page, p4, p1);
 end;
 
-procedure tScanLines.scanTextured(page: tPage; p1, p2, p3, p4, t1, t2, t3, t4: tPoint);
+{
+sets up scanLines for a textured poly as follows.
+
+ - destination points (p1..p4) are inclusive.
+ - texture coordinates mark the texture points at corners
+ - most drawing functions truncate, so it is recommended to use the middle of the texel
+}
+procedure tScanLines.scanTextured(page: tPage; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
 begin
   prepPoly(page, p1, p2, p3, p4);
   if bounds.area = 0 then exit;
@@ -197,21 +242,18 @@ begin
 end;
 
 {scans side of poly with given texture coordinates}
-procedure tScanLines.scanSideTextured(page: tPage; a, b, t1, t2: tPoint);
+procedure tScanLines.scanSideTextured(page: tPage; a, b: tPoint; t1, t2: tUVCoord);
 var
   tmp: tPoint;
   y: int32;
   x: single;
-  t: tScaledPoint;
+  t: tUVCoord;
   deltaX: single;
   yMin, yMax: integer;
   height: integer;
-  uv1,uv2, tmpUV: tScaledPoint;
-  deltaT: tScaledPoint;
+  uv1,uv2, tmpUV: tUVCoord;
+  deltaT: tUVCoord;
 begin
-  {scale texture co-ords to 16.16}
-  uv1 := t1.toScaled();
-  uv2 := t2.toScaled();
 
   if a.y = b.y then begin
     {special case}
@@ -264,8 +306,37 @@ type
   end;
 
 procedure tPolyTest.run();
+var
+  page: tPage;
+  sl: tScanLine;
 begin
-  {todo}
+  page := tPage.create(16,16);
+
+  polyDraw.scanTextured(
+    page,
+    Point(0,0), point(1,0), Point(1,1), Point(0,1),
+    UVCoord(1,2), UVCoord(3,4), UVCoord(5,6), UVCoord(7,8)
+  );
+
+  assertEqual(polyDraw.bounds.top, 0);
+  assertEqual(polyDraw.bounds.bottom, 2);
+  assertEqual(polyDraw.bounds.left, 0);
+  assertEqual(polyDraw.bounds.right, 2);
+  assertEqual(polyDraw.bounds.width, 2);
+  assertEqual(polyDraw.bounds.height, 2);
+
+  sl := polyDraw.scanLine[0];
+  assertEqual(sl.xMin, 0);
+  assertEqual(sl.xMax, 1);
+  assertEqual(sl.t1.toPoint, Point(1,2));
+  assertEqual(sl.t2.toPoint, Point(3,4));
+  sl := polyDraw.scanLine[1];
+  assertEqual(sl.xMin, 0);
+  assertEqual(sl.xMax, 1);
+  assertEqual(sl.t1.toPoint, Point(7,8));
+  assertEqual(sl.t1.toPoint, Point(5,6));
+
+  page.free;
 end;
 
 initialization

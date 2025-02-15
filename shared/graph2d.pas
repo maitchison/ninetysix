@@ -28,27 +28,16 @@ uses
 
 type
 
-  {16.16 scaled point}
-  tScaledPoint = record
-    x, y: int32;
-    class operator add(a,b: tScaledPoint): tScaledPoint;
-    constructor create(x, y: int32);
-  end;
-
   tPoint = record
     x, y: int32;
     class operator add(a,b: tPoint): tPoint;
-    function toScaled(): tScaledPoint;
-    class function FromScaled(a: tScaledPoint): tPoint; static;
-    constructor create(x, y: int32);
+    function toString(): string;
   end;
 
   tRect = record
     x,y: int32;
     width, height: int32;
 
-    constructor create(width, height: int32); overload;
-    constructor create(left, top, width, height: int32); overload;
     procedure init(left, top, width, height: int32);
     procedure pad(padding: int32);
     function  padded(padding: int32): tRect;
@@ -57,7 +46,6 @@ type
     function  isInside(x,y: int32): boolean;
     function  mid: tPoint;
     class function inset(other: tRect;x1, y1, x2, y2: int32): tRect; static;
-    class operator Explicit(a: TRect): ShortString;
 
   public
 
@@ -84,39 +72,50 @@ type
     property bottomLeft: tPoint read getBottomLeft;
     property bottomRight: tPoint read getBottomRight;
 
-    function toString: string;
+    function toString(): string;
 
   end;
 
-function Rect(left, top, width, height: int32): tRect; inline;
+function Rect(x, y, width, height: int32): tRect; inline; overload;
+function Rect(width, height: int32): tRect; inline; overload;
 function Point(x, y: int32): tPoint; inline;
+
+procedure assertEqual(a, b: tPoint;msg: string=''); overload;
 
 implementation
 
 uses debug, utils;
 
-function Rect(left, top, width, height: int32): tRect; inline;
+{--------------------------------------------------------}
+
+function Rect(x, y, width, height: int32): tRect; inline;
 begin
-  result := tRect.create(left, top, width, height);
+  result.x := x;
+  result.y := y;
+  result.width := width;
+  result.height := height;
+end;
+
+function Rect(width, height: int32): tRect; inline;
+begin
+  result.x := 0;
+  result.y := 0;
+  result.width := width;
+  result.height := height;
 end;
 
 function Point(x, y: int32): tPoint; inline;
 begin
-  result := tPoint.create(x, y);
+  result.x := x;
+  result.y := y;
 end;
 
 {--------------------------------------------------------}
 
-class operator tScaledPoint.add(a,b: tScaledPoint): tScaledPoint;
+procedure assertEqual(a, b: tPoint;msg: string=''); overload;
 begin
-  result.x := a.x + b.x;
-  result.y := a.y + b.y;
-end;
-
-constructor tScaledPoint.Create(x, y: int32);
-begin
-  self.x := x * 65536;
-  self.y := y * 65536;
+  if (a.x <> b.x) or (a.y <> b.y) then
+    assertError(Format('Points do not match, expecting %s but found %s %s', [a.toString, b.toString, msg]));
 end;
 
 {--------------------------------------------------------}
@@ -127,43 +126,12 @@ begin
   result.y := a.y + b.y;
 end;
 
-{convert to 16.16 scaled point}
-function tPoint.toScaled(): tScaledPoint;
+function tPoint.toString(): string;
 begin
-  result.x := x shl 16;
-  result.y := y shl 16;
-end;
-
-{convert to 16.16 scaled point}
-class function tPoint.FromScaled(a: tScaledPoint): tPoint; static;
-begin
-  result.x := shiftRight(a.x, 16);
-  result.y := shiftRight(a.y, 16);
-end;
-
-constructor tPoint.Create(x, y: int32);
-begin
-  self.x := x;
-  self.y := y;
+  result := format('(%d,%d)',[x, y]);
 end;
 
 {--------------------------------------------------------}
-
-constructor tRect.create(width, height: int32); overload;
-begin
-  self.x := 0;
-  self.y := 0;
-  self.width := width;
-  self.height := height;
-end;
-
-constructor tRect.create(left, top, width, height: int32); overload;
-begin
-  self.x := left;
-  self.y := top;
-  self.width := width;
-  self.height := height;
-end;
 
 procedure tRect.init(left, top, width, height: int32);
 begin
@@ -187,11 +155,6 @@ function tRect.padded(padding: int32): tRect;
 begin
   result := self;
   result.pad(padding);
-end;
-
-class operator tRect.Explicit(a: TRect): ShortString;
-begin
-  result := a.toString;
 end;
 
 {
@@ -328,26 +291,26 @@ var
   r: tRect;
 begin
 
-  r := tRect.create(10,10,50,50);
+  r := Rect(10,10,50,50);
   AssertEqual(r.toString, '(10,10 50x50)');
 
-  a := tRect.create(0,0,50,50);
-  b := tRect.create(10,25,10,50);
+  a := Rect(0,0,50,50);
+  b := Rect(10,25,10,50);
   a.clipTo(b);
   assertEqual(a.toString, '(10,25 10x25)');
 
   {make sure we have left/right top/bottom correct.}
-  r := tRect.create(2, 10, 16, 32);
+  r := Rect(2, 10, 16, 32);
   assertEqual(r.left, 2);
   assertEqual(r.top, 10);
   assertEqual(r.right, 18);
   assertEqual(r.bottom, 42);
 
   {check expand to include}
-  r := tRect.create(12, 14, 0, 0);
-  r.expandToInclude(tPoint.create(15, 3));
-  r.expandToInclude(tPoint.create(22, 19));
-  r.expandToInclude(tPoint.create(12, 2));
+  r := Rect(12, 14, 0, 0);
+  r.expandToInclude(Point(15, 3));
+  r.expandToInclude(Point(22, 19));
+  r.expandToInclude(Point(12, 2));
   assertEqual(r.left, 12);
   assertEqual(r.top, 2);
   assertEqual(r.right, 22);

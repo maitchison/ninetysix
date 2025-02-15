@@ -232,7 +232,7 @@ begin
   canvas := nil;
   SHOW_DIRTY_RECTS := false;
   scrollMode := SSM_OFFSET;
-  viewport := tRect.create(0,0);
+  viewport := Rect(0,0);
   resize(videoDriver.width, videoDriver.height);
 end;
 
@@ -260,8 +260,8 @@ begin
   clearBounds.init(256, 256, -256, -256);
   flipBounds.init(256, 256, -256, -256);
 
-  viewport := tRect.create(0, 0, videoDriver.physicalWidth, videoDriver.physicalHeight);
-  bounds := tRect.create(aWidth, aHeight);
+  viewport := Rect(videoDriver.physicalWidth, videoDriver.physicalHeight);
+  bounds := Rect(aWidth, aHeight);
 
   stats.reset();
 end;
@@ -409,12 +409,12 @@ begin
       flagGrid[x,y] := flags;
 
   if (flags and FG_FLIP = FG_FLIP) then begin
-    flipBounds.expandToInclude(tPoint.create(x1, y1));
-    flipBounds.expandToInclude(tPoint.create(x2, y2));
+    flipBounds.expandToInclude(Point(x1, y1));
+    flipBounds.expandToInclude(Point(x2, y2));
   end;
   if (flags and FG_CLEAR = FG_CLEAR) then begin
-    clearBounds.expandToInclude(tPoint.create(x1, y1));
-    clearBounds.expandToInclude(tPoint.create(x2, y2));
+    clearBounds.expandToInclude(Point(x1, y1));
+    clearBounds.expandToInclude(Point(x2, y2));
   end;
 
 end;
@@ -436,17 +436,17 @@ begin
         inc(stats.clearCells);
         inc(rle);
         flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
-        flipBounds.expandToInclude(tPoint.create(x, y));
+        flipBounds.expandToInclude(Point(x, y));
       end else begin
         if rle > 0 then begin
-          clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+          clearRegion(Rect(xStart*8, y*8, 8*rle, 8));
           stats.clearRegions += 1;
           rle := 0;
         end;
       end;
     end;
     if rle > 0 then begin
-      clearRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+      clearRegion(Rect(xStart*8, y*8, 8*rle, 8));
       stats.clearRegions += 1;
     end;
   end;
@@ -481,14 +481,14 @@ begin
             flagGrid[x,y] := (flagGrid[x,y] xor FG_FLIP)
           end else begin
             if rle > 0 then begin
-              copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+              copyRegion(Rect(xStart*8, y*8, 8*rle, 8));
               stats.copyRegions += 1;
               rle := 0;
             end;
           end;
         end;
         if rle > 0 then begin
-          copyRegion(tRect.create(xStart*8, y*8, 8*rle, 8));
+          copyRegion(Rect(xStart*8, y*8, 8*rle, 8));
           stats.copyRegions += 1;
         end;
       end;
@@ -540,13 +540,13 @@ end;
 {upload the entire page to video memory}
 procedure tScreen.pageFlip();
 begin
-  copyRegion(tRect.create(canvas.width, canvas.height));
+  copyRegion(Rect(canvas.width, canvas.height));
 end;
 
 {clears the entire page}
 procedure tScreen.pageClear();
 begin
-  clearRegion(tRect.create(canvas.width, canvas.height));
+  clearRegion(Rect(canvas.width, canvas.height));
 end;
 
 function tScreen.getViewPort(): tRect;
