@@ -126,6 +126,7 @@ function  encodeByteDelta(a,b: byte): byte; inline;
 
 function  sign(x: int32): int32; overload;
 function  sign(x: single): single; overload;
+function  lerp(a, b, factor: single): single;
 
 function  bytesForBits(x: int32): int32;
 function  toBytes(x: array of dword): tBytes; overload;
@@ -1023,6 +1024,12 @@ begin
   if x < 0 then exit(-1);
   if x > 0 then exit(1);
   exit(0);
+end;
+
+function lerp(a, b, factor: single): single;
+begin
+  factor := clamp(factor, 0, 1);
+  result := (a * (1-factor)) + (b * factor);
 end;
 
 {-------------------------------------------------------------------}

@@ -162,7 +162,6 @@ end;
 procedure tSprite.drawFlipped(dstPage: tPage; atX, atY: integer);
 begin
   {a bit inefficent, but ok for the moment}
-  //drawStretched(dstPage, graph2d.Rect(atX+self.rect.width, atY, -self.rect.width, self.rect.height));
   polyDraw_REF(dstPage, page, rect,
     Point(atX + rect.width, atY),
     Point(atX, atY),

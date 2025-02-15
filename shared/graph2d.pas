@@ -1,19 +1,45 @@
 {2D graphics library}
-
-{$MODE delphi}
-
 unit graph2d;
 
 interface
+
+{
+Rect co-ords are inclusive...
+
+
+e.g.
+
+0123456789
+1
+2
+3    #---#
+4    |   |
+5    #---#
+
+topLeft     = (5,3)
+bottomRight = (9,5)
+width  = 5
+height = 3
+
+}
 
 uses
   test;
 
 type
 
+  {16.16 scaled point}
+  tScaledPoint = record
+    x, y: int32;
+    class operator add(a,b: tScaledPoint): tScaledPoint;
+    constructor create(x, y: int32);
+  end;
+
   tPoint = record
     x, y: int32;
-    class operator add(a,b: TPoint): tPoint;
+    class operator add(a,b: tPoint): tPoint;
+    function toScaled(): tScaledPoint;
+    class function FromScaled(a: tScaledPoint): tPoint; static;
     constructor create(x, y: int32);
   end;
 
@@ -35,10 +61,14 @@ type
 
   public
 
-    function area: int32;
+    function getTopLeft: tPoint;
+    function getBottomRight: tPoint;
+    function getBottomLeft: tPoint;
+    function getTopRight: tPoint;
 
-    function topLeft: tPoint;
-    function bottomRight: tPoint;
+  public
+
+    function area: int32;
 
     function top: int32; inline;
     function left: int32; inline;
@@ -47,6 +77,12 @@ type
 
     procedure clear();
     procedure clipTo(const other: tRect);
+
+    {todo: setters}
+    property topLeft: tPoint read getTopLeft;
+    property topRight: tPoint read getTopRight;
+    property bottomLeft: tPoint read getBottomLeft;
+    property bottomRight: tPoint read getBottomRight;
 
     function toString: string;
 
@@ -71,10 +107,38 @@ end;
 
 {--------------------------------------------------------}
 
-class operator tPoint.add(a,b: TPoint): TPoint;
+class operator tScaledPoint.add(a,b: tScaledPoint): tScaledPoint;
 begin
   result.x := a.x + b.x;
   result.y := a.y + b.y;
+end;
+
+constructor tScaledPoint.Create(x, y: int32);
+begin
+  self.x := x * 65536;
+  self.y := y * 65536;
+end;
+
+{--------------------------------------------------------}
+
+class operator tPoint.add(a,b: tPoint): tPoint;
+begin
+  result.x := a.x + b.x;
+  result.y := a.y + b.y;
+end;
+
+{convert to 16.16 scaled point}
+function tPoint.toScaled(): tScaledPoint;
+begin
+  result.x := x shl 16;
+  result.y := y shl 16;
+end;
+
+{convert to 16.16 scaled point}
+class function tPoint.FromScaled(a: tScaledPoint): tPoint; static;
+begin
+  result.x := shiftRight(a.x, 16);
+  result.y := shiftRight(a.y, 16);
 end;
 
 constructor tPoint.Create(x, y: int32);
@@ -82,7 +146,6 @@ begin
   self.x := x;
   self.y := y;
 end;
-
 
 {--------------------------------------------------------}
 
@@ -163,16 +226,28 @@ begin
   result := width * height;
 end;
 
-function tRect.topLeft: TPoint;
+function tRect.getTopLeft: tPoint;
 begin
   result.x := left;
   result.y := top;
 end;
 
-function tRect.bottomRight: TPoint;
+function tRect.getBottomRight: tPoint;
 begin
   result.x := right;
   result.y := bottom;
+end;
+
+function tRect.getBottomLeft: tPoint;
+begin
+  result.x := left;
+  result.y := bottom;
+end;
+
+function tRect.getTopRight: tPoint;
+begin
+  result.x := right;
+  result.y := top;
 end;
 
 function tRect.top: int32; inline;

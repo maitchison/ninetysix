@@ -28,14 +28,26 @@ end;
 function polyDraw_REF(dstPage, srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint): tRect;
 var
   x, y: integer;
+  t: tPoint;
+  z: single;
+  sl: tScanLine;
+  width: integer;
 begin
-  polyDraw.scanPoly(dstPage, p1, p2, p3, p4);
+  polyDraw.scanTextured(
+    dstPage,
+    p1, p2, p3, p4,
+    src.topLeft, src.topRight, src.bottomRight, src.bottomLeft
+  );
   if polyDraw.bounds.area = 0 then exit;
   for y := polyDraw.bounds.top to polyDraw.bounds.bottom-1 do begin
-    for x := polyDraw.scanLine[y].xMin to polyDraw.scanline[y].xMax do begin
-      dstPage.putPixel(x, y, RGB(255,0,255));
+    sl := polyDraw.scanLine[y];
+    width := sl.xMax - sl.xMin;
+    for x := 0 to width-1 do begin
+      z := x / width;
+      t.x := round(lerp(sl.t1.x, sl.t2.x, z) / 65536);
+      t.y := round(lerp(sl.t1.y, sl.t2.y, z) / 65536);
+      dstPage.putPixel(x + sl.xMin, y, srcPage.getPixel(t.x, t.y));
     end;
   end;
-
 end;
 
