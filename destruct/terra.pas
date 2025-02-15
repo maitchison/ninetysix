@@ -82,7 +82,13 @@ begin
       y := atY+dy;
       if (dst2 > r2) then continue;
       if isEmpty(x, y) then continue;
-      v := round((1-(dst2/r2)) * power);
+      {linear fall off}
+      //v := round((1-(dst2/r2)) * power);
+      {spherical fall off}
+      if dst2 <= r2 then
+        v := round(sqrt(r2-dst2)/r * power / 2)
+      else
+        v := 0;
       tc := terrain.getPixel(x, y);
       dimFactor := round(50 * v / (tc.a+1));
       tc.a := clamp(tc.a - v, 0, 255);
