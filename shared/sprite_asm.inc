@@ -9,6 +9,8 @@ var
   topCrop,leftCrop: int32;
 begin
 
+  {todo: make this asm}
+
   y1 := max(atY, 0);
   y2 := min(atY+srcRect.height, dstPage.height-1);
   topCrop := y1-atY;

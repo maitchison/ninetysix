@@ -13,7 +13,8 @@ uses
   vga,
   iniFile,
   graph2d,
-  graph32;
+  graph32,
+  vertex;
 
 type
 
@@ -46,7 +47,8 @@ type
     procedure blit(dstPage: tPage; atX, atY: int32);
     procedure draw(dstPage: tPage; atX, atY: int32);
     procedure drawFlipped(dstPage: tPage; atX, atY: int32);
-    procedure drawStretched(DstPage: TPage; dest: TRect);
+    procedure drawStretched(DstPage: TPage; dest: tRect);
+    procedure drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
     {iIniSerializable}
@@ -187,6 +189,32 @@ end;
 procedure tSprite.drawStretched(dstPage: tPage; dest: tRect);
 begin
   stretchDraw_ASM(dstPage, Self.page, Self.rect, dest);
+end;
+
+{identity transform will the centered on sprite center...
+ todo: implement a default anchor}
+procedure tSprite.drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
+var
+  p1,p2,p3,p4: tPoint;
+
+  function xform(delta: tPoint): tPoint;
+  var
+    v: V3D;
+  begin
+    v := V3(delta.x, delta.y, 0) - V3(rect.width / 2, rect.height / 2, 0);
+    v := transform.apply(v) + pos;
+    // no perspective for the moment}
+    result.x := round(v.x);
+    result.y := round(v.y);
+  end;
+
+begin
+  polyDraw_REF(dstPage, page, rect,
+    xform(Point(0,0)),
+    xform(Point(rect.width-1, 0)),
+    xform(Point(rect.width, rect.height-1)),
+    xform(Point(0, rect.height-1))
+  );
 end;
 
 {Draw sprite using nine-slice method}

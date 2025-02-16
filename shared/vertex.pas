@@ -87,7 +87,6 @@ type
 
     function  apply(p: V3D): V3D;
 
-
     procedure translate(v: V3D);
     procedure scale(factor: single); overload;
     procedure scale(x,y,z: single); overload;
@@ -108,6 +107,7 @@ type
 
 function V2(x,y: single): V2D;
 function V2Polar(degree,r: single): V2D;
+function V3(x,y,z: single): V3D;
 
 implementation
 
@@ -122,6 +122,13 @@ end;
 function V2Polar(degree,r: single): V2D;
 begin
   result := V2D.create(sin(degree*DEG2RAD)*r,-cos(degree*DEG2RAD)*r);
+end;
+
+{------------}
+
+function V3(x,y,z: single): V3D;
+begin
+  result := V3D.create(x,y,z);
 end;
 
 {-----------------------------------------}

@@ -36,6 +36,9 @@ var
   b: tRect;
 begin
 
+  {stub:}
+  //note('%s %s %s %s', [p1.toString, p2.toString, p3.toString, p4.toString]);
+
   {src coords are inclusive-exclusive}
   t1 := UVCoord(src.topLeft) + UVCoord(0.5,0.5);
   t2 := UVCoord(src.topRight) + UVCoord(-0.5,0.5);
@@ -52,11 +55,13 @@ begin
     sl := polyDraw.scanLine[y];
     width := (sl.xMax - sl.xMin) + 1;
     for x := 0 to width-1 do begin
-      z := x / (width-1);
+      if width = 1 then
+        z := x
+      else
+        z := x / (width-1);
       t.x := trunc(lerp(sl.t1.x, sl.t2.x, z) / 65536);
       t.y := trunc(lerp(sl.t1.y, sl.t2.y, z) / 65536);
       dstPage.putPixel(x + sl.xMin, y, srcPage.getPixel(t.x, t.y));
     end;
   end;
 end;
-

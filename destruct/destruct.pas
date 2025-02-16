@@ -5,7 +5,7 @@ uses
   {game specific}
   uTank, uBullet, game, res, obj, terra, controller,
   {general}
-  graph2d, graph32, vga, vesa, screen,
+  graph2d, graph32, vga, vesa,
   sprite, inifile,
   vertex,
   myMath,
@@ -26,11 +26,11 @@ var
 begin
 
   {load background and refresh screen}
-  game.screen.background := tPage.create(320,240);
-  tSprite.create(titleGFX).blit(game.screen.background, 0, -16);
+  screen.background := tPage.create(320,240);
+  tSprite.create(titleGFX).blit(screen.background, 0, -16);
 
-  game.screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
-  game.screen.background.fillRect(Rect(0,240-24,320,24),RGB(0,0,0));
+  screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
+  screen.background.fillRect(Rect(0,240-24,320,24),RGB(0,0,0));
 
   {setup gui}
   gui := tGuiComponents.create();
@@ -45,7 +45,7 @@ begin
   verLabel.textColor := RGB(255,255,255);
   gui.append(verLabel);
 
-  game.screen.pageClear();
+  screen.pageClear();
 
   exitFlag := false;
 
@@ -54,7 +54,7 @@ begin
 
     musicUpdate();
     startTimer('main');
-    game.screen.clearAll();
+    screen.clearAll();
 
     elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
 
@@ -64,9 +64,9 @@ begin
       20
     );
     gui.update(elapsed);
-    gui.draw(game.screen);
+    gui.draw(screen);
 
-    game.screen.flipAll();
+    screen.flipAll();
 
     stopTimer('main');
 
@@ -153,13 +153,17 @@ var
   fps: tGuiLabel;
   xlp,ylp: integer;
   control1, control2: tController;
+  testSprite: tSprite;
+  m: tMatrix4x4;
 begin
 
-  game.screen.background := tPage.create(game.screen.width, game.screen.height);
-  renderSky(game.screen.background);
+  screen.background := tPage.create(screen.width, screen.height);
+  renderSky(screen.background);
 
-  game.screen.pageClear();
-  game.screen.pageFlip();
+  testSprite := tSprite.create(titleGFX);
+
+  screen.pageClear();
+  screen.pageFlip();
 
   exitFlag := false;
 
@@ -199,18 +203,27 @@ begin
     control1.apply(elapsed);
     control2.apply(elapsed);
 
-    game.screen.clearAll();
+    screen.clearAll();
 
     updateAll(elapsed);
-    drawAll(game.screen);
-    terrain.draw(game.screen);
+    drawAll(screen);
+    terrain.draw(screen);
 
     {gui}
     gui.update(elapsed);
-    gui.draw(game.screen);
+    gui.draw(screen);
 
-    game.screen.flipAll();
-    game.screen.pageFlip();
+    //screen.flipAll();
+
+    {stub:}
+    screen.pageClear();
+
+    m.setIdentity;
+    m.setRotationXYZ(0, 0, getSec);
+    m.scale(0.75);
+    testSprite.drawTransformed(screen.canvas, V3(160, 120, 0), m);
+
+    screen.pageFlip();
 
     stopTimer('main');
 
@@ -222,26 +235,6 @@ begin
 
   terrain.free();
 
-end;
-
-procedure screenInit();
-begin
-  {set video}
-  enableVideoDriver(tVesaDriver.create());
-  if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
-    fatal('Requires VESA 2.0 or greater.');
-  if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
-    fatal('Requires 1MB video card.');
-
-  videoDriver.setTrueColor(320, 240);
-  game.screen := tScreen.create();
-  game.screen.scrollMode := SSM_COPY;
-end;
-
-procedure screenDone();
-begin
-  videoDriver.setText();
-  textAttr := LIGHTGRAY;
 end;
 
 var

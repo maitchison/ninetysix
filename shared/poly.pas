@@ -183,10 +183,10 @@ begin
     if cross <= 0 then exit;
   end;
 
-  xMin := min4(p1.x, p2.x, p3.x, p4.x);
-  yMin := min4(p1.y, p2.y, p3.y, p4.y);
-  xMax := max4(p1.x, p2.x, p3.x, p4.x);
-  yMax := max4(p1.y, p2.y, p3.y, p4.y);
+  xMin := max(min4(p1.x, p2.x, p3.x, p4.x), 0);
+  yMin := max(min4(p1.y, p2.y, p3.y, p4.y), 0);
+  xMax := min(max4(p1.x, p2.x, p3.x, p4.x), page.width-1);
+  yMax := min(max4(p1.y, p2.y, p3.y, p4.y), page.height-1);
 
   bounds.y := yMin;
   bounds.height := yMax-yMin+1;

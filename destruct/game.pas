@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  crt,
   uBullet, uTank, obj;
 
 type
@@ -24,10 +25,11 @@ function  getTank(id: integer;team: integer): tTank;
 function  getObjectAtPos(x,y: integer): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
 
-var
-  screen: tScreen;
+procedure screenDone();
+procedure screenInit();
 
 var
+  screen: tScreen;
   tanks: tGameObjectList;
 
 implementation
@@ -184,6 +186,26 @@ begin
   tanks.draw(screen);
   bullets.draw(screen);
   particles.draw(screen);
+end;
+
+procedure screenInit();
+begin
+  {set video}
+  enableVideoDriver(tVesaDriver.create());
+  if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
+    fatal('Requires VESA 2.0 or greater.');
+  if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
+    fatal('Requires 1MB video card.');
+
+  videoDriver.setTrueColor(320, 240);
+  screen := tScreen.create();
+  screen.scrollMode := SSM_COPY;
+end;
+
+procedure screenDone();
+begin
+  videoDriver.setText();
+  textAttr := LIGHTGRAY;
 end;
 
 {----------------------------------------------------------}
