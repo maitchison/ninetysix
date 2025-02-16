@@ -157,16 +157,10 @@ begin
       add dl, ah
 
       mov eax, edx
-
       pop edx
-
-
     @Blit:
-
       mov dword ptr [edi], eax
-
     @Skip:
-
       add edi, 4
       add edx, deltaX
 
@@ -175,5 +169,170 @@ begin
 
       popad
     end;
+  end;
+end;
+
+
+{draw an image stretched to fill poly}
+function polyDraw_ASM(dstPage, srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint): tRect;
+var
+  x, y: integer;
+  t: tPoint;
+  f: single;
+  sl: tScanLine;
+  t1,t2,t3,t4: tUVCoord;
+  tInitial, tDelta: tUVCoord;
+  x1,x2: integer;
+  b: tRect;
+  f: float;
+  {for asm}
+  cnt: integer;
+  screenPtr, texturePtr: pointer;
+  texPos, texDelta: int32; // as 8.8 | 8.8
+  texX, texY, texDeltaX, texDeltaY: int32; // as 16.16
+begin
+
+  assertEqual(srcPage.width, 256);
+
+  {stub:}
+  //note('%s %s %s %s', [p1.toString, p2.toString, p3.toString, p4.toString]);
+
+  {src coords are inclusive-exclusive}
+  t1 := UVCoord(src.topLeft) + UVCoord(0.5,0.5);
+  t2 := UVCoord(src.topRight) + UVCoord(-0.5,0.5);
+  t3 := UVCoord(src.bottomRight) + UVCoord(-0.5,-0.5);
+  t4 := UVCoord(src.bottomLeft) + UVCoord(0.5,-0.5);
+  polyDraw.scanTextured(
+    dstPage,
+    p1, p2, p3, p4,
+    t1, t2, t3, t4
+  );
+  b := polyDraw.bounds;
+  if b.area = 0 then exit;
+  for y := b.top to b.bottom-1 do begin
+    sl := polyDraw.scanLine[y];
+    x1 := clamp(sl.xMin, 0, dstPage.width-1);
+    x2 := clamp(sl.xMax, 0, dstPage.width-1);
+    if (sl.xMax-sl.xMin) = 0 then continue;
+
+    {get initial texture pos (as 16.16}
+    f := (x-sl.xMin)/(sl.xMax-sl.xMin);
+    texX := trunc(lerp(tl.t1.x, tl.t2.x, f));
+    texY := trunc(lerp(tl.t1.y, tl.t2.y, f));
+    texPos := (texX div 256) + (texY div 256) shl 8;
+    {get delta}
+    f := ((x+1)-sl.xMin)/(sl.xMax-sl.xMin);
+    texDeltaX := trunc(lerp(tl.t1.x, tl.t2.x, f)) - texX;
+    texDeltaY := trunc(lerp(tl.t1.y, tl.t2.y, f)) - texY;
+    texDelta := (texX div 256) + (texY div 256) shl 8;
+
+    screenPtr := dstPage.pixels + (x1 + (y * dstPath.width)) * 4;
+    texturePtr := scr.pixels;
+    cnt := sl.xMax-sl.xMin;
+    asm
+      pushad
+
+      {todo: MMX version, four pixels at a time :) }
+
+      {
+        EAX   temp
+        EBX   texPos      Y.Y | X.X
+        EDX   texDelta
+
+        ECX   counter
+
+        EDI   screen
+        ESI   texture
+
+
+      }
+
+      mov edi, screenPtr
+      mov esi, texturePtr
+
+      mov ebx, texPos
+      mov edx, texY
+      mov ecx, cnt
+
+    @LOOP:
+
+      {get our texture location (EAX)}
+      mov al,  bh
+      ror ebx, 16
+      mov ah,  bh
+      ror ebx, 16
+
+      {lookup texel}
+      mov eax, [esi+eax*4]
+
+
+      mov esi, edx
+      shr esi, 16
+      shl esi, 2
+      add esi, imageOfs
+
+      mov eax, ds:[esi]
+      mov bl, ds:[esi+3]
+
+      cmp bl, 0
+      je @Skip
+      cmp bl, 255
+      je @Blit
+
+    @Blend:
+
+      push edx
+
+      xor edx, edx
+      mov bh, 255
+      sub bh, bl
+
+      {note: switch to MMX later}
+      mov al, byte ptr ds:[esi+2]
+      mul bl
+      mov dl, ah
+      mov al, byte ptr [edi+2]
+      mul bh
+      add dl, ah
+      shl edx, 8
+
+      mov al, byte ptr ds:[esi+1]
+      mul bl
+      mov dl, ah
+      mov al, byte ptr [edi+1]
+      mul bh
+      add dl, ah
+      shl edx, 8
+
+      mov al, byte ptr ds:[esi+0]
+      mul bl
+      mov dl, ah
+      mov al, byte ptr [edi+0]
+      mul bh
+      add dl, ah
+
+      mov eax, edx
+      pop edx
+    @Blit:
+      mov dword ptr [edi], eax
+    @Skip:
+      add edi, 4
+      add edx, deltaX
+
+      dec ecx
+      jnz @LOOP
+
+      popad
+    end;
+  end;
+
+    {
+    for x := x1 to x2 do begin
+      f := (x-sl.xMin)/(sl.xMax-sl.xMin);
+      t.x := trunc(lerp(sl.t1.x, sl.t2.x, f) / 65536);
+      t.y := trunc(lerp(sl.t1.y, sl.t2.y, f) / 65536);
+      dstPage.putPixel(x, y, srcPage.getPixel(t.x, t.y));
+    end;
+    }
   end;
 end;

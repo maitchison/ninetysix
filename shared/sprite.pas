@@ -148,16 +148,7 @@ end;
 {Draw sprite to screen at given location, with alpha etc}
 procedure tSprite.draw(dstPage: tPage; atX, atY: integer);
 begin
-  {stub:}
-  if keyDown(key_z) then
-    draw_REF(dstPage, self.page, self.rect, atX, atY)
-  else
-    polyDraw_REF(dstPage, page, rect,
-    Point(atX, atY),
-    Point(atX + rect.width - 1, atY),
-    Point(atX + rect.width - 1, atY + rect.height - 1),
-    Point(atX, atY + rect.height - 1)
-  );
+  draw_REF(dstPage, self.page, self.rect, atX, atY)
 end;
 
 {Draws sprite flipped on x-axis}
@@ -209,7 +200,7 @@ var
   end;
 
 begin
-  polyDraw_REF(dstPage, page, rect,
+  polyDraw_ASM(dstPage, page, rect,
     xform(Point(0,0)),
     xform(Point(rect.width-1, 0)),
     xform(Point(rect.width, rect.height-1)),

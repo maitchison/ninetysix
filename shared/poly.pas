@@ -24,20 +24,24 @@ type
 
   tScanLine = record
     xMin, xMax: int32; // inclusive
-    t1,t2: tUVCoord;
     procedure reset();
-    procedure adjust(x: int32); overload;
-    procedure adjust(x: int32; t: tUVCoord); overload;
+  end;
+
+  tTextureLine = record
+    t1,t2: tUVCoord;
   end;
 
 type
   tScanLines = class
   public
     scanLine: array[0..1024-1] of tScanLine;
+    textLine: array[0..1024-1] of tTextureLine;
     backfaceCull: boolean;
     bounds: tRect;
   protected
     procedure prepPoly(page: tPage; p1, p2, p3, p4: tPoint);
+    procedure adjustLine(y, x: int32); overload;
+    procedure adjustLine(y, x: int32; t: tUVCoord); overload;
   public
     constructor create();
     procedure scanSide(page: tPage; a, b: tPoint);
@@ -121,30 +125,30 @@ begin
   xMin := 9999;
 end;
 
-procedure tScanLine.adjust(x: int32); inline;
-begin
-  xMin := min(x, xMin);
-  xMax := max(x, xMax);
-end;
-
-{adjust with texture co-ord}
-procedure tScanLine.adjust(x: int32; t: tUVCoord); inline;
-begin
-  if x < xMin then begin
-    xMin := x;
-    t1 := t;
-  end;
-  if x > xMax then begin
-    xMax := x;
-    t2 := t;
-  end;
-end;
-
 {----------------------------------------------------}
 
 constructor tScanLines.create();
 begin
   backfaceCull := false;
+end;
+
+procedure tScanLines.adjustLine(y, x: int32); inline;
+begin
+  scanLine[y].xMin := min(x, scanLine[y].xMin);
+  scanLine[y].xMax := max(x, scanLine[y].xMax);
+end;
+
+{adjust with texture co-ord}
+procedure tScanLines.adjustLine(y, x: int32; t: tUVCoord); inline;
+begin
+  if x < scanLine[y].xMin then begin
+    scanLine[y].xMin := x;
+    textLine[y].t1 := t;
+  end;
+  if x > scanLine[y].xMax then begin
+    scanLine[y].xMax := x;
+    textLine[y].t2 := t;
+  end;
 end;
 
 {scans sides of poly, returns bounding rect}
@@ -230,8 +234,8 @@ begin
     {special case}
     y := a.y;
     if (y >= 0) and (y < page.height) then begin
-      scanLine[y].adjust(a.x);
-      scanLine[y].adjust(b.x);
+      adjustLine(y, a.x);
+      adjustLine(y, b.x);
     end;
     exit;
   end;
@@ -249,7 +253,7 @@ begin
   end;
   yMax := min(b.y, page.height-1);
   for y := yMin to yMax do begin
-    scanLine[y].adjust(round(x));
+    adjustLine(y, round(x));
     x += deltaX;
   end;
 end;
@@ -275,13 +279,13 @@ begin
     if a.x < b.x then begin
       scanLine[y].xMin := a.x;
       scanLine[y].xMax := b.x;
-      scanLine[y].t1 := t1;
-      scanLine[y].t2 := t2;
+      textLine[y].t1 := t1;
+      textLine[y].t2 := t2;
     end else begin
       scanLine[y].xMin := b.x;
       scanLine[y].xMax := a.x;
-      scanLine[y].t1 := t2;
-      scanLine[y].t2 := t1;
+      textLine[y].t1 := t2;
+      textLine[y].t2 := t1;
     end;
     exit;
   end;
@@ -306,7 +310,7 @@ begin
   end;
   yMax := min(b.y, page.height-1);
   for y := yMin to yMax do begin
-    scanLine[y].adjust(round(x), t);
+    adjustLine(y, round(x), t);
     x += deltaX;
     t += deltaT;
   end;
@@ -323,6 +327,7 @@ procedure tPolyTest.run();
 var
   page: tPage;
   sl: tScanLine;
+  tl: tTextureLine;
 begin
   page := tPage.create(16,16);
 
@@ -336,15 +341,17 @@ begin
   assertEqual(polyDraw.bounds.bottomRight, Point(2, 2));
 
   sl := polyDraw.scanLine[0];
+  tl := polyDraw.textLine[0];
   assertEqual(sl.xMin, 0);
   assertEqual(sl.xMax, 1);
-  assertEqual(sl.t1.toPoint, Point(1,2));
-  assertEqual(sl.t2.toPoint, Point(3,4));
+  assertEqual(tl.t1.toPoint, Point(1,2));
+  assertEqual(tl.t2.toPoint, Point(3,4));
   sl := polyDraw.scanLine[1];
+  tl := polyDraw.textLine[1];
   assertEqual(sl.xMin, 0);
   assertEqual(sl.xMax, 1);
-  assertEqual(sl.t1.toPoint, Point(7,8));
-  assertEqual(sl.t2.toPoint, Point(5,6));
+  assertEqual(tl.t1.toPoint, Point(7,8));
+  assertEqual(tl.t2.toPoint, Point(5,6));
 
   page.free;
 end;

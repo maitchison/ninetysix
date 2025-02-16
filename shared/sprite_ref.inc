@@ -31,9 +31,9 @@ var
   t: tPoint;
   f: single;
   sl: tScanLine;
+  tl: tTextureLine;
   width: integer;
   t1,t2,t3,t4: tUVCoord;
-  tDelta: tUVCoord;
   x1,x2: integer;
   b: tRect;
 begin
@@ -55,13 +55,14 @@ begin
   if b.area = 0 then exit;
   for y := b.top to b.bottom-1 do begin
     sl := polyDraw.scanLine[y];
+    tl := polyDraw.textLine[y];
     x1 := clamp(sl.xMin, 0, dstPage.width-1);
     x2 := clamp(sl.xMax, 0, dstPage.width-1);
     if (sl.xMax-sl.xMin) = 0 then continue;
     for x := x1 to x2 do begin
       f := (x-sl.xMin)/(sl.xMax-sl.xMin);
-      t.x := trunc(lerp(sl.t1.x, sl.t2.x, f) / 65536);
-      t.y := trunc(lerp(sl.t1.y, sl.t2.y, f) / 65536);
+      t.x := trunc(lerp(tl.t1.x, tl.t2.x, f) / 65536);
+      t.y := trunc(lerp(tl.t1.y, tl.t2.y, f) / 65536);
       dstPage.putPixel(x, y, srcPage.getPixel(t.x, t.y));
     end;
   end;
