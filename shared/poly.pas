@@ -17,6 +17,7 @@ type
   tUVCoord = record
     x, y: int32;
     class operator add(a,b: tUVCoord): tUVCoord;
+    class operator multiply(a: tUVCoord;b: integer): tUVCoord;
     function toPoint(): tPoint;
     function toString(): string;
   end;
@@ -24,7 +25,7 @@ type
   tScanLine = record
     xMin, xMax: int32; // inclusive
     t1,t2: tUVCoord;
-    procedure reset(width: integer);
+    procedure reset();
     procedure adjust(x: int32); overload;
     procedure adjust(x: int32; t: tUVCoord); overload;
   end;
@@ -82,6 +83,12 @@ begin
   result.y := a.y + b.y;
 end;
 
+class operator tUVCoord.multiply(a: tUVCoord;b: integer): tUVCoord;
+begin
+  result.x := a.x * b;
+  result.y := a.y * b;
+end;
+
 {convert to 16.16 scaled point}
 function tUVCoord.toPoint(): tPoint;
 begin
@@ -108,10 +115,10 @@ end;
 
 {----------------------------------------------------}
 
-procedure tScanLine.reset(width: integer); inline;
+procedure tScanLine.reset(); inline;
 begin
-  xMax := 0;
-  xMin := width-1;
+  xMax := -9999;
+  xMin := 9999;
 end;
 
 procedure tScanLine.adjust(x: int32); inline;
@@ -207,7 +214,7 @@ begin
   end;
 
   for y := yMin to yMax do
-    scanLine[y].reset(page.width);
+    scanLine[y].reset();
 
 end;
 
@@ -291,12 +298,13 @@ begin
   deltaT.x := (t2.x - t1.x) div height;
   deltaT.y := (t2.y - t1.y) div height;
   yMin := a.y;
+  t := t1;
   if yMin < 0 then begin
     x += deltaX * -yMin;
+    t += deltaT * -yMin;
     yMin := 0;
   end;
   yMax := min(b.y, page.height-1);
-  t := t1;
   for y := yMin to yMax do begin
     scanLine[y].adjust(round(x), t);
     x += deltaX;

@@ -220,8 +220,11 @@ begin
 
     m.setIdentity;
     m.setRotationXYZ(0, 0, getSec);
-    m.scale(0.75);
+    m.scale(2.0);
+    startTimer('drawTransformed');
     testSprite.drawTransformed(screen.canvas, V3(160, 120, 0), m);
+    stopTimer('drawTransformed');
+    note('%f', [getTimer('drawTransformed').avElapsed*1000]);
 
     screen.pageFlip();
 

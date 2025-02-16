@@ -29,10 +29,12 @@ function polyDraw_REF(dstPage, srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint):
 var
   x, y: integer;
   t: tPoint;
-  z: single;
+  f: single;
   sl: tScanLine;
   width: integer;
   t1,t2,t3,t4: tUVCoord;
+  tDelta: tUVCoord;
+  x1,x2: integer;
   b: tRect;
 begin
 
@@ -53,15 +55,14 @@ begin
   if b.area = 0 then exit;
   for y := b.top to b.bottom-1 do begin
     sl := polyDraw.scanLine[y];
-    width := (sl.xMax - sl.xMin) + 1;
-    for x := 0 to width-1 do begin
-      if width = 1 then
-        z := x
-      else
-        z := x / (width-1);
-      t.x := trunc(lerp(sl.t1.x, sl.t2.x, z) / 65536);
-      t.y := trunc(lerp(sl.t1.y, sl.t2.y, z) / 65536);
-      dstPage.putPixel(x + sl.xMin, y, srcPage.getPixel(t.x, t.y));
+    x1 := clamp(sl.xMin, 0, dstPage.width-1);
+    x2 := clamp(sl.xMax, 0, dstPage.width-1);
+    if (sl.xMax-sl.xMin) = 0 then continue;
+    for x := x1 to x2 do begin
+      f := (x-sl.xMin)/(sl.xMax-sl.xMin);
+      t.x := trunc(lerp(sl.t1.x, sl.t2.x, f) / 65536);
+      t.y := trunc(lerp(sl.t1.y, sl.t2.y, f) / 65536);
+      dstPage.putPixel(x, y, srcPage.getPixel(t.x, t.y));
     end;
   end;
 end;
