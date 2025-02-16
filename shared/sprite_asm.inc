@@ -181,9 +181,9 @@ asm
 
   {
     EAX   temp
-    EBX   texX      0|0|X.X
+    EBX   texX      X.X
     ECX   counter
-    EDX   texY      0|0|Y.Y
+    EDX   texY      Y.Y
 
     EDI   screen
     ESI   texture
@@ -227,6 +227,73 @@ asm
   popad
 end;
 
+{
+optimized version of polyLine when dims are 256x256
+notes:
+ - uses 8.8 instead of 16.16
+ - always uses wrap method for out of bounds.
+ - blit only (no alpha check)
+}
+procedure polyLine256_ASM(screenPtr, texturePtr: pointer; texX, texY, texDeltaX, texDeltaY: int32;textureWidth, textureSize, cnt: dword);
+begin
+  assertEqual(textureWidth, 256);
+  assertEqual(textureSize, 65536);
+asm
+  pushad
+
+  {
+    EAX   temp
+    EBX   texX      0|0|X.X
+    ECX   counter
+    EDX   texY      0|0|Y.Y
+
+    EDI   screen
+    ESI   texture
+  }
+
+  mov edi, SCREENPTR
+  mov esi, TEXTUREPTR
+
+  xor eax, eax
+  mov ebx, TEXX
+  sar ebx, 8
+  mov ecx, CNT
+  mov edx, TEXY
+  sar edx, 8
+
+  // convert from 16.16 to 8.8
+  mov eax, texDeltaX
+  sar eax, 8
+  mov texDeltaX, eax
+  mov eax, texDeltaY
+  sar eax, 8
+  mov texDeltaY, eax
+  xor eax, eax
+
+
+@PIXELLOOP:
+  {get our texel}
+  movzx eax, bh
+  mov ah, dh
+  mov eax, [esi+eax*4]
+@ALPHATEST:
+  rol eax,8
+  test al, al
+  jz @Skip
+  ror eax,8
+@Blit:
+  mov dword ptr [edi], eax
+@Skip:
+  add edi, 4
+  add ebx, TEXDELTAX
+  add edx, TEXDELTAY
+
+  dec ecx
+  jnz @PIXELLOOP
+
+  popad
+end;
+end;
 
 {draw an image stretched to fill poly}
 procedure polyDraw_ASM(dstPage, srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint);
@@ -245,11 +312,8 @@ var
   texX, texY, texDeltaX, texDeltaY: int32; // as 16.16
   textureWidth: dword;
   textureSize: dword;
-  cnt: dword;
+  cnt: int32;
 begin
-
-  {todo: optimized version for width=256}
-  //assertEqual(srcPage.width, 256);
 
   {src coords are inclusive-exclusive}
   t1 := UVCoord(src.topLeft) + UVCoord(0.5,0.5);
@@ -268,7 +332,7 @@ begin
     tl := polyDraw.textLine[y];
     x1 := clamp(sl.xMin, 0, dstPage.width-1);
     x2 := clamp(sl.xMax, 0, dstPage.width-1);
-    cnt := sl.xMax-sl.xMin;
+    cnt := x2-x1;
     if cnt <= 0 then continue;
 
     {get initial texture pos (as 16.16}
@@ -285,7 +349,10 @@ begin
     textureWidth := srcPage.width;
     textureSize := srcPage.width * srcPage.height;
 
-    polyLine_ASM(screenPtr, texturePtr, texX, texY, texDeltaX, texDeltaY, textureWidth, textureSize, cnt);
+    if (textureWidth = 256) and (textureSize = 65536) then
+      polyLine256_ASM(screenPtr, texturePtr, texX, texY, texDeltaX, texDeltaY, textureWidth, textureSize, cnt)
+    else
+      polyLine_ASM(screenPtr, texturePtr, texX, texY, texDeltaX, texDeltaY, textureWidth, textureSize, cnt);
 
   end;
 end;
