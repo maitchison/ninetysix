@@ -151,19 +151,19 @@ begin
       state := AI_WAIT;
     end;
     AI_WAIT: begin
-      case tank.lastBullet.status of
+      case tank.lastProjectile.status of
         GO_EMPTY:
           // this shouldn't happen;
           state := AI_AIMX;
         GO_PENDING_DELETE: begin
-          if tank.lastBullet.vel.y < 0 then begin
+          if tank.lastProjectile.vel.y < 0 then begin
             // we collided on the way up, so try to shoot over
             solutionY := clamp(solutionY + 2, 2, 16);
             if solutionX < 0 then solutionX += 10 else solutionX -= 10;
           end else begin
             // we collided on the way down so just adjust angle.
-            deltaX := target.xPos - tank.lastBullet.xPos;
-            deltaY := target.yPos - tank.lastBullet.yPos;
+            deltaX := target.xPos - tank.lastProjectile.xPos;
+            deltaY := target.yPos - tank.lastProjectile.yPos;
             solutionX += clamp(deltax/3 + deltay/5, -10, 10);
           end;
           state := AI_AIMX;

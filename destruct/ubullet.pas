@@ -7,7 +7,8 @@ uses
   obj;
 
 type
-  tBullet = class(tGameObject)
+
+  tProjectile = class(tGameObject)
     owner: tGameObject;
     procedure reset(); override;
     procedure explode();
@@ -20,7 +21,7 @@ implementation
 uses
   fx, res, uTank, game, terra;
 
-procedure tBullet.reset();
+procedure tProjectile.reset();
 begin
   inherited reset();
   col := RGB($ffffff86);
@@ -30,7 +31,7 @@ begin
   bounds.height := 3;
 end;
 
-procedure tBullet.explode();
+procedure tProjectile.explode();
 begin
   mixer.play(explodeSFX, 0.3);
   makeExplosion(xPos, yPos, 10);
@@ -38,7 +39,7 @@ begin
   markAsDeleted();
 end;
 
-procedure tBullet.update(elapsed: single);
+procedure tProjectile.update(elapsed: single);
 var
   c: RGBA;
   go: tGameObject;
@@ -74,12 +75,12 @@ begin
   end;
 end;
 
-procedure tBullet.draw(screen: tScreen);
+procedure tProjectile.draw(screen: tScreen);
 begin
   drawMarker(screen, xPos, yPos, col);
 end;
 
-{----------------------------------------------------------}
+{--------------------------------------}
 
 begin
 end.

@@ -146,7 +146,6 @@ end;
 procedure battleScreen();
 var
   exitFlag: boolean;
-  bullet: tBullet;
   tank1, tank2: tTank;
   elapsed: single;
   gui: tGuiComponents;
@@ -215,20 +214,7 @@ begin
     gui.update(elapsed);
     gui.draw(screen);
 
-    //screen.flipAll();
-
-    {stub:}
-    screen.pageClear();
-
-    m.setIdentity;
-    m.setRotationXYZ(0, 0, getSec);
-    m.scale(2.0);
-    startTimer('drawTransformed');
-    testSprite.drawTransformed(screen.canvas, V3(160, 120, 0), m);
-    stopTimer('drawTransformed');
-    note('%f', [getTimer('drawTransformed').avElapsed*1000]);
-
-    screen.pageFlip();
+    screen.flipAll();
 
     stopTimer('main');
 

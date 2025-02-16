@@ -23,7 +23,7 @@ type
   protected
     spriteSheet: tSpriteSheet;
     spriteIdx: word;
-    procedure fireBullet();
+    procedure fireProjectile();
     procedure fireLaser();
   public
     chassis: tChassis;
@@ -32,7 +32,7 @@ type
     angle: single;
     power: single;
     health: integer;
-    lastBullet: tBullet;
+    lastProjectile: tProjectile;
   public
     class function FromChassis(aChassis: tChassis): tTank; static;
     procedure reset(); override;
@@ -172,23 +172,23 @@ begin
   if chassis.ctype=CT_LAUNCHER then
     fireLaser()
   else
-    fireBullet();
+    fireProjectile();
 end;
 
-procedure tTank.fireBullet();
+procedure tTank.fireProjectile();
 var
-  bullet: tBullet;
+  projectile: tProjectile;
 begin
   if status <> GO_ACTIVE then exit;
   if cooldown <= 0 then begin
-    bullet := nextBullet();
-    bullet.pos := pos;
-    bullet.vel := V2(sin(angle*DEG2RAD) * power * 10, -cos(angle*DEG2RAD) * power * 10);
-    bullet.pos += bullet.vel.normed*6;
-    bullet.owner := self;
+    projectile := nextProjectile();
+    projectile.pos := pos;
+    projectile.vel := V2(sin(angle*DEG2RAD) * power * 10, -cos(angle*DEG2RAD) * power * 10);
+    projectile.pos += projectile.vel.normed*6;
+    projectile.owner := self;
     cooldown := 0.25;
     mixer.play(shootSFX, 0.2);
-    lastBullet := bullet;
+    lastProjectile := projectile;
   end;
 end;
 

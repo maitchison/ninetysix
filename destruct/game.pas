@@ -18,7 +18,7 @@ type
 procedure updateAll(elapsed: single);
 procedure drawAll(screen: tScreen);
 
-function  nextBullet: tBullet;
+function  nextProjectile: tProjectile;
 function  nextParticle: tParticle;
 function  getTank(id: integer;team: integer): tTank;
 
@@ -42,7 +42,7 @@ var
 
 var
   particles: tGameObjectList;
-  bullets: tGameObjectList;
+  projectiles: tGameObjectList;
 
 {----------------------------------------------------------}
 
@@ -125,7 +125,7 @@ var
 begin
   result := nil;
   {todo: we should implement a grid system, and maybe bounding rects as well}
-  {note: this would enable bullet collisions too}
+  {note: this would enable projectile collisions too}
   for go in tanks.objects do begin
     tank := tTank(go);
     if tank.status <> GO_ACTIVE then continue;
@@ -135,16 +135,16 @@ begin
   end;
 end;
 
-function nextBullet: tBullet;
+function nextProjectile: tProjectile;
 var
   go: tGameObject;
 begin
-  go := bullets.nextFree;
+  go := projectiles.nextFree;
   if assigned(go) then
-    result := tBullet(go)
+    result := tProjectile(go)
   else begin
-    result := tBullet.create();
-    bullets.append(result);
+    result := tProjectile.create();
+    projectiles.append(result);
   end;
 end;
 
@@ -175,7 +175,7 @@ begin
   updateAccumlator += elapsed;
   while updateAccumlator >= stepSize do begin
     tanks.update(stepSize);
-    bullets.update(stepSize);
+    projectiles.update(stepSize);
     particles.update(stepSize);
     updateAccumlator -= stepSize;
   end;
@@ -184,7 +184,7 @@ end;
 procedure drawAll(screen: tScreen);
 begin
   tanks.draw(screen);
-  bullets.draw(screen);
+  projectiles.draw(screen);
   particles.draw(screen);
 end;
 
@@ -214,14 +214,14 @@ procedure initObjects;
 begin
   updateAccumlator := 0;
   tanks := tGameObjectList.create();
-  bullets := tGameObjectList.create();
+  projectiles := tGameObjectList.create();
   particles := tGameObjectList.create();
 end;
 
 procedure closeObjects;
 begin
   tanks.free;
-  bullets.free;
+  projectiles.free;
   particles.free;
 end;
 
