@@ -180,11 +180,11 @@ var
   t: tPoint;
   f: single;
   sl: tScanLine;
+  tl: tTextureLine;
   t1,t2,t3,t4: tUVCoord;
   tInitial, tDelta: tUVCoord;
   x1,x2: integer;
   b: tRect;
-  f: float;
   {for asm}
   cnt: integer;
   screenPtr, texturePtr: pointer;
@@ -225,10 +225,12 @@ begin
     texDeltaX := trunc(lerp(tl.t1.x, tl.t2.x, f)) - texX;
     texDeltaY := trunc(lerp(tl.t1.y, tl.t2.y, f)) - texY;
     texDelta := (texX div 256) + (texY div 256) shl 8;
-
+                                             {
     screenPtr := dstPage.pixels + (x1 + (y * dstPath.width)) * 4;
     texturePtr := scr.pixels;
-    cnt := sl.xMax-sl.xMin;
+    cnt := sl.xMax-sl.xMin;                   }
+    exit;
+    (*
     asm
       pushad
 
@@ -325,7 +327,7 @@ begin
       popad
     end;
   end;
-
+      *)
     {
     for x := x1 to x2 do begin
       f := (x-sl.xMin)/(sl.xMax-sl.xMin);

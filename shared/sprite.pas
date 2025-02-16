@@ -200,7 +200,7 @@ var
   end;
 
 begin
-  polyDraw_ASM(dstPage, page, rect,
+  polyDraw_REF(dstPage, page, rect,
     xform(Point(0,0)),
     xform(Point(rect.width-1, 0)),
     xform(Point(rect.width, rect.height-1)),

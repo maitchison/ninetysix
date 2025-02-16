@@ -27,6 +27,7 @@ begin
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
   sprites.page.setTransparent(RGB(255,0,255));
   sprites.grid(12,14);
+  sprites.page.resize(256, sprites.page.height);
 
 end;
 

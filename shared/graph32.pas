@@ -22,7 +22,7 @@ type
 
      b,g,r,a: byte;
 
-    constructor Create(r,g,b: integer;a: integer=255);
+    constructor create(r,g,b: integer;a: integer=255);
 
     class function Random(): RGBA; static;
     class function Lerp(a,b: RGBA; factor: single): RGBA; static;
@@ -80,7 +80,7 @@ const
 type
 
   tPage = class(tResource)
-    width, height,bpp: Word;
+    width, height, bpp: Word;
     isRef: boolean;
     pixels: pointer;
     defaultColor: RGBA;
@@ -100,11 +100,14 @@ type
     procedure clear(c: RGBA);
     procedure fillRect(aRect: TRect; c: RGBA);
     procedure drawRect(aRect: TRect; c: RGBA);
-    function  clone(): TPage;
+    function  clone(): tPage;
     function  asBytes: tBytes;
     function  asRGBBytes: tBytes;
-    procedure setTransparent(col: RGBA);
+    function  scaled(aWidth, aHeight: integer): tPage;
+    function  resized(aWidth, aHeight: integer): tPage;
+    procedure resize(aWidth, aHeight: integer);
 
+    procedure setTransparent(col: RGBA);
     function  checkForAlpha: boolean;
 
     class function Load(filename: string): tPage;
@@ -122,6 +125,7 @@ procedure assertEqual(a, b: tPage); overload;
 implementation
 
 uses
+  sprite,
   bmp;
 
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
@@ -403,9 +407,9 @@ end;
 { TPage }
 {----------------------------------------------------------------}
 
-constructor tPage.Create(); overload;
+constructor tPage.create(); overload;
 begin
-  inherited Create;
+  inherited create();
   self.width := 0;
   self.height := 0;
   self.bpp := 0;
@@ -414,9 +418,9 @@ begin
   self.isRef := false;
 end;
 
-constructor tPage.Create(AWidth, AHeight: word); overload;
+constructor tPage.create(aWidth, aHeight: word); overload;
 begin
-  Create;
+  create();
   self.width := AWidth;
   self.height := AHeight;
   self.bpp := 32;
@@ -424,10 +428,10 @@ begin
   self.clear(RGBA.Create(0,0,0));
 end;
 
-constructor tPage.CreateAsReference(AWidth, AHeight: word;PixelData: Pointer);
+constructor tPage.CreateAsReference(aWidth, aHeight: word;pixelData: Pointer);
 {todo: support logical width}
 begin
-  Create;
+  create();
   self.width := AWidth;
   self.height := AHeight;
   self.bpp := 32;
@@ -435,7 +439,7 @@ begin
   self.isRef := true;
 end;
 
-destructor tPage.Destroy();
+destructor tPage.destroy();
 begin
   if (not self.isRef) and assigned(self.pixels) then
     freeMem(self.pixels, width*height*4);
@@ -444,7 +448,7 @@ begin
   self.height := 0;
   self.bpp := 0;
   self.isRef := false;
-  inherited Destroy;
+  inherited destroy();
 end;
 
 function TPage.GetPixel(x, y: Integer): RGBA; overload;
@@ -497,7 +501,7 @@ begin
   result := (c1 * p1) + (c2 * p2) + (c3 * p3) + (c4 * p4);
 end;
 
-function TPage.GetPixelScaled(x, y, s: integer;doGamma: boolean): RGBA;
+function TPage.getPixelScaled(x, y, s: integer;doGamma: boolean): RGBA;
 var
   i,j: int32;
   factor: single;
@@ -821,6 +825,7 @@ begin
   end;
 end;
 
+{deep copy of page}
 function tPage.clone(): tPage;
 begin
   result := tPage.create();
@@ -830,7 +835,6 @@ begin
   result.pixels := getMem(self.width*self.height*4);
   result.isRef := false;
   result.defaultColor := self.defaultColor;
-
   move(self.pixels^, result.pixels^, self.width*self.height*4);
 end;
 
@@ -867,6 +871,48 @@ begin
     for x := 0 to width-1 do
       if getPixel(x,y).a <> 255 then exit(True);
   exit(False);
+end;
+
+function tPage.resized(aWidth, aHeight: integer): tPage;
+var
+  new: tPage;
+  s: tSprite;
+begin
+  new := tPage.create(aWidth, aHeight);
+  s := tSprite(self);
+  s.blit(new, 0, 0);
+  s.free();
+  result := new;
+end;
+
+procedure tPage.resize(aWidth, aHeight: integer);
+var
+  tmp: tPage;
+  s: tSprite;
+begin
+  tmp := self.clone();
+  self.width := aWidth;
+  self.height := aHeight;
+  freemem(self.pixels);
+  getMem(self.pixels, aWidth*aHeight*4);
+  fillchar(self.pixels^, aWidth*aHeight*4, 0);
+  s := tSprite.create(tmp);
+  s.blit(self, 0, 0);
+  s.free();
+  note(hexStr(tmp));
+  tmp.free();
+end;
+
+function tPage.scaled(aWidth, aHeight: integer): tPage;
+var
+  new: tPage;
+  s: tSprite;
+begin
+  new := tPage.create(aWidth, aHeight);
+  s := tSprite(self);
+  s.drawStretched(new, rect(aWidth, aHeight));
+  s.free();
+  result := new;
 end;
 
 {Sets all instances of this color to transparent}
