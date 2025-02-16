@@ -160,7 +160,9 @@ begin
   screen.background := tPage.create(screen.width, screen.height);
   renderSky(screen.background);
 
-  testSprite := tSprite.create(titleGFX);
+  //testSprite := tSprite.create(titleGFX.scaled(255,255));
+  //testSprite := tSprite.create(titleGFX);
+  testSprite := tSprite.create(sprites.page);
 
   screen.pageClear();
   screen.pageFlip();

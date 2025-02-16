@@ -25,7 +25,7 @@ begin
 end;
 
 {draw an image stretched to fill poly}
-function polyDraw_REF(dstPage, srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint): tRect;
+procedure polyDraw_REF(dstPage, srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint);
 var
   x, y: integer;
   t: tPoint;

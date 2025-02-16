@@ -909,7 +909,7 @@ var
   s: tSprite;
 begin
   new := tPage.create(aWidth, aHeight);
-  s := tSprite(self);
+  s := tSprite.create(self);
   s.drawStretched(new, rect(aWidth, aHeight));
   s.free();
   result := new;
