@@ -190,11 +190,7 @@ end;
 
 procedure tTank.fire();
 begin
-  // stub: hard code laser for me
-  if chassis.ctype=tChassisType.launcher then
-    fireLaser()
-  else
-    fireProjectile();
+  fireProjectile();
 end;
 
 procedure tTank.fireProjectile();
@@ -204,12 +200,13 @@ begin
   if status <> GO_ACTIVE then exit;
   if cooldown <= 0 then begin
     projectile := nextProjectile();
+    weapon.applyToProjectile(projectile);
     projectile.pos := pos;
     projectile.vel := V2(sin(angle*DEG2RAD) * power * 10, -cos(angle*DEG2RAD) * power * 10);
     projectile.pos += projectile.vel.normed*6;
     projectile.owner := self;
-    cooldown := 0.25;
-    mixer.play(shootSFX, 0.2);
+    cooldown := weapon.cooldown;
+    mixer.play(shootSFX, 0.2); // todo: custom SFX for weapons
     lastProjectile := projectile;
   end;
 end;
@@ -233,7 +230,7 @@ begin
   if status <> GO_ACTIVE then exit;
   mixer.play(explodeSFX, 1.0);
   makeExplosion(xPos, yPos, 20);
-  markAsDeleted();
+  markAsEmpty();
 end;
 
 procedure tTank.adjust(deltaAngle, deltaPower: single);

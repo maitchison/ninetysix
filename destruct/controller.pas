@@ -193,7 +193,6 @@ begin
     AI_IDLE: begin
     end;
   end;
-
 end;
 
 begin

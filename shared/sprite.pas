@@ -46,7 +46,7 @@ type
 
     function  getPixel(atX, atY: integer): RGBA;
     procedure blit(dstPage: tPage; atX, atY: int32);
-    procedure draw(dstPage: tPage; atX, atY: int32);
+    function  draw(dstPage: tPage; atX, atY: int32): tRect;
     procedure drawFlipped(dstPage: tPage; atX, atY: int32);
     procedure drawStretched(DstPage: TPage; dest: tRect);
     procedure drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
@@ -155,10 +155,14 @@ begin
 end;
 
 
-{Draw sprite to screen at given location, with alpha etc}
-procedure tSprite.draw(dstPage: tPage; atX, atY: integer);
+{Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
+function tSprite.draw(dstPage: tPage; atX, atY: integer): tRect;
 begin
-  draw_REF(dstPage, self.page, self.rect, atX, atY)
+  draw_REF(dstPage, self.page, self.rect, atX, atY);
+  result.x := atX;
+  result.y := atY;
+  result.width := width;
+  result.height := height;
 end;
 
 {Draws sprite flipped on x-axis}

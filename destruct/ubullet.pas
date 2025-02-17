@@ -8,22 +8,26 @@ uses
 
 type
 
+  {$scopedenums on}
+  tProjectileType = (
+    none,
+    shell,
+    rocket,
+    plasma,
+    dirt,
+    laser// special case
+  );
+
   tProjectile = class(tGameObject)
     owner: tGameObject;
+    projectileType: tProjectileType;
+    sprite: tSprite;
+    damage: integer;
     procedure reset(); override;
     procedure explode();
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
   end;
-
-  tProjectileType = (
-    PT_NONE,
-    PT_SHELL,
-    PT_ROCKET,
-    PT_PLASMA,
-    PT_DIRT,
-    PT_LASER  // special case
-  );
 
   {note: we're using a 1:1 for weapons and projectiles here, but
    I think that's just fine.}
@@ -32,9 +36,10 @@ type
     spriteIdx: integer;
     damage: integer;
     projectileType: tProjectileType;
-    rechargeTime: single;
+    cooldown: single;
     function projectileSprite: tSprite;
     function weaponSprite: tSprite;
+    procedure applyToProjectile(projectile: tProjectile);
   end;
 
 type
@@ -50,15 +55,15 @@ const
 
   WEAPON_SPEC: array[tWeaponType] of tWeaponSpec =
   (
-    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: PT_NONE;   rechargeTime: 1.0),
-    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: PT_SHELL;  rechargeTime: 1.0),
-    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 100;  projectileType: PT_SHELL;  rechargeTime: 1.0),
-    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 200;  projectileType: PT_ROCKET; rechargeTime: 1.0)
-{    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: PT_ROCKET; rechargeTime: 1.0),
-    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: PT_ROCKET; rechargeTime: 1.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   rechargeTime: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: PT_DIRT;   rechargeTime: 1.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: PT_PLASMA; rechargeTime: 1.0)}
+    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: tProjectileType.none;   cooldown: 1.0),
+    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: tProjectileType.shell;  cooldown: 0.1),
+    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 100;  projectileType: tProjectileType.shell;  cooldown: 1.0),
+    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 200;  projectileType: tProjectileType.shell;  cooldown: 2.0)
+{    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: PT_ROCKET; cooldown: 1.0),
+    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: PT_ROCKET; cooldown: 1.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
+    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: PT_PLASMA; cooldown: 1.0)}
   );
 
 
@@ -80,6 +85,13 @@ begin
   result := sprites.sprites[spriteIdx-16];
 end;
 
+procedure tWeaponSpec.applyToProjectile(projectile: tProjectile);
+begin
+  projectile.sprite := projectileSprite;
+  projectile.damage := damage;
+  projectile.projectileType := projectileType;
+end;
+
 {-------------------------------------------------------}
 
 procedure tProjectile.reset();
@@ -93,11 +105,27 @@ begin
 end;
 
 procedure tProjectile.explode();
+var
+  radius: integer;
 begin
+  radius := round(clamp(2, sqrt(abs(damage)), 100));
   mixer.play(explodeSFX, 0.3);
-  makeExplosion(xPos, yPos, 10);
-  //terrain.burn(xPos-32, yPos, 3, 30); // for bullets
-  markAsDeleted();
+  case projectileType of
+    tProjectileType.none,
+    tProjectileType.shell:
+      terrain.burn(xPos-32, yPos, radius, damage);
+    tProjectileType.rocket:
+      makeExplosion(xPos, yPos, radius);
+    tProjectileType.plasma:
+      ; // niy
+    tProjectileType.dirt:
+      ; // niy
+    tProjectileType.laser:
+      ; // pass;
+    else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
+  end;
+
+  markAsEmpty();
 end;
 
 procedure tProjectile.update(elapsed: single);
@@ -112,7 +140,7 @@ begin
   inherited update(elapsed);
   {see if we're out of bounds}
   if (xPos < 32) or (xPos > 256+32) or (yPos > 256) then begin
-    markAsDeleted();
+    markAsEmpty();
     exit;
   end;
   {check if we collided with tank}
@@ -123,8 +151,8 @@ begin
     if (tank = self.owner) and (age < 0.10) then continue;
     c := tank.getWorldPixel(xPos, yPos);
     if c.a > 0 then begin
-      tank.takeDamage(xPos, yPos, 100, owner);
-      makeSparks(xPos, yPos, 3, 5, -vel.x, -vel.y);
+      tank.takeDamage(xPos, yPos, self.damage, owner);
+      makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
       explode();
       exit;
     end;
@@ -137,8 +165,19 @@ begin
 end;
 
 procedure tProjectile.draw(screen: tScreen);
+var
+  bounds: tRect;
 begin
-  drawMarker(screen, xPos, yPos, col);
+  bounds.init(0,0,0,0);
+  case projectileType of
+    tProjectileType.none: ;
+    tProjectileType.shell:
+      if assigned(sprite) then
+        bounds := sprite.draw(screen.canvas, xPos, yPos);
+    else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
+  end;
+  if bounds.width > 0 then
+    screen.markRegion(bounds);
 end;
 
 {--------------------------------------}
