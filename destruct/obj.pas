@@ -7,7 +7,7 @@ uses
 
 type
 
-  tGameObjectStatus = (GO_EMPTY, GO_PENDING_DELETE, GO_ACTIVE);
+  tGameObjectStatus = (GO_EMPTY, GO_PENDING_REMOVAL, GO_ACTIVE);
 
   tGameObject = class
   public
@@ -36,9 +36,18 @@ type
     property yPos: integer read getY;
   end;
 
+  {todo: think about changing this to one big block of memory..
+   perhaps with objects instead of classes.
+   also.. I think remove append and just have static storage for n items
+   }
   tGameObjectList = class
   public
     objects: array of tGameObject;
+    // index of objects that are currently avaliable
+    freeObjects: array of integer;
+    // number of currently free objects
+    numFreeObjects: integer;
+    constructor create(maxObjects: integer);
     procedure append(o: tGameObject);
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
@@ -64,6 +73,13 @@ uses
 { tGameObjects }
 {----------------------------------------------------------}
 
+constructor tGameObjectList.create(maxObjects: integer);
+begin
+  inherited create();
+  setLength(freeObjects, maxObjects);
+  numFreeObjects := 0;
+end;
+
 procedure tGameObjectList.append(o: tGameObject);
 begin
   setLength(objects, length(objects)+1);
@@ -79,30 +95,32 @@ end;
 
 procedure tGameObjectList.update(elapsed: single);
 var
+  i: integer;
   go: tGameObject;
 begin
   {remove tagged objects}
-  {note: in the future we'll add these to a stack of 'free' slots}
-  for go in objects do if go.status = GO_PENDING_DELETE then
-    go.status := GO_EMPTY;
+  for i := 0 to length(objects)-1 do begin
+    go := objects[i];
+    if (go.status = GO_PENDING_REMOVAL) then begin
+      freeObjects[numFreeObjects] := i;
+      inc(numFreeObjects);
+      go.status := GO_EMPTY;
+    end;
+  end;
   {update}
   for go in objects do if go.status = GO_ACTIVE then go.update(elapsed);
 end;
 
-{returns the next free object, or nill if there are none free}
+{returns the next free object, or nil if there are none free}
 function tGameObjectList.nextFree(): tGameObject;
-var
-  go: tGameObject;
 begin
-  result := nil;
-  {note: we could make this much faster by maintaining a list of known
-   expired elements. For small lists it's no problem though.}
-  for go in objects do begin
-    if go.status = GO_EMPTY then begin
-      go.reset();
-      exit(go);
-    end;
-  end;
+  if numFreeObjects = 0 then exit(nil);
+  {requester must init this object... otherwise it'll be lost forever..
+   only way around this is to trigger removal when active is set... but
+   I don't like that much at all}
+  dec(numFreeObjects);
+  result := objects[freeObjects[numFreeObjects]];
+  result.reset();
 end;
 
 {----------------------------------------------------------}
@@ -124,7 +142,7 @@ end;
 
 procedure tGameObject.markForRemoval();
 begin
-  status := GO_PENDING_DELETE;
+  status := GO_PENDING_REMOVAL;
 end;
 
 procedure tGameObject.setSprite(aSprite: tSprite);
@@ -168,7 +186,7 @@ begin
   age += elapsed;
   if ttl > 0 then begin
     if age >= ttl then
-      status := GO_PENDING_DELETE;
+      status := GO_PENDING_REMOVAL;
   end;
   bounds.x := round(pos.x+offset.x);
   bounds.y := round(pos.y+offset.y);

@@ -175,7 +175,7 @@ begin
         GO_EMPTY:
           // this shouldn't happen;
           state := AI_AIMX;
-        GO_PENDING_DELETE: begin
+        GO_PENDING_REMOVAL: begin
           if tank.lastProjectile.vel.y < 0 then begin
             // we collided on the way up, so try to shoot over
             solutionY := clamp(solutionY + 2, 2, 16);

@@ -152,7 +152,7 @@ function nextParticle: tParticle;
 var
   go: tGameObject;
 begin
-  go := particles.nextFree;
+  go := particles.nextFree();
   if assigned(go) then
     result := tParticle(go)
   else begin
@@ -213,9 +213,9 @@ end;
 procedure initObjects;
 begin
   updateAccumlator := 0;
-  tanks := tGameObjectList.create();
-  projectiles := tGameObjectList.create();
-  particles := tGameObjectList.create();
+  tanks := tGameObjectList.create(10);
+  projectiles := tGameObjectList.create(1*1024);
+  particles := tGameObjectList.create(16*1024);
 end;
 
 procedure closeObjects;
