@@ -57,8 +57,8 @@ const
   (
     (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: tProjectileType.none;   cooldown: 1.0),
     (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: tProjectileType.shell;  cooldown: 0.1),
-    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 100;  projectileType: tProjectileType.shell;  cooldown: 1.0),
-    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 200;  projectileType: tProjectileType.shell;  cooldown: 2.0)
+    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   projectileType: tProjectileType.shell;  cooldown: 1.0),
+    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0)
 {    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: PT_ROCKET; cooldown: 1.0),
     (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: PT_ROCKET; cooldown: 1.0),
     (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
@@ -108,12 +108,14 @@ procedure tProjectile.explode();
 var
   radius: integer;
 begin
-  radius := round(clamp(2, sqrt(abs(damage)), 100));
+  radius := round(clamp(2, 2*sqrt(abs(damage)), 100));
   mixer.play(explodeSFX, 0.3);
   case projectileType of
     tProjectileType.none,
-    tProjectileType.shell:
-      terrain.burn(xPos-32, yPos, radius, damage);
+    tProjectileType.shell: begin
+      terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
+      makeExplosion(xPos, yPos, radius);
+    end;
     tProjectileType.rocket:
       makeExplosion(xPos, yPos, radius);
     tProjectileType.plasma:
