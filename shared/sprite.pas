@@ -48,7 +48,7 @@ type
     function  getPixel(atX, atY: integer): RGBA;
     procedure blit(dstPage: tPage; atX, atY: int32);
     function  draw(dstPage: tPage; atX, atY: int32): tRect;
-    procedure drawFlipped(dstPage: tPage; atX, atY: int32);
+    function  drawFlipped(dstPage: tPage; atX, atY: int32): tRect;
     procedure drawStretched(DstPage: TPage; dest: tRect);
     procedure drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
@@ -70,7 +70,7 @@ type
     constructor create(aPage: tPage);
     procedure append(sprite: tSprite);
     procedure load(filename: string);
-    procedure grid(cellWidth, cellHeight: word);
+    procedure grid(cellWidth, cellHeight: word;centered: boolean=false);
     property items[tag: string]: tSprite read getByTag; default;
   end;
 
@@ -156,23 +156,25 @@ end;
 {Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
 function tSprite.draw(dstPage: tPage; atX, atY: integer): tRect;
 begin
-  draw_REF(dstPage, self.page, srcRect, atX-pivot.x, atY-pivot.y);
-  result.x := atX-pivot.x;
-  result.y := atY-pivot.y;
-  result.width := width;
-  result.height := height;
+  atX -= pivot.x;
+  atY -= pivot.y;
+  draw_REF(dstPage, self.page, srcRect, atX, atY);
+  result.init(atX, atY, width, height);
 end;
 
 {Draws sprite flipped on x-axis}
-procedure tSprite.drawFlipped(dstPage: tPage; atX, atY: integer);
+function tSprite.drawFlipped(dstPage: tPage; atX, atY: integer): tRect;
 begin
   {a bit inefficent, but ok for the moment}
-  polyDraw_REF(dstPage, page, srcRect,
+  atX -= pivot.x;
+  atY -= pivot.y;
+  polyDraw_ASM(dstPage, page, srcRect,
     Point(atX + srcRect.width - 1, atY),
     Point(atX, atY),
     Point(atX, atY + srcRect.height - 1),
     Point(atX + srcRect.width - 1, atY + srcRect.height - 1)
   );
+  result.init(atX, atY, width, height);
 end;
 
 function tSprite.getPixel(atX, atY: integer): RGBA;
@@ -337,7 +339,7 @@ begin
 end;
 
 {create sprites using a grid}
-procedure tSpriteSheet.grid(cellWidth,cellHeight: word);
+procedure tSpriteSheet.grid(cellWidth,cellHeight: word;centered: boolean=false);
 var
   sprite: tSprite;
   x, y: integer;
@@ -346,6 +348,10 @@ begin
     for x := 0 to (page.width div cellWidth)-1 do begin
       sprite := tSprite.create(page);
       sprite.srcRect := Rect(x*cellWidth, y*cellHeight, cellWidth, cellHeight);
+      if centered then begin
+        sprite.pivot.x := cellWidth div 2;
+        sprite.pivot.y := cellHeight div 2;
+      end;
       append(sprite);
     end;
   end;
