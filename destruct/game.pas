@@ -211,11 +211,21 @@ end;
 {----------------------------------------------------------}
 
 procedure initObjects;
+var
+  i: integer;
+  p: tParticle;
 begin
   updateAccumlator := 0;
   tanks := tGameObjectList.create(10);
   projectiles := tGameObjectList.create(1*1024);
   particles := tGameObjectList.create(16*1024);
+  {for performance reason init some empty objects}
+  for i := 0 to 8*1024-1 do begin
+    p := tParticle.create();
+    p.markForRemoval();
+    particles.append(p);
+  end;
+
 end;
 
 procedure closeObjects;

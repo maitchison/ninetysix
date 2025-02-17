@@ -72,6 +72,8 @@ var
   tc: RGBA;
   dimFactor: integer;
 begin
+  {todo: implement this with a 'template' and have a linear one
+   and a spherical one. Also add some texture to these}
   if power <= 0 then exit;
   if r <= 0 then exit;
   r2 := r*r;
@@ -92,7 +94,6 @@ begin
       tc := terrain.getPixel(x, y);
       dimFactor := round(50 * v / (tc.a+1));
       tc.a := clamp(tc.a - v, 0, 255);
-
       tc.r := clamp(tc.r - dimFactor, 0, 255);
       tc.g := clamp(tc.g - dimFactor, 0, 255);
       tc.b := clamp(tc.b - dimFactor, 0, 255);

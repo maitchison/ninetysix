@@ -63,9 +63,7 @@ const
     (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   projectileType: tProjectileType.shell;  cooldown: 1.0),
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: tProjectileType.rocket; cooldown: 2.0),
-    //for testing
-    (tag: 'Test Rocket';    spriteIdx: 16*11 + 7;  damage: 10; projectileType: tProjectileType.rocket; cooldown: 0.25)
- //   (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0)
+    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0)
 {    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
     (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
     (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: PT_PLASMA; cooldown: 1.0)}

@@ -45,29 +45,40 @@ procedure makeExplosion(atX, atY: single; power: single);
 var
   i: integer;
   p: tParticle;
-  radius: single;
+  radius, r2: single;
+  inv256: single;
   n: integer;
   z: single;
   angle: single;
+  dx, dy, d, d2: single;
 begin
-
   n := round(power * power);
   radius := power;
-  terrain.burn(round(atX-32), round(atY), round(radius+3), 25);
+  r2 := radius * radius;
+  inv256 := 1/256;
+  startTimer('burn');
+  terrain.burn(round(atX-32), round(atY), round(radius*1.1+1), 25);
+  stopTimer('burn');
+  startTimer('explosion');
   for i := 0 to n-1 do begin
     p := nextParticle();
-    z := (rnd/255);
-    angle := rnd/255*360;
-    p.pos := V2Polar(angle, z*radius/2) + V2(atX, atY);
-    case clamp(round(z*3), 0, 2) of
+    {todo: check these /128 are multiplies}
+    dx := (rnd-128) / 128 * radius;
+    dy := (rnd-128) / 128 * radius;
+    d2 := dx*dx + dy*dy;
+    if d2 > r2 then continue;
+    d := sqrt(d2);
+    p.pos.x := atX+dx;
+    p.pos.y := atY+dy;
+    case clamp(round(d/radius*3), 0, 2) of
       0: p.col := RGB($FFFEC729);
       1: p.col := RGB($FFF47817);
       2: p.col := RGB($FFC5361D);
     end;
-    p.vel := V2Polar(angle, (0.5+z)*radius/2);
-    {edit the terrain}
-    terrain.burn(p.xPos-32, p.yPos, 3, 5);
+    p.vel := V2(dx, dy).normed() * (0.5 + sqrt(d)) + V2(rnd-128, rnd-128) * 0.1;
   end;
+  stopTimer('explosion');
+  note('%f %f', [1000*getTimer('explosion').maxElapsed, 1000*getTimer('burn').maxElapsed]);
 end;
 
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
