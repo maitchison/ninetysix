@@ -29,7 +29,7 @@ type
     function  getWorldPixel(atX, atY: integer): RGBA;
     procedure draw(screen: tScreen); virtual;
     procedure update(elapsed: single); virtual;
-    procedure markAsEmpty();
+    procedure markForRemoval();
 
     property sprite: tSprite read fSprite write setSprite;
     property xPos: integer read getX;
@@ -122,7 +122,7 @@ begin
   col := RGB(255,0,255);
 end;
 
-procedure tGameObject.markAsEmpty();
+procedure tGameObject.markForRemoval();
 begin
   status := GO_PENDING_DELETE;
 end;

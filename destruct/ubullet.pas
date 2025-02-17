@@ -135,7 +135,7 @@ begin
     else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
   end;
 
-  markAsEmpty();
+  markForRemoval();
 end;
 
 procedure tProjectile.update(elapsed: single);
@@ -151,7 +151,7 @@ begin
   inherited update(elapsed);
   {see if we're out of bounds}
   if (xPos < 32) or (xPos > 256+32) or (yPos > 256) then begin
-    markAsEmpty();
+    markForRemoval();
     exit;
   end;
 

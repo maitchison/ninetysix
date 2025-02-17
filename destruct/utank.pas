@@ -238,7 +238,7 @@ begin
   if status <> GO_ACTIVE then exit;
   mixer.play(explodeSFX, 1.0);
   makeExplosion(xPos, yPos, 20);
-  markAsEmpty();
+  markForRemoval();
 end;
 
 procedure tTank.adjust(deltaAngle, deltaPower: single);
