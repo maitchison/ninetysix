@@ -9,7 +9,7 @@ uses
   utils,
   graph2d,
   graph32,
-  screen;
+  uScreen;
 
 type
 

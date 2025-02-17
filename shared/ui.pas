@@ -8,12 +8,11 @@ uses
   font,
   graph2d,
   graph32,
-  screen;
+  uScreen;
 
 type
-  {todo: bounds at component level}
   tGuiComponent = class
-    pos: tPoint;
+    bounds: tRect;
     alpha: single;
     targetAlpha: single;
     showForSeconds: single;
@@ -24,7 +23,7 @@ type
   public
     procedure draw(screen: tScreen);
     procedure update(elapsed: single); virtual;
-    constructor create(aPos: tPoint);
+    constructor create();
   end;
 
   tGuiComponents = class
@@ -35,14 +34,18 @@ type
   end;
 
   tGuiLabel = class(tGuiComponent)
+  protected
+    fText: string;
+  public
     textColor: RGBA;
-    text: string;
     centered: boolean;
     halfSize: boolean;
   protected
     procedure doDraw(screen: tScreen); override;
+    procedure setText(aText: string);
   public
-    constructor create(aPos: tPoint);
+    constructor create(aPos: tPoint; aText: string='');
+    property text: string read fText write setText;
   end;
 
 implementation
@@ -73,15 +76,15 @@ end;
 {--------------------------------------------------------}
 { UI Components }
 
-constructor tGuiComponent.create(aPos: tPoint);
+constructor tGuiComponent.create();
 begin
   inherited create();
-  self.pos := aPos;
   self.alpha := 1;
   self.targetAlpha := 1;
   self.showForSeconds := 0;
   self.autoFade := false;
   self.visible := true;
+  self.bounds.init(0,0,0,0);
 end;
 
 procedure tGuiComponent.update(elapsed: single);
@@ -114,37 +117,44 @@ end;
 
 procedure tGuiComponent.doDraw(screen: tScreen);
 begin
-  //pass
+  // pass
 end;
 
 {-----------------------}
 
-constructor tGuiLabel.create(aPos: tPoint);
+constructor tGuiLabel.create(aPos: tPoint; aText: string='');
 begin
-  inherited create(aPos);
+  inherited create();
+  self.bounds.x := aPos.x;
+  self.bounds.y := aPos.y;
   self.centered := false;
   self.textColor := RGB(250, 250, 250);
-  self.text := '';
   self.halfSize := false;
+  self.text := aText;
+end;
+
+procedure tGuiLabel.setText(aText: string);
+begin
+  fText := aText;
+  if halfSize then
+    {there's a bug here if textTextents ever moves the topleft corner}
+    bounds := textExtentsHalf(text, bounds.topLeft)
+  else
+    bounds := textExtents(text, bounds.topLeft);
+  if centered then bounds.x -= bounds.width div 2;
 end;
 
 procedure tGuiLabel.doDraw(screen: tScreen);
 var
-  bounds: tRect;
   c: RGBA;
 begin
   c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
   if c.a = 0 then exit;
-  if halfSize then begin
+  if halfSize then
     {todo: remove half size and use a font}
-    bounds := textExtentsHalf(text, pos);
-    if centered then bounds.x -= bounds.width div 2;
-    textOutHalf(screen.canvas, bounds.x, bounds.y, text, c);
-  end else begin
-    bounds := textExtents(text, pos);
-    if centered then bounds.x -= bounds.width div 2;
+    textOutHalf(screen.canvas, bounds.x, bounds.y, text, c)
+  else
     textOut(screen.canvas, bounds.x, bounds.y, text, c);
-  end;
   screen.markRegion(bounds);
 end;
 

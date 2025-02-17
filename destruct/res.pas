@@ -12,6 +12,7 @@ var
   titleGFX: tPage;
   shootSFX, explodeSFX: tSoundEffect;
   sprites: tSpriteSheet;
+  tankGuiSprite: tSprite;
 
 implementation
 
@@ -26,6 +27,7 @@ begin
 
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
   sprites.grid(16,16);
+  tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 160, 16));
 
 end;
 

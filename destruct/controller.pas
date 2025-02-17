@@ -19,6 +19,9 @@ type
 
 type
   tController = class
+  protected
+    changeWeaponCooldown: single;
+    changeTankCooldown: single;
   public
     doFire: boolean;
     changeTank: integer;
@@ -58,23 +61,30 @@ constructor tController.create(aTank: tTank);
 begin
   reset();
   tank := aTank;
-
 end;
 
 procedure tController.reset();
 begin
   tank := nil;
   target := nil;
+  changeWeaponCooldown := 0;
+  changeTankCooldown := 0;
 end;
 
 procedure tController.apply(elapsed: single);
 begin
   if doFire then tank.fire();
   tank.adjust(xVel * elapsed, yVel *elapsed);
-  if length(tank.weapons) > 0 then begin
-    tank.weaponIdx := (tank.weaponIdx + changeWeapon) mod length(tank.weapons);
-    if tank.weaponIdx < 0 then tank.weaponIdx += length(tank.weapons);
-  end;
+  if (changeWeapon <> 0) then begin
+    if (length(tank.weapons) > 0) and (changeWeaponCoolDown <= 0) then begin
+      tank.weaponIdx := (tank.weaponIdx + changeWeapon) mod length(tank.weapons);
+      if tank.weaponIdx < 0 then tank.weaponIdx += length(tank.weapons);
+      changeWeaponCooldown := 0.5;
+    end;
+  end else
+    changeWeaponCooldown := 0;
+  changeWeaponCoolDown := maxf(0, changeWeaponCoolDown - elapsed);
+  changeTankCoolDown := maxf(0, changeTankCoolDown - elapsed);
 end;
 
 procedure tController.process();
@@ -96,8 +106,8 @@ begin
   if keyDown(key_right) then xVel := +100;
   if keyDown(key_up) then yVel := +10;
   if keyDown(key_down) then yVel := -10;
-  if keyDown(key_pageUp) then changeWeapon := +1;
-  if keyDown(key_pageDown) then changeWeapon := -1;
+  if keyDown(Key_openSquareBracket) then changeWeapon := +1;
+  if keyDown(Key_closeSquareBracket) then changeWeapon := -1;
 end;
 
 {--------------------------------------------}

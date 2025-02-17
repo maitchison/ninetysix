@@ -15,7 +15,44 @@ uses
   keyboard,
   lc96, la96,
   mixlib,
+  font, uScreen,
   utils;
+
+type
+  tTankGUI = class(tGuiComponent)
+  public
+    tank: tTank;
+    sprite: tSprite;
+  protected
+    procedure doDraw(screen: tScreen); override;
+  public
+    constructor create(aPos: tPoint; aTank: tTank);
+  end;
+
+{-------------------------------------------}
+
+procedure tTankGUI.doDraw(screen: tScreen);
+var
+  weapon: tWeaponSpec;
+begin
+  sprite.blit(screen.canvas, bounds.x, bounds.y);
+  //screen.canvas.fillRect(bounds, RGB($FF730200));
+  //screen.canvas.drawRect(bounds, RGB($FFFFB93C));
+  weapon := tank.weapon;
+  weapon.weaponSprite.draw(screen.canvas, bounds.x, bounds.y);
+  textOutHalf(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
+  screen.markRegion(bounds);
+end;
+
+constructor tTankGUI.create(aPos: tPoint; aTank: tTank);
+begin
+  inherited create();
+  tank := aTank;
+  sprite := tankGuiSprite;
+  bounds := Rect(aPos.x, aPos.y, sprite.width, sprite.height);
+end;
+
+{-------------------------------------------}
 
 procedure titleScreen();
 var
@@ -154,6 +191,7 @@ var
   control1, control2: tController;
   testSprite: tSprite;
   m: tMatrix4x4;
+  tank2Gui: tTankGUI;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -173,7 +211,7 @@ begin
 
   {setup players}
   tank1 := tTank.FromChassis(CHASSIS_DEF[tChassisType.tank]);
-  tank2 := tTank.FromChassis(CHASSIS_DEF[tChassisType.launcher]);
+  tank2 := tTank.FromChassis(CHASSIS_DEF[tChassisType.tank]);
   tank1.id := 1;
   tank2.id := 2;
   control1 := tAIController.create(tank1);
@@ -187,6 +225,9 @@ begin
   gui := tGuiComponents.create();
   fps := tGuiLabel.create(Point(10, 10));
   gui.append(fps);
+
+  tank2Gui := tTankGUI.create(Point(160, 0), tank2);
+  gui.append(tank2Gui);
 
   {main loop}
   repeat

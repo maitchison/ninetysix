@@ -18,7 +18,7 @@
   vertex,
   vga,
   vesa,
-  screen,
+  uScreen,
 {sound}
   sound,
   mixLib

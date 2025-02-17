@@ -29,10 +29,12 @@ type
    I think that's just fine.}
   tWeaponSpec = record
     tag: string;
-    spriteIdx: integer; // by convention, subtract 16 from this to get the UI sprite
+    spriteIdx: integer;
     damage: integer;
     projectileType: tProjectileType;
     rechargeTime: single;
+    function projectileSprite: tSprite;
+    function weaponSprite: tSprite;
   end;
 
 type
@@ -48,7 +50,7 @@ const
 
   WEAPON_SPEC: array[tWeaponType] of tWeaponSpec =
   (
-    (tag: 'Null';         spriteIdx: 0;          damage: 0;    projectileType: PT_NONE;   rechargeTime: 1.0),
+    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: PT_NONE;   rechargeTime: 1.0),
     (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: PT_SHELL;  rechargeTime: 1.0),
     (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 100;  projectileType: PT_SHELL;  rechargeTime: 1.0),
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 200;  projectileType: PT_ROCKET; rechargeTime: 1.0)
@@ -64,6 +66,21 @@ implementation
 
 uses
   fx, res, uTank, game, terra;
+
+{-------------------------------------------------------}
+
+function tWeaponSpec.projectileSprite: tSprite;
+begin
+  result := sprites.sprites[spriteIdx];
+end;
+
+function tWeaponSpec.weaponSprite: tSprite;
+begin
+  // by convention, subtract 16 from this to get the UI sprite
+  result := sprites.sprites[spriteIdx-16];
+end;
+
+{-------------------------------------------------------}
 
 procedure tProjectile.reset();
 begin

@@ -35,7 +35,8 @@ type
     rect: tRect;
     border: tBorder;
 
-    constructor create(aPage: tPage);
+    constructor create(aPage: tPage); overload;
+    constructor create(aPage: tPage; aRect: tRect); overload;
     destructor destroy(); override;
 
     function  width: int32;
@@ -134,12 +135,21 @@ begin
   self.border.init(0, 0, 0, 0);
 end;
 
-function TSprite.Width: int32;
+constructor tSprite.Create(aPage: TPage; aRect: tRect);
+begin
+  inherited create();
+  self.tag := 'sprite';
+  self.page := aPage;
+  self.rect := aRect;
+  self.border.init(0, 0, 0, 0);
+end;
+
+function tSprite.width: int32;
 begin
   result := self.rect.Width;
 end;
 
-function tSprite.Height: int32;
+function tSprite.height: int32;
 begin
   result := Self.rect.Height;
 end;

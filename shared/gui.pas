@@ -2,6 +2,8 @@
 Unit gui;
 {$MODE delphi}
 
+{TODO: remove this, just use UI}
+
 interface
 
 uses
@@ -9,7 +11,7 @@ uses
   font,
   sprite,
   lc96,
-  screen,
+  uScreen,
   graph2d,
   mouse,
   graph32;

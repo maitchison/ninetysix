@@ -5,7 +5,7 @@ interface
 uses
   test, debug,
   utils,
-  graph32, screen;
+  graph32, uScreen;
 
 type
   tTerrain = class
