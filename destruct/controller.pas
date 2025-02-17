@@ -21,6 +21,8 @@ type
   tController = class
   public
     doFire: boolean;
+    changeTank: integer;
+    changeWeapon: integer;
     xVel, yVel: single;
     tank: tTank;
     target: tTank;
@@ -69,6 +71,10 @@ procedure tController.apply(elapsed: single);
 begin
   if doFire then tank.fire();
   tank.adjust(xVel * elapsed, yVel *elapsed);
+  if length(tank.weapons) > 0 then begin
+    tank.weaponIdx := (tank.weaponIdx + changeWeapon) mod length(tank.weapons);
+    if tank.weaponIdx < 0 then tank.weaponIdx += length(tank.weapons);
+  end;
 end;
 
 procedure tController.process();
@@ -76,6 +82,8 @@ begin
   doFire := false;
   xVel := 0;
   yVel := 0;
+  changeTank := 0;
+  changeWeapon := 0;
 end;
 
 {--------------------------------------------}
@@ -87,7 +95,9 @@ begin
   if keyDown(key_left) then xVel := -100;
   if keyDown(key_right) then xVel := +100;
   if keyDown(key_up) then yVel := +10;
-  if keyDown(key_down) then yVel := -10
+  if keyDown(key_down) then yVel := -10;
+  if keyDown(key_pageUp) then changeWeapon := +1;
+  if keyDown(key_pageDown) then changeWeapon := -1;
 end;
 
 {--------------------------------------------}

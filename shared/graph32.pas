@@ -879,7 +879,7 @@ var
   s: tSprite;
 begin
   new := tPage.create(aWidth, aHeight);
-  s := tSprite(self);
+  s := tSprite.create(self);
   s.blit(new, 0, 0);
   s.free();
   result := new;

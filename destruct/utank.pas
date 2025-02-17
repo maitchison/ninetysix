@@ -10,13 +10,20 @@ type
 
   tTank = class;
 
-  tChassisType = (CT_TANK, CT_LAUNCHER);
+  {$scopedenums on}
+  tChassisType = (
+    null,
+    tank,
+    launcher,
+    heavy
+  );
 
   tChassis = record
     tag: string;
     cType: tChassisType;
     health: integer;
     spriteIdx: integer;
+    defaultWeapons: array of tWeaponType;
   end;
 
   tTank = class(tGameObject)
@@ -26,6 +33,7 @@ type
     procedure fireProjectile();
     procedure fireLaser();
   public
+    weapons: array of tWeaponSpec;
     chassis: tChassis;
     id: integer;
     cooldown: single;
@@ -33,8 +41,10 @@ type
     power: single;
     health: integer;
     lastProjectile: tProjectile;
+    weaponIdx: integer;
   public
     class function FromChassis(aChassis: tChassis): tTank; static;
+    function  weapon: tWeaponSpec;
     procedure reset(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
@@ -45,15 +55,11 @@ type
   end;
 
 const
-
-  CD_TANK = 0;
-  CD_LAUNCHER = 1;
-  CD_HEAVY = 2;
-
-  CHASSIS_DEF: array[0..2] of tChassis = (
-    (tag: 'Tank'; cType: CT_TANK; health: 750; spriteIdx: 0),
-    (tag: 'Launcher'; cType: CT_LAUNCHER; health: 500; spriteIdx: 5),
-    (tag: 'Heavy Tank'; cType: CT_TANK; health: 100; spriteIdx: 10)
+  CHASSIS_DEF: array[tChassisType] of tChassis = (
+    (tag: 'Null';       cType: tChassisType.null;     health: 0;   spriteIdx: 0; defaultWeapons: [];),
+    (tag: 'Tank';       cType: tChassisType.tank;     health: 750; spriteIdx: 0; defaultWeapons: [tWeaponType.tracer, tWeaponType.blast, tWeaponType.megaBlast]),
+    (tag: 'Launcher';   cType: tChassisType.launcher; health: 500; spriteIdx: 5; defaultWeapons: [];),
+    (tag: 'Heavy Tank'; cType: tChassisType.heavy;    health: 100; spriteIdx: 10;defaultWeapons: [];)
   );
 
 implementation
@@ -64,17 +70,23 @@ uses
 {-----------------------------------------------------------}
 
 class function tTank.FromChassis(aChassis: tChassis): tTank;
+var
+  i: integer;
 begin
   result := tTank.create();
   result.reset();
   result.chassis := aChassis;
   result.health := aChassis.health;
   result.spriteIdx := aChassis.spriteIdx;
+  setLength(result.weapons, length(aChassis.defaultWeapons));
+  for i := 0 to length(aChassis.defaultWeapons)-1 do
+    result.weapons[i] := WEAPON_SPEC[aChassis.defaultWeapons[i]];
 end;
 
 procedure tTank.reset();
 begin
   inherited reset();
+  weaponIdx := 0;
   angle := 0;
   power := 10;
   spriteIdx := 0;
@@ -151,6 +163,16 @@ begin
   end;
 end;
 
+{---------------}
+
+function tTank.weapon(): tWeaponSpec;
+begin
+  if length(weapons) = 0 then
+    result := WEAPON_SPEC[tWeaponType.null]
+  else
+    result := weapons[weaponIdx];
+end;
+
 {tank takes damage at given location in world space. Sender is who delt the damage}
 procedure tTank.takeDamage(atX,atY: integer; damage: integer; sender: tObject=nil);
 var
@@ -169,7 +191,7 @@ end;
 procedure tTank.fire();
 begin
   // stub: hard code laser for me
-  if chassis.ctype=CT_LAUNCHER then
+  if chassis.ctype=tChassisType.launcher then
     fireLaser()
   else
     fireProjectile();
