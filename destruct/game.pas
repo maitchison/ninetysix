@@ -184,8 +184,8 @@ end;
 procedure drawAll(screen: tScreen);
 begin
   tanks.draw(screen);
-  projectiles.draw(screen);
   particles.draw(screen);
+  projectiles.draw(screen);
 end;
 
 procedure screenInit();

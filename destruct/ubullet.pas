@@ -143,6 +143,7 @@ var
   c: RGBA;
   go: tGameObject;
   tank: tTank;
+  dir: V2D;
 begin
   {gravity}
   vel.y += 58 * elapsed;
@@ -152,6 +153,14 @@ begin
   if (xPos < 32) or (xPos > 256+32) or (yPos > 256) then begin
     markAsEmpty();
     exit;
+  end;
+
+  {particle effects}
+  case projectileType of
+    tProjectileType.rocket: begin
+      dir := vel.normed();
+      makeSmoke(xPos - round(dir.x*6), yPos - round(dir.y*6), 1, 4);
+    end;
   end;
 
   {check if we collided with tank}
@@ -187,7 +196,7 @@ begin
       bounds := sprite.draw(screen.canvas, xPos, yPos);
     tProjectileType.rocket: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
-      sprite.drawRotated(screen.canvas, V3(xPos, yPos, 0), angle, 0.5);
+      sprite.drawRotated(screen.canvas, V3(xPos, yPos, 0), angle, 1.0);
       {todo: drawRotated should return rect}
       {also, this rect is too large}
       bounds := sprite.srcRect;
