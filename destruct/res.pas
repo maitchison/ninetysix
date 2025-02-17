@@ -14,6 +14,7 @@ var
   sprites: tSpriteSheet;
   tankGuiSprite: tSprite;
 
+
 implementation
 
 procedure loadResources();

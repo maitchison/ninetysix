@@ -1,5 +1,9 @@
 unit resLib;
 
+{todo: this needs a big update, or perhaps to just be removed.
+ airtime uses this... but no one else
+ also tResource overlaps with the resources unit}
+
 {$mode delphi}
 
 interface
@@ -14,7 +18,7 @@ uses
   lc96;
 
 type
-  tResource = record
+  tResourceInfo = record
     srcFile: string;
     dstFile: string;
     modifiedTime: int64;
@@ -25,9 +29,9 @@ type
 
     numResources: word;
 
-    resource: array[0..63] of tResource;
+    resource: array[0..63] of tResourceInfo;
 
-    procedure addResource(res: tResource);
+    procedure addResource(res: tResourceInfo);
 
     constructor Create(); overload;
     constructor Create(filename: string); overload;
@@ -38,7 +42,7 @@ type
     procedure deserialize(fileName: string);
 
     function findResourceIndex(dstFile: string): integer;
-    procedure updateResource(res: tResource);
+    procedure updateResource(res: tResourceInfo);
 
   end;
 
@@ -48,7 +52,7 @@ implementation
 
 {-----------------------------------------------}
 
-procedure tResource.clear();
+procedure tResourceInfo.clear();
 begin
   srcFile := '';
   dstFile := '';
@@ -83,7 +87,7 @@ begin
   inherited destroy();
 end;
 
-procedure tResourceLibrary.addResource(res: tResource);
+procedure tResourceLibrary.addResource(res: tResourceInfo);
 begin
   if numResources = length(resource) then
     fatal('Too many resources, limit is '+intToStr(length(resource)));
@@ -102,7 +106,7 @@ begin
 end;
 
 {updates or adds resource}
-procedure tResourceLibrary.updateResource(res: tResource);
+procedure tResourceLibrary.updateResource(res: tResourceInfo);
 var
   id: int32;
 begin
@@ -117,7 +121,7 @@ procedure tResourceLibrary.serialize(fileName: string);
 var
   t: text;
   ioError: word;
-  res: tResource;
+  res: tResourceInfo;
   i: integer;
 begin
   assign(t, filename);
@@ -148,7 +152,7 @@ var
   t: text;
   s,k,v: ansistring;
   ioError: word;
-  res: tResource;
+  res: tResourceInfo;
 begin
   assign(t, filename);
   {$I-}
@@ -203,7 +207,7 @@ type
 procedure tResourceLibraryTest.run();
 var
   rl: tResourceLibrary;
-  res: tResource;
+  res: tResourceInfo;
 begin
   rl := tResourceLibrary.Create();
   res.srcFile := 'a';
