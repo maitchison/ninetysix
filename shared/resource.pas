@@ -10,12 +10,15 @@ type
     tag: string;
   end;
 
+  tResourceLoaderFilter = function(path: string): boolean;
+
   tResourceLibrary = class
   protected
     resources: array of tResource;
     function getByTag(aTag: string): tResource;
   public
     function addResource(filename: string): tResource; virtual;
+    procedure loadFromFolder(root: string; pattern: string; filter: tResourceLoaderFilter = nil);
     constructor create();
     destructor destroy(); override;
     property items[tag: string]: tResource read getByTag; default;
@@ -30,6 +33,7 @@ procedure registerResourceLoader(aExtension: string; aProc: tResourceLoaderProc)
 implementation
 
 uses
+  fileSystem,
   utils;
 
 type
@@ -72,6 +76,20 @@ begin
   note(res.tag);
   result := res;
 end;
+
+procedure tResourceLibrary.loadFromFolder(root: string; pattern: string; filter: tResourceLoaderFilter = nil);
+var
+  filename: string;
+  tag: string;
+  path: string;
+begin
+  for filename in fs.listFiles(joinPath(root, '\'+pattern)) do begin
+    path := joinPath(root, filename);
+    if assigned(filter) and (not filter(path)) then continue;
+    addResource(path);
+  end;
+end;
+
 
 function tResourceLibrary.getByTag(aTag: string): tResource;
 var

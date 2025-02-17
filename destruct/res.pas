@@ -3,8 +3,8 @@ unit res;
 interface
 
 uses
-  {$i units}
-  ;
+  {$i units},
+  fileSystem;
 
 procedure loadResources();
 procedure freeResources();
@@ -22,6 +22,13 @@ const
     'shoot', 'explode', 'plasma', 'rocket'
   ];
 
+function sfxFilter(path: string): boolean;
+begin
+  {only load 'short' audio'}
+  if fs.getFileSize(path) > 128*1024 then exit(false);
+  exit(true);
+end;
+
 procedure loadResources();
 var
   i: integer;
@@ -32,8 +39,7 @@ begin
   titleGFX := tPage.Load('res\title.p96');
 
   sfx := tSFXLibrary.create();
-  for tag in sfxFiles do
-    sfx.addResource('res\'+tag+'.a96');
+  sfx.loadFromFolder('res', '*.a96', sfxFilter);
 
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
   sprites.grid(16, 16);
