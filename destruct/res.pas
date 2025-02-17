@@ -7,26 +7,33 @@ uses
   ;
 
 procedure loadResources();
+procedure freeResources();
 
 var
   titleGFX: tPage;
-  shootSFX, explodeSFX: tSoundEffect;
+  sfx: tSFXLibrary;
   sprites: tSpriteSheet;
   tankGuiSprite: tSprite;
 
-
 implementation
+
+const
+  sfxFiles: array of string = [
+    'shoot', 'explode', 'plasma', 'rocket'
+  ];
 
 procedure loadResources();
 var
   i: integer;
+  tag: string;
 begin
   info('Loading resources');
 
   titleGFX := tPage.Load('res\title.p96');
 
-  shootSFX := tSoundEffect.Load('res\shoot.a96');
-  explodeSFX := tSoundEffect.Load('res\explode.a96');
+  sfx := tSFXLibrary.create();
+  for tag in sfxFiles do
+    sfx.addResource('res\'+tag+'.a96');
 
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
   sprites.grid(16, 16);
@@ -37,7 +44,14 @@ begin
     sprites.sprites[i].pivot.x += 8;
     sprites.sprites[i].pivot.y += 8;
   end;
+end;
 
+procedure freeResources();
+begin
+  freeAndNil(titleGFX);
+  freeAndNil(sfx);
+  freeAndNil(sprites);
+  freeAndNil(tankGuiSprite);
 end;
 
 begin

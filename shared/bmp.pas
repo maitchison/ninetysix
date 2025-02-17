@@ -55,7 +55,7 @@ end;
 
 {----------------------------------------------}
 
-function LoadBMP(fileName: string): tPage;
+function LoadBMP(fileName: string): tPage; register;
 var
   FileHeader: TBMPHeader;
   InfoHeader: TBitmapInfoHeader;

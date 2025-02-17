@@ -39,6 +39,28 @@ begin
   img.free;
 end;
 
+procedure convertWave(filename: string);
+var
+  srcPath, dstPath: string;
+  writer: tLA96Writer;
+  sfx: tSoundEffect;
+begin
+  srcPath := joinPath('c:\dev\masters\destruct', filename+'.wav');
+  dstPath := 'res\'+filename+'.a96';
+  if (not FORCE) and fs.exists(dstPath) then exit;
+  sfx := tSoundEffect.Load(srcPath);
+
+  writer := tLA96Writer.create();
+  writer.open(dstPath);
+  writer.writeA96(sfx, ACP_HIGH);
+  writer.free();
+
+  textAttr := Green;
+  writeLn(format('[%.2fs]',[sfx.length/441000]));
+  textAttr := White;
+  sfx.free;
+end;
+
 procedure masterGFX();
 begin
   convertPNG('title');
@@ -51,47 +73,18 @@ end;
 {create compressed copies of master music tracks}
 procedure masterSFX();
 var
-  verbose: boolean;
-  sourceFiles: array of string = ['explode', 'shoot', 'plasma', 'rocket'];
-  writer: tLA96Writer;
   filename: string;
-  srcPath, dstPath: string;
-  srcMusic: tSoundEffect;
-  outStream: tMemoryStream;
+  tag: string;
+  root: string;
 begin
-  LA96_ENABLE_STATS := false;
-  verbose := true;
-
-  writer := tLA96Writer.create();
-
-  for filename in sourceFiles do begin
-    srcPath := joinPath('c:\dev\masters\destruct', filename+'.wav');
-    if not fs.exists(srcPath) then begin
-      warning('File not found '+srcPath);
-      continue;
-    end;
-
-    dstPath := joinPath('res', filename+'.a96');
-    if (not FORCE) and fs.exists(dstPath) then begin
-      note('Skipping '+srcPath);
-      continue;
-    end;
-
-    {compress it}
-    writeln();
-    write(filename+': ');
-    srcMusic := tSoundEffect.Load(srcPath);
-    writer.open(dstPath);
-    writer.frameWriteHook := updateEncodeProgress();
-    writer.writeA96(srcMusic, ACP_HIGH);
+  root := 'c:\dev\masters\destruct';
+  for filename in fs.listFiles(joinPath(root, '\*.wav')) do begin
+    {only load 'short' audio'}
+    if fs.getFileSize(joinPath(root, filename)) > 128*1024 then continue;
+    tag := removeExtension(extractFilename(filename));
+    convertWave(tag);
   end;
-
-  writer.free();
-
-  writeln();
-  writeln('Done.');
 end;
-
 
 {create compressed copies of master music tracks}
 procedure masterMusic();

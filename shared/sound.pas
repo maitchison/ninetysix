@@ -119,6 +119,16 @@ type
 
   end;
 
+type
+  tSFXLibrary = class(tResourceLibrary)
+  protected
+    function getSFXByTag(aTag: string): tSoundEffect;
+  public
+    function addResource(filename: string): tResource; override;
+    property items[tag: string]: tSoundEffect read getSFXByTag; default;
+  end;
+
+
 function getAudioFormat(bitsPerChannel: integer; numChannels: integer): tAudioFormat;
 
 implementation
@@ -127,6 +137,26 @@ uses
   mixLib,
   wave,
   la96;
+
+{--------------------------------------------------------}
+
+function tSFXLibrary.getSFXByTag(aTag: string): tSoundEffect;
+var
+  res: tResource;
+begin
+  res := getByTag(aTag);
+  assert(res is tSoundEffect);
+  result := tSoundEffect(res);
+end;
+
+function tSFXLibrary.addResource(filename: string): tResource;
+var
+  res: tResource;
+begin
+  res := inherited addResource(filename);
+  assert(res is tSoundEffect);
+  result := res;
+end;
 
 {--------------------------------------------------------}
 
@@ -341,7 +371,7 @@ end;
 
 class function tSoundEffect.Load(filename: string): tSoundEffect;
 var
-  proc: tResourceLoadProc;
+  proc: tResourceLoaderProc;
   res: tResource;
   startTime: double;
 begin

@@ -928,7 +928,7 @@ end;
 
 class function tPage.Load(filename: string): tPage;
 var
-  proc: tResourceLoadProc;
+  proc: tResourceLoaderProc;
   res: tResource;
   startTime: double;
 begin

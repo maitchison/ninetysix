@@ -196,7 +196,7 @@ type
     procedure writeA96(sfx: tSoundEffect); overload;
   end;
 
-function loadA96(filename: string): tSoundEffect;
+function loadA96(filename: string): tSoundEffect; register;
 function decodeLA96(s: tStream): tSoundEffect;
 function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 
@@ -339,12 +339,12 @@ begin
   startPos := fs.pos;
   fs.readBlock(header, sizeof(header));
 
-  if header.tag <> 'LA96' then raise ValueError.create(format('Not an LA96 file. Found "%s", expecting LA96', [string(header.tag)]));
+  if header.tag <> 'LA96' then raise ValueError('Not an LA96 file. Found "%s", expecting LA96', [string(header.tag)]);
   if (header.versionSmall > VER_SMALL) or (header.versionBig <> VER_BIG) then
-    raise ValueError.create(format('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]));
-  if header.format <> 0 then raise ValueError.create(format('Format type %d not supported', [header.format]));
-  if header.compressionMode <> 0 then raise ValueError.create('Compression not supported');
-  if header.frameSize <> 1024 then raise ValueError.create('Framesize must be 1024');
+    raise ValueError('Expecting v%d.%d, but found v%d.%d', [VER_SMALL, VER_BIG, header.versionSmall, header.versionBig]);
+  if header.format <> 0 then raise ValueError('Format type %d not supported', [header.format]);
+  if header.compressionMode <> 0 then raise ValueError('Compression not supported');
+  if header.frameSize <> 1024 then raise ValueError('Framesize must be 1024');
 
   fs.seek(startPos+128);
 

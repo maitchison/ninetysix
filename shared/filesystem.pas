@@ -282,7 +282,7 @@ begin
         system.rewrite(f,1);
       end;
     end;
-    else raise GeneralError.create('Invalid fileMode %d', [fileMode]);
+    else raise GeneralError('Invalid fileMode %d', [fileMode]);
   end;
 
   system.fileMode := oldFileMode;
@@ -292,8 +292,8 @@ begin
 
   case errorCode of
     0: ;
-    2: raise FileNotFoundError.create('File not found "%s"', [path]);
-    else raise IOError.create('Could not open file "%s", Error:%s', [path, getIOErrorString(errorCode)]);
+    2: raise tFileNotFoundError.create('File not found "%s"', [path]);
+    else raise tIOError.create('Could not open file "%s", Error:%s', [path, getIOErrorString(errorCode)]);
   end;
 
 end;

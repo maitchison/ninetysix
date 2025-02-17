@@ -295,6 +295,8 @@ begin
   battleScreen();
   screenDone();
 
+  freeResources();
+
   printLog();
 
 end.

@@ -214,7 +214,7 @@ begin
     projectile.pos += projectile.vel.normed*6;
     projectile.owner := self;
     cooldown := weapon.cooldown;
-    mixer.play(shootSFX, 0.2); // todo: custom SFX for weapons
+    mixer.play(sfx['shoot'], 0.2); // todo: custom SFX for weapons
     lastProjectile := projectile;
   end;
 end;
@@ -236,7 +236,7 @@ end;
 procedure tTank.explode();
 begin
   if status <> GO_ACTIVE then exit;
-  mixer.play(explodeSFX, 1.0);
+  mixer.play(sfx['explode'], 1.0);
   makeExplosion(xPos, yPos, 20);
   markForRemoval();
 end;

@@ -112,7 +112,7 @@ var
   radius: integer;
 begin
   radius := round(clamp(2, 2*sqrt(abs(damage)), 100));
-  mixer.play(explodeSFX, 0.3);
+  mixer.play(sfx['explode']  , 0.3);
   case projectileType of
     tProjectileType.none,
     tProjectileType.shell: begin

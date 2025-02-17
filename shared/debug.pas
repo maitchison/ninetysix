@@ -83,11 +83,16 @@ type
     property message: string read fMessage write fMessage;
   end;
 
-  GeneralError = class(Exception);
-  ValueError = class(Exception);
-  IOError = class(Exception);
-  FileNotFoundError = class(Exception);
-  AssertionError = class(Exception);
+  tGeneralError = class(Exception);
+  tValueError = class(Exception);
+  tIOError = class(Exception);
+  tFileNotFoundError = class(Exception);
+  tAssertionError = class(Exception);
+
+function ValueError(s: string): tValueError; overload;
+function ValueError(fmt: string;args: array of const): tValueError; overload;
+function GeneralError(s: string): tGeneralError; overload;
+function GeneralError(fmt: string;args: array of const): tGeneralError; overload;
 
 implementation
 
@@ -95,6 +100,28 @@ uses
   utils,
   sysInfo,
   vga;
+
+{------------------------------------------------}
+
+function ValueError(s: string): tValueError;
+begin
+  result := tValueError.create(s);
+end;
+
+function ValueError(fmt: string;args: array of const): tValueError;
+begin
+  result := tValueError.create(format(fmt, args));
+end;
+
+function GeneralError(s: string): tGeneralError;
+begin
+  result := tGeneralError.create(s);
+end;
+
+function GeneralError(fmt: string;args: array of const): tGeneralError;
+begin
+  result := tGeneralError.create(format(fmt, args));
+end;
 
 {------------------------------------------------}
 
@@ -165,7 +192,7 @@ end;
 procedure fatal(s: string; code: byte=255);
 begin
   log(s, llError);
-  raise GeneralError.create(s);
+  raise GeneralError(s);
 end;
 
 {todo: remove this and have caller use raise GeneralError instead}
@@ -175,7 +202,7 @@ var
 begin
   s := format(fmt, args);
   log(s, llError);
-  raise GeneralError.create(s);
+  raise GeneralError(s);
 end;
 
 procedure note(s: string);
@@ -201,7 +228,7 @@ end;
 procedure assert(condition: boolean; msg: string='');
 begin
   if not condition then
-    raise AssertionError(msg);
+    raise tAssertionError.create(msg);
 end;
 
 procedure printLog(MaxEntries: integer = 20);
@@ -412,10 +439,19 @@ begin
   textColor(White);
   clrscr;
 
-  textColor(White);
+  textColor(Red);
   writeln('An error has occured:');
   writeln();
-  writeln(obj.toString);
+  textColor(Yellow);
+  if assigned(obj) then
+    if obj is Exception then
+      writeln(obj.toString)
+    else if obj is tObject then
+      writeln('Invalid exception object: '+obj.toString)
+    else
+      writeln('Invalid exception object')
+  else
+    writeln('Nil exception object');
 
   textColor(White);
   writeln();
