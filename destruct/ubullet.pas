@@ -43,12 +43,15 @@ type
   end;
 
 type
+  {hmm.. we could index these by string no?}
   {$scopedenums on}
   tWeaponType = (
     null      = 0,
     tracer    = 1,
     blast     = 2,
-    megaBlast = 3
+    megaBlast = 3,
+    microNuke = 4,
+    miniNuke  = 5
   );
 
 const
@@ -58,10 +61,12 @@ const
     (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: tProjectileType.none;   cooldown: 1.0),
     (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: tProjectileType.shell;  cooldown: 0.1),
     (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   projectileType: tProjectileType.shell;  cooldown: 1.0),
-    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0)
-{    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: PT_ROCKET; cooldown: 1.0),
-    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: PT_ROCKET; cooldown: 1.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
+    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0),
+    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: tProjectileType.rocket; cooldown: 2.0),
+    //for testing
+    (tag: 'Test Rocket';    spriteIdx: 16*11 + 7;  damage: 10; projectileType: tProjectileType.rocket; cooldown: 0.25)
+ //   (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0)
+{    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
     (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
     (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: PT_PLASMA; cooldown: 1.0)}
   );
@@ -114,10 +119,13 @@ begin
     tProjectileType.none,
     tProjectileType.shell: begin
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
+      if damage > 10 then
+        makeExplosion(xPos, yPos, radius);
+    end;
+    tProjectileType.rocket: begin
+      terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
-    tProjectileType.rocket:
-      makeExplosion(xPos, yPos, radius);
     tProjectileType.plasma:
       ; // niy
     tProjectileType.dirt:
@@ -145,6 +153,7 @@ begin
     markAsEmpty();
     exit;
   end;
+
   {check if we collided with tank}
   for go in tanks.objects do begin
     tank := tTank(go);
@@ -169,13 +178,22 @@ end;
 procedure tProjectile.draw(screen: tScreen);
 var
   bounds: tRect;
+  angle: single;
 begin
   bounds.init(0,0,0,0);
   case projectileType of
     tProjectileType.none: ;
     tProjectileType.shell:
-      if assigned(sprite) then
-        bounds := sprite.draw(screen.canvas, xPos, yPos);
+      bounds := sprite.draw(screen.canvas, xPos, yPos);
+    tProjectileType.rocket: begin
+      angle := arcTan2(vel.y, vel.x) * RAD2DEG;
+      sprite.drawRotated(screen.canvas, V3(xPos, yPos, 0), angle, 0.5);
+      {todo: drawRotated should return rect}
+      {also, this rect is too large}
+      bounds := sprite.srcRect;
+      bounds.x := xPos - sprite.pivot.x;
+      bounds.y := yPos - sprite.pivot.y;
+    end;
     else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
   end;
   if bounds.width > 0 then

@@ -50,6 +50,7 @@ type
     function  draw(dstPage: tPage; atX, atY: int32): tRect;
     function  drawFlipped(dstPage: tPage; atX, atY: int32): tRect;
     procedure drawStretched(DstPage: TPage; dest: tRect);
+    procedure drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0);
     procedure drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
@@ -79,6 +80,7 @@ implementation
 uses
   poly,
   keyboard, //stub
+  myMath,
   filesystem;
 
 {$i sprite_ref.inc}
@@ -194,6 +196,18 @@ end;
 procedure tSprite.drawStretched(dstPage: tPage; dest: tRect);
 begin
   stretchDraw_ASM(dstPage, Self.page, Self.srcRect, dest);
+end;
+
+procedure tSprite.drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0);
+var
+  transform: tMatrix4x4;
+begin
+  {todo: switch to a 3x2 matrix for this stuff}
+  transform.setIdentity();
+  transform.translate(V3(-pivot.x, -pivot.y, 0));
+  transform.rotateXYZ(0, 0, zAngle * DEG2RAD);
+  transform.scale(scale);
+  drawTransformed(dstPage, pos, transform);
 end;
 
 {identity transform will the centered on sprite center...

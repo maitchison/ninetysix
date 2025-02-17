@@ -90,6 +90,7 @@ type
     procedure translate(v: V3D);
     procedure scale(factor: single); overload;
     procedure scale(x,y,z: single); overload;
+    procedure rotateXYZ(x,y,z: single);
 
     procedure setIdentity();
     procedure setTranslate(v: V3D);
@@ -410,6 +411,13 @@ begin
   end;
 end;
 
+procedure tMatrix4X4.rotateXYZ(x,y,z: single);
+var
+  m: tMatrix4x4;
+begin
+  m.setRotationXYZ(x,y,z);
+  self := self.MM(m);
+end;
 
 procedure tMatrix4X4.setTranslate(v: V3D);
 var
