@@ -32,15 +32,16 @@ type
 
     tag: string;
     page: tPage;
-    rect: tRect;
-    border: tBorder;
+    pivot: tPoint;    // the origin
+    srcRect: tRect;   // location of sprite on page
+    border: tBorder;  // border inset (not really used yet)
 
     constructor create(aPage: tPage); overload;
     constructor create(aPage: tPage; aRect: tRect); overload;
     destructor destroy(); override;
 
-    function  width: int32;
-    function  height: int32;
+    function  width: int32; inline;
+    function  height: int32; inline;
 
     function  clone(): tSprite;
 
@@ -126,41 +127,38 @@ end;
 
 {---------------------------------------------------------------------}
 
-constructor tSprite.Create(aPage: TPage);
+constructor tSprite.Create(aPage: tPage);
 begin
   inherited create();
   self.tag := 'sprite';
   self.page := aPage;
-  self.rect := graph2d.Rect(aPage.width, aPage.height);
+  self.srcRect := Rect(aPage.width, aPage.height);
+  self.pivot := Point(0,0);
   self.border.init(0, 0, 0, 0);
 end;
 
-constructor tSprite.Create(aPage: TPage; aRect: tRect);
+constructor tSprite.Create(aPage: tPage; aRect: tRect);
 begin
-  inherited create();
-  self.tag := 'sprite';
-  self.page := aPage;
-  self.rect := aRect;
-  self.border.init(0, 0, 0, 0);
+  create(aPage);
+  self.srcRect := aRect;
 end;
 
 function tSprite.width: int32;
 begin
-  result := self.rect.Width;
+  result := srcRect.Width;
 end;
 
 function tSprite.height: int32;
 begin
-  result := Self.rect.Height;
+  result := srcRect.Height;
 end;
-
 
 {Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
 function tSprite.draw(dstPage: tPage; atX, atY: integer): tRect;
 begin
-  draw_REF(dstPage, self.page, self.rect, atX, atY);
-  result.x := atX;
-  result.y := atY;
+  draw_REF(dstPage, self.page, srcRect, atX-pivot.x, atY-pivot.y);
+  result.x := atX-pivot.x;
+  result.y := atY-pivot.y;
   result.width := width;
   result.height := height;
 end;
@@ -169,31 +167,31 @@ end;
 procedure tSprite.drawFlipped(dstPage: tPage; atX, atY: integer);
 begin
   {a bit inefficent, but ok for the moment}
-  polyDraw_REF(dstPage, page, rect,
-    Point(atX + rect.width - 1, atY),
+  polyDraw_REF(dstPage, page, srcRect,
+    Point(atX + srcRect.width - 1, atY),
     Point(atX, atY),
-    Point(atX, atY + rect.height - 1),
-    Point(atX + rect.width - 1, atY + rect.height - 1)
+    Point(atX, atY + srcRect.height - 1),
+    Point(atX + srcRect.width - 1, atY + srcRect.height - 1)
   );
 end;
 
 function tSprite.getPixel(atX, atY: integer): RGBA;
 begin
   fillchar(result, sizeof(result), 0);
-  if (atX < 0) or (atY < 0) or (atX >= rect.width) or (atY >= rect.height) then exit;
-  result := page.getPixel(atX+rect.x, atY+rect.y);
+  if (atX < 0) or (atY < 0) or (atX >= srcRect.width) or (atY >= srcRect.height) then exit;
+  result := page.getPixel(atX+srcRect.x, atY+srcRect.y);
 end;
 
 {Copy sprite to screen at given location, no alpha blending}
 procedure tSprite.blit(dstPage: tPage; atX, atY: Integer);
 begin
-  blit_ASM(dstPage, self.page, self.rect, atX, atY);
+  blit_ASM(dstPage, self.page, self.srcRect, atX, atY);
 end;
 
 {Draws sprite stetched to cover destination rect}
 procedure tSprite.drawStretched(dstPage: tPage; dest: tRect);
 begin
-  stretchDraw_ASM(dstPage, Self.page, Self.rect, dest);
+  stretchDraw_ASM(dstPage, Self.page, Self.srcRect, dest);
 end;
 
 {identity transform will the centered on sprite center...
@@ -206,7 +204,7 @@ var
   var
     v: V3D;
   begin
-    v := V3(delta.x, delta.y, 0) - V3(rect.width / 2, rect.height / 2, 0);
+    v := V3(delta.x, delta.y, 0) - V3(srcRect.width / 2, srcRect.height / 2, 0);
     v := transform.apply(v) + pos;
     // no perspective for the moment}
     result.x := round(v.x);
@@ -214,11 +212,11 @@ var
   end;
 
 begin
-  polyDraw_ASM(dstPage, page, rect,
+  polyDraw_ASM(dstPage, page, srcRect,
     xform(Point(0,0)),
-    xform(Point(rect.width-1, 0)),
-    xform(Point(rect.width, rect.height-1)),
-    xform(Point(0, rect.height-1))
+    xform(Point(srcRect.width-1, 0)),
+    xform(Point(srcRect.width, srcRect.height-1)),
+    xform(Point(0, srcRect.height-1))
   );
 end;
 
@@ -232,42 +230,42 @@ begin
   if not assigned(self) then
     fatal('Tried drawing unassigned sprite');
 
-  oldRect := self.rect;
+  oldRect := srcRect;
 
   drawRect := graph2d.Rect(atX, atY, DrawWidth, DrawHeight);
 
   {top part}
-  rect := tRect.Inset(oldRect, 0, 0, Border.Left, Border.Top);
-  self.draw(DstPage, atX, atY);
+  srcRect := tRect.Inset(oldRect, 0, 0, Border.Left, Border.Top);
+  draw(DstPage, atX, atY);
 
-  self.rect := tRect.Inset(oldRect,Border.Left, 0, -Border.Right, Border.Top);
-  self.drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, 0, -Border.Right, Border.Top));
+  srcRect := tRect.Inset(oldRect,Border.Left, 0, -Border.Right, Border.Top);
+  drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, 0, -Border.Right, Border.Top));
 
-  self.rect := tRect.Inset(oldRect,-Border.Right, 0, 0, Border.Top);
-  self.draw(DstPage, atX+DrawWidth-Border.Right, atY);
+  srcRect := tRect.Inset(oldRect,-Border.Right, 0, 0, Border.Top);
+  draw(DstPage, atX+DrawWidth-Border.Right, atY);
 
   {middle part}
-  self.rect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
-  self.drawStretched(DstPage, TRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
+  srcRect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
+  drawStretched(DstPage, TRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
 
-  self.rect := tRect.Inset(oldRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom);
-  self.drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom));
+  srcRect := tRect.Inset(oldRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom);
+  drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom));
 
-  self.rect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
-  self.drawStretched(DstPage, TRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
+  srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
+  drawStretched(DstPage, TRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 
   {bottom part}
 
-  self.rect := tRect.Inset(oldRect,0, -Border.Bottom, Border.Left, 0);
-  self.draw(DstPage, atX, atY+DrawHeight-Border.Bottom);
+  srcRect := tRect.Inset(oldRect,0, -Border.Bottom, Border.Left, 0);
+  draw(DstPage, atX, atY+DrawHeight-Border.Bottom);
 
-  self.rect := tRect.Inset(oldRect,Border.Left, -Border.Bottom, -Border.Right, 0);
-  self.drawStretched(DstPage, TRect.Inset(DrawRect,Border.Left, -Border.Bottom, -Border.Right, 0));
+  srcRect := tRect.Inset(oldRect,Border.Left, -Border.Bottom, -Border.Right, 0);
+  drawStretched(DstPage, TRect.Inset(DrawRect,Border.Left, -Border.Bottom, -Border.Right, 0));
 
-  rect := tRect.Inset(oldRect,-Border.Right, -Border.Bottom, 0, 0);
+  srcRect := tRect.Inset(oldRect,-Border.Right, -Border.Bottom, 0, 0);
   draw(DstPage, atX+DrawWidth-Border.Right, atY+DrawHeight-Border.Bottom);
 
-  self.rect := oldRect;
+  srcRect := oldRect;
 
 end;
 
@@ -276,7 +274,7 @@ function tSprite.clone(): tSprite;
 begin
   result := tSprite.create(self.page);
   result.tag := self.tag;
-  result.rect := self.rect;
+  result.srcRect := self.srcRect;
   result.border := self.border;
 end;
 
@@ -292,7 +290,7 @@ end;
 procedure tSprite.writeToIni(ini: tIniWriter);
 begin
   ini.writeString('Tag', tag);
-  ini.writeRect('Rect', rect);
+  ini.writeRect('Rect', srcRect);
   // todo: support skipping default values
   //if not border.isDefault then
   border.writeToIni(ini);
@@ -301,7 +299,7 @@ end;
 procedure tSprite.readFromIni(ini: tIniReader);
 begin
   tag := ini.readString('Tag');
-  rect := ini.readRect('Rect');
+  srcRect := ini.readRect('Rect');
   if ini.peekKey.toLower = 'border' then
     border.readFromIni(ini)
   else
@@ -347,7 +345,7 @@ begin
   for y := 0 to (page.height div cellHeight)-1 do begin
     for x := 0 to (page.width div cellWidth)-1 do begin
       sprite := tSprite.create(page);
-      sprite.rect := Rect(x*cellWidth, y*cellHeight, cellWidth, cellHeight);
+      sprite.srcRect := Rect(x*cellWidth, y*cellHeight, cellWidth, cellHeight);
       append(sprite);
     end;
   end;
@@ -387,7 +385,7 @@ begin
   page := tPage.create(64,64);
   sprite1 := tSprite.create(page);
   sprite1.tag := 'Fish';
-  sprite1.rect := Rect(8,12,30,34);
+  sprite1.srcRect := Rect(8,12,30,34);
   sprite1.border.init(2,3,4,1);
 
   iniWriter := tIniWriter.create('test.ini');
@@ -400,7 +398,7 @@ begin
   iniReader.free();
 
   assertEqual(sprite2.tag, sprite1.tag);
-  assertEqual(sprite2.rect.toString, sprite1.rect.toString);
+  assertEqual(sprite2.srcRect.toString, sprite1.srcRect.toString);
   assertEqual(sprite2.border.toString, sprite1.border.toString);
 
   fs.delFile('test.ini');
