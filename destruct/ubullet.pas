@@ -47,12 +47,15 @@ type
   {hmm.. we could index these by string no?}
   {$scopedenums on}
   tWeaponType = (
-    null      = 0,
-    tracer    = 1,
-    blast     = 2,
-    megaBlast = 3,
-    microNuke = 4,
-    miniNuke  = 5
+    null,
+    tracer,
+    blast,
+    megaBlast,
+    microNuke,
+    miniNuke,
+    smallDirt,
+    largeDirt,
+    plasma
   );
 
 const
@@ -64,10 +67,10 @@ const
     (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   projectileType: tProjectileType.shell;  cooldown: 1.0),
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: tProjectileType.rocket; cooldown: 2.0),
-    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0)
-{    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: PT_DIRT;   cooldown: 1.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: PT_PLASMA; cooldown: 1.0)}
+    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: tProjectileType.dirt;   cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: tProjectileType.dirt;   cooldown: 4.0),
+    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: tProjectileType.plasma; cooldown: 1.0)
   );
 
 
@@ -167,7 +170,8 @@ var
   dir: V2D;
 begin
   {gravity}
-  vel.y += 250 * elapsed;
+  if projectileType <> tProjectileType.plasma then
+    vel.y += 250 * elapsed;
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}
@@ -216,7 +220,8 @@ begin
     tProjectileType.shell,
     tProjectileType.bullet:
       bounds := sprite.draw(screen.canvas, xPos, yPos);
-    tProjectileType.rocket: begin
+    tProjectileType.rocket,
+    tProjectileType.plasma: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
       sprite.drawRotated(screen.canvas, V3(xPos, yPos, 0), angle, 1.0);
       {todo: drawRotated should return rect}

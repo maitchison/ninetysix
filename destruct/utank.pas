@@ -63,7 +63,10 @@ const
         tWeaponType.blast,
         tWeaponType.megaBlast,
         tWeaponType.microNuke,
-        tWeaponType.miniNuke
+        tWeaponType.miniNuke,
+        tWeaponType.smallDirt,
+        tWeaponType.largeDirt,
+        tWeaponType.plasma
       ]
     ),
     (tag: 'Launcher';   cType: tChassisType.launcher; health: 500; spriteIdx: 5; defaultWeapons: [];),
@@ -219,6 +222,7 @@ begin
       tProjectileType.bullet: mixer.play(sfx['launch4'], 0.2);
       tProjectileType.shell: mixer.play(sfx['launch2'], 0.2);
       tProjectileType.rocket: mixer.play(sfx['launch3'], 0.2);
+      tProjectileType.plasma: mixer.play(sfx['plasma1'], 0.2);
     end;
 
     lastProjectile := projectile;

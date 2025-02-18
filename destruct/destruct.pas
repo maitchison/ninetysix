@@ -214,7 +214,6 @@ begin
   tank2 := tTank.FromChassis(CHASSIS_DEF[tChassisType.tank]);
   tank1.id := 1;
   tank2.id := 2;
-  tank2.weaponIdx := 1;
   control1 := tAIController.create(tank1);
   control2 := tHumanController.create(tank2);
   tank1.pos := V2(100, 130);
@@ -236,6 +235,8 @@ begin
     musicUpdate();
     startTimer('main');
     elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
+
+    if keydown(key_z) then elapsed := 0.001;
 
     {update ui}
     if elapsed > 0 then
