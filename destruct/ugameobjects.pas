@@ -1,4 +1,4 @@
-unit obj;
+unit uGameObjects;
 
 interface
 

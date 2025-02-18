@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   {game specific}
-  uTank, uWeapon, game, res, obj, terra, controller,
+  uTank, uWeapon, game, res, uGameObjects, terra, controller,
   {general}
   graph2d, graph32, vga, vesa,
   sprite, inifile,
@@ -180,6 +180,44 @@ begin
   end;
 end;
 
+{look for a good place to put a new tank}
+function findNewTankPosition(team: integer): integer;
+var
+  mask: array[0..255] of boolean;
+  options: array[0..255] of byte;
+  numOptions: integer;
+  xStart: integer;
+  xlp: integer;
+  xPos: integer;
+  tank: tTank;
+begin
+
+  fillchar(mask, sizeof(mask), true);
+  for tank in tanks do begin
+    if not tank.isActive then continue;
+    for xlp := -12 to +12 do begin
+      xPos := xlp + (tank.xPos-32);
+      if (xPos < 0) or (xPos > 255) then continue;
+      mask[xPos] := false;
+    end;
+  end;
+
+  if team = 1 then xStart := 10 else xStart := 128+10;
+
+  numOptions := 0;
+  for xlp := xStart to xStart + 108 do begin
+    if not mask[xlp] then continue;
+    options[numOptions] := xlp;
+    inc(numOptions);
+  end;
+
+  if numOptions = 0 then
+    exit(32+xStart+random(108))
+  else
+    exit(32+options[random(numOptions)]);
+
+end;
+
 procedure battleScreen();
 var
   exitFlag: boolean;
@@ -211,16 +249,18 @@ begin
   terrain.generate();
 
   {setup players}
-  for tank in tanks do
+  for tank in tanks do begin
+    tank.reset();
     tank.status := GO_EMPTY;
+  end;
 
-  tanks[0].init(10+rnd(108), 1, CT_TANK);
-  tanks[1].init(10+rnd(108), 1, CT_LAUNCHER);
-  tanks[2].init(10+rnd(108), 1, CT_HEAVY);
+  tanks[0].init(findNewTankPosition(1), 1, CT_TANK);
+  tanks[1].init(findNewTankPosition(1), 1, CT_LAUNCHER);
+  tanks[2].init(findNewTankPosition(1), 1, CT_HEAVY);
 
-  tanks[5].init(128+10+rnd(108), 2, CT_TANK);
-  tanks[6].init(128+10+rnd(108), 2, CT_LAUNCHER);
-  tanks[7].init(128+10+rnd(108), 2, CT_HEAVY);
+  tanks[5].init(findNewTankPosition(2), 2, CT_TANK);
+  tanks[6].init(findNewTankPosition(2), 2, CT_LAUNCHER);
+  tanks[7].init(findNewTankPosition(2), 2, CT_HEAVY);
 
   for tank in tanks do
     if tank.status = GO_ACTIVE then

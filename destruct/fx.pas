@@ -5,7 +5,7 @@ interface
 
 uses
   {$i units},
-  obj;
+  uGameObjects;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);

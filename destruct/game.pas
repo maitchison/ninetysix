@@ -5,7 +5,7 @@ interface
 uses
   {$i units},
   crt,
-  uWeapon, uTank, obj;
+  uWeapon, uTank, uGameObjects;
 
 type
   tHitInfo = record

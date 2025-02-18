@@ -4,7 +4,7 @@ interface
 
 uses
   {$i units},
-  obj;
+  uGameObjects;
 
 type
 

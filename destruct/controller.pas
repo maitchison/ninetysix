@@ -5,7 +5,7 @@ interface
 uses
   {$i units},
   uTank,
-  obj;
+  uGameObjects;
 
 type
   tAIState = (
