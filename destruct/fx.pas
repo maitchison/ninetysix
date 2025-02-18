@@ -78,7 +78,7 @@ begin
     p.vel := V2(dx, dy).normed() * (0.5 + sqrt(d)) + V2(rnd-128, rnd-128) * 0.1;
   end;
   stopTimer('explosion');
-  note('%f %f', [1000*getTimer('explosion').maxElapsed, 1000*getTimer('burn').maxElapsed]);
+  note('Explosion took explode:%fms burn:%fms', [1000*getTimer('explosion').elapsed, 1000*getTimer('burn').elapsed]);
 end;
 
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);

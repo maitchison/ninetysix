@@ -106,10 +106,12 @@ begin
   if r <= 0 then exit;
   r2 := r*r;
   for dy := -r to +r do begin
+    y := atY+dy;
+    if (y < 0) or (y > 255) then continue;
+    if lineStatus[y] = TL_EMPTY then continue;
     for dx := -r to +r do begin
       dst2 := (dx*dx)+(dy*dy);
       x := atX+dx;
-      y := atY+dy;
       if (dst2 > r2) then continue;
       if isEmpty(x, y) then continue;
       {linear fall off}
