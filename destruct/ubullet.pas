@@ -24,7 +24,7 @@ type
     sprite: tSprite;
     damage: integer;
     procedure reset(); override;
-    procedure explode();
+    procedure hit();
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
   end;
@@ -107,23 +107,48 @@ begin
   bounds.height := 3;
 end;
 
-procedure tProjectile.explode();
+procedure playRandomHit();
+var
+  hitSnd: tSoundEffect;
+  volume: single;
+  pitch: single;
+begin
+  case rnd mod 3 of
+    0: hitSnd := sfx['hit1'];
+    1: hitSnd := sfx['hit5'];
+    2: hitSnd := sfx['hit6'];
+  end;
+  volume := 0.7 + (rnd/256) * 0.2;
+  pitch := 0.9 + (rnd/256) * 0.2;
+  mixer.play(hitSnd, volume, SCS_NEXTFREE, pitch);
+end;
+
+procedure tProjectile.hit();
 var
   radius: integer;
 begin
   radius := round(clamp(2, 2*sqrt(abs(damage)), 100));
-  mixer.play(sfx['explode']  , 0.3);
   case projectileType of
-    tProjectileType.none,
+
+    tProjectileType.none: ;
+
     tProjectileType.shell: begin
+      if damage = 1 then
+        {special case for tracer}
+        playRandomHit()
+      else
+        mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       if damage > 10 then
         makeExplosion(xPos, yPos, radius);
     end;
+
     tProjectileType.rocket: begin
+      mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
+
     tProjectileType.plasma:
       ; // niy
     tProjectileType.dirt:
@@ -171,13 +196,13 @@ begin
     if c.a > 0 then begin
       tank.takeDamage(xPos, yPos, self.damage, owner);
       makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
-      explode();
+      hit();
       exit;
     end;
   end;
   {check if we collided with terrain}
   if terrain.isSolid(xPos-32, yPos) then begin
-    explode();
+    hit();
     exit;
   end;
 end;

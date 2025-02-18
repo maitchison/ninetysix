@@ -214,7 +214,12 @@ begin
     projectile.pos += projectile.vel.normed*6;
     projectile.owner := self;
     cooldown := weapon.cooldown;
-    mixer.play(sfx['shoot'], 0.2); // todo: custom SFX for weapons
+
+    case weapon.projectileType of
+      tProjectileType.shell: mixer.play(sfx['shoot'], 0.2);
+      tProjectileType.rocket: mixer.play(sfx['launch'], 0.2);
+    end;
+
     lastProjectile := projectile;
   end;
 end;

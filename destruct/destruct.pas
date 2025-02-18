@@ -290,7 +290,7 @@ begin
   loadResources();
 
   screenInit();
-  musicPlay('res\dance1.a96');
+  //musicPlay('res\dance1.a96');
   //titleScreen();
   battleScreen();
   screenDone();
