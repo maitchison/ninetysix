@@ -240,18 +240,19 @@ begin
     projectile := nextProjectile();
     weapon.applyToProjectile(projectile);
     projectile.pos := pos;
-    if weapon.projectileType = tProjectileType.plasma then pVel := 200 else pVel := power * 20;
+    if weapon.pType = PT_PLASMA then pVel := 200 else pVel := power * 20;
     projectile.vel := V2(sin(angle*DEG2RAD) * pVel, -cos(angle*DEG2RAD) * pVel);
     projectile.pos += projectile.vel.normed*6;
     projectile.owner := self;
     cooldown := weapon.cooldown;
 
-    case weapon.projectileType of
-      tProjectileType.bullet: mixer.play(sfx['launch4'], 0.2);
-      tProjectileType.shell: mixer.play(sfx['launch2'], 0.2);
-      tProjectileType.rocket: mixer.play(sfx['launch3'], 0.2);
-      tProjectileType.plasma: mixer.play(sfx['plasma1'], 0.2);
-      tProjectileType.dirt: mixer.play(sfx['launch1'], 0.2);
+    {todo: these should be part of the projectile spec}
+    case weapon.pType of
+      PT_BULLET: mixer.play(sfx['launch4'], 0.2);
+      PT_SHELL: mixer.play(sfx['launch2'], 0.2);
+      PT_ROCKET: mixer.play(sfx['launch3'], 0.2);
+      PT_PLASMA: mixer.play(sfx['plasma1'], 0.2);
+      PT_DIRT: mixer.play(sfx['launch1'], 0.2);
     end;
 
     lastProjectile := projectile;

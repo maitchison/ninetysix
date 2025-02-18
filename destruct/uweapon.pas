@@ -8,20 +8,19 @@ uses
 
 type
 
-  {$scopedenums on}
   tProjectileType = (
-    none,
-    bullet,
-    shell,
-    rocket,
-    plasma,
-    dirt,
-    laser// special case
+    PT_NONE,
+    PT_BULLET,
+    PT_SHELL,
+    PT_ROCKET,
+    PT_PLASMA,
+    PT_DIRT,
+    PT_LASER
   );
 
   tProjectile = class(tGameObject)
     owner: tGameObject;
-    projectileType: tProjectileType;
+    pType: tProjectileType;
     sprite: tSprite;
     damage: integer;
     procedure reset(); override;
@@ -36,7 +35,7 @@ type
     tag: string;
     spriteIdx: integer;
     damage: integer;
-    projectileType: tProjectileType;
+    pType: tProjectileType;
     cooldown: single;
     function projectileSprite: tSprite;
     function weaponSprite: tSprite;
@@ -62,15 +61,15 @@ const
 
   WEAPON_SPEC: array[tWeaponType] of tWeaponSpec =
   (
-    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: tProjectileType.none;   cooldown: 1.0),
-    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: tProjectileType.bullet; cooldown: 0.1),
-    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   projectileType: tProjectileType.shell;  cooldown: 1.0),
-    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0),
-    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: tProjectileType.rocket; cooldown: 2.0),
-    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: -20;  projectileType: tProjectileType.dirt;   cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: -40;  projectileType: tProjectileType.dirt;   cooldown: 4.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   projectileType: tProjectileType.plasma; cooldown: 1.0)
+    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    pType: PT_NONE;   cooldown: 1.0),
+    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    pType: PT_BULLET; cooldown: 0.1),
+    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   pType: PT_SHELL;  cooldown: 1.0),
+    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   pType: PT_SHELL;  cooldown: 2.0),
+    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  pType: PT_ROCKET; cooldown: 2.0),
+    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; pType: PT_ROCKET; cooldown: 4.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: -20;  pType: PT_DIRT;   cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: -40;  pType: PT_DIRT;   cooldown: 4.0),
+    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; cooldown: 1.0)
   );
 
 
@@ -96,7 +95,7 @@ procedure tWeaponSpec.applyToProjectile(projectile: tProjectile);
 begin
   projectile.sprite := projectileSprite;
   projectile.damage := damage;
-  projectile.projectileType := projectileType;
+  projectile.pType := pType;
 end;
 
 {-------------------------------------------------------}
@@ -133,38 +132,38 @@ var
   dir: V2D;
 begin
   radius := round(clamp(2, 2*sqrt(abs(damage)), 100));
-  case projectileType of
+  case pType of
 
-    tProjectileType.none: ;
+    PT_NONE: ;
 
-    tProjectileType.bullet: begin
+    PT_BULLET: begin
       mixer.play(sfx['hit1'] , 0.8);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
     end;
-    tProjectileType.shell: begin
+    PT_SHELL: begin
       mixer.play(sfx['explode'] , 0.10);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
-    tProjectileType.rocket: begin
+    PT_ROCKET: begin
       mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
-    tProjectileType.plasma: begin
+    PT_PLASMA: begin
       mixer.play(sfx['plasma3'] , 0.3);
       terrain.burn(xPos-32, yPos, 2, 20);
       dir := vel.normed();
       terrain.burn(xPos-32+round(dir.x*2), yPos+round(dir.y*2), 2, 20);
       terrain.burn(xPos-32+round(dir.x*4), yPos+round(dir.y*4), 2, 20);
     end;
-    tProjectileType.dirt: begin
+    PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
       terrain.dirt(xPos-32, yPos, -damage);
     end;
-    tProjectileType.laser:
+    PT_LASER:
       ; // pass;
-    else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
+    else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;
 
   markForRemoval();
@@ -178,7 +177,7 @@ var
   dir: V2D;
 begin
   {gravity}
-  if projectileType <> tProjectileType.plasma then
+  if pType <> PT_PLASMA then
     //open tyrian is 0.05*(FPS^2). If FPS=69.5, this gives us 241.5.
     vel.y += 241.5 * elapsed;
   {move}
@@ -190,8 +189,8 @@ begin
   end;
 
   {particle effects}
-  case projectileType of
-    tProjectileType.rocket: begin
+  case pType of
+    PT_ROCKET: begin
       dir := vel.normed();
       makeSmoke(xPos - round(dir.x*6), yPos - round(dir.y*6), 1, 4);
     end;
@@ -227,15 +226,15 @@ var
   angle: single;
 begin
   bounds.init(0,0,0,0);
-  case projectileType of
-    tProjectileType.none:
+  case pType of
+    PT_NONE:
       ;
-    tProjectileType.shell,
-    tProjectileType.bullet,
-    tProjectileType.dirt:
+    PT_SHELL,
+    PT_BULLET,
+    PT_DIRT:
       bounds := sprite.draw(screen.canvas, xPos, yPos);
-    tProjectileType.rocket,
-    tProjectileType.plasma: begin
+    PT_ROCKET,
+    PT_PLASMA: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
       sprite.drawRotated(screen.canvas, V3(xPos, yPos, 0), angle, 1.0);
       {todo: drawRotated should return rect}
@@ -244,7 +243,7 @@ begin
       bounds.x := xPos - sprite.pivot.x;
       bounds.y := yPos - sprite.pivot.y;
     end;
-    else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
+    else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;
   if bounds.width > 0 then
     screen.markRegion(bounds);
