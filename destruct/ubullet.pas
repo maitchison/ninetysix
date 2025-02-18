@@ -11,6 +11,7 @@ type
   {$scopedenums on}
   tProjectileType = (
     none,
+    bullet,
     shell,
     rocket,
     plasma,
@@ -59,7 +60,7 @@ const
   WEAPON_SPEC: array[tWeaponType] of tWeaponSpec =
   (
     (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    projectileType: tProjectileType.none;   cooldown: 1.0),
-    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: tProjectileType.shell;  cooldown: 0.1),
+    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    projectileType: tProjectileType.bullet; cooldown: 0.1),
     (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   projectileType: tProjectileType.shell;  cooldown: 1.0),
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: tProjectileType.rocket; cooldown: 2.0),
@@ -132,23 +133,20 @@ begin
 
     tProjectileType.none: ;
 
-    tProjectileType.shell: begin
-      if damage = 1 then
-        {special case for tracer}
-        playRandomHit()
-      else
-        mixer.play(sfx['explode'] , 0.3);
+    tProjectileType.bullet: begin
+      mixer.play(sfx['hit1'] , 0.8);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
-      if damage > 10 then
-        makeExplosion(xPos, yPos, radius);
     end;
-
+    tProjectileType.shell: begin
+      mixer.play(sfx['explode'] , 0.10);
+      terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
+      makeExplosion(xPos, yPos, radius);
+    end;
     tProjectileType.rocket: begin
       mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
-
     tProjectileType.plasma:
       ; // niy
     tProjectileType.dirt:
@@ -169,7 +167,7 @@ var
   dir: V2D;
 begin
   {gravity}
-  vel.y += 58 * elapsed;
+  vel.y += 250 * elapsed;
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}
@@ -215,7 +213,8 @@ begin
   bounds.init(0,0,0,0);
   case projectileType of
     tProjectileType.none: ;
-    tProjectileType.shell:
+    tProjectileType.shell,
+    tProjectileType.bullet:
       bounds := sprite.draw(screen.canvas, xPos, yPos);
     tProjectileType.rocket: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;

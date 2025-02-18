@@ -214,6 +214,7 @@ begin
   tank2 := tTank.FromChassis(CHASSIS_DEF[tChassisType.tank]);
   tank1.id := 1;
   tank2.id := 2;
+  tank2.weaponIdx := 1;
   control1 := tAIController.create(tank1);
   control2 := tHumanController.create(tank2);
   tank1.pos := V2(100, 130);

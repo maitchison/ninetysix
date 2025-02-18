@@ -16,7 +16,7 @@ uses
   go32;
 
 CONST
-  NUM_CHANNELS = 4;
+  NUM_CHANNELS = 8;
 
 type
 
@@ -30,6 +30,7 @@ type
     SCS_SELFOVERWRITE,    // overwrite is sound is already playing,
                           // otherwise next free
     SCS_NEXTFREE,         // find the next free channel
+    SCS_OLDEST,           // find the next free channel, or overwrite if needed
     SCS_FIXED1,           // use a fixed channel
     SCS_FIXED2,
     SCS_FIXED3,
@@ -62,7 +63,7 @@ type
     destructor destroy(); override;
     function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
     function playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
-    function play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel; overload;
+    function play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_OLDEST; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel; overload;
   end;
 
 type
@@ -706,20 +707,42 @@ end;
 function tSoundMixer.getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
 var
   i: integer;
+  bestIndex: integer;
+  bestScore: int64;
+  score: int64;
+
 begin
+
   case strategy of
     SCS_SELFOVERWRITE: begin
       for i := 1 to NUM_CHANNELS do
         if channels[i].sfx = sfx then
           exit(channels[i]);
-      exit(getFreeChannel(sfx, SCS_NEXTFREE));
+      exit(getFreeChannel(sfx, SCS_OLDEST));
     end;
     SCS_NEXTFREE: begin
       for i := 1 to NUM_CHANNELS do
         if not channels[i].inUse then
           exit(channels[i]);
       exit(nil);
+    end;
+    SCS_OLDEST: begin
+      {look for free channel, if none found use the one that's been
+       playing the longest}
+      bestIndex :=  -1;
+      bestScore := -1;
+      for i := 1 to NUM_CHANNELS do begin
+        if not channels[i].inUse then
+          exit(channels[i])
+        else
+          score := channels[i].sampleTick;
+        if score > bestScore then begin
+          bestScore := score;
+          bestIndex := i;
+        end;
       end;
+      exit(channels[bestIndex]);
+    end;
     SCS_FIXED1: exit(channels[1]);
     SCS_FIXED2: exit(channels[2]);
     SCS_FIXED3: exit(channels[3]);
@@ -738,7 +761,7 @@ begin
   result := channel;
 end;
 
-function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_NEXTFREE; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_OLDEST; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   ticksOffset: int32;
   offsetString: string;

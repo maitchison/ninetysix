@@ -17,11 +17,6 @@ var
 
 implementation
 
-const
-  sfxFiles: array of string = [
-    'shoot', 'explode', 'plasma', 'rocket'
-  ];
-
 function sfxFilter(path: string): boolean;
 begin
   {only load 'short' audio'}

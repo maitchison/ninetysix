@@ -210,14 +210,15 @@ begin
     projectile := nextProjectile();
     weapon.applyToProjectile(projectile);
     projectile.pos := pos;
-    projectile.vel := V2(sin(angle*DEG2RAD) * power * 10, -cos(angle*DEG2RAD) * power * 10);
+    projectile.vel := V2(sin(angle*DEG2RAD) * power * 20, -cos(angle*DEG2RAD) * power * 20);
     projectile.pos += projectile.vel.normed*6;
     projectile.owner := self;
     cooldown := weapon.cooldown;
 
     case weapon.projectileType of
-      tProjectileType.shell: mixer.play(sfx['shoot'], 0.2);
-      tProjectileType.rocket: mixer.play(sfx['rocket'], 0.2);
+      tProjectileType.bullet: mixer.play(sfx['launch4'], 0.2);
+      tProjectileType.shell: mixer.play(sfx['launch2'], 0.2);
+      tProjectileType.rocket: mixer.play(sfx['launch3'], 0.2);
     end;
 
     lastProjectile := projectile;
