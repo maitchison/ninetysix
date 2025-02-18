@@ -95,7 +95,7 @@ begin
       end;
     end;
 
-    if not terrain.isEmpty(rx-32, ry) then begin
+    if not terrain.isEmpty(rx, ry) then begin
       result.didHit := true;
       result.obj := nil;
       result.x := rx;

@@ -196,7 +196,7 @@ begin
   for tank in tanks do begin
     if not tank.isActive then continue;
     for xlp := -12 to +12 do begin
-      xPos := xlp + (tank.xPos-32);
+      xPos := xlp + (tank.xPos);
       if (xPos < 0) or (xPos > 255) then continue;
       mask[xPos] := false;
     end;
@@ -212,9 +212,9 @@ begin
   end;
 
   if numOptions = 0 then
-    exit(32+xStart+random(108))
+    exit(xStart+random(108))
   else
-    exit(32+options[random(numOptions)]);
+    exit(options[random(numOptions)]);
 
 end;
 

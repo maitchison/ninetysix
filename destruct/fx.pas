@@ -28,7 +28,7 @@ var
 begin
   c := col;
   c.a := c.a div 2;
-  x := round(atX);
+  x := round(atX+32);
   y := round(atY);
 
   screen.canvas.putPixel(x, y, col);
@@ -57,7 +57,7 @@ begin
   r2 := radius * radius;
   inv256 := 1/256;
   startTimer('burn');
-  terrain.burn(round(atX-32), round(atY), round(radius*1.1+1), 25);
+  terrain.burn(round(atX), round(atY), round(radius*1.1+1), 25);
   stopTimer('burn');
   startTimer('explosion');
   for i := 0 to n-1 do begin

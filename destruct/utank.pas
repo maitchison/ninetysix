@@ -128,16 +128,21 @@ begin
 end;
 
 procedure tTank.draw(screen: tScreen);
+var
+  r: tRect;
 begin
 
   if not assigned(sprite) then exit;
 
-  if angle < 0 then
-    sprite.drawFlipped(screen.canvas, bounds.x, bounds.y)
-  else
-    sprite.draw(screen.canvas, bounds.x, bounds.y);
+  r := bounds;
+  r.x += 32;
 
-  screen.markRegion(bounds);
+  if angle < 0 then
+    sprite.drawFlipped(screen.canvas, r.x, r.y)
+  else
+    sprite.draw(screen.canvas, r.x, r.y);
+
+  screen.markRegion(r);
   {draw target}
   drawMarker(
     screen,
@@ -171,7 +176,7 @@ begin
   for xlp := bounds.left+3 to bounds.right-3 do begin
     if DEBUG_SHOW_TANK_SUPPORT then
       screen.canvas.putPixel(xlp, bounds.bottom-3, RGB(255,0,255));
-    if terrain.isSolid(xlp-32, bounds.bottom-3) then inc(support);
+    if terrain.isSolid(xlp, bounds.bottom-3) then inc(support);
   end;
   if support = 0 then
     vel.y := clamp(vel.y + 100 * elapsed, -800, 800)
@@ -187,13 +192,13 @@ begin
           p.pos := V2(xPos, yPos);
           p.vel := V2(rnd-128, rnd-128) * 0.2;
           p.solid := true;
-          p.col := terrain.terrain.getPixel(xPos-32, yPos);
+          p.col := terrain.terrain.getPixel(xPos, yPos);
           if p.col.a = 0 then p.col := RGB(200,200,200);
           p.ttl := 0.5;
           p.radius := 2;
         end;
         {burn it}
-        terrain.burn(xPos-32, bounds.bottom-3, 2, round(hitPower/support/16));
+        terrain.burn(xPos, bounds.bottom-3, 2, round(hitPower/support/16));
       end;
       vel.y := 0;
     end;
@@ -268,7 +273,7 @@ begin
   hit := traceRay(xPos, yPos, angle, 100, self);
   if hit.didHit then begin
     makeSparks(hit.x, hit.y, 3, 5, 0, 0);
-    terrain.burn(hit.x-32, hit.y, 2, 10);
+    terrain.burn(hit.x, hit.y, 2, 10);
   end;
   {1. stretch draw the line}
 end;

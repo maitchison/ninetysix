@@ -138,28 +138,28 @@ begin
 
     PT_BULLET: begin
       mixer.play(sfx['hit1'] , 0.8);
-      terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
+      terrain.burn(xPos, yPos, radius, clamp(damage, 5, 80));
     end;
     PT_SHELL: begin
       mixer.play(sfx['explode'] , 0.10);
-      terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
+      terrain.burn(xPos, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
     PT_ROCKET: begin
       mixer.play(sfx['explode'] , 0.3);
-      terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
+      terrain.burn(xPos, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
     PT_PLASMA: begin
       mixer.play(sfx['plasma3'] , 0.3);
-      terrain.burn(xPos-32, yPos, 2, 20);
+      terrain.burn(xPos, yPos, 2, 20);
       dir := vel.normed();
-      terrain.burn(xPos-32+round(dir.x*2), yPos+round(dir.y*2), 2, 20);
-      terrain.burn(xPos-32+round(dir.x*4), yPos+round(dir.y*4), 2, 20);
+      terrain.burn(xPos+round(dir.x*2), yPos+round(dir.y*2), 2, 20);
+      terrain.burn(xPos+round(dir.x*4), yPos+round(dir.y*4), 2, 20);
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
-      terrain.dirt(xPos-32, yPos, -damage);
+      terrain.dirt(xPos, yPos, -damage);
     end;
     PT_LASER:
       ; // pass;
@@ -183,7 +183,7 @@ begin
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}
-  if (xPos < 32) or (xPos > 256+32) or (yPos > 256) then begin
+  if (xPos < 0) or (xPos > 255) or (yPos > 255) then begin
     markForRemoval();
     exit;
   end;
@@ -214,7 +214,7 @@ begin
     exit;
   end;
   {check if we collided with terrain}
-  if terrain.isSolid(xPos-32, yPos) then begin
+  if terrain.isSolid(xPos, yPos) then begin
     hit();
     exit;
   end;
@@ -232,15 +232,15 @@ begin
     PT_SHELL,
     PT_BULLET,
     PT_DIRT:
-      bounds := sprite.draw(screen.canvas, xPos, yPos);
+      bounds := sprite.draw(screen.canvas, xPos+32, yPos);
     PT_ROCKET,
     PT_PLASMA: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
-      sprite.drawRotated(screen.canvas, V3(xPos, yPos, 0), angle, 1.0);
+      sprite.drawRotated(screen.canvas, V3(xPos+32, yPos, 0), angle, 1.0);
       {todo: drawRotated should return rect}
       {also, this rect is too large}
       bounds := sprite.srcRect;
-      bounds.x := xPos - sprite.pivot.x;
+      bounds.x := xPos + 32 - sprite.pivot.x;
       bounds.y := yPos - sprite.pivot.y;
     end;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));

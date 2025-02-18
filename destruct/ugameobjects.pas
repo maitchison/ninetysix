@@ -185,8 +185,8 @@ end;
 
 procedure tGameObject.draw(screen: tScreen);
 begin
-  screen.canvas.putPixel(xPos, yPos, col);
-  screen.markRegion(rect(xPos, yPos, 1, 1));
+  screen.canvas.putPixel(xPos+32, yPos, col);
+  screen.markRegion(rect(xPos+32, yPos, 1, 1));
 end;
 
 procedure tGameObject.update(elapsed: single);
@@ -217,7 +217,7 @@ procedure tParticle.update(elapsed: single);
 begin
   inherited update(elapsed);
   col.a := clamp(round(255*(1-(age/ttl))), 0, 255);
-  if solid and terrain.isSolid(xPos-32, yPos) then begin
+  if solid and terrain.isSolid(xPos, yPos) then begin
     pos -= vel * elapsed;
     vel.x := -vel.x * 0.8;
     vel.y := -vel.y * 0.8;
