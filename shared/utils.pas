@@ -135,7 +135,8 @@ function  toDWords(x: array of word): tDWords; overload;
 function  toDWords(x: array of dword): tDWords; overload;
 
 procedure Wait(ms: integer);
-function  RND(): byte; assembler; register;
+function  rnd(max: integer): integer; overload;
+function  rnd(): byte; assembler; register; overload;
 function  Quantize(value, levels: byte): byte;
 function  clamp(x, a, b: int32): int32; inline; overload;
 function  clamp(x, a, b: single): single; inline; overload;
@@ -775,6 +776,11 @@ begin
   end;
 end;
 
+{generates a random number from 0..max-1}
+function rnd(max: integer): integer;
+begin
+  result := random(max);
+end;
 
 {A simple 8bit random number generator
 Can be used for generating random colors etc.

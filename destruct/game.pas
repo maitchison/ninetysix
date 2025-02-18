@@ -5,7 +5,7 @@ interface
 uses
   {$i units},
   crt,
-  uBullet, uTank, obj;
+  uWeapon, uTank, obj;
 
 type
   tHitInfo = record
@@ -20,9 +20,8 @@ procedure drawAll(screen: tScreen);
 
 function  nextProjectile: tProjectile;
 function  nextParticle: tParticle;
-function  getTank(id: integer;team: integer): tTank;
 
-function  getObjectAtPos(x,y: integer): tGameObject;
+function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
 
 procedure screenDone();
@@ -30,7 +29,7 @@ procedure screenInit();
 
 var
   screen: tScreen;
-  tanks: tGameObjectList;
+  tanks: array of tTank;
 
 implementation
 
@@ -117,18 +116,17 @@ begin
 end;
 
 {returns the object at given location}
-function getObjectAtPos(x,y: integer): tGameObject;
+function getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 var
-  go: tGameObject;
   tank: tTank;
   c: RGBA;
 begin
   result := nil;
   {todo: we should implement a grid system, and maybe bounding rects as well}
   {note: this would enable projectile collisions too}
-  for go in tanks.objects do begin
-    tank := tTank(go);
-    if tank.status <> GO_ACTIVE then continue;
+  for tank in tanks do begin
+    if not tank.isActive then continue;
+    if (tank = ignore) then continue;
     c := tank.getWorldPixel(x, y);
     if c.a > 0 then
       exit(tank);
@@ -161,31 +159,28 @@ begin
   end;
 end;
 
-function  getTank(id: integer;team: integer): tTank;
-begin
-  {todo: support multiple tanks per team}
-  assert(id = 0);
-  result := tTank(tanks.objects[team]);
-end;
-
 procedure updateAll(elapsed: single);
 const
   stepSize = 1/180;
+var
+  tank: tTank;
 begin
   // no reason for particles do do small updates
   particles.update(elapsed);
 
   updateAccumlator += elapsed;
   while updateAccumlator >= stepSize do begin
-    tanks.update(stepSize);
+    for tank in tanks do if tank.isActive then tank.update(stepSize);
     projectiles.update(stepSize);
     updateAccumlator -= stepSize;
   end;
 end;
 
 procedure drawAll(screen: tScreen);
+var
+  tank: tTank;
 begin
-  tanks.draw(screen);
+  for tank in tanks do if tank.isActive then tank.draw(screen);
   particles.draw(screen);
   projectiles.draw(screen);
 end;
@@ -218,11 +213,18 @@ var
   p: tParticle;
 begin
   updateAccumlator := 0;
-  tanks := tGameObjectList.create(10);
   projectiles := tGameObjectList.create(1*1024);
   particles := tGameObjectList.create(16*1024);
+
+  {init our 10 tanks}
+  setLength(tanks, 10);
+  for i := 0 to length(tanks)-1 do begin
+    tanks[i] := tTank.create();
+    tanks[i].status := GO_EMPTY;
+  end;
+
   {for performance reason init some empty objects}
-  for i := 0 to 8*1024-1 do begin
+  for i := 0 to 2*1024-1 do begin
     p := tParticle.create();
     p.markForRemoval();
     particles.append(p);
@@ -231,8 +233,11 @@ begin
 end;
 
 procedure closeObjects;
+var
+  tank: tTank;
 begin
-  tanks.free;
+  for tank in tanks do tank.free();
+  setLength(tanks, 0);
   projectiles.free;
   particles.free;
 end;

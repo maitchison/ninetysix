@@ -4,18 +4,17 @@ interface
 
 uses
   {$i units},
-  uBullet, obj;
+  uWeapon, obj;
 
 type
 
   tTank = class;
 
-  {$scopedenums on}
   tChassisType = (
-    null,
-    tank,
-    launcher,
-    heavy
+    CT_NULL,
+    CT_TANK,
+    CT_LAUNCHER,
+    CT_HEAVY
   );
 
   tChassis = record
@@ -33,9 +32,9 @@ type
     procedure fireProjectile();
     procedure fireLaser();
   public
+    team: integer;
     weapons: array of tWeaponSpec;
     chassis: tChassis;
-    id: integer;
     cooldown: single;
     angle: single;
     power: single;
@@ -43,8 +42,10 @@ type
     lastProjectile: tProjectile;
     weaponIdx: integer;
   public
-    class function FromChassis(aChassis: tChassis): tTank; static;
     function  weapon: tWeaponSpec;
+    procedure init(aPosX: integer; aTeam: integer; aChassisType: tChassisType);
+    procedure clearTerrain();
+    procedure applyChassis(aChassis: tChassis);
     procedure reset(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
@@ -56,8 +57,8 @@ type
 
 const
   CHASSIS_DEF: array[tChassisType] of tChassis = (
-    (tag: 'Null';       cType: tChassisType.null;     health: 0;   spriteIdx: 0; defaultWeapons: [];),
-    (tag: 'Tank';       cType: tChassisType.tank;     health: 350; spriteIdx: 0;
+    (tag: 'Null';       cType: CT_NULL;     health: 0;   spriteIdx: 0; defaultWeapons: [];),
+    (tag: 'Tank';       cType: CT_TANK;     health: 350; spriteIdx: 0;
       defaultWeapons: [
         tWeaponType.tracer,
         tWeaponType.blast,
@@ -69,8 +70,8 @@ const
         tWeaponType.plasma
       ]
     ),
-    (tag: 'Launcher';   cType: tChassisType.launcher; health: 200; spriteIdx: 5; defaultWeapons: [];),
-    (tag: 'Heavy Tank'; cType: tChassisType.heavy;    health: 700; spriteIdx: 10;defaultWeapons: [];)
+    (tag: 'Launcher';   cType: CT_LAUNCHER; health: 200; spriteIdx: 5; defaultWeapons: [];),
+    (tag: 'Heavy Tank'; cType: CT_HEAVY;    health: 700; spriteIdx: 10;defaultWeapons: [];)
   );
 
 implementation
@@ -83,18 +84,33 @@ const
 
 {-----------------------------------------------------------}
 
-class function tTank.FromChassis(aChassis: tChassis): tTank;
+{initializes tank to given chassis and team.
+ yPosition defaults to ground level.}
+procedure tTank.init(aPosX: integer; aTeam: integer; aChassisType: tChassisType);
+begin
+  reset();
+  status := GO_ACTIVE;
+  pos.x := aPosX;
+  pos.y := 100; // todo auto pos y
+  team := aTeam;
+  applyChassis(CHASSIS_DEF[aChassisType]);
+end;
+
+{remove and terrain around this tank}
+procedure tTank.clearTerrain();
+begin
+end;
+
+procedure tTank.applyChassis(aChassis: tChassis);
 var
   i: integer;
 begin
-  result := tTank.create();
-  result.reset();
-  result.chassis := aChassis;
-  result.health := aChassis.health;
-  result.spriteIdx := aChassis.spriteIdx;
-  setLength(result.weapons, length(aChassis.defaultWeapons));
+  self.chassis := aChassis;
+  self.health := aChassis.health;
+  self.spriteIdx := aChassis.spriteIdx;
+  setLength(self.weapons, length(aChassis.defaultWeapons));
   for i := 0 to length(aChassis.defaultWeapons)-1 do
-    result.weapons[i] := WEAPON_SPEC[aChassis.defaultWeapons[i]];
+    self.weapons[i] := WEAPON_SPEC[aChassis.defaultWeapons[i]];
 end;
 
 procedure tTank.reset();
@@ -108,11 +124,14 @@ begin
   fillchar(chassis, sizeof(chassis), 0);
   col := RGB(255,255,255);
   spriteSheet := res.sprites;
-  sprite := spriteSheet.sprites[spriteIdx]; // will be set on update
+  sprite := nil; // will be set on update
 end;
 
 procedure tTank.draw(screen: tScreen);
 begin
+
+  if not assigned(sprite) then exit;
+
   if angle < 0 then
     sprite.drawFlipped(screen.canvas, bounds.x, bounds.y)
   else

@@ -1,4 +1,4 @@
-unit uBullet;
+unit uWeapon;
 
 interface
 
@@ -197,20 +197,22 @@ begin
     end;
   end;
 
-  {check if we collided with tank}
-  for go in tanks.objects do begin
-    tank := tTank(go);
-    if tank.status <> GO_ACTIVE then continue;
-    {make sure we don't collide with ourself as soon as we fire}
-    if (tank = self.owner) and (age < 0.10) then continue;
-    c := tank.getWorldPixel(xPos, yPos);
-    if c.a > 0 then begin
+  {check if we collided with an object}
+  if age < 0.1 then
+    go := getObjectAtPos(xPos, yPos, self.owner)
+  else
+    go := getObjectAtPos(xPos, yPos);
+  if assigned(go) then begin
+    if go is tTank then begin
+      tank := tTank(go);
       if damage > 0 then
         tank.takeDamage(xPos, yPos, damage, owner);
       makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
-      hit();
-      exit;
+    end else begin
+      // hmm we hit something other than a tank?
     end;
+    hit();
+    exit;
   end;
   {check if we collided with terrain}
   if terrain.isSolid(xPos-32, yPos) then begin

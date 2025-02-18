@@ -26,6 +26,7 @@ type
   public
     constructor create(); virtual;
     procedure reset(); virtual;
+    function  isActive: boolean;
     function  getWorldPixel(atX, atY: integer): RGBA;
     procedure draw(screen: tScreen); virtual;
     procedure update(elapsed: single); virtual;
@@ -67,7 +68,7 @@ type
 implementation
 
 uses
-  uTank, uBullet, terra, fx;
+  uTank, uWeapon, terra, fx;
 
 {----------------------------------------------------------}
 { tGameObjects }
@@ -90,7 +91,7 @@ procedure tGameObjectList.draw(screen: tScreen);
 var
   go: tGameObject;
 begin
-  for go in objects do if go.status = GO_ACTIVE then go.draw(screen);
+  for go in objects do if go.isActive then go.draw(screen);
 end;
 
 procedure tGameObjectList.update(elapsed: single);
@@ -137,6 +138,7 @@ end;
 
 procedure tGameObject.reset();
 begin
+  // this is a bad idea... if we have dynmaic arrays I think it's a problem?
   fillchar((pByte(self) + sizeof(Pointer))^, self.InstanceSize - sizeof(Pointer), 0);
   status := GO_ACTIVE;
   col := RGB(255,0,255);
@@ -166,6 +168,11 @@ end;
 function tGameObject.getY: integer; inline;
 begin
   result := round(pos.y);
+end;
+
+function tGameObject.isActive: boolean; inline;
+begin
+  result := status = GO_ACTIVE;
 end;
 
 {gets pixel color of object given input co-ords as world co-ords}

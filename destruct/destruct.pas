@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   {game specific}
-  uTank, uBullet, game, res, obj, terra, controller,
+  uTank, uWeapon, game, res, obj, terra, controller,
   {general}
   graph2d, graph32, vga, vesa,
   sprite, inifile,
@@ -183,7 +183,8 @@ end;
 procedure battleScreen();
 var
   exitFlag: boolean;
-  tank1, tank2: tTank;
+  go: tGameObject;
+  tank: tTank;
   elapsed: single;
   gui: tGuiComponents;
   fps: tGuiLabel;
@@ -210,23 +211,31 @@ begin
   terrain.generate();
 
   {setup players}
-  tank1 := tTank.FromChassis(CHASSIS_DEF[tChassisType.tank]);
-  tank2 := tTank.FromChassis(CHASSIS_DEF[tChassisType.tank]);
-  tank1.id := 1;
-  tank2.id := 2;
-  control1 := tAIController.create(tank1);
-  control2 := tHumanController.create(tank2);
-  tank1.pos := V2(100, 130);
-  tank2.pos := V2(200, 160);
-  tanks.append(tank1);
-  tanks.append(tank2);
+  for tank in tanks do
+    tank.status := GO_EMPTY;
+
+  tanks[0].init(10+rnd(108), 1, CT_TANK);
+  tanks[1].init(10+rnd(108), 1, CT_LAUNCHER);
+  tanks[2].init(10+rnd(108), 1, CT_HEAVY);
+
+  tanks[5].init(128+10+rnd(108), 2, CT_TANK);
+  tanks[6].init(128+10+rnd(108), 2, CT_LAUNCHER);
+  tanks[7].init(128+10+rnd(108), 2, CT_HEAVY);
+
+  for tank in tanks do
+    if tank.status = GO_ACTIVE then
+      tank.clearTerrain();
+
+  {setup controllers}
+  //control1 := tAIController.create(tank1);
+  //control2 := tHumanController.create(tank2);
 
   {setup gui}
   gui := tGuiComponents.create();
   fps := tGuiLabel.create(Point(10, 10));
   gui.append(fps);
 
-  tank2Gui := tTankGUI.create(Point(160, 0), tank2);
+  tank2Gui := tTankGUI.create(Point(160, 0), tanks[5]);
   gui.append(tank2Gui);
 
   {main loop}
@@ -242,10 +251,10 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-    control1.process();
+{    control1.process();
     control2.process();
     control1.apply(elapsed);
-    control2.apply(elapsed);
+    control2.apply(elapsed);}
 
     screen.clearAll();
 
@@ -303,7 +312,7 @@ begin
   loadResources();
 
   screenInit();
-  //musicPlay('res\dance1.a96');
+  musicPlay('res\dance1.a96');
   //titleScreen();
   battleScreen();
   screenDone();
