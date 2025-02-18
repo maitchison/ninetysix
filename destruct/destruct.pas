@@ -249,13 +249,24 @@ begin
 
     screen.clearAll();
 
+    startTimer('update');
     updateAll(elapsed);
+    stopTimer('update');
+    startTimer('draw');
     drawAll(screen);
+    stopTimer('draw');
+
+    startTimer('drawTerrain');
     terrain.draw(screen);
+    stopTimer('drawTerrain');
 
     {gui}
+    startTimer('guiUpdate');
     gui.update(elapsed);
+    stopTimer('guiUpdate');
+    startTimer('guiDraw');
     gui.draw(screen);
+    stopTimer('guiDraw');
 
     screen.flipAll();
 
@@ -298,7 +309,8 @@ begin
   screenDone();
 
   freeResources();
+  logTimers();
 
-  printLog();
+  printLog(32);
 
 end.

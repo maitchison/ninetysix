@@ -24,18 +24,18 @@ procedure startTimer(aTag: string);
 procedure stopTimer(aTag: string; iterations: integer=1);
 function  getTimer(aTag: string): tTimer;
 
-procedure printTimers();
+procedure logTimers();
 
 var TIMERS: array of tTimer;
 
 implementation
 
-procedure printTimers();
+procedure logTimers();
 var
   timer: tTimer;
 begin
   for timer in TIMERS do
-    writeln(timer.toString);
+    note(timer.toString);
 end;
 
 function getTimer(aTag: string): tTimer;
@@ -133,7 +133,10 @@ end;
 
 function tTimer.toString(): string;
 begin
-  result := format('%s: %f (%f) [total:%.2f]', [tag, elapsed, maxElapsed, totalElapsed]);
+  if avElapsed < 0.1 then
+    result := format('%s %fms (%fms) [total:%.2fs]', [pad(tag,20), 1000*avElapsed, 1000*maxElapsed, totalElapsed])
+  else
+    result := format('%s %fs (%fs) [total:%.2fs]', [pad(tag, 20), avElapsed, maxElapsed, totalElapsed]);
 end;
 
 var timer: tTimer;
