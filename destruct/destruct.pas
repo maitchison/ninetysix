@@ -217,7 +217,7 @@ begin
     result.x := options[random(numOptions)];
 
   {find y pos}
-  result.y := 255-terrain.terrainHeight(result.x);
+  result.y := 255-terrain.terrainHeight(result.x)-5;
 
 end;
 
@@ -266,8 +266,7 @@ begin
   tanks[7].init(findNewTankPosition(2), 2, CT_HEAVY);
 
   for tank in tanks do
-    if tank.status = GO_ACTIVE then
-      tank.clearTerrain();
+    if tank.isActive then tank.clearTerrain();
 
   {setup controllers}
   control1 := tAIController.create(tanks[0]);

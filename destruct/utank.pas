@@ -95,11 +95,24 @@ begin
   pos.y := aPos.y;
   team := aTeam;
   applyChassis(CHASSIS_DEF[aChassisType]);
+  update(0);
 end;
 
 {remove and terrain around this tank}
 procedure tTank.clearTerrain();
 begin
+  terrain.burn(xPos, yPos, 10, 100);
+  // per pixel version
+  (*
+  if not assigned(sprite) then exit;
+  for y := 0 to sprite.height-1 do begin
+    for x := 0 to sprite.width-1 do begin
+      if sprite.getPixel(x, y).a = 0 then continue;
+      {note: this should be -sprite.pivot... but it seems to not be set?}
+      terrain.burn(x + xPos-8, y + yPos-8, 4, 50);
+    end;
+  end;
+  *)
 end;
 
 procedure tTank.applyChassis(aChassis: tChassis);

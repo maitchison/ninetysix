@@ -91,7 +91,7 @@ procedure tGameObjectList.draw(screen: tScreen);
 var
   go: tGameObject;
 begin
-  for go in objects do if go.isActive then go.draw(screen);
+  for go in objects do if go.status = GO_ACTIVE then go.draw(screen);
 end;
 
 procedure tGameObjectList.update(elapsed: single);
