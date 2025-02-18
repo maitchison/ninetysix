@@ -68,8 +68,8 @@ const
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   projectileType: tProjectileType.shell;  cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  projectileType: tProjectileType.rocket; cooldown: 2.0),
     (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: tProjectileType.dirt;   cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: tProjectileType.dirt;   cooldown: 4.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: -20;  projectileType: tProjectileType.dirt;   cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: -40;  projectileType: tProjectileType.dirt;   cooldown: 4.0),
     (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   projectileType: tProjectileType.plasma; cooldown: 1.0)
   );
 
@@ -158,8 +158,10 @@ begin
       terrain.burn(xPos-32+round(dir.x*2), yPos+round(dir.y*2), 2, 20);
       terrain.burn(xPos-32+round(dir.x*4), yPos+round(dir.y*4), 2, 20);
     end;
-    tProjectileType.dirt:
-      ; // niy
+    tProjectileType.dirt: begin
+      mixer.play(sfx['dirt'] , 0.3);
+      terrain.dirt(xPos-32, yPos, -damage);
+    end;
     tProjectileType.laser:
       ; // pass;
     else fatal('Invalid projectile type '+intToStr(ord(projectileType)));
@@ -202,7 +204,8 @@ begin
     if (tank = self.owner) and (age < 0.10) then continue;
     c := tank.getWorldPixel(xPos, yPos);
     if c.a > 0 then begin
-      tank.takeDamage(xPos, yPos, self.damage, owner);
+      if damage > 0 then
+        tank.takeDamage(xPos, yPos, damage, owner);
       makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
       hit();
       exit;
@@ -222,9 +225,11 @@ var
 begin
   bounds.init(0,0,0,0);
   case projectileType of
-    tProjectileType.none: ;
+    tProjectileType.none:
+      ;
     tProjectileType.shell,
-    tProjectileType.bullet:
+    tProjectileType.bullet,
+    tProjectileType.dirt:
       bounds := sprite.draw(screen.canvas, xPos, yPos);
     tProjectileType.rocket,
     tProjectileType.plasma: begin

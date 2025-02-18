@@ -225,6 +225,7 @@ begin
       tProjectileType.shell: mixer.play(sfx['launch2'], 0.2);
       tProjectileType.rocket: mixer.play(sfx['launch3'], 0.2);
       tProjectileType.plasma: mixer.play(sfx['plasma1'], 0.2);
+      tProjectileType.dirt: mixer.play(sfx['launch1'], 0.2);
     end;
 
     lastProjectile := projectile;
@@ -248,7 +249,7 @@ end;
 procedure tTank.explode();
 begin
   if status <> GO_ACTIVE then exit;
-  mixer.play(sfx['explode'], 1.0);
+  mixer.play(sfx['explode'], 0.6);
   makeExplosion(xPos, yPos, 20);
   markForRemoval();
 end;

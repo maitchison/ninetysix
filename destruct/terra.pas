@@ -24,7 +24,7 @@ type
     destructor destroy(); override;
     function  isEmpty(x,y: integer): boolean;
     function  isSolid(x,y: integer): boolean;
-
+    procedure dirt(atX,atY: integer;r: integer);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     procedure generate();
     procedure draw(screen: tScreen);
@@ -126,8 +126,40 @@ begin
       tc.g := clamp(tc.g - dimFactor, 0, 255);
       tc.b := clamp(tc.b - dimFactor, 0, 255);
       terrain.setPixel(x, y, tc);
-      lineStatus[y] := TL_UNKNOWN;
     end;
+    lineStatus[y] := TL_UNKNOWN;
+  end;
+end;
+
+{creates a circle of dirt at location}
+procedure tTerrain.dirt(atX,atY: integer;r: integer);
+var
+  dx, dy: integer;
+  x,y: integer;
+  v: single;
+  dst2: integer;
+  r2: integer;
+  dimFactor: integer;
+  c: RGBA;
+begin
+  if r <= 0 then exit;
+  r2 := r*r;
+  for dy := -r to +r do begin
+    for dx := -r to +r do begin
+      x := atX+dx;
+      y := atY+dy;
+      dst2 := (dx*dx)+(dy*dy);
+      if (dst2 > r2) then continue;
+      if not isEmpty(x, y) then continue;
+      c := TC_DIRT;
+      v := 0.7+(0.1*(rnd/255));
+      c.r := round(c.r * v);
+      c.g := round(c.g * v);
+      c.b := round(c.r * v);
+      c.a := round(c.a * v);
+      terrain.setPixel(x, y, c);
+    end;
+    lineStatus[y] := TL_UNKNOWN;
   end;
 end;
 
