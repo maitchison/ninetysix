@@ -101,14 +101,16 @@ begin
   {remove tagged objects}
   for i := 0 to length(objects)-1 do begin
     go := objects[i];
-    if (go.status = GO_PENDING_REMOVAL) then begin
-      freeObjects[numFreeObjects] := i;
-      inc(numFreeObjects);
-      go.status := GO_EMPTY;
+    case go.status of
+      GO_EMPTY: ;
+      GO_PENDING_REMOVAL: begin
+        freeObjects[numFreeObjects] := i;
+        inc(numFreeObjects);
+        go.status := GO_EMPTY;
+      end;
+      GO_ACTIVE: go.update(elapsed);
     end;
   end;
-  {update}
-  for go in objects do if go.status = GO_ACTIVE then go.update(elapsed);
 end;
 
 {returns the next free object, or nil if there are none free}

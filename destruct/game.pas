@@ -170,13 +170,15 @@ end;
 
 procedure updateAll(elapsed: single);
 const
-  stepSize = 0.01;
+  stepSize = 1/180;
 begin
+  // no reason for particles do do small updates
+  particles.update(elapsed);
+
   updateAccumlator += elapsed;
   while updateAccumlator >= stepSize do begin
     tanks.update(stepSize);
     projectiles.update(stepSize);
-    particles.update(stepSize);
     updateAccumlator -= stepSize;
   end;
 end;

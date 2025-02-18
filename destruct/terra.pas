@@ -8,15 +8,23 @@ uses
   graph32, uScreen;
 
 type
+
+  {optimization for terrain}
+  tTerrainLineStatus = (TL_EMPTY, TL_MIXED, TL_FULL, TL_UNKNOWN);
+
   tTerrain = class
     {todo: implement cell system, 0=empty, 1=mixed, 2=full}
   public
     terrain: tPage;
+  protected
+    lineStatus: array[0..255] of tTerrainLineStatus; {0=empty, 1=maybe mixed, 2=full}
+    procedure updateLineStatus(y: integer);
   public
     constructor create();
     destructor destroy(); override;
     function  isEmpty(x,y: integer): boolean;
     function  isSolid(x,y: integer): boolean;
+
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     procedure generate();
     procedure draw(screen: tScreen);
@@ -47,11 +55,31 @@ begin
   inherited destroy();
 end;
 
+{--------------------}
+
+procedure tTerrain.updateLineStatus(y: integer);
+var
+  x: integer;
+  totalSolid: int32;
+begin
+  totalSolid:= 0;
+  for x := 0 to 255 do
+    if terrain.getPixel(x,y).a > 0 then inc(totalSolid);
+  if totalSolid = 0 then
+    lineStatus[y] := TL_EMPTY
+  else if totalSolid = 256 then
+    lineStatus[y] := TL_FULL
+  else
+    lineStatus[y] := TL_MIXED;
+end;
+
+{--------------------}
+
 function tTerrain.isSolid(x,y: integer): boolean;
 begin
   if y > 255 then exit(true);
   if (x < 0) or (x > 255) or (y < 0) then exit(false);
-  result := terrain.getPixel(x, y).a > $07;
+  result := terrain.getPixel(x, y).a > 0;
 end;
 
 function tTerrain.isEmpty(x,y: integer): boolean;
@@ -98,6 +126,7 @@ begin
       tc.g := clamp(tc.g - dimFactor, 0, 255);
       tc.b := clamp(tc.b - dimFactor, 0, 255);
       terrain.setPixel(x, y, tc);
+      lineStatus[y] := TL_UNKNOWN;
     end;
   end;
 end;
@@ -117,9 +146,8 @@ begin
     rockHeight[x] := 200 + round(30*sin(30+x*0.0197) - 67*cos(20+x*0.003) + 15*sin(10+x*0.023)) div 4;
   end;
 
-  for y := 0 to 255 do
+  for y := 0 to 255 do begin
     for x := 0 to 255 do begin
-
       if y > rockHeight[x] then
         c := TC_ROCK
       else if y > dirtHeight[x] then
@@ -134,8 +162,9 @@ begin
       c.b := round(c.r * v);
       c.a := round(c.a * v);
       terrain.setPixel(x, y, c);
-
     end;
+    updateLineStatus(y);
+  end;
 end;
 
 procedure tTerrain.draw(screen: tScreen);
@@ -143,28 +172,54 @@ var
   c: RGBA;
   x,y: integer;
   srcPtr, dstPtr: pointer;
+  solidTiles: integer;
 begin
   for y := 0 to 240-1 do begin
+    case lineStatus[y] of
+      TL_EMPTY: screen.canvas.putPixel(319, y, RGB(255,0,0));
+      TL_MIXED: screen.canvas.putPixel(319, y, RGB(0,255,0));
+      TL_FULL: screen.canvas.putPixel(319, y, RGB(0,0,255));
+      TL_UNKNOWN: screen.canvas.putPixel(319, y, RGB(255,0,255));
+    end;
     srcPtr := terrain.pixels + (y * 256 * 4);
     dstPtr := screen.canvas.pixels + ((32 + (y*screen.canvas.width)) * 4);
+    if lineStatus[y] = TL_EMPTY then continue;
+    if lineStatus[y] = TL_FULL then begin
+      move(srcPtr^, dstPtr^, 256*4);
+      continue;
+    end;
     asm
       pushad
       mov esi, srcPtr
       mov edi, dstPtr
-      mov ecx, 255
+      mov ecx, 256
+      xor ebx, ebx
     @XLOOP:
       mov eax, dword ptr [esi]
       bswap eax
       test al, al
       jz @SKIP
       bswap eax
+      inc ebx
       mov dword ptr [edi], eax
     @SKIP:
       add esi, 4
       add edi, 4
-      loop @XLOOP
+      dec ecx
+      jnz @XLOOP
+    @ENDOFLOOP:
+      mov solidTiles, ebx
       popad
     end;
+
+    {since we processed the whole line, lets update it's status}
+    if solidTiles = 0 then
+      lineStatus[y] := TL_EMPTY
+    else if solidTiles = 256 then
+      lineStatus[y] := TL_FULL
+    else
+      lineStatus[y] := TL_MIXED;
+
   end;
 
 end;
