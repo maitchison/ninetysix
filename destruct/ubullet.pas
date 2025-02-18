@@ -179,7 +179,8 @@ var
 begin
   {gravity}
   if projectileType <> tProjectileType.plasma then
-    vel.y += 250 * elapsed;
+    //open tyrian is 0.05*(FPS^2). If FPS=69.5, this gives us 241.5.
+    vel.y += 241.5 * elapsed;
   {move}
   inherited update(elapsed);
   {see if we're out of bounds}

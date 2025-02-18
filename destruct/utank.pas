@@ -57,7 +57,7 @@ type
 const
   CHASSIS_DEF: array[tChassisType] of tChassis = (
     (tag: 'Null';       cType: tChassisType.null;     health: 0;   spriteIdx: 0; defaultWeapons: [];),
-    (tag: 'Tank';       cType: tChassisType.tank;     health: 750; spriteIdx: 0;
+    (tag: 'Tank';       cType: tChassisType.tank;     health: 350; spriteIdx: 0;
       defaultWeapons: [
         tWeaponType.tracer,
         tWeaponType.blast,
@@ -69,14 +69,17 @@ const
         tWeaponType.plasma
       ]
     ),
-    (tag: 'Launcher';   cType: tChassisType.launcher; health: 500; spriteIdx: 5; defaultWeapons: [];),
-    (tag: 'Heavy Tank'; cType: tChassisType.heavy;    health: 100; spriteIdx: 10;defaultWeapons: [];)
+    (tag: 'Launcher';   cType: tChassisType.launcher; health: 200; spriteIdx: 5; defaultWeapons: [];),
+    (tag: 'Heavy Tank'; cType: tChassisType.heavy;    health: 700; spriteIdx: 10;defaultWeapons: [];)
   );
 
 implementation
 
 uses
   fx, terra, res, game;
+
+const
+  DEBUG_SHOW_TANK_SUPPORT = false;
 
 {-----------------------------------------------------------}
 
@@ -144,8 +147,13 @@ begin
 
   {falling}
   support := 0;
-  for xlp := bounds.left+1 to bounds.right-1 do
-    if terrain.isSolid(xlp-32, bounds.bottom) then inc(support);
+  {todo: these insets should not be hard coded, better to check pixels of
+   texture, or maybe specify as part of the tank}
+  for xlp := bounds.left+3 to bounds.right-3 do begin
+    if DEBUG_SHOW_TANK_SUPPORT then
+      screen.canvas.putPixel(xlp, bounds.bottom-3, RGB(255,0,255));
+    if terrain.isSolid(xlp-32, bounds.bottom-3) then inc(support);
+  end;
   if support = 0 then
     vel.y := clamp(vel.y + 100 * elapsed, -800, 800)
   else begin
@@ -153,7 +161,7 @@ begin
       hitPower := round(10*vel.y);
       {weaken blocks holding us up}
       yPos := bounds.bottom;
-      for xPos:= bounds.left+1 to bounds.right-1 do begin
+      for xPos:= bounds.left+3 to bounds.right-3 do begin
         {make a little cloud}
         for i := 1 to 3 do begin
           p := nextParticle();
@@ -166,8 +174,7 @@ begin
           p.radius := 2;
         end;
         {burn it}
-        terrain.burn(xlp-32, bounds.bottom, 2, round(hitPower/(bounds.width-2)));
-
+        terrain.burn(xPos-32, bounds.bottom-3, 2, round(hitPower/support/16));
       end;
       vel.y := 0;
     end;
