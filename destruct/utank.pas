@@ -43,7 +43,7 @@ type
     weaponIdx: integer;
   public
     function  weapon: tWeaponSpec;
-    procedure init(aPosX: integer; aTeam: integer; aChassisType: tChassisType);
+    procedure init(aPos: tPoint; aTeam: integer; aChassisType: tChassisType);
     procedure clearTerrain();
     procedure applyChassis(aChassis: tChassis);
     procedure reset(); override;
@@ -86,12 +86,13 @@ const
 
 {initializes tank to given chassis and team.
  yPosition defaults to ground level.}
-procedure tTank.init(aPosX: integer; aTeam: integer; aChassisType: tChassisType);
+procedure tTank.init(aPos: tPoint; aTeam: integer; aChassisType: tChassisType);
 begin
+  note('Initializing tank at position %s', [aPos.toString]);
   reset();
   status := GO_ACTIVE;
-  pos.x := aPosX;
-  pos.y := 100; // todo auto pos y
+  pos.x := aPos.x;
+  pos.y := aPos.y;
   team := aTeam;
   applyChassis(CHASSIS_DEF[aChassisType]);
 end;

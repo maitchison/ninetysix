@@ -181,7 +181,7 @@ begin
 end;
 
 {look for a good place to put a new tank}
-function findNewTankPosition(team: integer): integer;
+function findNewTankPosition(team: integer): tPoint;
 var
   mask: array[0..255] of boolean;
   options: array[0..255] of byte;
@@ -212,9 +212,12 @@ begin
   end;
 
   if numOptions = 0 then
-    exit(xStart+random(108))
+    result.x := xStart+random(108)
   else
-    exit(options[random(numOptions)]);
+    result.x := options[random(numOptions)];
+
+  {find y pos}
+  result.y := 255-terrain.terrainHeight(result.x);
 
 end;
 
@@ -267,8 +270,8 @@ begin
       tank.clearTerrain();
 
   {setup controllers}
-  //control1 := tAIController.create(tank1);
-  //control2 := tHumanController.create(tank2);
+  control1 := tAIController.create(tanks[0]);
+  control2 := tHumanController.create(tanks[5]);
 
   {setup gui}
   gui := tGuiComponents.create();
@@ -291,10 +294,10 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-{    control1.process();
+    control1.process();
     control2.process();
     control1.apply(elapsed);
-    control2.apply(elapsed);}
+    control2.apply(elapsed);
 
     screen.clearAll();
 

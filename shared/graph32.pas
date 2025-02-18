@@ -451,7 +451,8 @@ begin
   inherited destroy();
 end;
 
-function TPage.GetPixel(x, y: Integer): RGBA; overload;
+{todo: this could be much faster...}
+function tPage.getPixel(x, y: Integer): RGBA; overload; inline;
 var
   address: dword;
   col: RGBA;

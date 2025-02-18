@@ -26,6 +26,7 @@ type
     function  isSolid(x,y: integer): boolean;
     procedure dirt(atX,atY: integer;r: integer);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
+    function  terrainHeight(xPos: integer): integer;
     procedure generate();
     procedure draw(screen: tScreen);
   end;
@@ -163,6 +164,16 @@ begin
     end;
     lineStatus[y] := TL_UNKNOWN;
   end;
+end;
+
+{returns height of terrain at x position}
+function tTerrain.terrainHeight(xPos: integer): integer;
+var
+  y: integer;
+begin
+  result := 0;
+  for y := 0 to 255 do
+    if terrain.getPixel(xPos, y).a > 0 then exit(255-y);
 end;
 
 procedure tTerrain.generate();
