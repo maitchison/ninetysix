@@ -70,7 +70,7 @@ const
     (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; projectileType: tProjectileType.rocket; cooldown: 4.0),
     (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 0;    projectileType: tProjectileType.dirt;   cooldown: 1.0),
     (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 0;    projectileType: tProjectileType.dirt;   cooldown: 4.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 200;  projectileType: tProjectileType.plasma; cooldown: 1.0)
+    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   projectileType: tProjectileType.plasma; cooldown: 1.0)
   );
 
 
@@ -130,6 +130,7 @@ end;
 procedure tProjectile.hit();
 var
   radius: integer;
+  dir: V2D;
 begin
   radius := round(clamp(2, 2*sqrt(abs(damage)), 100));
   case projectileType of
@@ -150,8 +151,13 @@ begin
       terrain.burn(xPos-32, yPos, radius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, radius);
     end;
-    tProjectileType.plasma:
-      ; // niy
+    tProjectileType.plasma: begin
+      mixer.play(sfx['plasma3'] , 0.3);
+      terrain.burn(xPos-32, yPos, 2, 20);
+      dir := vel.normed();
+      terrain.burn(xPos-32+round(dir.x*2), yPos+round(dir.y*2), 2, 20);
+      terrain.burn(xPos-32+round(dir.x*4), yPos+round(dir.y*4), 2, 20);
+    end;
     tProjectileType.dirt:
       ; // niy
     tProjectileType.laser:

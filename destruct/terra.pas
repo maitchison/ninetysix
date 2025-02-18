@@ -219,9 +219,7 @@ begin
       lineStatus[y] := TL_FULL
     else
       lineStatus[y] := TL_MIXED;
-
   end;
-
 end;
 
 {-----------------------------------------------------------}

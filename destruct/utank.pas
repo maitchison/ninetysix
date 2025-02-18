@@ -207,13 +207,15 @@ end;
 procedure tTank.fireProjectile();
 var
   projectile: tProjectile;
+  pVel: single;
 begin
   if status <> GO_ACTIVE then exit;
   if cooldown <= 0 then begin
     projectile := nextProjectile();
     weapon.applyToProjectile(projectile);
     projectile.pos := pos;
-    projectile.vel := V2(sin(angle*DEG2RAD) * power * 20, -cos(angle*DEG2RAD) * power * 20);
+    if weapon.projectileType = tProjectileType.plasma then pVel := 200 else pVel := power * 20;
+    projectile.vel := V2(sin(angle*DEG2RAD) * pVel, -cos(angle*DEG2RAD) * pVel);
     projectile.pos += projectile.vel.normed*6;
     projectile.owner := self;
     cooldown := weapon.cooldown;
