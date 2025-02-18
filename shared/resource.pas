@@ -73,7 +73,6 @@ begin
   setLength(resources, length(resources)+1);
   resources[length(resources)-1] := res;
   res.tag := removeExtension(extractFilename(filename)).toLower();
-  note(res.tag);
   result := res;
 end;
 

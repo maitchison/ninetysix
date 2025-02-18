@@ -217,7 +217,7 @@ begin
 
     case weapon.projectileType of
       tProjectileType.shell: mixer.play(sfx['shoot'], 0.2);
-      tProjectileType.rocket: mixer.play(sfx['launch'], 0.2);
+      tProjectileType.rocket: mixer.play(sfx['rocket'], 0.2);
     end;
 
     lastProjectile := projectile;
