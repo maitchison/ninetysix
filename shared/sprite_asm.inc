@@ -269,8 +269,6 @@ asm
   sar eax, 8
   mov texDeltaY, eax
   xor eax, eax
-
-
 @PIXELLOOP:
   {get our texel}
   movzx eax, bh
@@ -278,10 +276,70 @@ asm
   mov eax, [esi+eax*4]
 @ALPHATEST:
   rol eax,8
-  test al, al
-  jz @Skip
-  ror eax,8
+  cmp al, 0
+  je @Skip
+  cmp al, 255
+  je @Blit
+@Mix:
+
+  {perform mixing (slow without MMX!)}
+  push ebx
+  push ecx
+  push edx
+
+  mov cl,  al
+  mov ch,  255
+  sub ch,  al
+
+  // setup:
+
+  ror eax, 8
+  mov ebx, dword ptr [edi]
+
+  // eax = sA|sR|sG|sB
+  // ebx = dA|dR|dG|sB
+  // ecx = ? | ? | 255 - alpha | alpha
+  // edx = (used to store mixed result)
+
+  {blue}
+  mul cl                    // (al*cl->ax) -> ax = sR*alpha
+  mov dl,  ah               // store results
+  mov al,  bl
+  mul ch
+  add dl,  ah               // we now have src + dst
+  ror eax, 8
+  ror ebx, 8
+  ror edx, 8
+  {green}
+  mul cl                    // (al*cl->ax) -> ax = sR*alpha
+  mov dl,  ah               // store results
+  mov al,  bl
+  mul ch
+  add dl,  ah               // we now have src + dst
+  ror eax, 8
+  ror ebx, 8
+  ror edx, 8
+  {red}
+  mul cl                    // (al*cl->ax) -> ax = sR*alpha
+  mov dl,  ah               // store results
+  mov al,  bl
+  mul ch
+  add dl,  ah               // we now have src + dst
+  ror eax, 8
+  ror ebx, 8
+  ror edx, 8
+
+  // edx = r|g|b|-
+  // last ror8 will be done by blit
+  mov dl, 255
+  mov eax, edx
+
+  pop edx
+  pop ecx
+  pop ebx
+
 @Blit:
+  ror eax,8
   mov dword ptr [edi], eax
 @Skip:
   add edi, 4

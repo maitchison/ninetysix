@@ -301,14 +301,19 @@ begin
   deltaX := (b.x-a.x) / height;
   deltaT.x := (t2.x - t1.x) div height;
   deltaT.y := (t2.y - t1.y) div height;
+
   yMin := a.y;
+  yMax := min(b.y, page.height-1);
   t := t1;
+
+  if (yMax < 0) or (yMin >= page.height) then exit;
+
   if yMin < 0 then begin
     x += deltaX * -yMin;
     t += deltaT * -yMin;
     yMin := 0;
   end;
-  yMax := min(b.y, page.height-1);
+
   for y := yMin to yMax do begin
     adjustLine(y, round(x), t);
     x += deltaX;
