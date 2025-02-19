@@ -230,7 +230,6 @@ var
   gui: tGuiComponents;
   fps: tGuiLabel;
   xlp,ylp: integer;
-  control1, control2: tController;
   testSprite: tSprite;
   m: tMatrix4x4;
   tank2Gui: tTankGUI;
@@ -269,8 +268,8 @@ begin
     if tank.isActive then tank.clearTerrain();
 
   {setup controllers}
-  control1 := tAIController.create(tanks[0]);
-  control2 := tHumanController.create(tanks[5]);
+  player1 := tAIController.create(0);
+  player2 := tHumanController.create(5);
 
   {setup gui}
   gui := tGuiComponents.create();
@@ -294,10 +293,10 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-    control1.process();
-    control2.process();
-    control1.apply(elapsed);
-    control2.apply(elapsed);
+    player1.process();
+    player2.process();
+    player1.apply(elapsed);
+    player2.apply(elapsed);
 
     screen.clearAll();
 

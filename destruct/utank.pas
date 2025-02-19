@@ -44,6 +44,7 @@ type
   public
     function  weapon: tWeaponSpec;
     procedure init(aPos: tPoint; aTeam: integer; aChassisType: tChassisType);
+    function  isSelected: boolean;
     procedure clearTerrain();
     procedure applyChassis(aChassis: tChassis);
     procedure reset(); override;
@@ -97,6 +98,13 @@ begin
   applyChassis(CHASSIS_DEF[aChassisType]);
 end;
 
+function tTank.isSelected: boolean;
+begin
+  result :=
+    (assigned(player1) and (player1.tank = self)) or
+    (assigned(player2) and (player2.tank = self));
+end;
+
 {remove and terrain around this tank}
 procedure tTank.clearTerrain();
 begin
@@ -144,6 +152,7 @@ procedure tTank.draw(screen: tScreen);
 var
   p: tPoint;
   r: tRect;
+  markerColor: RGBA;
 begin
 
   if not assigned(sprite) then exit;
@@ -156,12 +165,18 @@ begin
     r := sprite.draw(screen.canvas, p.x, p.y);
 
   screen.markRegion(r);
+
+  if isSelected then
+    markerColor.init(255, 255, 128)
+  else
+    markerColor.init(128,128,128);
+
   {draw target}
   drawMarker(
     screen,
     xPos + sin(angle*DEG2RAD) * power * 2,
     yPos - cos(angle*DEG2RAD) * power * 2,
-    RGB(128,128,128)
+    markerColor
   );
 end;
 

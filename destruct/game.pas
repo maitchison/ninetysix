@@ -5,7 +5,7 @@ interface
 uses
   {$i units},
   crt,
-  uWeapon, uTank, uGameObjects;
+  uWeapon, uTank, uGameObjects, controller;
 
 type
   tHitInfo = record
@@ -47,6 +47,7 @@ procedure screenInit();
 var
   screen: tScreen;
   tanks: tTankList;
+  player1, player2: tController;
 
 implementation
 
@@ -278,6 +279,9 @@ begin
     p.markForRemoval();
     particles.append(p);
   end;
+
+  player1 := nil;
+  player2 := nil;
 
 end;
 

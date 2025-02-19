@@ -22,15 +22,18 @@ type
   protected
     changeWeaponCooldown: single;
     changeTankCooldown: single;
+    procedure cycleWeapon(delta: integer);
+    procedure cycleTank(delta: integer);
   public
     doFire: boolean;
     changeTank: integer;
     changeWeapon: integer;
     xVel, yVel: single;
-    tank: tTank;
+    tankIdx: integer;
     target: tTank;
-    constructor create(aTank: tTank);
+    constructor create(aTankIdx: integer);
     procedure reset(); virtual;
+    function  tank: tTank;
     procedure apply(elapsed: single);
     procedure process(); virtual;
   end;
@@ -57,32 +60,68 @@ uses
 
 {--------------------------------------------}
 
-constructor tController.create(aTank: tTank);
+constructor tController.create(aTankIdx: integer);
 begin
   reset();
-  tank := aTank;
+  tankIdx := aTankIdx;
 end;
 
 procedure tController.reset();
 begin
-  tank := nil;
+  tankIdx := 0;
   target := nil;
   changeWeaponCooldown := 0;
   changeTankCooldown := 0;
+end;
+
+procedure tController.cycleWeapon(delta: integer);
+begin
+  if (length(tank.weapons) <= 0) then exit;
+  if (changeWeaponCoolDown > 0) then exit;
+  tank.weaponIdx := (tank.weaponIdx + delta) mod length(tank.weapons);
+  if tank.weaponIdx < 0 then tank.weaponIdx += length(tank.weapons);
+  changeWeaponCooldown := 0.5;
+end;
+
+procedure tController.cycleTank(delta: integer);
+var
+  originalTank: tTank;
+  i: integer;
+  tankIsGood: boolean;
+begin
+  if (length(tanks.objects) <= 0) then exit;
+  if (changeTankCoolDown > 0) then exit;
+
+  changeTankCooldown := 0.5;
+
+  originalTank := tanks[tankIdx];
+  i := tankIdx;
+  repeat
+    inc(i);
+    if i >= length(tanks.objects) then i := 0;
+    if tanks[i] = originalTank then
+      {we are the only valid tank}
+      exit;
+    tankIsGood := tanks[i].isActive and (tanks[i].team = originalTank.team);
+    until tankIsGood;
+  tankIdx := i;
 end;
 
 procedure tController.apply(elapsed: single);
 begin
   if doFire then tank.fire();
   tank.adjust(xVel * elapsed, yVel *elapsed);
-  if (changeWeapon <> 0) then begin
-    if (length(tank.weapons) > 0) and (changeWeaponCoolDown <= 0) then begin
-      tank.weaponIdx := (tank.weaponIdx + changeWeapon) mod length(tank.weapons);
-      if tank.weaponIdx < 0 then tank.weaponIdx += length(tank.weapons);
-      changeWeaponCooldown := 0.5;
-    end;
-  end else
+
+  if (changeWeapon <> 0) then
+    cycleWeapon(changeWeapon)
+  else
     changeWeaponCooldown := 0;
+
+  if (changeTank <> 0) then
+    cycleTank(changeTank)
+  else
+    changeTankCooldown := 0;
+
   changeWeaponCoolDown := maxf(0, changeWeaponCoolDown - elapsed);
   changeTankCoolDown := maxf(0, changeTankCoolDown - elapsed);
 end;
@@ -94,6 +133,11 @@ begin
   yVel := 0;
   changeTank := 0;
   changeWeapon := 0;
+end;
+
+function tController.tank: tTank;
+begin
+  result := tanks[tankIdx];
 end;
 
 {--------------------------------------------}
@@ -108,6 +152,7 @@ begin
   if keyDown(key_down) then yVel := -10;
   if keyDown(Key_openSquareBracket) then changeWeapon := +1;
   if keyDown(Key_closeSquareBracket) then changeWeapon := -1;
+  if keyDown(Key_n) then changeTank := +1;
 end;
 
 {--------------------------------------------}
