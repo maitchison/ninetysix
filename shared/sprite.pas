@@ -269,13 +269,17 @@ var
 
   function xform(delta: tPoint): tPoint;
   var
-    v: V3D;
+    d, v, r: V3D;
   begin
-    v := V3(delta.x, delta.y, 0) - V3(srcRect.width / 2, srcRect.height / 2, 0);
-    v := transform.apply(v) + pos;
-    // no perspective for the moment}
-    result.x := round(v.x);
-    result.y := round(v.y);
+    {note: locked to midpoint pivot for the moment}
+    d := V3(delta.x, delta.y, 0) - V3(srcRect.width / 2, srcRect.height / 2, 0);
+    v := transform.apply(d);
+    { no perspective for the moment }
+    { round towards center}
+    r := V3(v.x-sign(v.x)*0.50, v.y-sign(v.y)*0.50, 0);
+    result.x := trunc(r.x+pos.x);
+    result.y := trunc(r.y+pos.y);
+
     minX := min(result.x, minX);
     maxX := max(result.x, maxX);
     minY := min(result.y, minY);
@@ -289,9 +293,9 @@ begin
   maxY := 0;
   polyDraw_ASM(dstPage, page, srcRect,
     xform(Point(0,0)),
-    xform(Point(srcRect.width-1, 0)),
-    xform(Point(srcRect.width, srcRect.height-1)),
-    xform(Point(0, srcRect.height-1))
+    xform(Point(srcRect.width, 0)),
+    xform(Point(srcRect.width, srcRect.height)),
+    xform(Point(0, srcRect.height))
   );
   result := Rect(minX, minY, maxX-minX+1, maxY-minY+1);
 end;
@@ -486,40 +490,42 @@ var
    ((0, 0, 0, 0),
     (0, 3, 1, 0),
     (0, 4, 2, 0),
-    (0, 0, 0, 0))
+    (0, 0, 0, 0)),
+    {scaling}
+   ((3, 3, 1, 1),
+    (3, 3, 1, 1),
+    (4, 4, 2, 2),
+    (4, 4, 2, 2))
   ];
 
-  function whichColor(aC: RGBA): char;
+  function whichColor(aC: RGBA): string;
   var
     i: integer;
   begin
     result := '?';
     for i := 0 to 4 do
-      if aC = c[i] then exit(intToStr(i)[1]);
+      if aC = c[i] then exit(intToStr(i));
   end;
 
   procedure testSln(aPage: tPage; sln: tSln);
   var
     i,j: integer;
     wasError: boolean;
-    noteStr: string;
+    foundStr, expectedStr: string;
   begin
     wasError := false;
     for i := 0 to 3 do
       for j := 0 to 3 do
         if aPage.getPixel(i,j) <> c[sln[j,i]] then wasError := true;
-    if wasError then begin
-      for j := 0 to 3 do begin
-        noteStr := '';
-        for i := 0 to 3 do begin
-          noteStr += whichColor(aPage.getPixel(i,j));
-        end;
-        note('  '+noteStr);
-      end;
+    if not wasError then exit;
+    for j := 0 to 3 do begin
+      foundStr := '';
+      expectedstr := '';
+      for i := 0 to 3 do foundStr += whichColor(aPage.getPixel(i,j));
+      for i := 0 to 3 do expectedStr += intToStr(sln[j,i]);
+      note('  '+foundStr+' '+expectedStr);
     end;
-    for i := 0 to 3 do
-      for j := 0 to 3 do
-        assertEqual(aPage.getPixel(i,j), c[sln[j,i]]);
+    fatal('Colors do not match');
   end;
 
 begin
@@ -544,13 +550,18 @@ begin
   testSln(page, sln[2]);
 
   {rotation}
-{  sprite.setPivot(1,1);
+  sprite.setPivot(1,1);
   page.clear(c[0]);
-  sprite.drawRotated(page, Point(1, 1), 0);
-  testSln(page, sln[0]);}
-{  page.clear(c[0]);
-  sprite.drawRotated(page, V3(1, 1, 0), 90);
-  testSln(page, sln[4]);}
+  sprite.drawRotated(page, Point(2, 2), 0);
+  testSln(page, sln[0]);
+  page.clear(c[0]);
+  sprite.drawRotated(page, Point(2, 2), 90);
+  testSln(page, sln[3]);
+
+  {scaling (via rotation)}
+  page.clear(c[0]);
+  sprite.drawRotated(page, Point(2, 2), 90, 2.0);
+  testSln(page, sln[4]);
 
   page.free;
   spritePage.free;

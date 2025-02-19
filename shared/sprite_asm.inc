@@ -39,6 +39,7 @@ end;
 {draw an image segment, stretched}
 {todo: needs a bit rewrite, I think just make it a generic stretch like
  voxel does (with scanline)}
+{todo: remove this and just use polyDraw}
 procedure stretchDraw_ASM(dstPage, srcPage: TPage; src, dst: tRect);
 var
   deltaX, deltaY: int32;
@@ -85,16 +86,17 @@ begin
     dx1 := 0;
   end;
 
+  //check: is this right?
   cnt := (dx2-dx1)-1;
   if cnt <= 0 then exit;
 
   dstPixels := dstPage.Pixels;
 
   for y := dy1 to dy2-1 do begin
-    if y > videoDriver.height then exit;
+    if y >= dstPage.height then exit;
     if y < 0 then continue;
     v := (y - dy1) / (dy2 - dy1);
-    screenOfs := y * videoDriver.width + dx1;
+    screenOfs := y * dstPage.width + dx1;
     imageOfs := min(src.top, src.bottom) + round(src.height * v);
     imageOfs *= srcPage.width * 4;
     imageOfs += dword(srcPage.pixels);
@@ -390,7 +392,7 @@ begin
     tl := polyDraw.textLine[y];
     x1 := clamp(sl.xMin, 0, dstPage.width-1);
     x2 := clamp(sl.xMax, 0, dstPage.width-1);
-    cnt := x2-x1;
+    cnt := (x2-x1)+1;
     if cnt <= 0 then continue;
 
     {get initial texture pos (as 16.16}

@@ -44,6 +44,7 @@ type
     procedure adjustLine(y, x: int32; t: tUVCoord); overload;
   public
     constructor create();
+    procedure logScan();
     procedure scanSide(page: tPage; a, b: tPoint);
     procedure scanSideTextured(page: tPage; a, b: tPoint; t1, t2: tUVCoord);
     procedure scanTextured(page: tPage; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
@@ -130,6 +131,14 @@ end;
 constructor tScanLines.create();
 begin
   backfaceCull := false;
+end;
+
+procedure tScanLines.logScan();
+var
+  y: integer;
+begin
+  for y := bounds.top to bounds.bottom-1 do
+    note('%d: %d %d', [y, scanLine[y].xMin, scanLine[y].xMax]);
 end;
 
 procedure tScanLines.adjustLine(y, x: int32); inline;
@@ -271,7 +280,6 @@ var
   tmpUV: tUVCoord;
   deltaT: tUVCoord;
 begin
-
   if a.y = b.y then begin
     {special case}
     y := a.y;
@@ -319,6 +327,7 @@ begin
     x += deltaX;
     t += deltaT;
   end;
+
 end;
 
 {-----------------------------------------------------}
