@@ -143,18 +143,18 @@ end;
 
 procedure tTank.draw(screen: tScreen);
 var
+  p: tPoint;
   r: tRect;
 begin
 
   if not assigned(sprite) then exit;
 
-  r := bounds;
-  r.x += 32;
+  p := Point(xPos+32, yPos);
 
   if angle < 0 then
-    sprite.drawFlipped(screen.canvas, r.x, r.y)
+    r := sprite.drawFlipped(screen.canvas, p.x, p.y)
   else
-    sprite.draw(screen.canvas, r.x, r.y);
+    r := sprite.draw(screen.canvas, p.x, p.y);
 
   screen.markRegion(r);
   {draw target}
@@ -162,7 +162,7 @@ begin
     screen,
     xPos + sin(angle*DEG2RAD) * power * 2,
     yPos - cos(angle*DEG2RAD) * power * 2,
-    RGB(255,128,128)
+    RGB(128,128,128)
   );
 end;
 

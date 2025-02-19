@@ -15,6 +15,23 @@ type
     procedure clear();
   end;
 
+
+  tTankEnumerator = record
+    private
+      fIndex: Integer;
+      fArray: array of tGameObject;
+      function GetCurrent: tTank;
+    public
+      function moveNext: boolean;
+      property current: tTank read getCurrent;
+    end;
+
+  tTankList = class(tGameObjectList)
+    function  getTank(idx: integer): tTank;
+    property  items[index: int32]: tTank read getTank; default;
+    function  getEnumerator(): tTankEnumerator;
+  end;
+
 procedure updateAll(elapsed: single);
 procedure drawAll(screen: tScreen);
 
@@ -29,7 +46,7 @@ procedure screenInit();
 
 var
   screen: tScreen;
-  tanks: array of tTank;
+  tanks: tTankList;
 
 implementation
 
@@ -42,6 +59,36 @@ var
 var
   particles: tGameObjectList;
   projectiles: tGameObjectList;
+
+{----------------------------------------------------------}
+
+function tTankEnumerator.moveNext: boolean;
+begin
+  inc(fIndex);
+  result := fIndex < length(fArray);
+end;
+
+function tTankEnumerator.getCurrent: tTank;
+begin
+  result := tTank(fArray[fIndex]);
+end;
+
+function tTankList.getTank(idx: integer): tTank;
+var
+  go: tGameObject;
+begin
+  go := objects[idx];
+//  {$ifdef DEBUG}
+  assert(go is tTank, 'Object is not a tTank');
+//  {$endif}
+  result := tTank(go);
+end;
+
+function tTankList.getEnumerator(): tTankEnumerator;
+begin
+  result.fArray := objects;
+  result.fIndex := -1;
+end;
 
 {----------------------------------------------------------}
 
@@ -180,7 +227,7 @@ procedure drawAll(screen: tScreen);
 var
   tank: tTank;
 begin
-  for tank in tanks do if tank.isActive then tank.draw(screen);
+  tanks.draw(screen);
   particles.draw(screen);
   projectiles.draw(screen);
 end;
@@ -211,16 +258,18 @@ procedure initObjects;
 var
   i: integer;
   p: tParticle;
+  t: tTank;
 begin
   updateAccumlator := 0;
   projectiles := tGameObjectList.create(1*1024);
   particles := tGameObjectList.create(16*1024);
 
   {init our 10 tanks}
-  setLength(tanks, 10);
-  for i := 0 to length(tanks)-1 do begin
-    tanks[i] := tTank.create();
-    tanks[i].status := GO_EMPTY;
+  tanks := tTankList.create(10);
+  for i := 0 to 10-1 do begin
+    t := tTank.create();
+    t.status := GO_EMPTY;
+    tanks.append(t);
   end;
 
   {for performance reason init some empty objects}
@@ -236,8 +285,7 @@ procedure closeObjects;
 var
   tank: tTank;
 begin
-  for tank in tanks do tank.free();
-  setLength(tanks, 0);
+  tanks.free;
   projectiles.free;
   particles.free;
 end;

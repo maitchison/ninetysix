@@ -13,7 +13,6 @@ type
   public
     pos, vel: V2D;
     bounds: tRect;
-    offset: V2D;
     fSprite: tSprite;
     col: RGBA;
     age: single;
@@ -29,6 +28,7 @@ type
     function  isActive: boolean;
     function  getWorldPixel(atX, atY: integer): RGBA;
     procedure draw(screen: tScreen); virtual;
+    procedure drawBounds(screen: tScreen);
     procedure update(elapsed: single); virtual;
     procedure markForRemoval();
 
@@ -50,8 +50,8 @@ type
     numFreeObjects: integer;
     constructor create(maxObjects: integer);
     procedure append(o: tGameObject);
-    procedure draw(screen: tScreen);
-    procedure update(elapsed: single);
+    procedure draw(screen: tScreen); virtual;
+    procedure update(elapsed: single); virtual;
     function  nextFree(): tGameObject;
   end;
 
@@ -64,6 +64,9 @@ type
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
   end;
+
+var
+  DEBUG_DRAW_BOUNDS: boolean = false;
 
 implementation
 
@@ -91,7 +94,11 @@ procedure tGameObjectList.draw(screen: tScreen);
 var
   go: tGameObject;
 begin
-  for go in objects do if go.status = GO_ACTIVE then go.draw(screen);
+  for go in objects do
+    if go.status = GO_ACTIVE then begin
+      go.draw(screen);
+      if DEBUG_DRAW_BOUNDS then go.drawBounds(screen);
+    end;
 end;
 
 procedure tGameObjectList.update(elapsed: single);
@@ -155,8 +162,6 @@ begin
   if assigned(fSprite) then begin
     bounds.width := fSprite.width;
     bounds.height := fSprite.height;
-    offset.x := -fSprite.width div 2;
-    offset.y := -fSprite.height div 2;
   end;
 end;
 
@@ -189,6 +194,17 @@ begin
   screen.markRegion(rect(xPos+32, yPos, 1, 1));
 end;
 
+procedure tGameObject.drawBounds(screen: tScreen);
+var
+  drawRect: tRect;
+begin
+  drawRect := bounds;
+  drawRect.x += 32;
+  screen.canvas.drawRect(drawRect, col);
+  screen.canvas.putPixel(xPos+32, yPos, col);
+  screen.markRegion(drawRect);
+end;
+
 procedure tGameObject.update(elapsed: single);
 begin
   pos := pos + (vel * elapsed);
@@ -197,8 +213,16 @@ begin
     if age >= ttl then
       status := GO_PENDING_REMOVAL;
   end;
-  bounds.x := round(pos.x+offset.x);
-  bounds.y := round(pos.y+offset.y);
+  if assigned(sprite) then begin
+    bounds.init(
+      round(pos.x-sprite.pivot.x),
+      round(pos.y-sprite.pivot.y),
+      sprite.width, sprite.height
+    );
+  end else begin
+    bounds.x := xPos;
+    bounds.y := yPos;
+  end;
 end;
 
 {--------------------------------------}

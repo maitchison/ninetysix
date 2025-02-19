@@ -288,6 +288,7 @@ begin
     elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
 
     if keydown(key_z) then elapsed := 0.001;
+    DEBUG_DRAW_BOUNDS := keydown(key_b);
 
     {update ui}
     if elapsed > 0 then

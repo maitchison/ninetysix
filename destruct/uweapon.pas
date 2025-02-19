@@ -104,8 +104,6 @@ procedure tProjectile.reset();
 begin
   inherited reset();
   col := RGB($ffffff86);
-  offset.x := -1;
-  offset.y := -1;
   bounds.width := 3;
   bounds.height := 3;
 end;

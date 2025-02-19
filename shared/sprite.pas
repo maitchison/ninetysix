@@ -47,6 +47,7 @@ type
 
     function  getPixel(atX, atY: integer): RGBA;
     procedure blit(dstPage: tPage; atX, atY: int32);
+    procedure trim();
     function  draw(dstPage: tPage; atX, atY: int32): tRect;
     function  drawFlipped(dstPage: tPage; atX, atY: int32): tRect;
     procedure drawStretched(DstPage: TPage; dest: tRect);
@@ -153,6 +154,45 @@ end;
 function tSprite.height: int32;
 begin
   result := srcRect.Height;
+end;
+
+{trim bounds to fit non-transparient pixels}
+procedure tSprite.trim();
+var
+  x,y: integer;
+  xMin,xMax, yMin, yMax: integer;
+  oldRect: tRect;
+begin
+  xMin := width; yMin := height; xMax := 0; yMax := 0;
+  for y := 0 to height-1 do begin
+    for x := 0 to width-1 do begin
+      if getPixel(x,y).a > 0 then begin
+        xMax := max(x, xMax);
+        yMax := max(y, yMax);
+        xMin := min(x, xMin);
+        yMin := min(y, yMin);
+      end;
+    end;
+  end;
+
+  if (xMax-xMin) < 0 then begin
+    // special case, sprite is empty.
+    srcRect.width := 0;
+    srcRect.height:= 0;
+    exit;
+  end;
+
+  oldRect := srcRect;
+
+  pivot.x -= xMin;
+  pivot.y -= yMin;
+
+  srcRect.x += xMin;
+  srcRect.y += yMin;
+  srcRect.width := (xMax-xMin)+1;
+  srcRect.height := (yMax-yMin)+1;
+
+  //note('Sprite trim: old:%s new:%s', [oldRect.toString, srcRect.toString]);
 end;
 
 {Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
@@ -366,6 +406,7 @@ begin
         sprite.pivot.x := cellWidth div 2;
         sprite.pivot.y := cellHeight div 2;
       end;
+      sprite.trim();
       append(sprite);
     end;
   end;
