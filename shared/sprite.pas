@@ -274,6 +274,10 @@ var
   end;
 
 begin
+  minX := page.width;
+  maxX := 0;
+  minY := page.height;
+  maxY := 0;
   polyDraw_ASM(dstPage, page, srcRect,
     xform(Point(0,0)),
     xform(Point(srcRect.width-1, 0)),
