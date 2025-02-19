@@ -194,7 +194,7 @@ begin
   fillchar(result, sizeof(result), 0);
   if not assigned(sprite) then exit;
   {todo: I think this is wrong}
-  result := sprite.getPixel(atX-xPos+sprite.pivot.x, atY-yPos-sprite.pivot.y);
+  result := sprite.getPixel(atX-xPos+(sprite.pivot2x.x div 2), atY-yPos-(sprite.pivot2x.y div 2));
 end;
 
 {returns bounds for object (based on radius). Optional offset}

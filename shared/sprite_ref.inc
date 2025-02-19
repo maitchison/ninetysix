@@ -1,24 +1,24 @@
-{draw an image segment to screen}
+{draw an image segment to page}
 procedure blit_REF(dstPage, srcPage: tPage; srcRect: tRect; atX,atY: int32);
 var
   x,y: int32;
   dst: tRect;
 begin
   dst := Rect(atX, atY, srcRect.width, srcRect.height);
-  dst.clipTo(Rect(0, 0, videoDriver.width, videoDriver.height));
+  dst.clipTo(Rect(0, 0, dstPage.width, dstPage.height));
   for y := dst.top to dst.bottom-1 do
     for x := dst.left to dst.right-1 do
       dstPage.setPixel(x, y, srcPage.getPixel(x+srcRect.x-atX, y+srcRect.y-atY));
 end;
 
-{draw an image segment to screen}
+{draw an image segment to page}
 procedure draw_REF(dstPage, srcPage: tPage; srcRect: tRect; atX,atY: int32);
 var
   x,y: int32;
   dst: tRect;
 begin
   dst := Rect(atX, atY, srcRect.width, srcRect.height);
-  dst.clipTo(Rect(0, 0, videoDriver.width, videoDriver.height));
+  dst.clipTo(Rect(0, 0, dstPage.width, dstPage.height));
   for y := dst.top to dst.bottom-1 do
     for x := dst.left to dst.right-1 do
       dstPage.putPixel(x, y, srcPage.getPixel(x+srcRect.x-atX, y+srcRect.y-atY));

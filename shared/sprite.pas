@@ -29,13 +29,16 @@ type
   end;
 
   tSprite = class(tObject, iIniSerializable)
-
+  public
     tag: string;
     page: tPage;
-    pivot: tPoint;    // the origin
+    pivot2x: tPoint;  // the origin
     srcRect: tRect;   // location of sprite on page
     border: tBorder;  // border inset (not really used yet)
 
+  protected
+    procedure setPivot(x,y: single);
+  public
     constructor create(aPage: tPage); overload;
     constructor create(aPage: tPage; aRect: tRect); overload;
     destructor destroy(); override;
@@ -51,7 +54,7 @@ type
     function  draw(dstPage: tPage; atX, atY: int32): tRect;
     function  drawFlipped(dstPage: tPage; atX, atY: int32): tRect;
     function  drawStretched(DstPage: TPage; dest: tRect): tRect;
-    function  drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0): tRect;
+    function  drawRotated(dstPage: tPage; atPos: tPoint;zAngle: single; scale: single=1.0): tRect;
     function  drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4): tRect;
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
@@ -136,7 +139,7 @@ begin
   self.tag := 'sprite';
   self.page := aPage;
   self.srcRect := Rect(aPage.width, aPage.height);
-  self.pivot := Point(0,0);
+  self.pivot2x := Point(0,0);
   self.border.init(0, 0, 0, 0);
 end;
 
@@ -144,6 +147,12 @@ constructor tSprite.Create(aPage: tPage; aRect: tRect);
 begin
   create(aPage);
   self.srcRect := aRect;
+end;
+
+procedure tSprite.setPivot(x,y: single);
+begin
+  pivot2x.x := round(x*2);
+  pivot2x.y := round(y*2);
 end;
 
 function tSprite.width: int32;
@@ -184,8 +193,8 @@ begin
 
   oldRect := srcRect;
 
-  pivot.x -= xMin;
-  pivot.y -= yMin;
+  pivot2x.x -= xMin*2;
+  pivot2x.y -= yMin*2;
 
   srcRect.x += xMin;
   srcRect.y += yMin;
@@ -198,8 +207,8 @@ end;
 {Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
 function tSprite.draw(dstPage: tPage; atX, atY: integer): tRect;
 begin
-  atX -= pivot.x;
-  atY -= pivot.y;
+  atX -= pivot2x.x div 2;
+  atY -= pivot2x.y div 2;
   draw_REF(dstPage, self.page, srcRect, atX, atY);
   result.init(atX, atY, width, height);
 end;
@@ -207,9 +216,8 @@ end;
 {Draws sprite flipped on x-axis}
 function tSprite.drawFlipped(dstPage: tPage; atX, atY: integer): tRect;
 begin
-  {a bit inefficent, but ok for the moment}
-  atX -= pivot.x;
-  atY -= pivot.y;
+  atX -= pivot2x.x div 2;
+  atY -= pivot2x.y div 2;
   polyDraw_ASM(dstPage, page, srcRect,
     Point(atX + srcRect.width - 1, atY),
     Point(atX, atY),
@@ -229,6 +237,7 @@ end;
 {Copy sprite to screen at given location, no alpha blending}
 procedure tSprite.blit(dstPage: tPage; atX, atY: Integer);
 begin
+  {note: this is wrong, need to use pivot}
   blit_ASM(dstPage, self.page, self.srcRect, atX, atY);
 end;
 
@@ -239,16 +248,16 @@ begin
   result := dest;
 end;
 
-function tSprite.drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0): tRect;
+function tSprite.drawRotated(dstPage: tPage; atPos: tPoint;zAngle: single; scale: single=1.0): tRect;
 var
   transform: tMatrix4x4;
 begin
   {todo: switch to a 3x2 matrix for this stuff}
   transform.setIdentity();
-  transform.translate(V3(-pivot.x, -pivot.y, 0));
+  transform.translate(V3(-pivot2x.x/2, -pivot2x.y/2, 0));
   transform.rotateXYZ(0, 0, zAngle * DEG2RAD);
   transform.scale(scale);
-  result := drawTransformed(dstPage, pos, transform);
+  result := drawTransformed(dstPage, V3(atPos.x, atPos.y, 0), transform);
 end;
 
 {identity transform will the centered on sprite center...
@@ -414,8 +423,8 @@ begin
       sprite := tSprite.create(page);
       sprite.srcRect := Rect(x*cellWidth, y*cellHeight, cellWidth, cellHeight);
       if centered then begin
-        sprite.pivot.x := cellWidth div 2;
-        sprite.pivot.y := cellHeight div 2;
+        sprite.pivot2x.x := cellWidth;
+        sprite.pivot2x.y := cellHeight;
       end;
       sprite.trim();
       append(sprite);
@@ -444,8 +453,111 @@ end;
 
 type
   tSpriteTest = class(tTestSuite)
+    procedure testDraw();
     procedure run; override;
   end;
+
+procedure tSpriteTest.testDraw();
+var
+  page: tPage;
+  spritePage: tPage;
+  sprite: tSprite;
+  c: array[0..4] of RGBA;
+  x,y: integer;
+
+type tSln = array[0..3,0..3] of byte;
+
+var
+  sln: array of tSln = [
+    {draw with clip}
+   ((0, 0, 0, 0),
+    (0, 1, 2, 0),
+    (0, 3, 4, 0),
+    (0, 0, 0, 0)),
+   ((4, 0, 0, 0),
+    (0, 0, 0, 0),
+    (0, 0, 0, 0),
+    (0, 0, 0, 0)),
+   ((0, 0, 0, 0),
+    (0, 0, 0, 0),
+    (0, 0, 0, 0),
+    (0, 0, 0, 1)),
+    {rotation}
+   ((0, 0, 0, 0),
+    (0, 3, 1, 0),
+    (0, 4, 2, 0),
+    (0, 0, 0, 0))
+  ];
+
+  function whichColor(aC: RGBA): char;
+  var
+    i: integer;
+  begin
+    result := '?';
+    for i := 0 to 4 do
+      if aC = c[i] then exit(intToStr(i)[1]);
+  end;
+
+  procedure testSln(aPage: tPage; sln: tSln);
+  var
+    i,j: integer;
+    wasError: boolean;
+    noteStr: string;
+  begin
+    wasError := false;
+    for i := 0 to 3 do
+      for j := 0 to 3 do
+        if aPage.getPixel(i,j) <> c[sln[j,i]] then wasError := true;
+    if wasError then begin
+      for j := 0 to 3 do begin
+        noteStr := '';
+        for i := 0 to 3 do begin
+          noteStr += whichColor(aPage.getPixel(i,j));
+        end;
+        note('  '+noteStr);
+      end;
+    end;
+    for i := 0 to 3 do
+      for j := 0 to 3 do
+        assertEqual(aPage.getPixel(i,j), c[sln[j,i]]);
+  end;
+
+begin
+  page := tPage.create(4,4);
+  spritePage := tPage.create(2,2);
+  c[0] := RGB(0,0,0); c[1] := RGB(255,0,0); c[2] := RGB(0,255,0); c[3] := RGB(0,0,255); c[4] := RGB(255,0,255);
+  spritePage.putPixel(0,0,c[1]);
+  spritePage.putPixel(1,0,c[2]);
+  spritePage.putPixel(0,1,c[3]);
+  spritePage.putPixel(1,1,c[4]);
+  sprite := tSprite.create(spritePage);
+
+  {standard draw with clipping}
+  page.clear(c[0]);
+  sprite.draw(page, 1, 1);
+  testSln(page, sln[0]);
+  page.clear(c[0]);
+  sprite.draw(page, -1, -1);
+  testSln(page, sln[1]);
+  page.clear(c[0]);
+  sprite.draw(page, 3, 3);
+  testSln(page, sln[2]);
+
+  {rotation}
+{  sprite.setPivot(1,1);
+  page.clear(c[0]);
+  sprite.drawRotated(page, Point(1, 1), 0);
+  testSln(page, sln[0]);}
+{  page.clear(c[0]);
+  sprite.drawRotated(page, V3(1, 1, 0), 90);
+  testSln(page, sln[4]);}
+
+  page.free;
+  spritePage.free;
+  sprite.free;
+
+
+end;
 
 procedure tSpriteTest.run();
 var
@@ -479,8 +591,7 @@ begin
   sprite2.free;
   page.free;
 
-  {todo: tests for draw/blit/stretch}
-
+  testDraw();
 end;
 
 initialization

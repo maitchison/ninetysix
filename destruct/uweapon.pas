@@ -234,7 +234,8 @@ begin
     PT_ROCKET,
     PT_PLASMA: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
-      r := sprite.drawRotated(screen.canvas, V3(xPos+32, yPos, 0), angle, 1.0);
+      angle := round(angle/45) * 45;
+      r := sprite.drawRotated(screen.canvas, Point(xPos+32, yPos), angle, 1.0);
     end;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;
