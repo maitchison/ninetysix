@@ -39,7 +39,7 @@ begin
   //screen.canvas.fillRect(bounds, RGB($FF730200));
   //screen.canvas.drawRect(bounds, RGB($FFFFB93C));
   weapon := tank.weapon;
-  weapon.weaponSprite.draw(screen.canvas, bounds.x, bounds.y);
+  weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
   textOutHalf(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
   screen.markRegion(bounds);
 end;
@@ -196,7 +196,7 @@ begin
   for tank in tanks do begin
     if not tank.isActive then continue;
     for xlp := -12 to +12 do begin
-      xPos := xlp + (tank.xPos);
+      xPos := xlp + tank.xPos;
       if (xPos < 0) or (xPos > 255) then continue;
       mask[xPos] := false;
     end;

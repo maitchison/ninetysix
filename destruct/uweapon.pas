@@ -21,7 +21,6 @@ type
   tProjectile = class(tGameObject)
     owner: tGameObject;
     pType: tProjectileType;
-    sprite: tSprite;
     damage: integer;
     procedure reset(); override;
     procedure hit();
@@ -104,8 +103,7 @@ procedure tProjectile.reset();
 begin
   inherited reset();
   col := RGB($ffffff86);
-  bounds.width := 3;
-  bounds.height := 3;
+  radius := 1;
 end;
 
 procedure playRandomHit();
@@ -126,27 +124,27 @@ end;
 
 procedure tProjectile.hit();
 var
-  radius: integer;
+  hitRadius: integer;
   dir: V2D;
 begin
-  radius := round(clamp(2, 2*sqrt(abs(damage)), 100));
+  hitRadius := round(clamp(2, 2*sqrt(abs(damage)), 100));
   case pType of
 
     PT_NONE: ;
 
     PT_BULLET: begin
       mixer.play(sfx['hit1'] , 0.8);
-      terrain.burn(xPos, yPos, radius, clamp(damage, 5, 80));
+      terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
     end;
     PT_SHELL: begin
       mixer.play(sfx['explode'] , 0.10);
-      terrain.burn(xPos, yPos, radius, clamp(damage, 5, 80));
-      makeExplosion(xPos, yPos, radius);
+      terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
+      makeExplosion(xPos, yPos, hitRadius);
     end;
     PT_ROCKET: begin
       mixer.play(sfx['explode'] , 0.3);
-      terrain.burn(xPos, yPos, radius, clamp(damage, 5, 80));
-      makeExplosion(xPos, yPos, radius);
+      terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
+      makeExplosion(xPos, yPos, hitRadius);
     end;
     PT_PLASMA: begin
       mixer.play(sfx['plasma3'] , 0.3);
@@ -178,8 +176,10 @@ begin
   if pType <> PT_PLASMA then
     //open tyrian is 0.05*(FPS^2). If FPS=69.5, this gives us 241.5.
     vel.y += 241.5 * elapsed;
+
   {move}
   inherited update(elapsed);
+
   {see if we're out of bounds}
   if (xPos < 0) or (xPos > 255) or (yPos > 255) then begin
     markForRemoval();
@@ -220,31 +220,26 @@ end;
 
 procedure tProjectile.draw(screen: tScreen);
 var
-  bounds: tRect;
   angle: single;
+  r: tRect;
 begin
-  bounds.init(0,0,0,0);
+  r.init(0, 0, 0, 0);
   case pType of
     PT_NONE:
       ;
     PT_SHELL,
     PT_BULLET,
     PT_DIRT:
-      bounds := sprite.draw(screen.canvas, xPos+32, yPos);
+      r := sprite.draw(screen.canvas, xPos+32, yPos);
     PT_ROCKET,
     PT_PLASMA: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
-      sprite.drawRotated(screen.canvas, V3(xPos+32, yPos, 0), angle, 1.0);
-      {todo: drawRotated should return rect}
-      {also, this rect is too large}
-      bounds := sprite.srcRect;
-      bounds.x := xPos + 32 - sprite.pivot.x;
-      bounds.y := yPos - sprite.pivot.y;
+      r := sprite.drawRotated(screen.canvas, V3(xPos+32, yPos, 0), angle, 1.0);
     end;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;
-  if bounds.width > 0 then
-    screen.markRegion(bounds);
+  if r.width > 0 then
+    screen.markRegion(r);
 end;
 
 {--------------------------------------}

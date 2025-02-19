@@ -12,7 +12,7 @@ type
   tGameObject = class
   public
     pos, vel: V2D;
-    bounds: tRect;
+    radius: integer;
     fSprite: tSprite;
     col: RGBA;
     age: single;
@@ -27,6 +27,7 @@ type
     procedure reset(); virtual;
     function  isActive: boolean;
     function  getWorldPixel(atX, atY: integer): RGBA;
+    function  getBounds(xOffset:integer=0;yOffset: integer=0): tRect;
     procedure draw(screen: tScreen); virtual;
     procedure drawBounds(screen: tScreen);
     procedure update(elapsed: single); virtual;
@@ -58,7 +59,6 @@ type
   tParticle = class(tGameObject)
   public
     solid: boolean;
-    radius: integer;
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
@@ -145,10 +145,14 @@ end;
 
 procedure tGameObject.reset();
 begin
-  // this is a bad idea... if we have dynmaic arrays I think it's a problem?
-  fillchar((pByte(self) + sizeof(Pointer))^, self.InstanceSize - sizeof(Pointer), 0);
-  status := GO_ACTIVE;
+  pos := V2(0,0);
+  vel := V2(0,0);
+  radius := 1;
+  sprite := nil;
   col := RGB(255,0,255);
+  age := 0;
+  ttl := 0;
+  status := GO_ACTIVE;
 end;
 
 procedure tGameObject.markForRemoval();
@@ -157,11 +161,15 @@ begin
 end;
 
 procedure tGameObject.setSprite(aSprite: tSprite);
+var
+  halfw,halfh: single;
 begin
   fSprite := aSprite;
+  {update radius}
   if assigned(fSprite) then begin
-    bounds.width := fSprite.width;
-    bounds.height := fSprite.height;
+    halfw := fSprite.width/2;
+    halfh := fSPrite.height/2;
+    radius := ceil(sqrt(halfw*halfw+halfh*halfh));
   end;
 end;
 
@@ -185,7 +193,20 @@ function tGameObject.getWorldPixel(atX, atY: integer): RGBA;
 begin
   fillchar(result, sizeof(result), 0);
   if not assigned(sprite) then exit;
-  result := sprite.getPixel(atX-bounds.x, atY-bounds.y);
+  {todo: I think this is wrong}
+  result := sprite.getPixel(atX-xPos+sprite.pivot.x, atY-yPos-sprite.pivot.y);
+end;
+
+{returns bounds for object (based on radius). Optional offset}
+function tGameObject.getBounds(xOffset:integer=0;yOffset: integer=0): tRect;
+begin
+  if radius <= 0 then exit(Rect(xPos+xOffset, yPos+yOffset, 0, 0));
+  result.init(
+    xPos+xOffset-radius+1,
+    yPos+yOffset-radius+1,
+    radius*2-1,
+    radius*2-1
+  );
 end;
 
 procedure tGameObject.draw(screen: tScreen);
@@ -196,32 +217,23 @@ end;
 
 procedure tGameObject.drawBounds(screen: tScreen);
 var
-  drawRect: tRect;
+  bounds: tRect;
 begin
-  drawRect := bounds;
-  drawRect.x += 32;
-  screen.canvas.drawRect(drawRect, col);
   screen.canvas.putPixel(xPos+32, yPos, col);
-  screen.markRegion(drawRect);
+  if radius <= 1 then exit;
+  bounds := getBounds(32, 0);
+  screen.canvas.drawRect(bounds, col);
+  screen.markRegion(bounds);
 end;
 
 procedure tGameObject.update(elapsed: single);
 begin
   pos := pos + (vel * elapsed);
   age += elapsed;
+
   if ttl > 0 then begin
     if age >= ttl then
       status := GO_PENDING_REMOVAL;
-  end;
-  if assigned(sprite) then begin
-    bounds.init(
-      round(pos.x-sprite.pivot.x),
-      round(pos.y-sprite.pivot.y),
-      sprite.width, sprite.height
-    );
-  end else begin
-    bounds.x := xPos;
-    bounds.y := yPos;
   end;
 end;
 
@@ -230,10 +242,8 @@ end;
 procedure tParticle.reset();
 begin
   inherited reset();
-  radius := 0;
   ttl := 1;
   col := RGB(255,0,0);
-  radius := 1;
   solid := false;
 end;
 
@@ -250,6 +260,7 @@ end;
 
 procedure tParticle.draw(screen: tScreen);
 begin
+  {todo: implement template based particles}
   if radius = 1 then
     inherited draw(screen)
   else

@@ -50,9 +50,9 @@ type
     procedure trim();
     function  draw(dstPage: tPage; atX, atY: int32): tRect;
     function  drawFlipped(dstPage: tPage; atX, atY: int32): tRect;
-    procedure drawStretched(DstPage: TPage; dest: tRect);
-    procedure drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0);
-    procedure drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
+    function  drawStretched(DstPage: TPage; dest: tRect): tRect;
+    function  drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0): tRect;
+    function  drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4): tRect;
     procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
 
     {iIniSerializable}
@@ -233,12 +233,13 @@ begin
 end;
 
 {Draws sprite stetched to cover destination rect}
-procedure tSprite.drawStretched(dstPage: tPage; dest: tRect);
+function tSprite.drawStretched(dstPage: tPage; dest: tRect): tRect;
 begin
   stretchDraw_ASM(dstPage, Self.page, Self.srcRect, dest);
+  result := dest;
 end;
 
-procedure tSprite.drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0);
+function tSprite.drawRotated(dstPage: tPage; pos: V3D;zAngle: single; scale: single=1.0): tRect;
 var
   transform: tMatrix4x4;
 begin
@@ -247,14 +248,15 @@ begin
   transform.translate(V3(-pivot.x, -pivot.y, 0));
   transform.rotateXYZ(0, 0, zAngle * DEG2RAD);
   transform.scale(scale);
-  drawTransformed(dstPage, pos, transform);
+  result := drawTransformed(dstPage, pos, transform);
 end;
 
 {identity transform will the centered on sprite center...
  todo: implement a default anchor}
-procedure tSprite.drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4);
+function tSprite.drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4): tRect;
 var
   p1,p2,p3,p4: tPoint;
+  minX, minY, maxX, maxY: integer;
 
   function xform(delta: tPoint): tPoint;
   var
@@ -265,6 +267,10 @@ var
     // no perspective for the moment}
     result.x := round(v.x);
     result.y := round(v.y);
+    minX := min(result.x, minX);
+    maxX := max(result.x, maxX);
+    minY := min(result.y, minY);
+    maxY := max(result.y, maxY);
   end;
 
 begin
@@ -274,6 +280,7 @@ begin
     xform(Point(srcRect.width, srcRect.height-1)),
     xform(Point(0, srcRect.height-1))
   );
+  result := Rect(minX, minY, maxX-minX+1, maxY-minY+1);
 end;
 
 {Draw sprite using nine-slice method}

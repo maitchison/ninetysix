@@ -95,7 +95,6 @@ begin
   pos.y := aPos.y;
   team := aTeam;
   applyChassis(CHASSIS_DEF[aChassisType]);
-  update(0);
 end;
 
 {remove and terrain around this tank}
@@ -169,11 +168,12 @@ end;
 procedure tTank.update(elapsed: single);
 var
   xlp: integer;
+  x,y: integer;
   support: integer;
   hitPower: integer;
   p: tParticle;
-  xPos, yPos: integer;
   i: integer;
+  bounds: tRect;
 begin
 
   {inherited update stuff}
@@ -182,6 +182,8 @@ begin
 
   {animation}
   sprite := spriteSheet.sprites[spriteIdx + clamp(round((90-abs(angle)) * 5 / 90), 0, 4)];
+
+  bounds := rect(xPos-8, yPos-8, 16, 16);
 
   {falling}
   support := 0;
@@ -198,21 +200,21 @@ begin
     if vel.y > 0 then begin
       hitPower := round(10*vel.y);
       {weaken blocks holding us up}
-      yPos := bounds.bottom;
-      for xPos:= bounds.left+3 to bounds.right-3 do begin
+      y := bounds.bottom;
+      for x := bounds.left+3 to bounds.right-3 do begin
         {make a little cloud}
         for i := 1 to 3 do begin
           p := nextParticle();
-          p.pos := V2(xPos, yPos);
+          p.pos := V2(x, y);
           p.vel := V2(rnd-128, rnd-128) * 0.2;
           p.solid := true;
-          p.col := terrain.terrain.getPixel(xPos, yPos);
+          p.col := terrain.terrain.getPixel(x, y);
           if p.col.a = 0 then p.col := RGB(200,200,200);
           p.ttl := 0.5;
           p.radius := 2;
         end;
         {burn it}
-        terrain.burn(xPos, bounds.bottom-3, 2, round(hitPower/support/16));
+        terrain.burn(x, bounds.bottom-3, 2, round(hitPower/support/16));
       end;
       vel.y := 0;
     end;
