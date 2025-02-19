@@ -19,35 +19,35 @@ uses
   utils;
 
 type
-  tTankGUI = class(tGuiComponent)
+  tPlayerGUI = class(tGuiComponent)
   public
-    tank: tTank;
+    player: tController;
     sprite: tSprite;
   protected
     procedure doDraw(screen: tScreen); override;
   public
-    constructor create(aPos: tPoint; aTank: tTank);
+    constructor create(aPos: tPoint; aPlayer: tController);
   end;
 
 {-------------------------------------------}
 
-procedure tTankGUI.doDraw(screen: tScreen);
+procedure tPlayerGUI.doDraw(screen: tScreen);
 var
   weapon: tWeaponSpec;
 begin
   sprite.blit(screen.canvas, bounds.x, bounds.y);
   //screen.canvas.fillRect(bounds, RGB($FF730200));
   //screen.canvas.drawRect(bounds, RGB($FFFFB93C));
-  weapon := tank.weapon;
+  weapon := player.tank.weapon;
   weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
   textOutHalf(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
   screen.markRegion(bounds);
 end;
 
-constructor tTankGUI.create(aPos: tPoint; aTank: tTank);
+constructor tPlayerGUI.create(aPos: tPoint; aPlayer: tController);
 begin
   inherited create();
-  tank := aTank;
+  player := aPlayer;
   sprite := tankGuiSprite;
   bounds := Rect(aPos.x, aPos.y, sprite.width, sprite.height);
 end;
@@ -232,7 +232,8 @@ var
   xlp,ylp: integer;
   testSprite: tSprite;
   m: tMatrix4x4;
-  tank2Gui: tTankGUI;
+  player1Gui,
+  player2Gui: tPlayerGUI;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
@@ -276,8 +277,10 @@ begin
   fps := tGuiLabel.create(Point(10, 10));
   gui.append(fps);
 
-  tank2Gui := tTankGUI.create(Point(160, 0), tanks[5]);
-  gui.append(tank2Gui);
+  player1Gui := tPlayerGUI.create(Point(0, 0), player1);
+  gui.append(player1Gui);
+  player2Gui := tPlayerGUI.create(Point(160, 0), player2);
+  gui.append(player2Gui);
 
   {main loop}
   repeat

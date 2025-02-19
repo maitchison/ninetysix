@@ -58,21 +58,28 @@ type
 
 const
   CHASSIS_DEF: array[tChassisType] of tChassis = (
-    (tag: 'Null';       cType: CT_NULL;     health: 0;   spriteIdx: 0; defaultWeapons: [];),
+    (tag: 'Null';       cType: CT_NULL;     health: 0;   spriteIdx: 0; defaultWeapons: []),
     (tag: 'Tank';       cType: CT_TANK;     health: 350; spriteIdx: 0;
       defaultWeapons: [
         tWeaponType.tracer,
         tWeaponType.blast,
-        tWeaponType.megaBlast,
-        tWeaponType.microNuke,
-        tWeaponType.miniNuke,
         tWeaponType.smallDirt,
-        tWeaponType.largeDirt,
-        tWeaponType.plasma
+        tWeaponType.largeDirt
       ]
     ),
-    (tag: 'Launcher';   cType: CT_LAUNCHER; health: 200; spriteIdx: 5; defaultWeapons: [];),
-    (tag: 'Heavy Tank'; cType: CT_HEAVY;    health: 700; spriteIdx: 10;defaultWeapons: [];)
+    (tag: 'Launcher';   cType: CT_LAUNCHER; health: 200; spriteIdx: 5;
+      defaultWeapons: [
+        tWeaponType.microNuke,
+        tWeaponType.miniNuke
+      ];
+    ),
+    (tag: 'Heavy Tank'; cType: CT_HEAVY;    health: 700; spriteIdx: 10;
+      defaultWeapons: [
+        tWeaponType.blast,
+        tWeaponType.megaBlast,
+        tWeaponType.plasma
+      ];
+    )
   );
 
 implementation
