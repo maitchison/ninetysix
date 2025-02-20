@@ -5,6 +5,7 @@ interface
 uses
   {$i units},
   crt,
+  list,
   uWeapon, uTank, uGameObjects, controller;
 
 type
@@ -43,6 +44,7 @@ function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
 
 procedure damagePlayers(x, y: integer; radius: integer; damage: integer;sender: tGameObject=nil);
+function  randomTank(aTeam: integer): tTank;
 
 procedure screenDone();
 procedure screenInit();
@@ -105,6 +107,18 @@ begin
   self.obj := nil;
   self.x := 0;
   self.y := 0;
+end;
+
+{returns a random tank belonging to given team, or nil if there are none}
+function randomTank(aTeam: integer): tTank;
+var
+  teamTanks: tIntList;
+  i: integer;
+begin
+  teamTanks.clear();
+  for i := 0 to length(tanks.objects)-1 do if tanks[i].team = aTeam then teamTanks.append(i);
+  if teamTanks.len = 0 then exit(nil);
+  result := tanks[teamTanks[rnd(teamTanks.len)]];
 end;
 
 {damage all players within area, using linear falloff

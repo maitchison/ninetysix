@@ -36,23 +36,24 @@ type
     procedure reset(); virtual;
     function  tank: tTank;
     procedure apply(elapsed: single);
-    procedure process(); virtual;
+    procedure process(elapsed: single); virtual;
   end;
 
   tNullController = class(tController)
   end;
 
   tHumanController = class(tController)
-    procedure process(); override;
+    procedure process(elapsed: single); override;
   end;
 
   tAIController = class(tController)
     solutionX, solutionY: single;
     state: tAIState;
+    stateTimer: single;
     shotsFired: integer;
     function firingSolution(dst: tPoint; v: single): single;
     procedure reset(); override;
-    procedure process(); override;
+    procedure process(elapsed: single); override;
   end;
 
 implementation
@@ -135,7 +136,7 @@ begin
   changeTankCoolDown := maxf(0, changeTankCoolDown - elapsed);
 end;
 
-procedure tController.process();
+procedure tController.process(elapsed: single);
 begin
   doFire := false;
   xVel := 0;
@@ -151,9 +152,9 @@ end;
 
 {--------------------------------------------}
 
-procedure tHumanController.process();
+procedure tHumanController.process(elapsed: single);
 begin
-  inherited process();
+  inherited process(elapsed);
   if keyDown(key_space) then doFire := true;
   if keyDown(key_left) then xVel := -100;
   if keyDown(key_right) then xVel := +100;
@@ -172,6 +173,7 @@ begin
   solutionY := 0;
   shotsFired := 0;
   state := AI_SELECT_TARGET;
+  stateTimer := 0;
 end;
 
 {returns the angle tank should fire at to hit dst from src, assuming given power
@@ -223,11 +225,11 @@ begin
   if dst.x > tank.pos.x then result := -result;
 end;
 
-procedure tAIController.process();
+procedure tAIController.process(elapsed: single);
 var
-  delta, deltaX, deltaY: single;
+  delta: single;
 begin
-  inherited process();
+  inherited process(elapsed);
 
   {work on an iterative firing solution}
   {
@@ -244,68 +246,33 @@ begin
     Note: we could update this so that we also take shots while waiting.
   }
 
-  {stub auto fire}
-  solutionY := 10;
-  solutionX := firingSolution(Point(mouse_x-32, mouse_y), 20*solutionY);
+  {change target every 15 seconds or so}
+  if stateTimer > 15 then
+    target := nil;
+
+  if not assigned(target) then begin
+    note('Selecting new target');
+    stateTimer := 0;
+    target := randomTank(2);
+    if not assigned(target) then begin
+      {nothing to shoot, stand at attention}
+      delta := 0 - tank.angle;
+      xVel := clamp(delta*4, -50, 50);
+      exit;
+    end;
+    solutionY := 8+rnd(5);
+    {todo: random weapon here?}
+  end;
+
+  stateTimer += elapsed;
+
+  {just fire all the time basically (with 1 second delay)}
+  doFire := stateTimer > 1;
+  solutionX := firingSolution(Point(target.xPos, target.yPos), 20*solutionY);
   delta := solutionX - tank.angle;
   xVel := clamp(delta*4, -50, 50);
   delta := solutionY - tank.power;
   yVel := clamp(delta, -5, 5);
-  doFire := true;
-  exit;
-
-  case state of
-    AI_SELECT_TARGET: begin
-      {stub: hard code to tank2 for the moment}
-      target := tanks[5];
-      if target.xPos > tank.xPos then solutionX := 45 else solutionX := -45;
-      solutionY := 10;
-      state := AI_AIMX;
-    end;
-    AI_AIMX: begin
-      if target.status <> GO_ACTIVE then begin
-        state := AI_IDLE;
-        exit;
-      end;
-      delta := solutionX - tank.angle;
-      xVel := clamp(delta*4, -50, 50);
-      if abs(delta) < 1 then
-        state := AI_AIMY;
-    end;
-    AI_AIMY: begin
-      delta := solutionY - tank.power;
-      yVel := clamp(delta, -5, 5);
-      if abs(delta) < 0.1 then
-        state := AI_FIRE;
-    end;
-    AI_FIRE: begin
-      doFire := true;
-      inc(shotsFired);
-      state := AI_WAIT;
-    end;
-    AI_WAIT: begin
-      case tank.lastProjectile.status of
-        GO_EMPTY:
-          // this shouldn't happen;
-          state := AI_AIMX;
-        GO_PENDING_REMOVAL: begin
-          if tank.lastProjectile.vel.y < 0 then begin
-            // we collided on the way up, so try to shoot over
-            solutionY := clamp(solutionY + 2, 2, 16);
-            if solutionX < 0 then solutionX += 10 else solutionX -= 10;
-          end else begin
-            // we collided on the way down so just adjust angle.
-            deltaX := target.xPos - tank.lastProjectile.xPos;
-            deltaY := target.yPos - tank.lastProjectile.yPos;
-            solutionX += clamp(deltax/3 + deltay/5, -10, 10);
-          end;
-          state := AI_AIMX;
-        end;
-      end;
-    end;
-    AI_IDLE: begin
-    end;
-  end;
 end;
 
 begin

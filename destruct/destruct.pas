@@ -298,8 +298,8 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-    player1.process();
-    player2.process();
+    player1.process(elapsed);
+    player2.process(elapsed);
     player1.apply(elapsed);
     player2.apply(elapsed);
 
