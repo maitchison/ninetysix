@@ -396,7 +396,11 @@ begin
     if cnt <= 0 then continue;
 
     {get initial texture pos (as 16.16}
-    f := (x1-sl.xMin)/(sl.xMax-sl.xMin);
+    if cnt = 1 then
+      f := 0
+    else
+      f := (x1-sl.xMin)/(sl.xMax-sl.xMin);
+    {todo: range check error here... I think just switch to simpler TX coord system}
     texX := trunc(lerp(tl.t1.x, tl.t2.x, f));
     texY := trunc(lerp(tl.t1.y, tl.t2.y, f));
     {get delta}

@@ -51,6 +51,8 @@ type
     state: tAIState;
     stateTimer: single;
     shotsFired: integer;
+    errorX, errorY: integer;
+    switchDelay, tickTimer: single;
     function firingSolution(dst: tPoint; v: single): single;
     procedure reset(); override;
     procedure process(elapsed: single); override;
@@ -174,6 +176,9 @@ begin
   shotsFired := 0;
   state := AI_SELECT_TARGET;
   stateTimer := 0;
+  switchDelay := 0;
+  errorX := 0;
+  errorY := 0;
 end;
 
 {returns the angle tank should fire at to hit dst from src, assuming given power
@@ -246,14 +251,25 @@ begin
     Note: we could update this so that we also take shots while waiting.
   }
 
-  {change target every 15 seconds or so}
-  if stateTimer > 15 then
-    target := nil;
+  if tickTimer > 1 then begin
+    // ticks occur every second}
+    tickTimer := 0;
+    errorX := round((rnd-128)/16);
+    errorY := round((rnd-128)/16);
+    case rnd(16) of
+      0: begin changeTank := +1; doFire := false; target := nil; exit; end;
+      1: changeWeapon := +1;
+      2: target := nil;
+    end;
+  end;
 
   if not assigned(target) then begin
     note('Selecting new target');
     stateTimer := 0;
     target := randomTank(2);
+
+    switchDelay := rnd(10);
+
     if not assigned(target) then begin
       {nothing to shoot, stand at attention}
       delta := 0 - tank.angle;
@@ -265,10 +281,11 @@ begin
   end;
 
   stateTimer += elapsed;
+  tickTimer += elapsed;
 
-  {just fire all the time basically (with 1 second delay)}
-  doFire := stateTimer > 1;
-  solutionX := firingSolution(Point(target.xPos, target.yPos), 20*solutionY);
+  {just fire all the time basically}
+  doFire := (xVel < 10) and (yVel < 1) and (stateTimer > 1) and (abs(tank.angle)>1);
+  solutionX := firingSolution(Point(errorX+target.xPos, errorY+target.yPos), 20*solutionY);
   delta := solutionX - tank.angle;
   xVel := clamp(delta*4, -50, 50);
   delta := solutionY - tank.power;
