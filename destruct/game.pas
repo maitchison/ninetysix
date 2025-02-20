@@ -41,6 +41,8 @@ function  nextParticle: tParticle;
 function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
 
+procedure damagePlayers(x, y: integer; radius: integer; damage: integer;sender: tGameObject=nil);
+
 procedure screenDone();
 procedure screenInit();
 
@@ -99,6 +101,21 @@ begin
   self.obj := nil;
   self.x := 0;
   self.y := 0;
+end;
+
+{damage all players within area, using linear falloff
+ sender is who caused the damage (if any).}
+procedure damagePlayers(x, y: integer; radius: integer; damage: integer;sender: tGameObject=nil);
+var
+  tank: tTank;
+  distance: single;
+begin
+  for tank in tanks do begin
+    distance := V2(x-tank.xPos, y-tank.yPos).abs;
+    if distance > radius then continue;
+    tank.takeDamage(tank.xPos, tank.yPos, round(damage * (1-(distance / radius))), sender);
+  end;
+
 end;
 
 {returns first object that ray intersects with}

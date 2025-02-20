@@ -23,7 +23,7 @@ type
     pType: tProjectileType;
     damage: integer;
     procedure reset(); override;
-    procedure hit();
+    procedure hit(other: tGameObject = nil);
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
   end;
@@ -66,8 +66,8 @@ const
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   pType: PT_SHELL;  cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  pType: PT_ROCKET; cooldown: 2.0),
     (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; pType: PT_ROCKET; cooldown: 4.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: -20;  pType: PT_DIRT;   cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: -40;  pType: PT_DIRT;   cooldown: 4.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 20;   pType: PT_DIRT;   cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 40;   pType: PT_DIRT;   cooldown: 4.0),
     (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; cooldown: 1.0)
   );
 
@@ -122,19 +122,23 @@ begin
   mixer.play(hitSnd, volume, SCS_NEXTFREE, pitch);
 end;
 
-procedure tProjectile.hit();
+procedure tProjectile.hit(other: tGameObject=nil);
 var
   hitRadius: integer;
   dir: V2D;
+  targetDamage: integer;
 begin
   hitRadius := round(clamp(2, 2*sqrt(abs(damage)), 100));
+  targetDamage := damage;
+
   case pType of
-
-    PT_NONE: ;
-
+    PT_NONE:
+      ;
     PT_BULLET: begin
       mixer.play(sfx['hit1'] , 0.8);
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
+      if assigned(other) then
+        makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
     end;
     PT_SHELL: begin
       mixer.play(sfx['explode'] , 0.10);
@@ -145,6 +149,8 @@ begin
       mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, hitRadius);
+      targetDamage := damage div 2;
+      damagePlayers(xPos, yPos, hitRadius, damage div 2, owner);
     end;
     PT_PLASMA: begin
       mixer.play(sfx['plasma3'] , 0.3);
@@ -155,11 +161,16 @@ begin
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
-      terrain.dirt(xPos, yPos, -damage);
+      terrain.dirt(xPos, yPos, damage);
+      targetDamage := 0;
     end;
     PT_LASER:
       ; // pass;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
+  end;
+
+  if (targetDamage > 0) and assigned(other) and (other is tTank) then begin
+    tTank(other).takeDamage(xPos, yPos, targetDamage, owner);
   end;
 
   markForRemoval();
@@ -200,20 +211,13 @@ begin
   else
     go := getObjectAtPos(xPos, yPos);
   if assigned(go) then begin
-    if go is tTank then begin
-      tank := tTank(go);
-      if damage > 0 then
-        tank.takeDamage(xPos, yPos, damage, owner);
-      makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
-    end else begin
-      // hmm we hit something other than a tank?
-    end;
-    hit();
+    hit(go);
     exit;
   end;
+
   {check if we collided with terrain}
   if terrain.isSolid(xPos, yPos) then begin
-    hit();
+    hit(nil);
     exit;
   end;
 end;
