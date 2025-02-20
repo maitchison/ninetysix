@@ -325,6 +325,8 @@ begin
 end;
 
 procedure tTank.adjust(deltaAngle, deltaPower: single);
+var
+  pre,post: double;
 begin
   if status <> GO_ACTIVE then exit;
   angle := clamp(angle + deltaAngle, -90, 90);

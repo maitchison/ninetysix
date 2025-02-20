@@ -5,7 +5,7 @@ interface
 uses
   {$i units},
   uTank,
-//  {$ifdef debug} mouse, {$endif}
+  {$ifdef debug} mouse, {$endif}
   uGameObjects;
 
 type
@@ -111,6 +111,13 @@ end;
 
 procedure tController.apply(elapsed: single);
 begin
+
+  {sometimes these are nan}
+  if (xVel <> xVel) or (yVel <> yVel) then exit;
+
+  xVel := clamp(xVel, -100, 100);
+  yVel := clamp(yVel, -10, 10);
+
   if doFire then tank.fire();
   tank.adjust(xVel * elapsed, yVel *elapsed);
 
@@ -175,6 +182,7 @@ var
   z1,z2,A,g: single;
   det: single;
   sln1, sln2: single;
+  takeHighShot: boolean;
 
 begin
   {balastic path is a parabola, parameterized by
@@ -187,25 +195,32 @@ begin
     we know x_0, y_0, x_final, y_final and vel... so solve to find theta.
   }
   if not assigned(tank) then exit(0);
-  dX := dst.x-tank.pos.x;
-  dY := dst.y-tank.pos.y;
+  dX := abs(dst.x-tank.pos.x);
+  dY := (dst.y-tank.pos.y);
   g := game.GRAVITY;
-  A := g * dx / (2*v*v);
-  det := dX*dX - 4 * A * (A - dY);
+  A := g * (dX*dX) / (2*v*v);
+  det := (dX*dX) - (4 * A * (A-dY));
   if det < 0 then begin
     result := 0; // no solution!
     exit;
   end;
 
-  z1 := (-dX + sqrt(det)) / 2*A;
-  z2 := (-dX - sqrt(det)) / 2*A;
-  sln1 := arcTan(z1)*RAD2DEG;
-  sln2 := arcTan(z2)*RAD2DEG;
+  z1 := (-dX + sqrt(det)) / (2*A);
+  z2 := (-dX - sqrt(det)) / (2*A);
+  //{solution has theta=0 being -> but we want it ^}
+  sln1 := clamp(-(90+radToDeg(arcTan(z1))), -150.0, 150.0);
+  sln2 := clamp(-(90+radToDeg(arcTan(z2))), -150.0, 150.0);
+
   {use the high shot, not the low shot}
-  if abs(sln1) < abs(sln2) then
-    result := sln1
+  takeHighShot := not keyDown(key_x);
+  if takeHighShot then
+    {take high shot}
+    if abs(sln1) < abs(sln2) then result := sln1 else result := sln2
   else
-    result := sln2;
+    {take low shot}
+    if abs(sln1) > abs(sln2) then result := sln1 else result := sln2;
+
+  if dst.x > tank.pos.x then result := -result;
 end;
 
 procedure tAIController.process();
@@ -230,10 +245,12 @@ begin
   }
 
   {stub auto fire}
-  //solutionX := firingSolution(Point(mouse_x, mouse_y), 15*10);
-  solutionX := 0;
+  solutionY := 10;
+  solutionX := firingSolution(Point(mouse_x-32, mouse_y), 20*solutionY);
   delta := solutionX - tank.angle;
   xVel := clamp(delta*4, -50, 50);
+  delta := solutionY - tank.power;
+  yVel := clamp(delta, -5, 5);
   doFire := true;
   exit;
 

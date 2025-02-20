@@ -16,7 +16,7 @@ uses
   keyboard,
   lc96, la96,
   mixlib,
-//  {$ifdef debug} mouse, {$endif}
+  {$ifdef debug} mouse, {$endif}
   font, uScreen,
   utils;
 
@@ -367,7 +367,7 @@ begin
 
   screenInit();
   musicPlay('res\dance1.a96');
-  //{$ifdef debug} initMouse(); {$endif}
+  {$ifdef debug} initMouse(); {$endif}
   //titleScreen();
   battleScreen();
   screenDone();
