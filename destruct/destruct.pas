@@ -276,12 +276,13 @@ begin
 
   {setup gui}
   gui := tGuiComponents.create();
-  fps := tGuiLabel.create(Point(10, 10));
+  fps := tGuiLabel.create(Point(6, 20));
+  fps.halfSize := true;
   gui.append(fps);
 
   player1Gui := tPlayerGUI.create(Point(0, 0), player1);
   gui.append(player1Gui);
-  player2Gui := tPlayerGUI.create(Point(160, 0), player2);
+  player2Gui := tPlayerGUI.create(Point(320-155-1, 0), player2);
   gui.append(player2Gui);
 
   {main loop}

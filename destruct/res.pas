@@ -38,7 +38,7 @@ begin
 
   sprites := tSpriteSheet.create(tPage.load('res\sprites.p96'));
   sprites.grid(16, 16, true);
-  tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 160, 16));
+  tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 155, 16));
 end;
 
 procedure freeResources();
