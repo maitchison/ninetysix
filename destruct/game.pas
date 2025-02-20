@@ -38,6 +38,7 @@ procedure drawAll(screen: tScreen);
 function  nextProjectile: tProjectile;
 function  nextParticle: tParticle;
 
+procedure debugShowWorldPixels(screen: tScreen);
 function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
 
@@ -50,6 +51,9 @@ var
   screen: tScreen;
   tanks: tTankList;
   player1, player2: tController;
+
+const
+  GRAVITY = 241.5;
 
 implementation
 
@@ -178,6 +182,17 @@ begin
     x += dx;
     y += dy;
   end;
+end;
+
+procedure debugShowWorldPixels(screen: tScreen);
+var
+  x,y: integer;
+begin
+  for y := 0 to 255 do
+    for x := 0 to 255 do
+      if assigned(getObjectAtPos(x,y)) then
+        screen.canvas.putPixel(x+32, y, RGB(255,0,255));
+  screen.markRegion(Rect(32,0,256,256));
 end;
 
 {returns the object at given location}

@@ -8,7 +8,6 @@
 {some base units}
   mymath,
   keyboard,
-  mouse,
   timer,
 {graphics}
   graph2d,

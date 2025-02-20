@@ -186,7 +186,7 @@ begin
   {gravity}
   if pType <> PT_PLASMA then
     //open tyrian is 0.05*(FPS^2). If FPS=69.5, this gives us 241.5.
-    vel.y += 241.5 * elapsed;
+    vel.y += game.GRAVITY * elapsed;
 
   {move}
   inherited update(elapsed);
@@ -210,6 +210,7 @@ begin
     go := getObjectAtPos(xPos, yPos, self.owner)
   else
     go := getObjectAtPos(xPos, yPos);
+
   if assigned(go) then begin
     hit(go);
     exit;

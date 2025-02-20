@@ -220,12 +220,14 @@ var
   solidTiles: integer;
 begin
   for y := 0 to 240-1 do begin
+    {$ifdef debug}
     case lineStatus[y] of
       TL_EMPTY: screen.canvas.putPixel(319, y, RGB(255,0,0));
       TL_MIXED: screen.canvas.putPixel(319, y, RGB(0,255,0));
       TL_FULL: screen.canvas.putPixel(319, y, RGB(0,0,255));
       TL_UNKNOWN: screen.canvas.putPixel(319, y, RGB(255,0,255));
     end;
+    {$endif}
     srcPtr := terrain.pixels + (y * 256 * 4);
     dstPtr := screen.canvas.pixels + ((32 + (y*screen.canvas.width)) * 4);
     if lineStatus[y] = TL_EMPTY then continue;

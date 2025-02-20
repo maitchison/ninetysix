@@ -6,6 +6,7 @@ uses
   uTank, uWeapon, game, res, uGameObjects, terra, controller,
   {general}
   graph2d, graph32, vga, vesa,
+  sysInfo,
   sprite, inifile,
   vertex,
   myMath,
@@ -15,6 +16,7 @@ uses
   keyboard,
   lc96, la96,
   mixlib,
+//  {$ifdef debug} mouse, {$endif}
   font, uScreen,
   utils;
 
@@ -322,6 +324,9 @@ begin
     gui.draw(screen);
     stopTimer('guiDraw');
 
+    {debug}
+    if keydown(key_f5) then debugShowWorldPixels(screen);
+
     screen.flipAll();
 
     stopTimer('main');
@@ -344,6 +349,10 @@ begin
 
   CALL_OLD_KBH := false;
 
+  {show useful stuff}
+  cpuInfo.printToLog();
+  logDPMIInfo();
+
   autoHeapSize();
 
   textAttr := White + Blue*16;
@@ -358,12 +367,13 @@ begin
 
   screenInit();
   musicPlay('res\dance1.a96');
+  //{$ifdef debug} initMouse(); {$endif}
   //titleScreen();
   battleScreen();
   screenDone();
 
-  freeResources();
   logTimers();
+  freeResources();
 
   printLog(32);
 

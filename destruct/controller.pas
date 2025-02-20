@@ -5,6 +5,7 @@ interface
 uses
   {$i units},
   uTank,
+//  {$ifdef debug} mouse, {$endif}
   uGameObjects;
 
 type
@@ -49,6 +50,7 @@ type
     solutionX, solutionY: single;
     state: tAIState;
     shotsFired: integer;
+    function firingSolution(dst: tPoint; v: single): single;
     procedure reset(); override;
     procedure process(); override;
   end;
@@ -165,6 +167,47 @@ begin
   state := AI_SELECT_TARGET;
 end;
 
+{returns the angle tank should fire at to hit dst from src, assuming given power
+ if no solution then return 0 (which would mean firing directly up)}
+function tAIController.firingSolution(dst: tPoint; v: single): single;
+var
+  dX,dY: single;
+  z1,z2,A,g: single;
+  det: single;
+  sln1, sln2: single;
+
+begin
+  {balastic path is a parabola, parameterized by
+
+    v_initial = -cos(theta)*vel
+    v_t = v_initial + gravity * t
+    y_t = 0.5 * gravity * t^2 + v_initial * t
+    x_t = sin(theta) * t
+
+    we know x_0, y_0, x_final, y_final and vel... so solve to find theta.
+  }
+  if not assigned(tank) then exit(0);
+  dX := dst.x-tank.pos.x;
+  dY := dst.y-tank.pos.y;
+  g := game.GRAVITY;
+  A := g * dx / (2*v*v);
+  det := dX*dX - 4 * A * (A - dY);
+  if det < 0 then begin
+    result := 0; // no solution!
+    exit;
+  end;
+
+  z1 := (-dX + sqrt(det)) / 2*A;
+  z2 := (-dX - sqrt(det)) / 2*A;
+  sln1 := arcTan(z1)*RAD2DEG;
+  sln2 := arcTan(z2)*RAD2DEG;
+  {use the high shot, not the low shot}
+  if abs(sln1) < abs(sln2) then
+    result := sln1
+  else
+    result := sln2;
+end;
+
 procedure tAIController.process();
 var
   delta, deltaX, deltaY: single;
@@ -185,6 +228,14 @@ begin
 
     Note: we could update this so that we also take shots while waiting.
   }
+
+  {stub auto fire}
+  //solutionX := firingSolution(Point(mouse_x, mouse_y), 15*10);
+  solutionX := 0;
+  delta := solutionX - tank.angle;
+  xVel := clamp(delta*4, -50, 50);
+  doFire := true;
+  exit;
 
   case state of
     AI_SELECT_TARGET: begin

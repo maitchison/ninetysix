@@ -268,6 +268,4 @@ end;
 
 initialization
   CPUInfo := getCPUInfo();
-  cpuInfo.printToLog();
-  logDPMIInfo();
 end.

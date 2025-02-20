@@ -150,15 +150,15 @@ end;
 {write entry to log}
 procedure log(s: string; level: tLogLevel=llNote);
 var
-  entry: TLogEntry;
+  entry: tLogEntry;
   isText: boolean;
   oldTextAttr: byte;
 begin
   SetLength(LogEntries, LogCount+1);
 
-  Entry.Time := Now;
-  Entry.Msg := s;
-  Entry.Level := level;
+  entry.Time := Now;
+  entry.Msg := s;
+  entry.Level := level;
 
   {Save to memory}
   LogEntries[LogCount] := entry;
@@ -443,15 +443,21 @@ begin
   writeln('An error has occured:');
   writeln();
   textColor(Yellow);
-  if assigned(obj) then
-    if obj is Exception then
-      writeln(obj.toString)
-    else if obj is tObject then
-      writeln('Invalid exception object: '+obj.toString)
+
+  try
+    if assigned(obj) then
+      if obj is Exception then
+        writeln(obj.toString)
+      else if obj is tObject then begin
+        writeln('Invalid exception object: '+obj.toString)
+      end else
+        writeln('Invalid exception object')
     else
-      writeln('Invalid exception object')
-  else
-    writeln('Nil exception object');
+      writeln('Nil exception object');
+  except
+    // hmm and error while printing the error..
+    writeln('An exception occured while trying to print the error.');
+  end;
 
   textColor(White);
   writeln();

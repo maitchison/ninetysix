@@ -259,7 +259,7 @@ end;
 
 procedure CloseMouse();
 begin
-  Info('[close] Mouse');
+  info('[close] Mouse');
   removeMouseProc();
 end;
 
@@ -444,5 +444,4 @@ initialization
 
 finalization
   closeMouse();
-
 end.

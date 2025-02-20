@@ -277,7 +277,6 @@ begin
   ArgIndex := 0;
   places := 1;
   InPlaceholder := False;
-
   for i := 1 to length(fmt) do begin
     if fmt[i] = '%' then begin
       if inPlaceholder then begin
@@ -290,7 +289,7 @@ begin
     end;
     if inPlaceholder then begin
       inPlaceholder := False;
-      a := args[ArgIndex];
+      a := args[argIndex];
       case fmt[i] of
         '.': begin
             // very basic for the moment
@@ -332,8 +331,10 @@ begin
         'f': begin
           // float
           case a.VType of
-            vtExtended: Str(args[ArgIndex].VExtended^:0:places, s);
-            else fatal('Invalid type for %f:'+IntToStr(a.VType));
+            vtInteger: str((1.0*a.VInteger):0:places, s);
+            vtInt64: str((1.0*a.VInt64^):0:places, s);
+            vtExtended: str(a.VExtended^:0:places, s);
+            else raise Exception.create('Invalid type for %f:'+intToStr(a.VType));
           end;
           result += s;
         end;

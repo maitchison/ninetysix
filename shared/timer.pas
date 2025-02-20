@@ -77,9 +77,9 @@ end;
 
 {------------------------------------------------------}
 
-constructor tTimer.Create(aTag: string);
+constructor tTimer.create(aTag: string);
 begin
-  inherited Create();
+  inherited create();
   reset(aTag);
 end;
 
@@ -134,7 +134,7 @@ end;
 function tTimer.toString(): string;
 begin
   if avElapsed < 0.1 then
-    result := format('%s %fms (%fms) [total:%.2fs]', [pad(tag,20), 1000*avElapsed, 1000*maxElapsed, totalElapsed])
+    result := format('%s %fms (%fms) [total:%.2fs]', [pad(tag, 20), 1000*avElapsed, 1000*maxElapsed, 1.0*totalElapsed])
   else
     result := format('%s %fs (%fs) [total:%.2fs]', [pad(tag, 20), avElapsed, maxElapsed, totalElapsed]);
 end;
@@ -145,7 +145,8 @@ initialization
 
 finalization
 
-  for timer in Timers do
-    timer.free;
+  for timer in TIMERS do
+    timer.free();
+  setLength(TIMERS, 0);
 
 end.
