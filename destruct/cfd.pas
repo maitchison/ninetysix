@@ -27,28 +27,43 @@ type
     procedure init(aShift: byte);
   end;
 
-  tCellArray = array[0..127, 0..127] of single;
+  tIntCellArray = array[0..127, 0..127] of single;
+  tFloatCellArray = array[0..127, 0..127] of single;
   tGridArray = array[0..15, 0..15] of byte;
 
   tCFDGrid = class
     size: tPowerOfTwo;
     procedure init(); virtual;
-    procedure setDensity(x,y: integer; value: integer); virtual; abstract;
+    procedure setDensity(x,y: integer; value: single); virtual; abstract;
+    function  getDensity(x,y: integer): single; virtual; abstract;
     procedure update(); virtual; abstract;
     procedure draw(screen: tScreen;xPos, yPos: integer); virtual; abstract;
   end;
 
+  {method1: pressure 'diffuses' into the surrounding area. Implemented with a blur}
+  tDiffusionGrid = class(tCFDGrid)
+  protected
+    f, fTemp: tFloatCellArray;
+  public
+    procedure init(); override;
+    procedure setDensity(x,y: integer; value: single); override;
+    function  getDensity(x,y: integer): single; override;
+    procedure update(); override;
+    procedure draw(screen: tScreen;xPos, yPos: integer); override;
+  end;
+
   tLatticeBoltzmannGrid = class(tCFDGrid)
   protected
-    f, fTemp: array[0..8] of tCellArray;
-    displayRho, displayVel: tCellArray;
+    f, fTemp: array[0..8] of tFloatCellArray;
+    displayRho, displayVel: tFloatCellArray;
     procedure computeMacros(var rho, ux, uy: single; x,y: integer); inline;
     function  calcFreq(i: integer; rho,ux,uy,uxuv: single): single; inline;
     procedure collision(force: boolean=false);
     procedure stream();
   public
     procedure init(); override;
-    procedure setDensity(x,y: integer; value: integer); override;
+    procedure setDensity(x,y: integer; value: single); override;
+    function  getDensity(x,y: integer): single; override;
     procedure update(); override;
     procedure draw(screen: tScreen;xPos, yPos: integer); override;
   end;
@@ -75,6 +90,70 @@ procedure tCFDGrid.init();
 begin
   size.init(7); {128x128}
 end;
+
+{---------------------------------------------------------------}
+
+procedure tDiffusionGrid.init();
+begin
+  fillchar(f, sizeof(f), 0);
+  fillchar(fTemp, sizeof(fTemp), 0);
+end;
+
+procedure tDiffusionGrid.setDensity(x,y: integer; value: single);
+begin
+  if (x < 0) or (y < 0) or (x > 127) or (y > 127) then exit;
+  f[y, x] := value;
+end;
+
+function tDiffusionGrid.getDensity(x,y: integer): single;
+begin
+  result := 0;
+  if (x < 0) or (y < 0) or (x > 127) or (y > 127) then exit;
+  result := f[y, x]
+end;
+
+procedure tDiffusionGrid.update();
+var
+  x,y: integer;
+  dx,dy: integer;
+  prev, this, next: single;
+begin
+  prev := 0;
+  for y := 1 to 128-2 do begin
+    for x := 1 to 128-2 do begin
+      this := f[y,x];
+      next := f[y,x+1];
+      f[y,x] := (prev / 2) + (this / 4) + (next / 2);
+      prev := this;
+    end;
+  end;
+  prev := 0;
+  for x := 1 to 128-2 do begin
+    for y := 1 to 128-2 do begin
+      this := f[y,x];
+      next := f[y+1,x];
+      f[y,x] := (prev / 2) + (this / 4) + (next / 2);
+      prev := this;
+    end;
+  end;
+end;
+
+procedure tDiffusionGrid.draw(screen: tScreen;xPos, yPos: integer);
+var
+  x,y: integer;
+  density, velocity: single;
+  c: RGBA;
+begin
+  for x := 0 to 127 do
+    for y := 0 to 127 do begin
+      c := RGB(round(f[y,x]*100), round(f[y,x]*200), 0);
+      screen.canvas.setPixel(xPos+x, yPos+y, c);
+    end;
+  screen.markRegion(Rect(xPos, yPos, 128, 128));
+end;
+
+
+{---------------------------------------------------------------}
 
 procedure tLatticeBoltzmannGrid.init();
 var
@@ -106,13 +185,17 @@ begin
   collision(true);
 end;
 
-procedure tLatticeBoltzmannGrid.setDensity(x,y: integer; value: integer);
+procedure tLatticeBoltzmannGrid.setDensity(x,y: integer; value: single);
 begin
-  if x < 0 then x := 0;
-  if y < 0 then y := 0;
-  if x > 127 then x := 127;
-  if y > 127 then y := 127;
+  if (x < 0) or (y < 0) or (x > 127) or (y > 127) then exit;
   f[0, x, y] := value;
+end;
+
+function tLatticeBoltzmannGrid.getDensity(x,y: integer): single;
+begin
+  result := 0;
+  if (x < 0) or (y < 0) or (x > 127) or (y > 127) then exit;
+  result := displayRho[x, y]
 end;
 
 procedure tLatticeBoltzmannGrid.computeMacros(var rho, ux, uy: single; x,y: integer);
@@ -273,7 +356,6 @@ begin
     end;
   screen.markRegion(Rect(xPos, yPos, 128, 128));
 end;
-
 
 begin
 end.
