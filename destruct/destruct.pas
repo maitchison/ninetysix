@@ -125,20 +125,11 @@ var
   gui: tGuiComponents;
   elapsed: single;
   ofsX, ofsY: integer;
-
-  procedure addPressure(x,y: integer);
-  begin
-    if x < 0 then x := 0;
-    if y < 0 then y := 0;
-    if x > 127 then x := 127;
-    if y > 127 then y := 127;
-    cg.f[0, x, y] := 10.0;
-  end;
-
-
+  timeUntilNextUpdate: single;
 begin
   cg := tCFDGrid.create();
   cg.init();
+
 
   gui := tGuiComponents.create();
   fpsLabel := tGuiLabel.create(Point(10, 10));
@@ -146,6 +137,8 @@ begin
 
   ofsX := (320-128) div 2;
   ofsY := (240-128) div 2;
+
+  timeUntilNextUpdate := 0;
 
   {main loop}
   repeat
@@ -158,17 +151,19 @@ begin
     gui.update(elapsed);
     gui.draw(screen);
 
-    if MOUSE_B = 1 then begin
-      addPressure(mouse_x-ofsX, mouse_y-ofsY);
+    if (MOUSE_B = 1) then
+      cg.setDensity(mouse_x-ofsX, mouse_y-ofsY, 10);
+
+    timeUntilNextUpdate -= elapsed;
+    if timeUntilNextUpdate <= 0 then begin
+      startTimer('cfd');
+      cg.update();
+      stopTimer('cfd');
+      fpsLabel.text := format('CFD: %fms', [1000*getTimer('cfd').avElapsed]);
+      timeUntilNextUpdate := 1/30;
     end;
 
-    startTimer('cfd');
-    cg.update();
-    stopTimer('cfd');
-    fpsLabel.text := format('CFD: %fms', [1000*getTimer('cfd').avElapsed]);
-
     cg.draw(screen, ofsX, ofsY);
-
 
     screen.pageFlip();
     stopTimer('main');
