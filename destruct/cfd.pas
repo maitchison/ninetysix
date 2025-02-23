@@ -141,12 +141,11 @@ end;
 procedure tLatticeBoltzmannGrid.collision(force: boolean=false);
 var
   x,y,i: integer;
-  rho, ux, uy, freq: single;
+  rho, ux, uy, uv, freq: single;
   ux3, uy3: single; {3*ux}
   uxux,uyuy: single;  {ux*ux}
   eu3: single;
-  uxuv,uv15: single;
-  eu: single;
+  oneMinusUv15: single;
   a: array[0..8] of single;
 
 begin
@@ -170,34 +169,34 @@ begin
       uyuy := uy*uy;
       ux3 := 3*ux;
       uy3 := 3*uy;
-      uxuv := uxux + uyuy;
-      uv15 := uxuv * 1.5;
+      uv := uxux + uyuy;
+      oneMinusUv15 := 1 - (uv * 1.5);
 
-      freq := (4/9) * rho * (1.0 - uv15);
+      freq := (4/9) * rho * (oneMinusUv15);
       fTemp[0,x,y] := a[0] + omega * (freq - a[0]);
-      freq := (1/9) * rho * (1.0 + ux3 + 4.5 * uxux - uv15);
+      freq := (1/9) * rho * (oneMinusUv15 + ux3 + 4.5 * uxux);
       fTemp[1,x,y] := a[1] + omega * (freq - a[1]);
-      freq := (1/9) * rho * (1.0 + uy3 + 4.5 * uyuy - uv15);
+      freq := (1/9) * rho * (oneMinusUv15 + uy3 + 4.5 * uyuy);
       fTemp[2,x,y] := a[2] + omega * (freq - a[2]);
-      freq := (1/9) * rho * (1.0 - ux3 + 4.5 * uxux - uv15);
+      freq := (1/9) * rho * (oneMinusUv15 - ux3 + 4.5 * uxux);
       fTemp[3,x,y] := a[3] + omega * (freq - a[3]);
-      freq := (1/9) * rho * (1.0 - uy3 + 4.5 * uyuy - uv15);
+      freq := (1/9) * rho * (oneMinusUv15 - uy3 + 4.5 * uyuy);
       fTemp[4,x,y] := a[4] + omega * (freq - a[4]);
       eu3 := +ux3+uy3;
-      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      freq := (1/36) * rho * (oneMinusUv15 + eu3 + 0.5 * eu3 * eu3);
       fTemp[5,x,y] := a[5] + omega * (freq - a[5]);
       eu3 := -ux3+uy3;
-      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      freq := (1/36) * rho * (oneMinusUv15 + eu3 + 0.5 * eu3 * eu3);
       fTemp[6,x,y] := a[6] + omega * (freq - a[6]);
       eu3 := -ux3-uy3;
-      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      freq := (1/36) * rho * (oneMinusUv15 + eu3 + 0.5 * eu3 * eu3);
       fTemp[7,x,y] := a[7] + omega * (freq - a[7]);
       eu3 := +ux3-uy3;
-      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      freq := (1/36) * rho * (oneMinusUv15 + eu3 + 0.5 * eu3 * eu3);
       fTemp[8,x,y] := a[8] + omega * (freq - a[8]);
 
       displayRho[x,y] := rho;
-      displayVel[x,y] := uxuv;
+      displayVel[x,y] := uv;
     end;
   end;
 end;
