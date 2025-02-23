@@ -31,17 +31,26 @@ type
   tGridArray = array[0..15, 0..15] of byte;
 
   tCFDGrid = class
+    size: tPowerOfTwo;
+    procedure init(); virtual;
+    procedure setDensity(x,y: integer; value: integer); virtual; abstract;
+    procedure update(); virtual; abstract;
+    procedure draw(screen: tScreen;xPos, yPos: integer); virtual; abstract;
+  end;
+
+  tLatticeBoltzmannGrid = class(tCFDGrid)
+  protected
     f, fTemp: array[0..8] of tCellArray;
     displayRho, displayVel: tCellArray;
-    size: tPowerOfTwo;
-    procedure init();
-    procedure setDensity(x,y: integer; value: integer);
     procedure computeMacros(var rho, ux, uy: single; x,y: integer); inline;
     function  calcFreq(i: integer; rho,ux,uy,uxuv: single): single; inline;
     procedure collision(force: boolean=false);
     procedure stream();
-    procedure update();
-    procedure draw(screen: tScreen;xPos, yPos: integer);
+  public
+    procedure init(); override;
+    procedure setDensity(x,y: integer; value: integer); override;
+    procedure update(); override;
+    procedure draw(screen: tScreen;xPos, yPos: integer); override;
   end;
 
 
@@ -60,16 +69,23 @@ begin
   shift := aShift;
 end;
 
+{---------------------------------------------------------------}
+
 procedure tCFDGrid.init();
+begin
+  size.init(7); {128x128}
+end;
+
+procedure tLatticeBoltzmannGrid.init();
 var
   x, y, i: integer;
   rho, ux, uy: single;
 begin
 
+  inherited init();
+
   fillchar(displayRho, sizeof(displayRho), 0);
   fillchar(displayVel, sizeof(displayVel), 0);
-
-  size.init(7); {128x128}
 
   rho := 1.0;
   ux := 0.05;
@@ -90,7 +106,7 @@ begin
   collision(true);
 end;
 
-procedure tCFDGrid.setDensity(x,y: integer; value: integer);
+procedure tLatticeBoltzmannGrid.setDensity(x,y: integer; value: integer);
 begin
   if x < 0 then x := 0;
   if y < 0 then y := 0;
@@ -99,7 +115,7 @@ begin
   f[0, x, y] := value;
 end;
 
-procedure tCFDGrid.computeMacros(var rho, ux, uy: single; x,y: integer);
+procedure tLatticeBoltzmannGrid.computeMacros(var rho, ux, uy: single; x,y: integer);
 var
   i: integer;
   a: array[0..8] of single;
@@ -114,7 +130,7 @@ begin
   uy := (a[2] - a[4] + a[5] + a[6] - a[7] - a[8]) / rho;
 end;
 
-function tCFDGrid.calcFreq(i: integer; rho,ux,uy,uxuv: single): single; inline;
+function tLatticeBoltzmannGrid.calcFreq(i: integer; rho,ux,uy,uxuv: single): single; inline;
 var
   eu: single;
 begin
@@ -122,7 +138,7 @@ begin
   result := w[i] * rho * (1.0 + 3.0 * eu + 4.5 * eu * eu - 1.5 * uxuv);
 end;
 
-procedure tCFDGrid.collision(force: boolean=false);
+procedure tLatticeBoltzmannGrid.collision(force: boolean=false);
 var
   x,y,i: integer;
   rho, ux, uy, freq: single;
@@ -152,7 +168,6 @@ begin
       freq := (1/9) * rho * (1.0 + 3.0 * eu + 4.5 * eu * eu - uv15);
       fTemp[2,x,y] := f[2,x,y] + omega * (freq - f[2,x,y]);
 
-
 {    cx: array[0..8] of integer = (0, +1,  0, -1,  0, +1, -1, -1, +1);
     cy: array[0..8] of integer = (0,  0, +1,  0, -1, +1, +1, -1, -1);
  }{
@@ -165,7 +180,7 @@ begin
   end;
 end;
 
-procedure tCFDGrid.stream;
+procedure tLatticeBoltzmannGrid.stream();
 var
   x,y,i,j,xdst,ydst: integer;
   gx,gy,xx,yy: integer;
@@ -218,13 +233,13 @@ begin
   end;
 end;
 
-procedure tCFDGrid.update();
+procedure tLatticeBoltzmannGrid.update();
 begin
   collision();
   stream();
 end;
 
-procedure tCFDGrid.draw(screen: tScreen;xPos, yPos: integer);
+procedure tLatticeBoltzmannGrid.draw(screen: tScreen;xPos, yPos: integer);
 var
   x,y: integer;
   density, velocity: single;

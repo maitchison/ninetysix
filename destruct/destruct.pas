@@ -127,7 +127,7 @@ var
   ofsX, ofsY: integer;
   timeUntilNextUpdate: single;
 begin
-  cg := tCFDGrid.create();
+  cg := tLatticeBoltzmannGrid.create();
   cg.init();
 
 
