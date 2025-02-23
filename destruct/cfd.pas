@@ -147,17 +147,24 @@ var
   eu3: single;
   uxuv,uv15: single;
   eu: single;
+  a: array[0..8] of single;
 
 begin
   for y := 0 to 127 do begin
     for x := 0 to 127 do begin
-      computeMacros(rho, ux, uy, x, y);
 
-      {
-      for i := 0 to 8 do begin
-        freq := calcFreq(i, rho, ux, uy, uxuv);
-        fTemp[i,x,y] := f[i,x,y] + omega * (freq - f[i,x,y]);
-      end;}
+      {compute macro}
+      for i := 0 to 8 do a[i] := f[i,x,y];
+      rho := a[0] + a[1] + a[2] + a[3] + a[4] + a[5] + a[6] + a[7] + a[8];
+      if rho < 1e-4 then begin
+        for i := 0 to 8 do fTemp[i,x,y] := a[i];
+        displayRho[x,y] := 255;
+        displayVel[x,y] := 255;
+        continue;
+      end else begin
+        ux := (a[1] - a[3] + a[5] - a[6] - a[7] + a[8]) / rho;
+        uy := (a[2] - a[4] + a[5] + a[6] - a[7] - a[8]) / rho;
+      end;
 
       uxux := ux*ux;
       uyuy := uy*uy;
@@ -167,27 +174,27 @@ begin
       uv15 := uxuv * 1.5;
 
       freq := (4/9) * rho * (1.0 - uv15);
-      fTemp[0,x,y] := f[0,x,y] + omega * (freq - f[0,x,y]);
+      fTemp[0,x,y] := a[0] + omega * (freq - a[0]);
       freq := (1/9) * rho * (1.0 + ux3 + 4.5 * uxux - uv15);
-      fTemp[1,x,y] := f[1,x,y] + omega * (freq - f[1,x,y]);
+      fTemp[1,x,y] := a[1] + omega * (freq - a[1]);
       freq := (1/9) * rho * (1.0 + uy3 + 4.5 * uyuy - uv15);
-      fTemp[2,x,y] := f[2,x,y] + omega * (freq - f[2,x,y]);
+      fTemp[2,x,y] := a[2] + omega * (freq - a[2]);
       freq := (1/9) * rho * (1.0 - ux3 + 4.5 * uxux - uv15);
-      fTemp[3,x,y] := f[3,x,y] + omega * (freq - f[3,x,y]);
+      fTemp[3,x,y] := a[3] + omega * (freq - a[3]);
       freq := (1/9) * rho * (1.0 - uy3 + 4.5 * uyuy - uv15);
-      fTemp[4,x,y] := f[4,x,y] + omega * (freq - f[4,x,y]);
+      fTemp[4,x,y] := a[4] + omega * (freq - a[4]);
       eu3 := +ux3+uy3;
       freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
-      fTemp[5,x,y] := f[5,x,y] + omega * (freq - f[5,x,y]);
+      fTemp[5,x,y] := a[5] + omega * (freq - a[5]);
       eu3 := -ux3+uy3;
       freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
-      fTemp[6,x,y] := f[6,x,y] + omega * (freq - f[6,x,y]);
+      fTemp[6,x,y] := a[6] + omega * (freq - a[6]);
       eu3 := -ux3-uy3;
       freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
-      fTemp[7,x,y] := f[7,x,y] + omega * (freq - f[7,x,y]);
+      fTemp[7,x,y] := a[7] + omega * (freq - a[7]);
       eu3 := +ux3-uy3;
       freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
-      fTemp[8,x,y] := f[8,x,y] + omega * (freq - f[8,x,y]);
+      fTemp[8,x,y] := a[8] + omega * (freq - a[8]);
 
       displayRho[x,y] := rho;
       displayVel[x,y] := uxuv;
