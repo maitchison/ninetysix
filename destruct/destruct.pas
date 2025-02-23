@@ -13,10 +13,11 @@ uses
   timer,
   ui,
   crt, //todo: remove
+  cfd,
   keyboard,
   lc96, la96,
   mixlib,
-  {$ifdef debug} mouse, {$endif}
+  mouse,
   font, uScreen,
   utils;
 
@@ -114,6 +115,64 @@ begin
     idle();
 
   until exitFlag;
+
+end;
+
+procedure cfdScreen();
+var
+  cg: tCFDGrid;
+  fpsLabel: tGuiLabel;
+  gui: tGuiComponents;
+  elapsed: single;
+  ofsX, ofsY: integer;
+
+  procedure addPressure(x,y: integer);
+  begin
+    if x < 0 then x := 0;
+    if y < 0 then y := 0;
+    if x > 127 then x := 127;
+    if y > 127 then y := 127;
+    cg.f[0, x, y] := 10.0;
+  end;
+
+
+begin
+  cg := tCFDGrid.create();
+  cg.init();
+
+  gui := tGuiComponents.create();
+  fpsLabel := tGuiLabel.create(Point(10, 10));
+  gui.append(fpsLabel);
+
+  ofsX := (320-128) div 2;
+  ofsY := (240-128) div 2;
+
+  {main loop}
+  repeat
+    startTimer('main');
+
+    screen.clearAll();
+
+    elapsed := clamp(getTimer('main').elapsed, 0.001, 1.0);
+
+    gui.update(elapsed);
+    gui.draw(screen);
+
+    if MOUSE_B = 1 then begin
+      addPressure(mouse_x-ofsX, mouse_y-ofsY);
+    end;
+
+    startTimer('cfd');
+    cg.update();
+    stopTimer('cfd');
+    fpsLabel.text := format('CFD: %fms', [1000*getTimer('cfd').avElapsed]);
+
+    cg.draw(screen, ofsX, ofsY);
+
+
+    screen.pageFlip();
+    stopTimer('main');
+  until keyDown(key_esc);
 
 end;
 
@@ -367,10 +426,11 @@ begin
   loadResources();
 
   screenInit();
-  musicPlay('res\dance1.a96');
-  {$ifdef debug} initMouse(); {$endif}
-  titleScreen();
-  battleScreen();
+  //musicPlay('res\dance1.a96');
+  initMouse();
+  //titleScreen();
+  //battleScreen();
+  cfdScreen();
   screenDone();
 
   logTimers();
