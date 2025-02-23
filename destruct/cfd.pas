@@ -18,11 +18,19 @@ uses
 
 type
 
+  tPowerOfTwo = record
+    mask: word;
+    value: word;
+    shift: byte;
+    procedure init(aShift: byte);
+  end;
+
   tGridArray = array[0..127, 0..127] of single;
 
   tCFDGrid = class
     f, fTemp: array[0..8] of tGridArray;
     displayRho, displayVel: tGridArray;
+    size: tPowerOfTwo;
     procedure init();
     procedure computeMacros(var rho, ux, uy: single; x,y: integer);
     function  freq(i: integer; rho,ux,uy: single): single;
@@ -41,18 +49,27 @@ var
 
 implementation
 
+procedure tPowerOfTwo.init(aShift: byte);
+begin
+  mask := (1 shl aShift) - 1;
+  value := 1 shl aShift;
+  shift := aShift;
+end;
+
 procedure tCFDGrid.init();
 var
   x, y, i: integer;
   rho, ux, uy: single;
 begin
 
+  size.init(7); {128x128}
+
   rho := 1.0;
   ux := 0.05;
   uy := 0.00;
 
-  for x := 0 to 128-1 do
-    for y := 0 to 128-1 do
+  for x := 0 to 127 do
+    for y := 0 to 127 do
       for i := 0 to 8 do begin
         f[i,x,y] := w[i] * rho *
           (
@@ -117,11 +134,13 @@ procedure tCFDGrid.stream;
 var
   x,y,i,xdst,ydst: integer;
 begin
+  {this is literally just a mem copy... I can ASM this no proble}
+  {but this is a place where we also want to active inactive cells}
   for x := 0 to 127 do
     for y := 0 to 127 do
       for i := 0 to 8 do begin
-        xDst := (x + cx[i] + 128) mod 128;
-        yDst := (y + cy[i] + 128) mod 128;
+        xDst := (x + cx[i] + size.value) and size.mask;
+        yDst := (y + cy[i] + size.value) and size.mask;
         f[i, xdst, ydst] := fTemp[i, x, y];
       end;
 end;
