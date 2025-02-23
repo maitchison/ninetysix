@@ -166,7 +166,7 @@ end;
 
 procedure tCFDGrid.stream;
 var
-  x,y,i,xdst,ydst: integer;
+  x,y,i,j,xdst,ydst: integer;
   gx,gy,xx,yy: integer;
 
   procedure streamCell(gx,gy: integer);
@@ -186,13 +186,30 @@ var
     end;
   end;
 
+  procedure process(x,y: integer);
+  var
+    i, xDst, yDst: integer;
+  begin
+    for i := 0 to 8 do begin
+      xDst := (x + cx[i] + size.value) and size.mask;
+      yDst := (y + cy[i] + size.value) and size.mask;
+      f[i, xdst, ydst] := fTemp[i, x, y];
+    end;
+  end;
+
 begin
   {this is literally just a mem copy... I can ASM this no problem}
   {but this is a place where we also want to active inactive cells}
-  for gy := 0 to 15 do begin
-    for gx := 0 to 15 do begin
-      streamCell(gx, gy);
-    end;
+  for i := 0 to 8 do begin
+    {perform copy}
+    move(fTemp[i, 1, 1], f[i, 1+cx[i], 1+cy[i]], 126*128*4);
+  end;
+  {handle edges correctly}
+  for j := 0 to 127 do begin
+    process(0, j);
+    process(j, 0);
+    process(127, j);
+    process(j, 127);
   end;
 end;
 
