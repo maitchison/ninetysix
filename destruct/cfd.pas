@@ -142,6 +142,9 @@ procedure tLatticeBoltzmannGrid.collision(force: boolean=false);
 var
   x,y,i: integer;
   rho, ux, uy, freq: single;
+  ux3, uy3: single; {3*ux}
+  uxux,uyuy: single;  {ux*ux}
+  eu3: single;
   uxuv,uv15: single;
   eu: single;
 
@@ -149,31 +152,43 @@ begin
   for y := 0 to 127 do begin
     for x := 0 to 127 do begin
       computeMacros(rho, ux, uy, x, y);
-      uxuv := sqr(ux) + sqr(uy);
 
-      for i := 3 to 8 do begin
+      {
+      for i := 0 to 8 do begin
         freq := calcFreq(i, rho, ux, uy, uxuv);
         fTemp[i,x,y] := f[i,x,y] + omega * (freq - f[i,x,y]);
-      end;
+      end;}
 
+      uxux := ux*ux;
+      uyuy := uy*uy;
+      ux3 := 3*ux;
+      uy3 := 3*uy;
+      uxuv := uxux + uyuy;
       uv15 := uxuv * 1.5;
 
-      eu := 0;
       freq := (4/9) * rho * (1.0 - uv15);
       fTemp[0,x,y] := f[0,x,y] + omega * (freq - f[0,x,y]);
-      eu := ux;
-      freq := (1/9) * rho * (1.0 + 3.0 * eu + 4.5 * eu * eu - uv15);
+      freq := (1/9) * rho * (1.0 + ux3 + 4.5 * uxux - uv15);
       fTemp[1,x,y] := f[1,x,y] + omega * (freq - f[1,x,y]);
-      eu := uy;
-      freq := (1/9) * rho * (1.0 + 3.0 * eu + 4.5 * eu * eu - uv15);
+      freq := (1/9) * rho * (1.0 + uy3 + 4.5 * uyuy - uv15);
       fTemp[2,x,y] := f[2,x,y] + omega * (freq - f[2,x,y]);
+      freq := (1/9) * rho * (1.0 - ux3 + 4.5 * uxux - uv15);
+      fTemp[3,x,y] := f[3,x,y] + omega * (freq - f[3,x,y]);
+      freq := (1/9) * rho * (1.0 - uy3 + 4.5 * uyuy - uv15);
+      fTemp[4,x,y] := f[4,x,y] + omega * (freq - f[4,x,y]);
+      eu3 := +ux3+uy3;
+      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      fTemp[5,x,y] := f[5,x,y] + omega * (freq - f[5,x,y]);
+      eu3 := -ux3+uy3;
+      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      fTemp[6,x,y] := f[6,x,y] + omega * (freq - f[6,x,y]);
+      eu3 := -ux3-uy3;
+      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      fTemp[7,x,y] := f[7,x,y] + omega * (freq - f[7,x,y]);
+      eu3 := +ux3-uy3;
+      freq := (1/36) * rho * (1.0 + eu3 + 0.5 * eu3 * eu3 - uv15);
+      fTemp[8,x,y] := f[8,x,y] + omega * (freq - f[8,x,y]);
 
-{    cx: array[0..8] of integer = (0, +1,  0, -1,  0, +1, -1, -1, +1);
-    cy: array[0..8] of integer = (0,  0, +1,  0, -1, +1, +1, -1, -1);
- }{
-      eu := cx[i]*ux + cy[i]*uy;
-      freq := w[i] * rho * (1.0 + 3.0 * eu + 4.5 * eu * eu - 1.5 * uxuv);
-   }
       displayRho[x,y] := rho;
       displayVel[x,y] := uxuv;
     end;
