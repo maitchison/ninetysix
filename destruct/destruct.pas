@@ -121,19 +121,23 @@ end;
 procedure cfdScreen();
 var
   cg: tCFDGrid;
-  fpsLabel: tGuiLabel;
+  fpsLabel, densityLabel: tGuiLabel;
   gui: tGuiComponents;
   elapsed: single;
   ofsX, ofsY: integer;
   timeUntilNextUpdate: single;
 begin
   cg := tDiffusionGrid.create();
+  //cg := tLatticeBoltzmannGrid.create();
   cg.init();
 
 
   gui := tGuiComponents.create();
   fpsLabel := tGuiLabel.create(Point(10, 10));
   gui.append(fpsLabel);
+  densityLabel := tGuiLabel.create(Point(10, 200));
+  gui.append(densityLabel);
+
 
   ofsX := (320-128) div 2;
   ofsY := (240-128) div 2;
@@ -152,7 +156,9 @@ begin
     gui.draw(screen);
 
     if (MOUSE_B = 1) then
-      cg.setDensity(mouse_x-ofsX, mouse_y-ofsY, 10);
+      cg.addDensity(mouse_x-ofsX, mouse_y-ofsY, clamp(100*elapsed, 0, 1))
+    else
+      densityLabel.text := format('%.3f', [cg.getDensity(mouse_x-ofsX, mouse_y-ofsY)]);
 
     timeUntilNextUpdate -= elapsed;
     if timeUntilNextUpdate <= 0 then begin

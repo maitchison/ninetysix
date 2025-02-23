@@ -34,6 +34,7 @@ type
   tCFDGrid = class
     size: tPowerOfTwo;
     procedure init(); virtual;
+    procedure addDensity(x,y: integer; value: single);
     procedure setDensity(x,y: integer; value: single); virtual; abstract;
     function  getDensity(x,y: integer): single; virtual; abstract;
     procedure update(); virtual; abstract;
@@ -91,6 +92,11 @@ begin
   size.init(7); {128x128}
 end;
 
+procedure tCFDGrid.addDensity(x,y: integer; value: single);
+begin
+  setDensity(x,y, getDensity(x,y) + value);
+end;
+
 {---------------------------------------------------------------}
 
 procedure tDiffusionGrid.init();
@@ -116,24 +122,26 @@ procedure tDiffusionGrid.update();
 var
   x,y: integer;
   dx,dy: integer;
-  prev, this, next: single;
+  prev4, this4, next4: single;
 begin
-  prev := 0;
   for y := 1 to 128-2 do begin
+    prev4 := f[y,0]*0.25;
+    this4 := f[y,1]*0.25;
     for x := 1 to 128-2 do begin
-      this := f[y,x];
-      next := f[y,x+1];
-      f[y,x] := (prev / 2) + (this / 4) + (next / 2);
-      prev := this;
+      next4 := f[y,x+1]*0.25;
+      f[y,x] := (prev4) + (this4*2) + (next4);
+      prev4 := this4;
+      this4 := next4;
     end;
   end;
-  prev := 0;
   for x := 1 to 128-2 do begin
+    prev4 := f[0,x]*0.25;
+    this4 := f[1,x]*0.25;
     for y := 1 to 128-2 do begin
-      this := f[y,x];
-      next := f[y+1,x];
-      f[y,x] := (prev / 2) + (this / 4) + (next / 2);
-      prev := this;
+      next4 := f[y+1,x]*0.25;
+      f[y,x] := (prev4) + (this4*2) + (next4);
+      prev4 := this4;
+      this4 := next4;
     end;
   end;
 end;
@@ -146,7 +154,7 @@ var
 begin
   for x := 0 to 127 do
     for y := 0 to 127 do begin
-      c := RGB(round(f[y,x]*100), round(f[y,x]*200), 0);
+      c := RGB(round(f[y,x]*1000), round(f[y,x]*200), 0);
       screen.canvas.setPixel(xPos+x, yPos+y, c);
     end;
   screen.markRegion(Rect(xPos, yPos, 128, 128));
