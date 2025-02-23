@@ -210,6 +210,10 @@ begin
     process(j, 0);
     process(127, j);
     process(j, 127);
+    process(1, j);
+    process(j, 1);
+    process(126, j);
+    process(j, 126);
   end;
 end;
 
