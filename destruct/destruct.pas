@@ -79,7 +79,7 @@ begin
   gui.append(startLabel);
 
   verLabel := tGuiLabel.create(Point(320-75, 26));
-  verLabel.text := '0.1a (12/02/1996)';
+  verLabel.text := '0.2a (20/02/1996)';
   verLabel.halfSize := true;
   verLabel.textColor := RGB(255,255,255);
   gui.append(verLabel);
@@ -369,7 +369,7 @@ begin
   screenInit();
   musicPlay('res\dance1.a96');
   {$ifdef debug} initMouse(); {$endif}
-  //titleScreen();
+  titleScreen();
   battleScreen();
   screenDone();
 

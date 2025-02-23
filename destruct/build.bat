@@ -1,6 +1,6 @@
 @echo off
 
-set VERSION=01
+set VERSION=02
 set MAIN=destruct
 set BUILD_DIR=c:\dev\build\%MAIN%\%VERSION%
 set LATEST_DIR=c:\dev\build\%MAIN%\latest
