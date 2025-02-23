@@ -32,7 +32,6 @@ type
 
   tCFDGrid = class
     f, fTemp: array[0..8] of tCellArray;
-    grid: tGridArray;
     displayRho, displayVel: tCellArray;
     size: tPowerOfTwo;
     procedure init();
@@ -67,7 +66,6 @@ var
   rho, ux, uy: single;
 begin
 
-  fillchar(grid, sizeof(grid), 0);
   fillchar(displayRho, sizeof(displayRho), 0);
   fillchar(displayVel, sizeof(displayVel), 0);
 
@@ -99,7 +97,6 @@ begin
   if x > 127 then x := 127;
   if y > 127 then y := 127;
   f[0, x, y] := value;
-  grid[x div 8, y div 8] := 1;
 end;
 
 procedure tCFDGrid.computeMacros(var rho, ux, uy: single; x,y: integer);
@@ -143,11 +140,7 @@ var
   var
     xx,yy,i,x,y: integer;
     rho, ux, uy, freqVal: single;
-    rhoM1, rhoM2: single;
-    rhoVar: single;
   begin
-    rhoM1 := 0;
-    rhoM2 := 0;
     for yy := 0 to 7 do begin
       for xx := 0 to 7 do begin
         x := gx * 8 + xx;
@@ -159,19 +152,14 @@ var
         end;
         displayRho[x,y] := rho;
         displayVel[x,y] := sqr(ux) + sqr(uy);
-        rhoM1 += rho / 64;
-        rhoM2 += (rho*rho) / 64;
       end;
     end;
-    rhoVar := (rhoM2) - (rhoM1*rhoM1);
-    if rhoVar < 0.0003 then grid[gx,gy] := 0;
   end;
 
 begin
   for gy := 0 to 15 do begin
     for gx := 0 to 15 do begin
-      if (grid[gx, gy] = 1) or force then
-        cellSlow(gx, gy);
+      cellSlow(gx, gy);
     end;
   end;
 end;
@@ -192,10 +180,7 @@ var
         for i := 0 to 8 do begin
           xDst := (x + cx[i] + size.value) and size.mask;
           yDst := (y + cy[i] + size.value) and size.mask;
-          if abs(f[i, xdst, ydst] - fTemp[i, x, y]) > 0.0001 then begin
-            grid[xdst div 8, ydst div 8] := 1;
-            f[i, xdst, ydst] := fTemp[i, x, y];
-          end;
+          f[i, xdst, ydst] := fTemp[i, x, y];
         end;
       end;
     end;
@@ -206,7 +191,7 @@ begin
   {but this is a place where we also want to active inactive cells}
   for gy := 0 to 15 do begin
     for gx := 0 to 15 do begin
-      if grid[gx, gy] = 1 then streamCell(gx, gy);
+      streamCell(gx, gy);
     end;
   end;
 end;
@@ -226,8 +211,6 @@ begin
   for x := 0 to 127 do
     for y := 0 to 127 do begin
       c := RGB(round(displayRho[x,y]*100), round(displayVel[x,y]*200), 0);
-      {if grid[x div 8, y div 8] = 1 then
-        c.b := 100;}
       screen.canvas.setPixel(xPos+x, yPos+y, c);
     end;
   screen.markRegion(Rect(xPos, yPos, 128, 128));
