@@ -18,9 +18,9 @@ const
 
 type
 
-  tDirtType = (DT_EMPTY, DT_DIRT, DT_STONE);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_ROCK);
 
-  tTerrainInfo = record
+  tCellInfo = record
     case byte of
     0: (
       dType: tDirtType;
@@ -42,7 +42,7 @@ type
     count: byte;
   end;
 
-  tTerrainInfoArray = array[0..256-1, 0..256-1] of tTerrainInfo;
+  tCellInfoArray = array[0..256-1, 0..256-1] of tCellInfo;
   tTerrainAttrArray = array[0..256-1, 0..32-1] of tTerrainLine;
 
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
@@ -51,7 +51,7 @@ type
   protected
     {todo: these need to be aligned to 32 bytes, which means custom getMem}
     cellAttr: tTerrainAttrArray;
-    cellInfo: tTerrainInfoArray;
+    cellInfo: tCellInfoArray;
     blockInfo: tBlockInfoArray;
   public
     constructor create();
@@ -59,8 +59,8 @@ type
 
     procedure clear(); virtual;
 
-    function  getDirt(x,y: integer): tTerrainInfo; inline;
-    procedure setDirt(x,y: integer; dType: tDirtType); inline;
+    function  getCell(x,y: integer): tCellInfo; inline;
+    procedure setCell(x,y: integer; cell: tCellInfo); inline;
     function  isEmpty(x, y: integer): boolean; inline;
     function  isSolid(x, y: integer): boolean; inline;
 
@@ -110,41 +110,27 @@ begin
   fillchar(cellAttr, sizeof(cellAttr), 0);
 end;
 
-function tTerrainModel.getDirt(x,y: integer): tTerrainInfo; inline;
+function tTerrainModel.getCell(x,y: integer): tCellInfo; inline;
 begin
   result.code := 0;
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit();
   result := cellInfo[y, x];
-{
-  asm
-    xor eax, eax
-    mov al, byte ptr X
-    mov ah, byte ptr Y
-    mov al, [ebp + blocksInfo + eax]
-    end;}
+end;
+
+procedure tTerrainModel.setCell(x,y: integer; cell: tCellInfo); inline;
+begin
+  if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
+  cellInfo[y, x] := cell;
 end;
 
 function tTerrainModel.isEmpty(x, y: integer): boolean; inline;
 begin
-  result := getDirt(x, y).dType = DT_EMPTY;
+  result := getCell(x, y).dType = DT_EMPTY;
 end;
 
 function tTerrainModel.isSolid(x, y: integer): boolean; inline;
 begin
-  result := getDirt(x, y).dType <> DT_EMPTY;
-end;
-
-procedure tTerrainModel.setDirt(x,y: integer; dType: tDirtType); inline;
-begin
-  if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
-  cellInfo[y, x].code := byte(dType);
-  {todo: set attr if needed}
-  {
-  cellAttr[y, x div 8].x[x and $7] := 0;
-  cellAttr[y, x div 8].y[x and $7] := 0;
-  cellAttr[y, x div 8].vX[x and $7] := 0;
-  cellAttr[y, x div 8].vY[x and $7] := 0;
-  }
+  result := getCell(x, y).dType <> DT_EMPTY;
 end;
 
 {removes terrain in given radius, and burns edges}
@@ -235,7 +221,7 @@ var
 begin
   result := 0;
   for y := 0 to 255 do
-    if getDirt(xPos, y).dType <> DT_EMPTY then exit(255-y);
+    if getCell(xPos, y).dType <> DT_EMPTY then exit(255-y);
 end;
 
 procedure tTerrainModel.generate();
@@ -244,6 +230,7 @@ var
   rockHeight: array[0..255] of integer;
   x,y: integer;
   c: RGBA;
+  cell: tCellInfo;
   v: single;
 begin
 
@@ -257,20 +244,17 @@ begin
   for y := 0 to 255 do begin
     for x := 0 to 255 do begin
       if y > rockHeight[x] then
-        c := TC_ROCK
-      else if y > dirtHeight[x] then
-        c := TC_DIRT
-      else if y > dirtHeight[x]-1 then
-        c := RGB(TC_DIRT.r-10, TC_DIRT.g-10, TC_DIRT.b-10, TC_DIRT.a-10)
+        cell.dType := DT_ROCK
+      else if y >= dirtHeight[x] then
+        cell.dType := DT_DIRT
       else
         continue;
-      v := 0.9+(0.1*(rnd/255));
-      c.r := round(c.r * v);
-      c.g := round(c.g * v);
-      c.b := round(c.r * v);
-      c.a := round(c.a * v);
-      setDirt(x, y, DT_DIRT);
-      //dirtColor.setPixel(x, y, c);
+
+      { random strength mostly for texture }
+      cell.strength := 200+rnd(50);
+      if y = dirtHeight[x] then cell.strength := cell.strength div 2;
+
+      setCell(x, y, cell);
     end;
   end;
 end;
@@ -290,9 +274,10 @@ var
 begin
   for y := 0 to 255 do begin
     for x := 0 to 255 do begin
-      case getDirt(x,y).dType of
+      case getCell(x,y).dType of
         DT_EMPTY: ;
         DT_DIRT: screen.canvas.setPixel(32+x, y, RGB(128,128,128));
+        DT_ROCK: screen.canvas.setPixel(32+x, y, RGB(64,64,64));
       end;
     end;
   end;
@@ -364,7 +349,7 @@ end;
 { tParticleTerrain }
 {----------------------------------------------------------------------}
              (*
-procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tTerrainInfoArray; var cellAttr: tTerrainAttrArray);
+procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray; var cellAttr: tTerrainAttrArray);
 var
   i,j,x,y: integer;
   idx: integer;
