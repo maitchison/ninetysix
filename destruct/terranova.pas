@@ -12,9 +12,8 @@ uses
   graph2d, graph32, uScreen;
 
 const
-  BS_EMPTY = 0;
-  BS_FULL = 1;
-  BS_ACTIVE = 2;
+  BS_LOCKED = 1;   // no updates required as no particles can move
+  BS_DIRTY = 2;    // must redraw this block as it's changed
 
 type
 
@@ -77,7 +76,7 @@ type
   {very simple non-moving terrain}
   tStaticTerrain = class(tTerrainModel)
   public
-    procedure update(elapsed: single); virtual;
+    procedure update(elapsed: single); override;
   end;
 
 implementation
@@ -127,11 +126,15 @@ begin
 end;
 
 procedure tTerrainModel.setCell(x,y: integer; cell: tCellInfo); inline;
+var
+  bi: ^tBlockInfo;
 begin
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
   if cellInfo[y, x].dType <> DT_EMPTY then dec(blockInfo[y div 8, x div 8].count);
   cellInfo[y, x] := cell;
-  if cell.dType <> DT_EMPTY then inc(blockInfo[y div 8, x div 8].count);
+  bi := @blockInfo[y div 8, x div 8];
+  if cell.dType <> DT_EMPTY then inc(bi^.count);
+  bi^.status := bi^.status or BS_DIRTY;
 end;
 
 function tTerrainModel.isEmpty(x, y: integer): boolean; inline;
@@ -282,16 +285,23 @@ var
   gx, gy: integer;
   srcPtr, dstPtr: pointer;
   solidTiles: integer;
+  bi: ^tBlockInfo;
 
   procedure debugDrawBlock(gx, gy: integer);
   var
     r: tRect;
     c: RGBA;
+    bi: tBlockInfo;
   begin
-    r := Rect(32+gx*8, gy*8, 8,8);
-    c := RGB(255,0,0);
-    if blockInfo[gy, gx].count = 0 then
-      c := RGB(0,0,255);
+    r := Rect(32+gx*8, gy*8, 9,9);
+    c := RGB(128,128,128);
+    bi := blockInfo[gy, gx];
+    if bi.count = 0 then
+      c.r := 0;
+    if bi.count = 64 then
+      c.r := 255;
+    if (bi.status and BS_DIRTY = BS_DIRTY) then
+      c.g := 255;
     screen.canvas.drawRect(r, c);
     screen.markRegion(r);
   end;
@@ -372,11 +382,15 @@ begin
   for gy := 0 to 30-1 do begin
     for gx := 0 to 32-1 do begin
 
-      if blockInfo[gy, gx].count > 0 then
+      bi := @blockInfo[gy, gx];
+
+      if bi^.count > 0 then
         drawBlock_ASM(gx, gy);
 
       if keyDown(key_g) then
         debugDrawBlock(gx, gy);
+
+      bi^.status := bi^.status and (not BS_DIRTY);
     end;
   end;
 end;
