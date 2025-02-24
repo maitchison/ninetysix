@@ -24,6 +24,7 @@ type
     case byte of
     0: (
       dType: tDirtType;
+      strength: byte;
     );
     1: (code: dword);
   end;
@@ -46,37 +47,38 @@ type
 
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
 
-  tTerrain = class
-  public
-    {todo: these need to be aligned to 32 bytes, which means custom getMem}
-    cellInfo: tTerrainInfoArray;
-    cellAttr: tTerrainAttrArray;
-    blockInfo: tBlockInfoArray;
+  tTerrainModel = class
   protected
-    procedure updateCelluar();
+    {todo: these need to be aligned to 32 bytes, which means custom getMem}
+    cellAttr: tTerrainAttrArray;
+    cellInfo: tTerrainInfoArray;
+    blockInfo: tBlockInfoArray;
   public
     constructor create();
     destructor destroy(); override;
 
-    procedure clear();
+    procedure clear(); virtual;
 
-    function  getDirt(x,y: integer): tTerrainInfo;
-    procedure setDirt(x,y: integer; dType: tDirtType);
-
-    function  isEmpty(x, y: integer): boolean;
-    function  isSolid(x, y: integer): boolean;
+    function  getDirt(x,y: integer): tTerrainInfo; inline;
+    procedure setDirt(x,y: integer; dType: tDirtType); inline;
+    function  isEmpty(x, y: integer): boolean; inline;
+    function  isSolid(x, y: integer): boolean; inline;
 
     procedure addDirtCircle(atX,atY: integer;r: integer);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     function  getTerrainHeight(xPos: integer): integer;
 
     procedure generate();
-    procedure draw(screen: tScreen);
-    procedure update(elapsed: single);
+
+    procedure draw(screen: tScreen); virtual;
+    procedure update(elapsed: single); virtual;
   end;
 
-var
-  terrain: tTerrain;
+  {very simple non-moving terrain}
+  tStaticTerrain = class(tTerrainModel)
+  public
+    procedure update(elapsed: single); virtual;
+  end;
 
 implementation
 
@@ -88,27 +90,27 @@ const
 
 {-----------------------------------------------------------}
 
-constructor tTerrain.create();
+constructor tTerrainModel.create();
 begin
   inherited create();
   clear();
 end;
 
-destructor tTerrain.destroy();
+destructor tTerrainModel.destroy();
 begin
   inherited destroy();
 end;
 
 {--------------------}
 
-procedure tTerrain.clear();
+procedure tTerrainModel.clear();
 begin
   fillchar(blockInfo, sizeof(blockInfo), 0);
   fillchar(cellInfo, sizeof(cellInfo), 0);
   fillchar(cellAttr, sizeof(cellAttr), 0);
 end;
 
-function tTerrain.getDirt(x,y: integer): tTerrainInfo; inline;
+function tTerrainModel.getDirt(x,y: integer): tTerrainInfo; inline;
 begin
   result.code := 0;
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit();
@@ -122,28 +124,31 @@ begin
     end;}
 end;
 
-function tTerrain.isEmpty(x, y: integer): boolean;
+function tTerrainModel.isEmpty(x, y: integer): boolean; inline;
 begin
   result := getDirt(x, y).dType = DT_EMPTY;
 end;
 
-function tTerrain.isSolid(x, y: integer): boolean;
+function tTerrainModel.isSolid(x, y: integer): boolean; inline;
 begin
   result := getDirt(x, y).dType <> DT_EMPTY;
 end;
 
-procedure tTerrain.setDirt(x,y: integer; dType: tDirtType); inline;
+procedure tTerrainModel.setDirt(x,y: integer; dType: tDirtType); inline;
 begin
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
   cellInfo[y, x].code := byte(dType);
+  {todo: set attr if needed}
+  {
   cellAttr[y, x div 8].x[x and $7] := 0;
   cellAttr[y, x div 8].y[x and $7] := 0;
   cellAttr[y, x div 8].vX[x and $7] := 0;
   cellAttr[y, x div 8].vY[x and $7] := 0;
+  }
 end;
 
 {removes terrain in given radius, and burns edges}
-procedure tTerrain.burn(atX,atY: integer;r: integer;power:integer=255);
+procedure tTerrainModel.burn(atX,atY: integer;r: integer;power:integer=255);
 var
   dx, dy: integer;
   x,y: integer;
@@ -190,7 +195,7 @@ begin
 end;
 
 {creates a circle of dirt at location}
-procedure tTerrain.addDirtCircle(atX,atY: integer;r: integer);
+procedure tTerrainModel.addDirtCircle(atX,atY: integer;r: integer);
 var
   dx, dy: integer;
   x,y: integer;
@@ -224,7 +229,7 @@ begin
 end;
 
 {returns height of terrain at x position}
-function tTerrain.getTerrainHeight(xPos: integer): integer;
+function tTerrainModel.getTerrainHeight(xPos: integer): integer;
 var
   y: integer;
 begin
@@ -233,7 +238,7 @@ begin
     if getDirt(xPos, y).dType <> DT_EMPTY then exit(255-y);
 end;
 
-procedure tTerrain.generate();
+procedure tTerrainModel.generate();
 var
   dirtHeight: array[0..255] of integer;
   rockHeight: array[0..255] of integer;
@@ -270,7 +275,13 @@ begin
   end;
 end;
 
-procedure tTerrain.draw(screen: tScreen);
+procedure tTerrainModel.update(elapsed: single);
+begin
+  // nothing to do
+end;
+
+
+procedure tTerrainModel.draw(screen: tScreen);
 var
   c: RGBA;
   x,y: integer;
@@ -285,6 +296,16 @@ begin
       end;
     end;
   end;
+end;
+
+{----------------------------------------------------------------------}
+{ tStaticTerrain }
+{----------------------------------------------------------------------}
+
+procedure tStaticTerrain.update(elapsed: single);
+begin
+  // nothing to do
+end;
 
 (*
 
@@ -338,8 +359,11 @@ begin
       lineStatus[y] := TL_MIXED;
   end;
 *)
-end;
 
+{----------------------------------------------------------------------}
+{ tParticleTerrain }
+{----------------------------------------------------------------------}
+             (*
 procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tTerrainInfoArray; var cellAttr: tTerrainAttrArray);
 var
   i,j,x,y: integer;
@@ -407,7 +431,7 @@ procedure tTerrain.update(elapsed: single);
 begin
   updateCelluar();
 end;
-
+           *)
 {-----------------------------------------------------------}
 
 begin

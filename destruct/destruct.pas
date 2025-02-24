@@ -311,7 +311,6 @@ begin
 
   exitFlag := false;
 
-  terrain := tTerrain.create();
   terrain.generate();
 
   {setup players}
@@ -404,8 +403,6 @@ begin
     idle();
 
   until exitFlag;
-
-  terrain.free();
 
 end;
 

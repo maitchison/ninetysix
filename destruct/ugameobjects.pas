@@ -71,7 +71,7 @@ var
 implementation
 
 uses
-  uTank, uWeapon, terra, fx;
+  uTank, uWeapon, terra, fx, game;
 
 {----------------------------------------------------------}
 { tGameObjects }

@@ -6,6 +6,7 @@ uses
   {$i units},
   crt,
   list,
+  terra,
   uWeapon, uTank, uGameObjects, controller;
 
 type
@@ -15,7 +16,6 @@ type
     x,y: integer;
     procedure clear();
   end;
-
 
   tTankEnumerator = record
     private
@@ -53,14 +53,12 @@ var
   screen: tScreen;
   tanks: tTankList;
   player1, player2: tController;
+  terrain: tStaticTerrain;
 
 const
   GRAVITY = 241.5;
 
 implementation
-
-uses
-  terra;
 
 var
   updateAccumlator: single;
@@ -329,6 +327,8 @@ begin
   player1 := nil;
   player2 := nil;
 
+  terrain := tStaticTerrain.create();
+
 end;
 
 procedure closeObjects;
@@ -338,6 +338,7 @@ begin
   tanks.free;
   projectiles.free;
   particles.free;
+  terrain.free;
 end;
 
 initialization
