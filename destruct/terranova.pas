@@ -3,7 +3,7 @@ unit terraNova;
 interface
 
 {
-Every pixel is a particle, that can move and collide
+Every pixel is a particle, that can moves and collide
 }
 
 uses
@@ -46,17 +46,25 @@ type
 
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
 
-  tTerrainModel = class
+  tTerrainSolver = (TS_STATIC, TS_FALLING, TS_PARTICLE);
+
+  tTerrain = class
   protected
     {todo: these need to be aligned to 32 bytes, which means custom getMem}
     cellAttr: tTerrainAttrArray;
     cellInfo: tCellInfoArray;
     blockInfo: tBlockInfoArray;
+    solver: tTerrainSolver;
+    timeUntilNextSolve: single;
+
+    procedure updateStatic();
+    procedure updateFalling();
+
   public
 
     sky: tPage;
 
-    constructor create();
+    constructor create(aSolver: tTerrainSolver = TS_FALLING);
     destructor destroy(); override;
 
     procedure clear(); virtual;
@@ -72,14 +80,8 @@ type
 
     procedure generate();
 
-    procedure draw(screen: tScreen); virtual;
-    procedure update(elapsed: single); virtual;
-  end;
-
-  {very simple non-moving terrain}
-  tStaticTerrain = class(tTerrainModel)
-  public
-    procedure update(elapsed: single); override;
+    procedure draw(screen: tScreen);
+    procedure update(elapsed: single);
   end;
 
 implementation
@@ -105,14 +107,15 @@ var
 
 {-----------------------------------------------------------}
 
-constructor tTerrainModel.create();
+constructor tTerrain.create(aSolver: tTerrainSolver = TS_FALLING);
 begin
   inherited create();
+  solver := aSolver;
   sky := tPage.create(256, 256);
   clear();
 end;
 
-destructor tTerrainModel.destroy();
+destructor tTerrain.destroy();
 begin
   sky.free();
   inherited destroy();
@@ -120,21 +123,21 @@ end;
 
 {--------------------}
 
-procedure tTerrainModel.clear();
+procedure tTerrain.clear();
 begin
   fillchar(blockInfo, sizeof(blockInfo), 0);
   fillchar(cellInfo, sizeof(cellInfo), 0);
   fillchar(cellAttr, sizeof(cellAttr), 0);
 end;
 
-function tTerrainModel.getCell(x,y: integer): tCellInfo; inline;
+function tTerrain.getCell(x,y: integer): tCellInfo; inline;
 begin
   result.code := 0;
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit();
   result := cellInfo[y, x];
 end;
 
-procedure tTerrainModel.setCell(x,y: integer; cell: tCellInfo); inline;
+procedure tTerrain.setCell(x,y: integer; cell: tCellInfo); inline;
 var
   bi: ^tBlockInfo;
 begin
@@ -146,18 +149,18 @@ begin
   bi^.status := bi^.status or BS_DIRTY;
 end;
 
-function tTerrainModel.isEmpty(x, y: integer): boolean; inline;
+function tTerrain.isEmpty(x, y: integer): boolean; inline;
 begin
   result := getCell(x, y).dType = DT_EMPTY;
 end;
 
-function tTerrainModel.isSolid(x, y: integer): boolean; inline;
+function tTerrain.isSolid(x, y: integer): boolean; inline;
 begin
   result := getCell(x, y).dType <> DT_EMPTY;
 end;
 
 {removes terrain in given radius, and burns edges}
-procedure tTerrainModel.burn(atX,atY: integer;r: integer;power:integer=255);
+procedure tTerrain.burn(atX,atY: integer;r: integer;power:integer=255);
 var
   dx, dy: integer;
   x,y: integer;
@@ -206,7 +209,7 @@ begin
 end;
 
 {creates a circle of dirt at location}
-procedure tTerrainModel.addDirtCircle(atX,atY: integer;r: integer);
+procedure tTerrain.addDirtCircle(atX,atY: integer;r: integer);
 var
   dx, dy: integer;
   x,y: integer;
@@ -234,7 +237,7 @@ begin
 end;
 
 {returns height of terrain at x position}
-function tTerrainModel.getTerrainHeight(xPos: integer): integer;
+function tTerrain.getTerrainHeight(xPos: integer): integer;
 var
   y: integer;
 begin
@@ -243,7 +246,7 @@ begin
     if getCell(xPos, y).dType <> DT_EMPTY then exit(255-y);
 end;
 
-procedure tTerrainModel.generate();
+procedure tTerrain.generate();
 var
   dirtHeight: array[0..255] of integer;
   rockHeight: array[0..255] of integer;
@@ -282,14 +285,8 @@ begin
       blockInfo[y,x].status := BS_DIRTY;
 end;
 
-procedure tTerrainModel.update(elapsed: single);
-begin
-  // nothing to do
-end;
-
-
 {draw terrain to background}
-procedure tTerrainModel.draw(screen: tScreen);
+procedure tTerrain.draw(screen: tScreen);
 var
   c: RGBA;
   gx, gy: integer;
@@ -417,63 +414,70 @@ end;
 { tStaticTerrain }
 {----------------------------------------------------------------------}
 
-procedure tStaticTerrain.update(elapsed: single);
+procedure tTerrain.updateStatic();
 begin
-  // nothing to do
+  // nothing to do.
 end;
 
-(*
-
-  {todo: switch to grid system}
-  for y := 0 to 240-1 do begin
-    {$ifdef debug}
-    case lineStatus[y] of
-      TL_EMPTY: screen.canvas.putPixel(319, y, RGB(255,0,0));
-      TL_MIXED: screen.canvas.putPixel(319, y, RGB(0,255,0));
-      TL_FULL: screen.canvas.putPixel(319, y, RGB(0,0,255));
-      TL_UNKNOWN: screen.canvas.putPixel(319, y, RGB(255,0,255));
+procedure updateBlockFalling_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray);
+var
+  i,j,x,y: integer;
+  idx: integer;
+  px,py: integer;
+  empty, cell: tCellInfo;
+  selfChanges, belowChanges: integer;
+begin
+  empty.code := 0;
+  selfChanges := 0;
+  belowChanges := 0;
+  {process lines bottom up}
+  for i := 0 to 7 do begin
+    y := gy*8+(7-i);
+    for j := 0 to 7 do begin
+      x := gx*8+j;
+      cell := cellInfo[y,x];
+      if cell.dtype = DT_EMPTY then continue;
+      if cellInfo[y+1,x].dtype = DT_EMPTY then begin
+        inc(selfChanges);
+        if i = 0 then inc(belowChanges);
+        cellInfo[y+1, x] := cell;
+        cellInfo[y, x] := empty;
+      end;
     end;
-    {$endif}
-    srcPtr := dirtColor.pixels + (y * 256 * 4);
-    dstPtr := screen.canvas.pixels + ((32 + (y*screen.canvas.width)) * 4);
-    if lineStatus[y] = TL_EMPTY then continue;
-    if lineStatus[y] = TL_FULL then begin
-      move(srcPtr^, dstPtr^, 256*4);
-      continue;
-    end;
-    asm
-      pushad
-      mov esi, srcPtr
-      mov edi, dstPtr
-      mov ecx, 256
-      xor ebx, ebx
-    @XLOOP:
-      mov eax, dword ptr [esi]
-      bswap eax
-      test al, al
-      jz @SKIP
-      bswap eax
-      inc ebx
-      mov dword ptr [edi], eax
-    @SKIP:
-      add esi, 4
-      add edi, 4
-      dec ecx
-      jnz @XLOOP
-    @ENDOFLOOP:
-      mov solidTiles, ebx
-      popad
-    end;
-
-    {since we processed the whole line, lets update it's status}
-    if solidTiles = 0 then
-      lineStatus[y] := TL_EMPTY
-    else if solidTiles = 256 then
-      lineStatus[y] := TL_FULL
-    else
-      lineStatus[y] := TL_MIXED;
   end;
-*)
+  {keep track of block stats}
+  if (selfChanges > 0) then blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
+  if (belowChanges > 0) then blockInfo[gy+1, gx].status := blockInfo[gy+1, gx].status or BS_DIRTY;
+  blockInfo[gy, gx].count -= belowChanges;
+  blockInfo[gy+1, gx].count += belowChanges;
+end;
+
+
+procedure tTerrain.updateFalling();
+var
+  gx,gy: integer;
+begin
+  for gy := 30-1 downto 0 do begin
+    for gx := 0 to 32-1 do begin
+      if blockInfo[gy, gx].count = 0 then continue;
+      updateBlockFalling_REF(gx, gy, blockInfo, cellInfo);
+    end;
+  end;
+end;
+
+procedure tTerrain.update(elapsed: single);
+begin
+  {we update the terrain simulation at 30 fps}
+  timeUntilNextSolve -= elapsed;
+
+  while timeUntilNextSolve < 0 do begin
+    case solver of
+      TS_STATIC: updateStatic();
+      TS_FALLING: updateFalling();
+    end;
+    timeUntilNextSolve += (1/30)
+  end;
+end;
 
 {----------------------------------------------------------------------}
 { tParticleTerrain }
@@ -529,23 +533,6 @@ begin
   end;
 end;
 
-{simple celluar based terrain update}
-procedure tTerrain.updateCelluar();
-var
-  gx,gy: integer;
-begin
-  for gy := 32-1 downto 0 do begin
-    for gx := 0 to 32-1 do begin
-      if blockInfo[gy, gx].count = 0 then continue;
-      updateBlock_REF(gx, gy, blockInfo, cellInfo, cellAttr);
-    end;
-  end;
-end;
-
-procedure tTerrain.update(elapsed: single);
-begin
-  updateCelluar();
-end;
            *)
 {-----------------------------------------------------------}
 

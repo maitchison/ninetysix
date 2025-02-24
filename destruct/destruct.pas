@@ -352,6 +352,10 @@ begin
     if keydown(key_z) then elapsed := 0.001;
     DEBUG_DRAW_BOUNDS := keydown(key_b);
 
+    if mouse_b = 1 then
+      terrain.burn(mouse_x-32, mouse_y, 20, 3);
+
+
     {update ui}
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
@@ -390,6 +394,8 @@ begin
 
     {debug}
     if keydown(key_f5) then debugShowWorldPixels(screen);
+    if keydown(key_f4) then
+      screen.pageFlip();
 
     screen.flipAll();
 

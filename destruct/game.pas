@@ -53,7 +53,7 @@ var
   screen: tScreen;
   tanks: tTankList;
   player1, player2: tController;
-  terrain: tStaticTerrain;
+  terrain: tTerrain;
 
 const
   GRAVITY = 241.5;
@@ -327,7 +327,7 @@ begin
   player1 := nil;
   player2 := nil;
 
-  terrain := tStaticTerrain.create();
+  terrain := tTerrain.create();
 
 end;
 
