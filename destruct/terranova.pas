@@ -89,7 +89,11 @@ uses
 
 const
 
-  terrainColors: array[tDirtType] of RGBA = (
+  TERRAIN_DECAY: array[tDirtType] of integer = (
+    0, 6, 2, 32
+  );
+
+  TERRAIN_COLOR: array[tDirtType] of RGBA = (
     (b:$00; g:$00; r:$00; a: $ff),
     (b:$44; g:$80; r:$8d; a: $ff),
     (b:$44; g:$44; r:$44; a: $ff),
@@ -157,16 +161,16 @@ procedure tTerrainModel.burn(atX,atY: integer;r: integer;power:integer=255);
 var
   dx, dy: integer;
   x,y: integer;
-  v: integer;
   dst2: integer;
   r2: integer;
   emptyC, burntC: RGBA;
   tc: RGBA;
   dimFactor: integer;
+  cell: tCellInfo;
+  strength: integer;
 begin
   {todo: implement this with a 'template' and have a linear one
    and a spherical one. Also add some texture to these}
-   (*
   if power <= 0 then exit;
   if r <= 0 then exit;
   r2 := r*r;
@@ -178,25 +182,27 @@ begin
       dst2 := (dx*dx)+(dy*dy);
       x := atX+dx;
       if (dst2 > r2) then continue;
-      if isEmpty(x, y) then continue;
+      cell := getCell(x,y);
+      if cell.dType = DT_EMPTY then continue;
       {linear fall off}
-      //v := round((1-(dst2/r2)) * power);
+      dimFactor := round((1-(dst2/r2)) * power) * TERRAIN_DECAY[cell.dtype];
       {spherical fall off}
-      if dst2 <= r2 then
-        v := round(sqrt(r2-dst2)/r * power / 2)
+      {if dst2 <= r2 then
+        dimFactor := round(sqrt(r2-dst2)/r * power / 2)
       else
-        v := 0;
-      tc := dirtColor.getPixel(x, y);
-      dimFactor := round(50 * v / (tc.a+1));
-      tc.a := clamp(tc.a - v, 0, 255);
-      tc.r := clamp(tc.r - dimFactor, 0, 255);
-      tc.g := clamp(tc.g - dimFactor, 0, 255);
-      tc.b := clamp(tc.b - dimFactor, 0, 255);
-      dirtColor.setPixel(x, y, tc);
+        dimFactor := 0;}
+
+      strength := int32(cell.strength) - dimFactor;
+      if strength <= 0 then begin
+        cell.dtype := DT_EMPTY;
+        cell.strength := 0;
+      end else
+        cell.strength := strength;
+
+      setCell(x,y, cell);
+
     end;
-    lineStatus[y] := TL_UNKNOWN;
   end;
-  *)
 end;
 
 {creates a circle of dirt at location}
@@ -551,9 +557,9 @@ var
   dType: tDirtType;
   i: integer;
 begin
-  for dType := low(terrainColors) to high(terrainColors) do
+  for dType := low(TERRAIN_COLOR) to high(TERRAIN_COLOR) do
     for i := 0 to 255 do
-       terrainColorLookup[dType, i] := RGBA.Lerp(RGB(0,0,0), terrainColors[dType], i/255);
+       terrainColorLookup[dType, i] := RGBA.Lerp(RGB(0,0,0), TERRAIN_COLOR[dType], i/255);
 end;
 
 begin
