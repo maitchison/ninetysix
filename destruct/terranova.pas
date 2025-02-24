@@ -9,7 +9,7 @@ Every pixel is a particle, that can move and collide
 uses
   test, debug,
   utils,
-  graph32, uScreen;
+  graph2d, graph32, uScreen;
 
 const
   BS_EMPTY = 0;
@@ -82,6 +82,9 @@ type
 
 implementation
 
+uses
+  keyboard; {for debugging}
+
 const
   TC_DIRT: RGBA =  (b:$44; g:$80; r:$8d; a: $20);
   TC_ROCK: RGBA =  (b:$44; g:$44; r:$44; a: $ff);
@@ -120,7 +123,9 @@ end;
 procedure tTerrainModel.setCell(x,y: integer; cell: tCellInfo); inline;
 begin
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
+  if cellInfo[y, x].dType <> DT_EMPTY then dec(blockInfo[y div 8, x div 8].count);
   cellInfo[y, x] := cell;
+  if cell.dType <> DT_EMPTY then inc(blockInfo[y div 8, x div 8].count);
 end;
 
 function tTerrainModel.isEmpty(x, y: integer): boolean; inline;
@@ -268,17 +273,59 @@ end;
 procedure tTerrainModel.draw(screen: tScreen);
 var
   c: RGBA;
-  x,y: integer;
+  gx, gy: integer;
   srcPtr, dstPtr: pointer;
   solidTiles: integer;
-begin
-  for y := 0 to 255 do begin
-    for x := 0 to 255 do begin
-      case getCell(x,y).dType of
-        DT_EMPTY: ;
-        DT_DIRT: screen.canvas.setPixel(32+x, y, RGB(128,128,128));
-        DT_ROCK: screen.canvas.setPixel(32+x, y, RGB(64,64,64));
+
+  procedure debugDrawBlock(gx, gy: integer);
+  var
+    r: tRect;
+    c: RGBA;
+  begin
+    r := Rect(32+gx*8, gy*8, 8,8);
+    c := RGB(255,0,0);
+    if blockInfo[gy, gx].count = 0 then
+      c := RGB(0,0,255);
+    screen.canvas.drawRect(r, c);
+    screen.markRegion(r);
+  end;
+
+  procedure drawBlock_REF(gx, gy: integer);
+  var
+    i,j: integer;
+    x,y: integer;
+  begin
+    for j := 0 to 8-1 do begin
+      for i := 0 to 8-1 do begin
+        x := gx*8+i;
+        y := gy*8+j;
+        case getCell(x,y).dType of
+          DT_EMPTY: ;
+          DT_DIRT: screen.canvas.setPixel(32+x, y, RGB(128,128,128));
+          DT_ROCK: screen.canvas.setPixel(32+x, y, RGB(64,64,64));
+        end;
       end;
+    end;
+    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
+  end;
+
+  procedure drawBlock_MMX(gx, gy: integer);
+  var
+    i,j: integer;
+    x,y: integer;
+  begin
+    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
+  end;
+
+begin
+  for gy := 0 to 32-1 do begin
+    for gx := 0 to 32-1 do begin
+
+      if blockInfo[gy, gx].count > 0 then
+        drawBlock_REF(gx, gy);
+
+      if keyDown(key_g) then
+        debugDrawBlock(gx, gy);
     end;
   end;
 end;
