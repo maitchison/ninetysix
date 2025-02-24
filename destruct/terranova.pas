@@ -53,6 +53,9 @@ type
     cellInfo: tCellInfoArray;
     blockInfo: tBlockInfoArray;
   public
+
+    sky: tPage;
+
     constructor create();
     destructor destroy(); override;
 
@@ -101,11 +104,13 @@ var
 constructor tTerrainModel.create();
 begin
   inherited create();
+  sky := tPage.create(256, 256);
   clear();
 end;
 
 destructor tTerrainModel.destroy();
 begin
+  sky.free();
   inherited destroy();
 end;
 
@@ -271,6 +276,10 @@ begin
       setCell(x, y, cell);
     end;
   end;
+
+  for x := 0 to 32-1 do
+    for y := 0 to 32-1 do
+      blockInfo[y,x].status := BS_DIRTY;
 end;
 
 procedure tTerrainModel.update(elapsed: single);
@@ -279,6 +288,7 @@ begin
 end;
 
 
+{draw terrain to background}
 procedure tTerrainModel.draw(screen: tScreen);
 var
   c: RGBA;
@@ -311,17 +321,21 @@ var
     i,j: integer;
     x,y: integer;
     cell: tCellInfo;
+    c: RGBA;
   begin
     for j := 0 to 8-1 do begin
       for i := 0 to 8-1 do begin
         x := gx*8+i;
         y := gy*8+j;
         cell := getCell(x,y);
-        if cell.dType = DT_EMPTY then continue;
-        screen.canvas.setPixel(32+x, y, terrainColorLookup[cell.dtype, cell.strength]);
+        if cell.dType = DT_EMPTY then
+          c := sky.getPixel(x,y)
+        else
+          c := terrainColorLookup[cell.dtype, cell.strength];
+        screen.background.setPixel(32+x, y, c);
       end;
     end;
-    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
+    screen.markRegion(Rect(32+gx*8, gy*8, 8,8), FG_FLIP);
   end;
 
   procedure drawBlock_ASM(gx, gy: integer);
@@ -330,7 +344,7 @@ var
     screenInc: dword;
   begin
     lookupPtr := @terrainColorLookup;
-    screenPtr := screen.canvas.getAddress(32+gx*8, gy*8);
+    screenPtr := screen.background.getAddress(32+gx*8, gy*8);
     if not assigned(screenPtr) then exit;
     cellPtr := @cellInfo[gy*8, gx*8];
     screenInc := (screen.canvas.width-8) * 4;
@@ -375,7 +389,7 @@ var
 
     end;
 
-    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
+    screen.markRegion(Rect(32+gx*8, gy*8, 8,8), FG_FLIP);
   end;
 
 begin
@@ -384,11 +398,12 @@ begin
 
       bi := @blockInfo[gy, gx];
 
-      if bi^.count > 0 then
-        drawBlock_ASM(gx, gy);
-
       if keyDown(key_g) then
         debugDrawBlock(gx, gy);
+
+      if (bi^.status and BS_DIRTY) <> BS_DIRTY then continue;
+
+      drawBlock_REF(gx, gy);
 
       bi^.status := bi^.status and (not BS_DIRTY);
     end;

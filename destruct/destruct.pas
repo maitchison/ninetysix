@@ -211,10 +211,6 @@ begin
   cy := page.height * 5;
   for y := 0 to page.height-1 do begin
     for x := 0 to page.width-1 do begin
-      if (x < 32) or (x >= page.width-32) then begin
-        page.setPixel(x,y, RGB(0,0,0));
-        continue;
-      end;
       dx := x-cx;
       dy := y-cy;
       r := sqrt(sqr(dx) + sqr(dy)) / page.height;
@@ -297,10 +293,11 @@ var
   m: tMatrix4x4;
   player1Gui,
   player2Gui: tPlayerGUI;
+  sky: tPage;
 begin
 
   screen.background := tPage.create(screen.width, screen.height);
-  renderSky(screen.background);
+  renderSky(terrain.sky);
 
   //testSprite := tSprite.create(titleGFX.scaled(255,255));
   //testSprite := tSprite.create(titleGFX);
@@ -345,6 +342,9 @@ begin
   player2Gui := tPlayerGUI.create(Point(320-155-1, 0), player2);
   gui.append(player2Gui);
 
+  terrain.draw(screen);
+  screen.pageClear();
+
   {main loop}
   repeat
 
@@ -378,10 +378,10 @@ begin
     terrain.update(elapsed);
     stopTimer('updateTerrain');
 
-
     startTimer('drawTerrain');
     terrain.draw(screen);
     stopTimer('drawTerrain');
+
 
     {gui}
     startTimer('guiUpdate');
