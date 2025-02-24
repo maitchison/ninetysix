@@ -230,7 +230,7 @@ begin
           p.pos := V2(x, y);
           p.vel := V2(rnd-128, rnd-128) * 0.2;
           p.solid := true;
-          p.col := terrain.terrain.getPixel(x, y);
+          p.col := terrain.dirtColor.getPixel(x, y);
           if p.col.a = 0 then p.col := RGB(200,200,200);
           p.ttl := 0.5;
           p.radius := 2;

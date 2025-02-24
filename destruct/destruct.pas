@@ -374,6 +374,11 @@ begin
     drawAll(screen);
     stopTimer('draw');
 
+    startTimer('updateTerrain');
+    terrain.update(elapsed);
+    stopTimer('updateTerrain');
+
+
     startTimer('drawTerrain');
     terrain.draw(screen);
     stopTimer('drawTerrain');
@@ -431,8 +436,8 @@ begin
   //musicPlay('res\dance1.a96');
   initMouse();
   //titleScreen();
-  //battleScreen();
-  cfdScreen();
+  battleScreen();
+  //cfdScreen();
   screenDone();
 
   logTimers();

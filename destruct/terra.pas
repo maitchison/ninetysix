@@ -12,13 +12,18 @@ type
   {optimization for terrain}
   tTerrainLineStatus = (TL_EMPTY, TL_MIXED, TL_FULL, TL_UNKNOWN);
 
+  tTerrainByteArray = array[0..255, 0..255] of byte;
+  tTerrainSingleArray = array[0..255, 0..255] of byte;
+
   tTerrain = class
-    {todo: implement cell system, 0=empty, 1=mixed, 2=full}
   public
-    terrain: tPage;
+    dirtColor: tPage;
+    dirtType: tTerrainByteArray;
+    dirtVx, dirtVy: tTerrainSingleArray;
   protected
     lineStatus: array[0..255] of tTerrainLineStatus; {0=empty, 1=maybe mixed, 2=full}
     procedure updateLineStatus(y: integer);
+    procedure updateCelluar();
   public
     constructor create();
     destructor destroy(); override;
@@ -29,6 +34,7 @@ type
     function  terrainHeight(xPos: integer): integer;
     procedure generate();
     procedure draw(screen: tScreen);
+    procedure update(elapsed: single);
   end;
 
 var
@@ -47,7 +53,7 @@ const
 constructor tTerrain.create();
 begin
   inherited create();
-  terrain := tPage.create(256, 256);
+  dirtColor := tPage.create(256, 256);
 end;
 
 destructor tTerrain.destroy();
@@ -65,7 +71,7 @@ var
 begin
   totalSolid:= 0;
   for x := 0 to 255 do
-    if terrain.getPixel(x,y).a > 0 then inc(totalSolid);
+    if dirtColor.getPixel(x,y).a > 0 then inc(totalSolid);
   if totalSolid = 0 then
     lineStatus[y] := TL_EMPTY
   else if totalSolid = 256 then
@@ -80,13 +86,13 @@ function tTerrain.isSolid(x,y: integer): boolean;
 begin
   if y > 255 then exit(true);
   if (x < 0) or (x > 255) or (y < 0) then exit(false);
-  result := terrain.getPixel(x, y).a > 0;
+  result := dirtColor.getPixel(x, y).a > 0;
 end;
 
 function tTerrain.isEmpty(x,y: integer): boolean;
 begin
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit(true);
-  result := terrain.getPixel(x, y).a = 0;
+  result := dirtColor.getPixel(x, y).a = 0;
 end;
 
 {removes terrain in given radius, and burns edges}
@@ -122,13 +128,13 @@ begin
         v := round(sqrt(r2-dst2)/r * power / 2)
       else
         v := 0;
-      tc := terrain.getPixel(x, y);
+      tc := dirtColor.getPixel(x, y);
       dimFactor := round(50 * v / (tc.a+1));
       tc.a := clamp(tc.a - v, 0, 255);
       tc.r := clamp(tc.r - dimFactor, 0, 255);
       tc.g := clamp(tc.g - dimFactor, 0, 255);
       tc.b := clamp(tc.b - dimFactor, 0, 255);
-      terrain.setPixel(x, y, tc);
+      dirtColor.setPixel(x, y, tc);
     end;
     lineStatus[y] := TL_UNKNOWN;
   end;
@@ -160,7 +166,7 @@ begin
       c.g := round(c.g * v);
       c.b := round(c.r * v);
       c.a := round(c.a * v);
-      terrain.setPixel(x, y, c);
+      dirtColor.setPixel(x, y, c);
     end;
     lineStatus[y] := TL_UNKNOWN;
   end;
@@ -173,7 +179,7 @@ var
 begin
   result := 0;
   for y := 0 to 255 do
-    if terrain.getPixel(xPos, y).a > 0 then exit(255-y);
+    if dirtColor.getPixel(xPos, y).a > 0 then exit(255-y);
 end;
 
 procedure tTerrain.generate();
@@ -184,7 +190,7 @@ var
   c: RGBA;
   v: single;
 begin
-  terrain.clear(RGB(0, 0, 0, 0));
+  dirtColor.clear(RGB(0, 0, 0, 0));
 
   for x := 0 to 255 do begin
     dirtHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
@@ -206,7 +212,7 @@ begin
       c.g := round(c.g * v);
       c.b := round(c.r * v);
       c.a := round(c.a * v);
-      terrain.setPixel(x, y, c);
+      dirtColor.setPixel(x, y, c);
     end;
     updateLineStatus(y);
   end;
@@ -228,7 +234,7 @@ begin
       TL_UNKNOWN: screen.canvas.putPixel(319, y, RGB(255,0,255));
     end;
     {$endif}
-    srcPtr := terrain.pixels + (y * 256 * 4);
+    srcPtr := dirtColor.pixels + (y * 256 * 4);
     dstPtr := screen.canvas.pixels + ((32 + (y*screen.canvas.width)) * 4);
     if lineStatus[y] = TL_EMPTY then continue;
     if lineStatus[y] = TL_FULL then begin
@@ -267,6 +273,31 @@ begin
     else
       lineStatus[y] := TL_MIXED;
   end;
+end;
+
+{simple celluar based terrain update}
+procedure tTerrain.updateCelluar();
+var
+  x,y: integer;
+  empty, c: RGBA;
+begin
+  empty := RGB(0,0,0,0);
+  for y := 255 downto 0 do begin
+    for x := 0 to 255 do begin
+      c := dirtColor.getPixel(x,y);
+      if c.a = 0 then continue;
+      if dirtColor.getPixel(x,y+1).a = 0 then begin
+        dirtColor.setPixel(x,y+1, c);
+        dirtColor.setPixel(x,y, empty);
+      end;
+    end;
+  end;
+
+end;
+
+procedure tTerrain.update(elapsed: single);
+begin
+  updateCelluar();
 end;
 
 {-----------------------------------------------------------}
