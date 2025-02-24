@@ -18,7 +18,7 @@ const
 
 type
 
-  tDirtType = (DT_EMPTY, DT_DIRT, DT_ROCK);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_ROCK, DT_GRASS);
 
   tCellInfo = record
     case byte of
@@ -86,10 +86,16 @@ uses
   keyboard; {for debugging}
 
 const
-  TC_DIRT: RGBA =  (b:$44; g:$80; r:$8d; a: $20);
-  TC_ROCK: RGBA =  (b:$44; g:$44; r:$44; a: $ff);
-  TC_GRASS: RGBA = (b:$5d; g:$80; r:$0d; a: $0f);
-  TC_SKY: RGBA =   (b:$00; g:$00; r:$00; a: $00);
+
+  terrainColors: array[tDirtType] of RGBA = (
+    (b:$00; g:$00; r:$00; a: $ff),
+    (b:$44; g:$80; r:$8d; a: $ff),
+    (b:$44; g:$44; r:$44; a: $ff),
+    (b:$5d; g:$80; r:$0d; a: $ff)
+  );
+
+var
+  terrainColorLookup: array[tDirtType, 0..255] of RGBA;
 
 {-----------------------------------------------------------}
 
@@ -248,7 +254,7 @@ begin
 
   for y := 0 to 255 do begin
     for x := 0 to 255 do begin
-      if y > rockHeight[x] then
+      if y >= rockHeight[x] then
         cell.dType := DT_ROCK
       else if y >= dirtHeight[x] then
         cell.dType := DT_DIRT
@@ -256,8 +262,8 @@ begin
         continue;
 
       { random strength mostly for texture }
-      cell.strength := 200+rnd(50);
-      if y = dirtHeight[x] then cell.strength := cell.strength div 2;
+      cell.strength := 220+rnd(30);
+      if (y = min(dirtHeight[x], rockHeight[x])) then cell.strength -= 50;
 
       setCell(x, y, cell);
     end;
@@ -294,16 +300,15 @@ var
   var
     i,j: integer;
     x,y: integer;
+    cell: tCellInfo;
   begin
     for j := 0 to 8-1 do begin
       for i := 0 to 8-1 do begin
         x := gx*8+i;
         y := gy*8+j;
-        case getCell(x,y).dType of
-          DT_EMPTY: ;
-          DT_DIRT: screen.canvas.setPixel(32+x, y, RGB(128,128,128));
-          DT_ROCK: screen.canvas.setPixel(32+x, y, RGB(64,64,64));
-        end;
+        cell := getCell(x,y);
+        if cell.dType = DT_EMPTY then continue;
+        screen.canvas.setPixel(32+x, y, terrainColorLookup[cell.dtype, cell.strength]);
       end;
     end;
     screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
@@ -438,7 +443,7 @@ begin
     for j := 0 to 7 do begin
       x := gx*8+j;
       if cellInfo[y,x].dtype = DT_EMPTY then continue;
-      py := cellAttr[y,x div 8].y[x and $7] + cellAttr[y,x div 8].vy[x and $7];
+      py := cellAttr [y,x div 8].y[x and $7] + cellAttr[y,x div 8].vy[x and $7];
       cellAttr[y,x div 8].y[x and $7] := byte(py);
       if (py <= -127) then doMove(0,-1);
       if (py >= 128) then doMove(0,+1);
@@ -466,5 +471,16 @@ end;
            *)
 {-----------------------------------------------------------}
 
+procedure generateTerrainColorLookup();
+var
+  dType: tDirtType;
+  i: integer;
 begin
+  for dType := low(terrainColors) to high(terrainColors) do
+    for i := 0 to 255 do
+       terrainColorLookup[dType, i] := RGBA.Lerp(RGB(0,0,0), terrainColors[dType], i/255);
+end;
+
+begin
+  generateTerrainColorLookup();
 end.
