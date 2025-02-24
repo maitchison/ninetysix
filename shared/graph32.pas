@@ -90,6 +90,7 @@ type
     constructor create(AWidth, AHeight: word); overload;
     constructor createAsReference(AWidth, AHeight: word;PixelData: Pointer);
 
+    function  getAddress(x, y: integer): pointer; inline;
     function  getPixel(x, y: integer): RGBA; inline; overload;
     function  getPixel(fx,fy: single): RGBA; overload;
     function  getPixelScaled(x, y, s: integer;doGamma: boolean=False): RGBA;
@@ -449,6 +450,14 @@ begin
   self.bpp := 0;
   self.isRef := false;
   inherited destroy();
+end;
+
+{returns address in memory of given pixel. If out of bounds, returns nil}
+function tPage.getAddress(x, y: integer): pointer; inline;
+begin
+  if (x < 0) or (y < 0) or (x >= self.width) or (y >= self.height) then
+    exit(nil);
+  result := pixels + ((y * width + x) shl 2);
 end;
 
 {todo: this could be much faster...}

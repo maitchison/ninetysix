@@ -23,8 +23,8 @@ type
   tCellInfo = record
     case byte of
     0: (
-      dType: tDirtType;
       strength: byte;
+      dType: tDirtType;
     );
     1: (code: dword);
   end;
@@ -314,20 +314,60 @@ var
     screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
   end;
 
-  procedure drawBlock_MMX(gx, gy: integer);
+  procedure drawBlock_ASM(gx, gy: integer);
   var
-    i,j: integer;
-    x,y: integer;
+    lookupPtr, screenPtr, cellPtr: pointer;
+    screenInc: dword;
   begin
+    lookupPtr := @terrainColorLookup;
+    screenPtr := screen.canvas.getAddress(32+gx*8, gy*8);
+    if not assigned(screenPtr) then exit;
+    cellPtr := @cellInfo[gy*8, gx*8];
+    screenInc := (screen.canvas.width-8) * 4;
+
+    asm
+      pushad
+
+      mov ch, 8
+      mov edx, LOOKUPPTR
+      mov edi, SCREENPTR
+      mov esi, CELLPTR
+
+    @YLOOP:
+      mov cl, 8
+
+    @XLOOP:
+
+      movzx ebx, word ptr [esi]      // eax = strength | type (i.e. strength*type*256)
+      add esi, 4
+      test bh, bh
+      jz @SKIP
+      mov eax, [edx+ebx*4]
+      mov [edi], eax
+    @SKIP:
+      add edi, 4
+
+      dec cl
+      jnz @XLOOP
+
+      add edi, SCREENINC
+      add esi, (256-8)*4
+      dec ch
+      jnz @YLOOP
+
+      popad
+
+    end;
+
     screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
   end;
 
 begin
-  for gy := 0 to 32-1 do begin
+  for gy := 0 to 30-1 do begin
     for gx := 0 to 32-1 do begin
 
       if blockInfo[gy, gx].count > 0 then
-        drawBlock_REF(gx, gy);
+        drawBlock_ASM(gx, gy);
 
       if keyDown(key_g) then
         debugDrawBlock(gx, gy);
