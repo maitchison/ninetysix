@@ -26,7 +26,7 @@ type
       strength: byte;
       dType: tDirtType;
     );
-    1: (code: dword);
+    1: (code: word);
   end;
 
   {optimized for MMX reads, also is 32bytes so fits into a cache line.}
@@ -334,24 +334,30 @@ var
       mov esi, CELLPTR
 
     @YLOOP:
-      mov cl, 8
+      mov cl, 4
 
     @XLOOP:
-
-      movzx ebx, word ptr [esi]      // eax = strength | type (i.e. strength*type*256)
-      add esi, 4
+      mov ebx, [esi]      // eax = strength | type (i.e. strength*type*256)
       test bh, bh
-      jz @SKIP
-      mov eax, [edx+ebx*4]
+      jz @SKIP1
+      movzx eax, bx
+      mov eax, [edx+eax*4]
       mov [edi], eax
-    @SKIP:
-      add edi, 4
+    @SKIP1:
+      shr ebx, 16
+      test bh, bh
+      jz @SKIP2
+      mov eax, [edx+ebx*4]
+      mov [edi+4], eax
+    @SKIP2:
+      add edi, 8
+      add esi, 4
 
       dec cl
       jnz @XLOOP
 
       add edi, SCREENINC
-      add esi, (256-8)*4
+      add esi, (256-8)*2
       dec ch
       jnz @YLOOP
 
