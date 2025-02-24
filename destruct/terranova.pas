@@ -215,8 +215,8 @@ var
   r2: integer;
   dimFactor: integer;
   c: RGBA;
+  cell: tCellInfo;
 begin
-  (*
   if r <= 0 then exit;
   r2 := r*r;
   for dy := -r to +r do begin
@@ -226,17 +226,11 @@ begin
       dst2 := (dx*dx)+(dy*dy);
       if (dst2 > r2) then continue;
       if not isEmpty(x, y) then continue;
-      c := TC_DIRT;
-      v := 0.7+(0.1*(rnd/255));
-      c.r := round(c.r * v);
-      c.g := round(c.g * v);
-      c.b := round(c.r * v);
-      c.a := round(c.a * v);
-      dirtColor.setPixel(x, y, c);
+      cell.dType := DT_DIRT;
+      cell.strength := 128+rnd(16);
+      setCell(x, y, cell);
     end;
-    lineStatus[y] := TL_UNKNOWN;
   end;
-  *)
 end;
 
 {returns height of terrain at x position}
@@ -341,7 +335,7 @@ var
         screen.background.setPixel(32+x, y, c);
       end;
     end;
-    screen.markRegion(Rect(32+gx*8, gy*8, 8,8), FG_FLIP);
+    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
   end;
 
   procedure drawBlock_ASM(gx, gy: integer);
@@ -395,7 +389,7 @@ var
 
     end;
 
-    screen.markRegion(Rect(32+gx*8, gy*8, 8,8), FG_FLIP);
+    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
   end;
 
 begin

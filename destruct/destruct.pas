@@ -342,9 +342,6 @@ begin
   player2Gui := tPlayerGUI.create(Point(320-155-1, 0), player2);
   gui.append(player2Gui);
 
-  terrain.draw(screen);
-  screen.pageClear();
-
   {main loop}
   repeat
 
