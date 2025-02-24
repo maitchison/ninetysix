@@ -340,12 +340,12 @@ var
 
   procedure drawBlock_ASM(gx, gy: integer);
   var
-    lookupPtr, screenPtr, cellPtr: pointer;
+    skyPtr, lookupPtr, screenPtr, cellPtr: pointer;
     screenInc: dword;
   begin
     lookupPtr := @terrainColorLookup;
     screenPtr := screen.background.getAddress(32+gx*8, gy*8);
-    if not assigned(screenPtr) then exit;
+    skyPtr := sky.getAddress(gx*8, gy*8);
     cellPtr := @cellInfo[gy*8, gx*8];
     screenInc := (screen.canvas.width-8) * 4;
 
@@ -353,35 +353,38 @@ var
       pushad
 
       mov ch, 8
+      mov ebx, SKYPTR
       mov edx, LOOKUPPTR
       mov edi, SCREENPTR
       mov esi, CELLPTR
 
     @YLOOP:
-      mov cl, 4
+      mov cl, 8
 
     @XLOOP:
-      mov ebx, [esi]      // eax = strength | type (i.e. strength*type*256)
-      test bh, bh
-      jz @SKIP1
-      movzx eax, bx
+      movzx eax, word ptr [esi]      // eax = strength | type (i.e. strength*type*256)
+
+      test ah, ah
+      jz  @SKY
+      jmp @TERRAIN
+    @SKY:
+      mov eax, [ebx]
+      jmp @WRITE
+    @TERRAIN:
+      movzx eax, ax
       mov eax, [edx+eax*4]
+    @WRITE:
       mov [edi], eax
-    @SKIP1:
-      shr ebx, 16
-      test bh, bh
-      jz @SKIP2
-      mov eax, [edx+ebx*4]
-      mov [edi+4], eax
-    @SKIP2:
-      add edi, 8
-      add esi, 4
+      add edi, 4
+      add esi, 2
+      add ebx, 4
 
       dec cl
       jnz @XLOOP
 
       add edi, SCREENINC
       add esi, (256-8)*2
+      add ebx, (256-8)*4
       dec ch
       jnz @YLOOP
 
@@ -403,7 +406,7 @@ begin
 
       if (bi^.status and BS_DIRTY) <> BS_DIRTY then continue;
 
-      drawBlock_REF(gx, gy);
+      drawBlock_ASM(gx, gy);
 
       bi^.status := bi^.status and (not BS_DIRTY);
     end;
