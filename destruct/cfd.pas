@@ -45,12 +45,20 @@ type
   tDiffusionGrid = class(tCFDGrid)
   protected
     f, fTemp: tFloatCellArray;
+    vx,vy: tFloatCellArray;
+    procedure calculateVelocity();
   public
     procedure init(); override;
     procedure setDensity(x,y: integer; value: single); override;
     function  getDensity(x,y: integer): single; override;
     procedure update(); override;
     procedure draw(screen: tScreen;xPos, yPos: integer); override;
+  end;
+
+  {method2: pressure may not flow up hill}
+  tMethod2Grid = class(tDiffusionGrid)
+  public
+    procedure update(); override;
   end;
 
   tLatticeBoltzmannGrid = class(tCFDGrid)
@@ -146,18 +154,91 @@ begin
   end;
 end;
 
+procedure tDiffusionGrid.calculateVelocity();
+var
+  prev: single;
+  x,y: integer;
+begin
+  for y := 1 to 127 do begin
+    for x := 1 to 127 do begin
+      vx[x,y] := f[x,y] - f[x-1, y];
+      vy[x,y] := f[x,y] - f[x, y-1];
+    end;
+  end;
+end;
+
 procedure tDiffusionGrid.draw(screen: tScreen;xPos, yPos: integer);
 var
   x,y: integer;
   density, velocity: single;
   c: RGBA;
 begin
+  calculateVelocity();
   for x := 0 to 127 do
     for y := 0 to 127 do begin
-      c := RGB(round(f[y,x]*1000), round(f[y,x]*200), 0);
+      c := RGB(round(f[y,x]*100), 128+round(vx[y,x]*1000), 128+round(vy[y,x]*1000));
       screen.canvas.setPixel(xPos+x, yPos+y, c);
     end;
   screen.markRegion(Rect(xPos, yPos, 128, 128));
+end;
+
+{---------------------------------------------------------------}
+
+procedure tMethod2Grid.update();
+var
+  x,y: integer;
+  prev,this,next: single;
+  w0,w1,w2,w3,w4,wt: single;
+  a,b: boolean;
+  value: single;
+  give: single;
+  u,v,uv: single;
+begin
+  fTemp := f;
+  for y := 1 to 128-1 do begin
+    for x := 1 to 128-1 do begin
+      value := fTemp[y,x];
+      a := fTemp[y,x-1] < value;
+      b := fTemp[y,x+1] < value;
+      if (a and b) then begin
+        {1/4, 1/2, 1/4}
+        f[y,x]     -= 0.50 * value;
+        f[y,x-1]   += 0.25 * value;
+        f[y,x+1]   += 0.25 * value;
+      end else if (a) then begin
+        {1/3, 2/3}
+        f[y,x]     -= (1/3) * value;
+        f[y,x-1]   += (1/3) * value;
+      end else if (b) then begin
+        {1/3, 2/3}
+        f[y,x]     -= (1/3) * value;
+        f[y,x+1]   += (1/3) * value;
+      end;
+    end;
+  end;
+  fTemp := f;
+  for x := 1 to 128-1 do begin
+    for y := 1 to 128-1 do begin
+      value := fTemp[y,x];
+      a := fTemp[y-1,x] < value;
+      b := fTemp[y+1,x] < value;
+      if (a and b) then begin
+        {1/4, 1/2, 1/4}
+        f[y-1,x]  += 0.25 * value;
+        f[y,x]    -= 0.50 * value;
+        f[y+1,x]  += 0.25 * value;
+      end else if (a) then begin
+        {1/3, 2/3}
+        f[y-1,x]  += (1/3) * value;
+        f[y,x]    -= (1/3) * value;
+      end else if (b) then begin
+        {1/3, 2/3}
+        f[y,x]    -= (1/3) * value;
+        f[y+1,x]  += (1/3) * value;
+      end;
+    end;
+  end;
+
 end;
 
 

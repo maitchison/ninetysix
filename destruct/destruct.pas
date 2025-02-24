@@ -127,7 +127,8 @@ var
   ofsX, ofsY: integer;
   timeUntilNextUpdate: single;
 begin
-  cg := tDiffusionGrid.create();
+  //cg := tDiffusionGrid.create();
+  cg := tMethod2Grid.create();
   //cg := tLatticeBoltzmannGrid.create();
   cg.init();
 
