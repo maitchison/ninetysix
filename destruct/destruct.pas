@@ -280,7 +280,7 @@ begin
     result.x := options[random(numOptions)];
 
   {find y pos}
-  result.y := 255-terrain.terrainHeight(result.x)-5;
+  result.y := 255-terrain.getTerrainHeight(result.x)-5;
 
 end;
 
@@ -360,9 +360,10 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/elapsed]);
 
-    player1.process(elapsed);
+    {stub:}
+    //player1.process(elapsed);
     player2.process(elapsed);
-    player1.apply(elapsed);
+    //player1.apply(elapsed);
     player2.apply(elapsed);
 
     screen.clearAll();

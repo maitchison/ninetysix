@@ -178,7 +178,7 @@ begin
       end;
     end;
 
-    if not terrain.isEmpty(rx, ry) then begin
+    if terrain.isSolid(rx, ry) then begin
       result.didHit := true;
       result.obj := nil;
       result.x := rx;

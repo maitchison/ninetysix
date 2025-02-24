@@ -2,36 +2,74 @@ unit terra;
 
 interface
 
+{
+Every pixel is a particle, that can move and collide
+}
+
 uses
   test, debug,
   utils,
   graph32, uScreen;
 
+const
+  BS_EMPTY = 0;
+  BS_FULL = 1;
+  BS_ACTIVE = 2;
+
 type
 
-  {optimization for terrain}
-  tTerrainLineStatus = (TL_EMPTY, TL_MIXED, TL_FULL, TL_UNKNOWN);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_STONE);
 
-  tTerrainByteArray = array[0..255, 0..255] of byte;
-  tTerrainSingleArray = array[0..255, 0..255] of byte;
+  tTerrainInfo = record
+    case byte of
+    0: (
+      dType: tDirtType;
+    );
+    1: (code: dword);
+  end;
+
+  {optimized for MMX reads, also is 32bytes so fits into a cache line.}
+  tTerrainLine = packed record
+    x: array[0..7] of byte;
+    y: array[0..7] of byte;
+    vx: array[0..7] of byte;
+    vy: array[0..7] of byte;
+  end;
+
+  tBlockInfo = record
+    status: byte;
+    count: byte;
+  end;
+
+  tTerrainInfoArray = array[0..256-1, 0..256-1] of tTerrainInfo;
+  tTerrainAttrArray = array[0..256-1, 0..32-1] of tTerrainLine;
+
+  tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
 
   tTerrain = class
   public
-    dirtColor: tPage;
-    dirtType: tTerrainByteArray;
-    dirtVx, dirtVy: tTerrainSingleArray;
+    {todo: these need to be aligned to 32 bytes, which means custom getMem}
+    cellInfo: tTerrainInfoArray;
+    cellAttr: tTerrainAttrArray;
+    blockInfo: tBlockInfoArray;
   protected
-    lineStatus: array[0..255] of tTerrainLineStatus; {0=empty, 1=maybe mixed, 2=full}
-    procedure updateLineStatus(y: integer);
     procedure updateCelluar();
   public
     constructor create();
     destructor destroy(); override;
-    function  isEmpty(x,y: integer): boolean;
-    function  isSolid(x,y: integer): boolean;
-    procedure dirt(atX,atY: integer;r: integer);
+
+    procedure clear();
+
+    function  getDirt(x,y: integer): tTerrainInfo;
+    procedure setDirt(x,y: integer; dType: tDirtType);
+
+    function  isEmpty(x, y: integer): boolean;
+    function  isSolid(x, y: integer): boolean;
+
+    procedure addDirtCircle(atX,atY: integer;r: integer);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
-    function  terrainHeight(xPos: integer): integer;
+    function  getTerrainHeight(xPos: integer): integer;
+
     procedure generate();
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
@@ -53,46 +91,55 @@ const
 constructor tTerrain.create();
 begin
   inherited create();
-  dirtColor := tPage.create(256, 256);
+  clear();
 end;
 
 destructor tTerrain.destroy();
 begin
-  terrain.free();
   inherited destroy();
 end;
 
 {--------------------}
 
-procedure tTerrain.updateLineStatus(y: integer);
-var
-  x: integer;
-  totalSolid: int32;
+procedure tTerrain.clear();
 begin
-  totalSolid:= 0;
-  for x := 0 to 255 do
-    if dirtColor.getPixel(x,y).a > 0 then inc(totalSolid);
-  if totalSolid = 0 then
-    lineStatus[y] := TL_EMPTY
-  else if totalSolid = 256 then
-    lineStatus[y] := TL_FULL
-  else
-    lineStatus[y] := TL_MIXED;
+  fillchar(blockInfo, sizeof(blockInfo), 0);
+  fillchar(cellInfo, sizeof(cellInfo), 0);
+  fillchar(cellAttr, sizeof(cellAttr), 0);
 end;
 
-{--------------------}
-
-function tTerrain.isSolid(x,y: integer): boolean;
+function tTerrain.getDirt(x,y: integer): tTerrainInfo; inline;
 begin
-  if y > 255 then exit(true);
-  if (x < 0) or (x > 255) or (y < 0) then exit(false);
-  result := dirtColor.getPixel(x, y).a > 0;
+  result.code := 0;
+  if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit();
+  result := cellInfo[y, x];
+{
+  asm
+    xor eax, eax
+    mov al, byte ptr X
+    mov ah, byte ptr Y
+    mov al, [ebp + blocksInfo + eax]
+    end;}
 end;
 
-function tTerrain.isEmpty(x,y: integer): boolean;
+function tTerrain.isEmpty(x, y: integer): boolean;
 begin
-  if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit(true);
-  result := dirtColor.getPixel(x, y).a = 0;
+  result := getDirt(x, y).dType = DT_EMPTY;
+end;
+
+function tTerrain.isSolid(x, y: integer): boolean;
+begin
+  result := getDirt(x, y).dType <> DT_EMPTY;
+end;
+
+procedure tTerrain.setDirt(x,y: integer; dType: tDirtType); inline;
+begin
+  if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
+  cellInfo[y, x].code := byte(dType);
+  cellAttr[y, x div 8].x[x and $7] := 0;
+  cellAttr[y, x div 8].y[x and $7] := 0;
+  cellAttr[y, x div 8].vX[x and $7] := 0;
+  cellAttr[y, x div 8].vY[x and $7] := 0;
 end;
 
 {removes terrain in given radius, and burns edges}
@@ -109,13 +156,14 @@ var
 begin
   {todo: implement this with a 'template' and have a linear one
    and a spherical one. Also add some texture to these}
+   (*
   if power <= 0 then exit;
   if r <= 0 then exit;
   r2 := r*r;
   for dy := -r to +r do begin
     y := atY+dy;
     if (y < 0) or (y > 255) then continue;
-    if lineStatus[y] = TL_EMPTY then continue;
+    //if lineStatus[y] = TL_EMPTY then continue;
     for dx := -r to +r do begin
       dst2 := (dx*dx)+(dy*dy);
       x := atX+dx;
@@ -138,10 +186,11 @@ begin
     end;
     lineStatus[y] := TL_UNKNOWN;
   end;
+  *)
 end;
 
 {creates a circle of dirt at location}
-procedure tTerrain.dirt(atX,atY: integer;r: integer);
+procedure tTerrain.addDirtCircle(atX,atY: integer;r: integer);
 var
   dx, dy: integer;
   x,y: integer;
@@ -151,6 +200,7 @@ var
   dimFactor: integer;
   c: RGBA;
 begin
+  (*
   if r <= 0 then exit;
   r2 := r*r;
   for dy := -r to +r do begin
@@ -170,16 +220,17 @@ begin
     end;
     lineStatus[y] := TL_UNKNOWN;
   end;
+  *)
 end;
 
 {returns height of terrain at x position}
-function tTerrain.terrainHeight(xPos: integer): integer;
+function tTerrain.getTerrainHeight(xPos: integer): integer;
 var
   y: integer;
 begin
   result := 0;
   for y := 0 to 255 do
-    if dirtColor.getPixel(xPos, y).a > 0 then exit(255-y);
+    if getDirt(xPos, y).dType <> DT_EMPTY then exit(255-y);
 end;
 
 procedure tTerrain.generate();
@@ -190,7 +241,8 @@ var
   c: RGBA;
   v: single;
 begin
-  dirtColor.clear(RGB(0, 0, 0, 0));
+
+  clear();
 
   for x := 0 to 255 do begin
     dirtHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
@@ -212,9 +264,9 @@ begin
       c.g := round(c.g * v);
       c.b := round(c.r * v);
       c.a := round(c.a * v);
-      dirtColor.setPixel(x, y, c);
+      setDirt(x, y, DT_DIRT);
+      //dirtColor.setPixel(x, y, c);
     end;
-    updateLineStatus(y);
   end;
 end;
 
@@ -225,6 +277,18 @@ var
   srcPtr, dstPtr: pointer;
   solidTiles: integer;
 begin
+  for y := 0 to 255 do begin
+    for x := 0 to 255 do begin
+      case getDirt(x,y).dType of
+        DT_EMPTY: ;
+        DT_DIRT: screen.canvas.setPixel(32+x, y, RGB(128,128,128));
+      end;
+    end;
+  end;
+
+(*
+
+  {todo: switch to grid system}
   for y := 0 to 240-1 do begin
     {$ifdef debug}
     case lineStatus[y] of
@@ -273,26 +337,70 @@ begin
     else
       lineStatus[y] := TL_MIXED;
   end;
+*)
+end;
+
+procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tTerrainInfoArray; var cellAttr: tTerrainAttrArray);
+var
+  i,j,x,y: integer;
+  idx: integer;
+  px,py: integer;
+
+  procedure doMove(dx, dy: integer);
+  var
+    nx,ny: integer;
+  begin
+    nx := x+dx;
+    ny := y+dy;
+    if byte(nx) <> nx then exit;
+    if byte(ny) <> ny then exit;
+
+    if cellInfo[ny, nx].dType <> DT_EMPTY then exit;
+
+    cellInfo[ny,nx].code := cellInfo[y,x].code;
+    cellInfo[y,x].code := 0;
+
+    cellAttr[ny,nx div 8].x[nx and $7] := cellAttr[y,x div 8].x[x and $7];
+    cellAttr[ny,nx div 8].y[nx and $7] := cellAttr[y,x div 8].y[x and $7];
+    cellAttr[ny,nx div 8].vX[nx and $7] := cellAttr[y,x div 8].vX[x and $7];
+    cellAttr[ny,nx div 8].vY[nx and $7] := cellAttr[y,x div 8].vY[x and $7];
+    cellAttr[y,x div 8].x[x and $7] := 0;
+    cellAttr[y,x div 8].y[x and $7] := 0;
+    cellAttr[y,x div 8].vX[x and $7] := 0;
+    cellAttr[y,x div 8].vY[x and $7] := 0;
+
+    dec(blockInfo[y, x div 8].count);
+    inc(blockInfo[ny, nx div 8].count);
+    {cellColor.setPixel(nx,ny,RGB(128,128,128));
+    cellColor.setPixel(x,y,RGB(0,0,0,0));}
+  end;
+
+begin
+  {process lines bottom up}
+  for i := 0 to 7 do begin
+    y := gy*8+(8-i);
+    for j := 0 to 7 do begin
+      x := gx*8+j;
+      if cellInfo[y,x].dtype = DT_EMPTY then continue;
+      py := cellAttr[y,x div 8].y[x and $7] + cellAttr[y,x div 8].vy[x and $7];
+      cellAttr[y,x div 8].y[x and $7] := byte(py);
+      if (py <= -127) then doMove(0,-1);
+      if (py >= 128) then doMove(0,+1);
+    end;
+  end;
 end;
 
 {simple celluar based terrain update}
 procedure tTerrain.updateCelluar();
 var
-  x,y: integer;
-  empty, c: RGBA;
+  gx,gy: integer;
 begin
-  empty := RGB(0,0,0,0);
-  for y := 255 downto 0 do begin
-    for x := 0 to 255 do begin
-      c := dirtColor.getPixel(x,y);
-      if c.a = 0 then continue;
-      if dirtColor.getPixel(x,y+1).a = 0 then begin
-        dirtColor.setPixel(x,y+1, c);
-        dirtColor.setPixel(x,y, empty);
-      end;
+  for gy := 32-1 downto 0 do begin
+    for gx := 0 to 32-1 do begin
+      if blockInfo[gy, gx].count = 0 then continue;
+      updateBlock_REF(gx, gy, blockInfo, cellInfo, cellAttr);
     end;
   end;
-
 end;
 
 procedure tTerrain.update(elapsed: single);
