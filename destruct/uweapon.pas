@@ -75,7 +75,7 @@ const
 implementation
 
 uses
-  fx, res, uTank, game, terra;
+  fx, res, uTank, game, terraNova;
 
 {-------------------------------------------------------}
 

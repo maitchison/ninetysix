@@ -6,7 +6,7 @@ uses
   {$i units},
   crt,
   list,
-  terra,
+  terraNova,
   uWeapon, uTank, uGameObjects, controller;
 
 type

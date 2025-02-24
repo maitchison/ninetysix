@@ -3,7 +3,7 @@ program destruct;
 uses
   debug, test,
   {game specific}
-  uTank, uWeapon, game, res, uGameObjects, terra, controller,
+  uTank, uWeapon, game, res, uGameObjects, terraNova, controller,
   {general}
   graph2d, graph32, vga, vesa,
   sysInfo,

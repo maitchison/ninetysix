@@ -85,7 +85,7 @@ const
 implementation
 
 uses
-  fx, terra, res, game;
+  fx, terraNova, res, game;
 
 const
   DEBUG_SHOW_TANK_SUPPORT = false;

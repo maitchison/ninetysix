@@ -15,7 +15,7 @@ procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: singl
 implementation
 
 uses
-  terra, game;
+  terraNova, game;
 
 {----------------------------------------------------------}
 { helpers }
