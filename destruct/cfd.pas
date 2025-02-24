@@ -188,54 +188,37 @@ procedure tMethod2Grid.update();
 var
   x,y: integer;
   prev,this,next: single;
-  w0,w1,w2,w3,w4,wt: single;
-  a,b: boolean;
+  w1,w2,w3,w4,w0,wt: single;
   value: single;
   give: single;
-  u,v,uv: single;
 begin
   fTemp := f;
   for y := 1 to 128-1 do begin
     for x := 1 to 128-1 do begin
+
       value := fTemp[y,x];
-      a := fTemp[y,x-1] < value;
-      b := fTemp[y,x+1] < value;
-      if (a and b) then begin
-        {1/4, 1/2, 1/4}
-        f[y,x]     -= 0.50 * value;
-        f[y,x-1]   += 0.25 * value;
-        f[y,x+1]   += 0.25 * value;
-      end else if (a) then begin
-        {1/3, 2/3}
-        f[y,x]     -= (1/3) * value;
-        f[y,x-1]   += (1/3) * value;
-      end else if (b) then begin
-        {1/3, 2/3}
-        f[y,x]     -= (1/3) * value;
-        f[y,x+1]   += (1/3) * value;
-      end;
-    end;
-  end;
-  fTemp := f;
-  for x := 1 to 128-1 do begin
-    for y := 1 to 128-1 do begin
-      value := fTemp[y,x];
-      a := fTemp[y-1,x] < value;
-      b := fTemp[y+1,x] < value;
-      if (a and b) then begin
-        {1/4, 1/2, 1/4}
-        f[y-1,x]  += 0.25 * value;
-        f[y,x]    -= 0.50 * value;
-        f[y+1,x]  += 0.25 * value;
-      end else if (a) then begin
-        {1/3, 2/3}
-        f[y-1,x]  += (1/3) * value;
-        f[y,x]    -= (1/3) * value;
-      end else if (b) then begin
-        {1/3, 2/3}
-        f[y,x]    -= (1/3) * value;
-        f[y+1,x]  += (1/3) * value;
-      end;
+
+      w1 := 0;
+      w2 := 0;
+      w3 := 0;
+      w4 := 0;
+      if fTemp[y,x-1] < value then w1 := 1;
+      if fTemp[y,x+1] < value then w2 := 1;
+      if fTemp[y-1,x] < value then w3 := 1;
+      if fTemp[y+1,x] < value then w4 := 1;
+
+      wt := w1+w2+w3+w4;
+
+      if wt = 0 then continue;
+
+      give := value * 0.2;
+
+      f[y,x] -= give;
+      f[y,x-1] += give * (w1/wt);
+      f[y,x+1] += give * (w2/wt);
+      f[y-1,x] += give * (w3/wt);
+      f[y+1,x] += give * (w4/wt);
+
     end;
   end;
 

@@ -9,9 +9,8 @@ simulations on a p166
 uses
   crt,
   graph32,
-  screen,
-  time,
-  graph3d;
+  uScreen,
+  time;
 
 
 const
