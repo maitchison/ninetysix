@@ -354,6 +354,8 @@ begin
 
     if mouse_b = 1 then
       terrain.burn(mouse_x-32, mouse_y, 20, 3);
+    if mouse_b = 2 then
+      terrain.putCircle(mouse_x-32, mouse_y, 20, DT_SAND);
 
 
     {update ui}

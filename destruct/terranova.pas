@@ -41,8 +41,9 @@ type
     count: byte;
   end;
 
+  tCellMovedArray = array[0..256-1, 0..32-1] of byte;
   tCellInfoArray = array[0..256-1, 0..256-1] of tCellInfo;
-  tTerrainAttrArray = array[0..256-1, 0..32-1] of tTerrainLine;
+  tCellAttrArray = array[0..256-1, 0..32-1] of tTerrainLine;
 
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
 
@@ -51,20 +52,18 @@ type
   tTerrain = class
   protected
     {todo: these need to be aligned to 32 bytes, which means custom getMem}
-    cellAttr: tTerrainAttrArray;
+    cellAttr: tCellAttrArray;
     cellInfo: tCellInfoArray;
     blockInfo: tBlockInfoArray;
+    cellMoved: tCellMovedArray;
     solver: tTerrainSolver;
     timeUntilNextSolve: single;
-
-    procedure updateStatic();
-    procedure updateFalling();
 
   public
 
     sky: tPage;
 
-    constructor create(aSolver: tTerrainSolver = TS_FALLING);
+    constructor create(aSolver: tTerrainSolver = TS_PARTICLE);
     destructor destroy(); override;
 
     procedure clear(); virtual;
@@ -114,7 +113,7 @@ var
 
 {-----------------------------------------------------------}
 
-constructor tTerrain.create(aSolver: tTerrainSolver = TS_FALLING);
+constructor tTerrain.create(aSolver: tTerrainSolver = TS_PARTICLE);
 begin
   inherited create();
   solver := aSolver;
@@ -154,6 +153,7 @@ begin
   bi := @blockInfo[y div 8, x div 8];
   if cell.dType <> DT_EMPTY then inc(bi^.count);
   {set DIRTY clear INACTIVE}
+  {todo: really we should to to active all blocks within 1 cell of this one}
   bi^.status := BS_DIRTY;
 end;
 
@@ -422,15 +422,6 @@ begin
   end;
 end;
 
-{----------------------------------------------------------------------}
-{ tStaticTerrain }
-{----------------------------------------------------------------------}
-
-procedure tTerrain.updateStatic();
-begin
-  // nothing to do.
-end;
-
 procedure updateBlockFalling_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray);
 var
   i,j,x,y: integer;
@@ -515,31 +506,141 @@ begin
   end;
 end;
 
-
-procedure tTerrain.updateFalling();
+procedure updateBlockParticle_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray; var cellAttr: tCellAttrArray;var cellMoved: tCellMovedArray);
 var
-  gx,gy: integer;
+  i,j,x,y: integer;
+  idx: integer;
+  px,py,vx,vy: int32;
+  empty, cell: tCellInfo;
+  selfChanged: boolean;
+  changes: array[-1..1, -1..1] of int8;
+  delta: integer;
+  cx,cy: integer;
+  coin: integer;
+  dx,dy: integer;
+  hasSupport: boolean;
+  nx,ny: integer;
+
+  procedure doMove(dx,dy: integer); inline;
+  begin
+    selfChanged := true;
+    if (j+dx < 0) then cx := -1 else if (j+dx >= 8) then cx := +1 else cx := 0;
+    if ((7-i)+dy < 0) then cy := -1 else if ((7-i)+dy >= 8) then cy := +1 else cy := 0;
+    inc(changes[cx,cy]);
+    nx := x+dx;
+    ny := y+dy;
+    cellInfo[ny, nx] := cell;
+    cellInfo[y, x] := empty;
+
+    {grr...}
+    cellAttr[ny, nx div 8].x[nx and $7] := cellAttr[y, x div 8].x[x and $7];
+    cellAttr[ny, nx div 8].y[nx and $7] := cellAttr[y, x div 8].y[x and $7];
+    cellAttr[ny, nx div 8].vx[nx and $7] := cellAttr[y, x div 8].vx[x and $7];
+    cellAttr[ny, nx div 8].vy[nx and $7] := cellAttr[y, x div 8].vy[x and $7];
+    cellAttr[y, x div 8].x[x and $7] := 0;
+    cellAttr[y, x div 8].y[x and $7] := 0;
+    cellAttr[y, x div 8].vx[x and $7] := 0;
+    cellAttr[y, x div 8].vy[x and $7] := 0;
+
+    cellMoved[ny, nx div 8] := cellMoved[ny, nx div 8] or (1 shl (nx and $7));
+  end;
+
+  function checkAndMove(dx,dy: integer): boolean; inline;
+  begin
+    {todo: no bounds checking..}
+    if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
+    if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
+    result := cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
+    if result then doMove(dx,dy);
+  end;
+
 begin
-  for gy := 31-1 downto 1 do begin
-    for gx := 0 to 32-1 do begin
-      //if blockInfo[gy, gx].count = 0 then continue;
-      if (blockInfo[gy, gx].status and BS_INACTIVE) = BS_INACTIVE then continue;
-      updateBlockFalling_REF(gx, gy, blockInfo, cellInfo);
+  empty.code := 0;
+  fillchar(changes, sizeof(changes), 0);
+  selfChanged := false;
+  for i := 0 to 7 do begin
+    y := gy*8+(7-i);
+    for j := 0 to 7 do begin
+      x := gx*8+j;
+
+      {check if we have already moved}
+      if (cellMoved[y, gx] and (1 shl j)) <> 0 then continue;
+
+      cell := cellInfo[y,x];
+      if cell.dtype in [DT_EMPTY, DT_ROCK] then continue;
+      hasSupport := cellInfo[y+1, x].dtype <> DT_EMPTY;
+      {get particle}
+      vx := cellAttr[y, x div 8].vx[x and $7];
+      vy := cellAttr[y, x div 8].vy[x and $7];
+      if (vx = 0) and (vy = 0) and hasSupport then continue;
+      selfChanged := true;
+      px := cellAttr[y, x div 8].x[x and $7];
+      py := cellAttr[y, x div 8].y[x and $7];
+      {gravity}
+      if hasSupport then
+        vy := 0
+      else
+        vy := clamp(vy + 3, -120, 120);
+      cellAttr[y, x div 8].vy[x and $7] := vy;
+      {move particle}
+      px += vx;
+      py += vy;
+      if (px <= -127) then dx := -1 else if (px >= 128) then dx := +1 else dx := 0;
+      if (py <= -127) then dy := -1 else if (py >= 128) then dy := +1 else dy := 0;
+      cellAttr[y, x div 8].x[x and $7] := int8(byte(word(px) and $ff));
+      cellAttr[y, x div 8].y[x and $7] := int8(byte(word(py) and $ff));
+      if (dx <> 0) or (dy <> 0) then begin
+        if not checkAndMove(dx, dy) then begin
+          if dx <> 0 then cellAttr[y, x div 8].vx[x and $7] := 0;
+          if dy <> 0 then cellAttr[y, x div 8].vy[x and $7] := 0;
+        end;
+      end;
+    end;
+  end;
+  {keep track of block stats}
+  if (not selfChanged) then begin
+    blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_INACTIVE;
+    exit;
+  end;
+
+  blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
+
+  for cx := -1 to 1 do begin
+    for cy := -1 to 1 do begin
+      delta := changes[cx,cy];
+      // let all neighbours know to check themselves
+      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
+      if delta = 0 then continue;
+      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
+      blockInfo[gy+cy, gx+cx].count += delta;
+      blockInfo[gy, gx].count -= delta;
     end;
   end;
 end;
 
 procedure tTerrain.update(elapsed: single);
+var
+  gx,gy: integer;
 begin
   {we update the terrain simulation at 30 fps}
   timeUntilNextSolve -= elapsed;
-
   while timeUntilNextSolve < 0 do begin
-    case solver of
-      TS_STATIC: updateStatic();
-      TS_FALLING: updateFalling();
+
+    if solver = TS_PARTICLE then
+      fillchar(cellMoved, sizeof(cellMoved), 0);
+
+    for gy := 31-1 downto 1 do begin
+      for gx := 0 to 32-1 do begin
+        //if blockInfo[gy, gx].count = 0 then continue;
+        if (blockInfo[gy, gx].status and BS_INACTIVE) = BS_INACTIVE then continue;
+        case solver of
+          TS_STATIC: ;
+          TS_FALLING: updateBlockFalling_REF(gx, gy, blockInfo, cellInfo);
+          TS_PARTICLE: updateBlockParticle_REF(gx, gy, blockInfo, cellInfo, cellAttr, cellMoved);
+        end;
+      end;
     end;
-    timeUntilNextSolve += (1/30)
+    timeUntilNextSolve += (1/60)
   end;
 end;
 
@@ -547,7 +648,7 @@ end;
 { tParticleTerrain }
 {----------------------------------------------------------------------}
              (*
-procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray; var cellAttr: tTerrainAttrArray);
+procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray; var cellAttr: tCellAttrArray);
 var
   i,j,x,y: integer;
   idx: integer;
