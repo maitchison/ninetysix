@@ -43,10 +43,9 @@ type
   private
     viewport: tRect;
     // dirty grid
-    // support for up to 2048x2048
+    // support for up to 1024x1024
     // pixel -> grid is divide by 8
-    flagGrid: array[0..256-1, 0..256-1] of byte;
-    clearBounds, flipBounds: tRect;
+    flagGrid: array[0..128-1, 0..256-1] of byte;
     videoDepth: tVideoDepth;
 
   public
@@ -259,8 +258,6 @@ begin
   end;
 
   fillchar(flagGrid, sizeof(flagGrid), 0);
-  clearBounds.init(256, 256, -256, -256);
-  flipBounds.init(256, 256, -256, -256);
 
   viewport := Rect(videoDriver.physicalWidth, videoDriver.physicalHeight);
   bounds := Rect(aWidth, aHeight);
@@ -408,31 +405,14 @@ begin
 
   for y := y1 to y2 do
     for x := x1 to x2 do
-      flagGrid[x,y] := flags;
-
-  if (flags and FG_FLIP = FG_FLIP) then begin
-    flipBounds.expandToInclude(Point(x1, y1));
-    flipBounds.expandToInclude(Point(x2, y2));
-  end;
-  if (flags and FG_CLEAR = FG_CLEAR) then begin
-    clearBounds.expandToInclude(Point(x1, y1));
-    clearBounds.expandToInclude(Point(x2, y2));
-  end;
-
+      flagGrid[y, x] := flags;
 end;
 
 {indicates that a pixel should fliped this frame, and cleared next frame}
 procedure tScreen.markPixel(x,y: integer; flags:word=FG_FLIP+FG_CLEAR); inline;
 begin
-  flagGrid[x div 8,y div 8] := flags;
-  if (flags and FG_FLIP = FG_FLIP) then begin
-    flipBounds.expandToInclude(Point(x div 8, y div 8));
-    flipBounds.expandToInclude(Point(x div 8, y div 8));
-  end;
-  if (flags and FG_CLEAR = FG_CLEAR) then begin
-    clearBounds.expandToInclude(Point(x div 8, y div 8));
-    clearBounds.expandToInclude(Point(x div 8, y div 8));
-  end;
+  if (dword(y) >= width) or (dword(x) >= width) then exit;
+  flagGrid[y div 8,x div 8] := flags;
 end;
 
 {clears all parts of the screen marked for clearing
@@ -444,15 +424,15 @@ var
 begin
   stats.clearCells := 0; stats.clearRegions := 0;
   startTimer('clear');
-  for y := clearBounds.top to clearBounds.bottom do begin
+  for y := 0 to (height div 8)-1 do begin
     rle := 0;
-    for x := clearBounds.left to clearBounds.right do begin
-      if (flagGrid[x,y] and FG_CLEAR) = FG_CLEAR then begin
+    {todo: fast read in ASM, until we hit first and last non-zero cell}
+    for x := 0 to (width div 8)-1 do begin
+      if (flagGrid[y, x] and FG_CLEAR) = FG_CLEAR then begin
         if rle = 0 then xStart := x;
         inc(stats.clearCells);
         inc(rle);
-        flagGrid[x,y] := (flagGrid[x,y] xor FG_CLEAR) or FG_FLIP;
-        flipBounds.expandToInclude(Point(x, y));
+        flagGrid[y,x] := (flagGrid[y,x] xor FG_CLEAR) or FG_FLIP;
       end else begin
         if rle > 0 then begin
           clearRegion(Rect(xStart*8, y*8, 8*rle, 8));
@@ -466,7 +446,6 @@ begin
       stats.clearRegions += 1;
     end;
   end;
-  clearBounds.init(256,256,-256, -256);
   stopTimer('clear');
 end;
 
@@ -482,19 +461,20 @@ begin
 
   case scrollMode of
     SSM_COPY: begin
+      {todo: if viewport did not move then copy only changed regions (e.g. from below)}
       for y := 0 to videoDriver.physicalHeight-1 do
         transferLineToScreen(canvas, viewport.x, viewport.y+y, 0, y, videoDriver.physicalWidth);
       end;
     SSM_OFFSET: begin
       videoDriver.setDisplayStart(viewport.x, viewport.y);
-      for y := flipBounds.top to flipBounds.bottom do begin
+      for y := 0 to (height div 8)-1 do begin
         rle := 0;
-        for x := flipBounds.left to flipBounds.right do begin
-          if (flagGrid[x,y] and FG_FLIP) = FG_FLIP then begin
+        for x := 0 to (width div 8)-1 do begin
+          if (flagGrid[y,x] and FG_FLIP) = FG_FLIP then begin
             if rle = 0 then xStart := x;
             inc(stats.copyCells);
             inc(rle);
-            flagGrid[x,y] := (flagGrid[x,y] xor FG_FLIP)
+            flagGrid[y,x] := (flagGrid[y,x] xor FG_FLIP)
           end else begin
             if rle > 0 then begin
               copyRegion(Rect(xStart*8, y*8, 8*rle, 8));
@@ -508,7 +488,8 @@ begin
           stats.copyRegions += 1;
         end;
       end;
-      flipBounds.init(256,256,-256,-256);
+      // todo: clear flip bit but not clearBit
+      //fillchar(flipLines, sizeof(flipLines), 0);
     end;
     else fatal('Invalid copy mode');
   end;
