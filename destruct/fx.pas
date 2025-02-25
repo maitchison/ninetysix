@@ -10,7 +10,7 @@ uses
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
-procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0);
+procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
 
 implementation
 
@@ -110,15 +110,15 @@ begin
   end;
 end;
 
-procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0);
+procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0; n: integer=-1);
 var
   i: integer;
   p: tParticle;
-  n: integer;
   z: single;
   angle: single;
 begin
-  n := round(radius * radius);
+  if n < 0 then
+    n := round(radius * radius);
   for i := 0 to n-1 do begin
     p := nextParticle();
     z := (rnd/255);

@@ -261,9 +261,10 @@ end;
 procedure tParticle.draw(screen: tScreen);
 begin
   {todo: implement template based particles}
-  if radius = 1 then
-    inherited draw(screen)
-  else
+  if radius = 1 then begin
+    screen.canvas.putPixel(32+xPos, yPos, col);
+    screen.markPixel(32+xPos, yPos);
+  end else
     drawMarker(screen, xPos, yPos, col);
 end;
 

@@ -67,7 +67,7 @@ type
 
     sky: tPage;
 
-    constructor create(aSolver: tTerrainSolver = TS_PARTICLE);
+    constructor create(aSolver: tTerrainSolver = TS_FALLING);
     destructor destroy(); override;
 
     procedure clear(); virtual;
@@ -121,7 +121,7 @@ var
 
 {-----------------------------------------------------------}
 
-constructor tTerrain.create(aSolver: tTerrainSolver = TS_PARTICLE);
+constructor tTerrain.create(aSolver: tTerrainSolver = TS_FALLING);
 begin
   inherited create();
   solver := aSolver;

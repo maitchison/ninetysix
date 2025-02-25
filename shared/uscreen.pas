@@ -86,7 +86,9 @@ type
     {dirty handling}
     procedure flipAll();
     procedure clearAll();
-    procedure markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR);
+    procedure markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR); inline;
+    procedure markPixel(x,y: integer; flags:word=FG_FLIP+FG_CLEAR); inline;
+
 
   end;
 
@@ -393,7 +395,7 @@ begin
 end;
 
 {indicates that region should fliped this frame, and cleared next frame}
-procedure tScreen.markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR);
+procedure tScreen.markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR); inline;
 var
   x,y, x1,x2,y1,y2: integer;
 begin
@@ -417,6 +419,20 @@ begin
     clearBounds.expandToInclude(Point(x2, y2));
   end;
 
+end;
+
+{indicates that a pixel should fliped this frame, and cleared next frame}
+procedure tScreen.markPixel(x,y: integer; flags:word=FG_FLIP+FG_CLEAR); inline;
+begin
+  flagGrid[x div 8,y div 8] := flags;
+  if (flags and FG_FLIP = FG_FLIP) then begin
+    flipBounds.expandToInclude(Point(x div 8, y div 8));
+    flipBounds.expandToInclude(Point(x div 8, y div 8));
+  end;
+  if (flags and FG_CLEAR = FG_CLEAR) then begin
+    clearBounds.expandToInclude(Point(x div 8, y div 8));
+    clearBounds.expandToInclude(Point(x div 8, y div 8));
+  end;
 end;
 
 {clears all parts of the screen marked for clearing

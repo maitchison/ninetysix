@@ -12,6 +12,7 @@ uses
   myMath,
   timer,
   ui,
+  fx,
   crt, //todo: remove
   cfd,
   keyboard,
@@ -352,12 +353,6 @@ begin
     if keydown(key_z) then elapsed := 0.001;
     DEBUG_DRAW_BOUNDS := keydown(key_b);
 
-    if mouse_b = 1 then
-      terrain.burn(mouse_x-32, mouse_y, 20, 3);
-    if mouse_b = 2 then
-      terrain.putCircle(mouse_x-32, mouse_y, 20, DT_SAND);
-
-
     {update ui}
     if elapsed > 0 then
       fps.text := format('%f', [1/getTimer('main').avElapsed]);
@@ -395,9 +390,16 @@ begin
     stopTimer('guiDraw');
 
     {debug}
-    if keydown(key_f5) then debugShowWorldPixels(screen);
-    if keydown(key_f4) then
+    if keyDown(key_f5) then debugShowWorldPixels(screen);
+    if keyDown(key_f4) then
       screen.pageFlip();
+
+    if keyDown(key_1) then
+      terrain.burn(mouse_x-32, mouse_y, 20, 3);
+    if keyDown(key_2) then
+      terrain.putCircle(mouse_x-32, mouse_y, 20, DT_SAND);
+    if keyDown(key_3) then
+      makeSparks(mouse_x-32, mouse_y, 20, 100, 0, 0, round(10000*elapsed));
 
     screen.flipAll();
 
