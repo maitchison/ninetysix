@@ -43,7 +43,7 @@ type
   private
     viewport: tRect;
     // dirty grid
-    // support for up to 1024x1024
+    // support for up to 1024x2048
     // pixel -> grid is divide by 8
     flagGrid: array[0..128-1, 0..256-1] of byte;
     videoDepth: tVideoDepth;

@@ -672,61 +672,6 @@ begin
   end;
 end;
 
-{----------------------------------------------------------------------}
-{ tParticleTerrain }
-{----------------------------------------------------------------------}
-             (*
-procedure updateBlock_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray; var cellAttr: tCellAttrArray);
-var
-  i,j,x,y: integer;
-  idx: integer;
-  px,py: integer;
-
-  procedure doMove(dx, dy: integer);
-  var
-    nx,ny: integer;
-  begin
-    nx := x+dx;
-    ny := y+dy;
-    if byte(nx) <> nx then exit;
-    if byte(ny) <> ny then exit;
-
-    if cellInfo[ny, nx].dType <> DT_EMPTY then exit;
-
-    cellInfo[ny,nx].code := cellInfo[y,x].code;
-    cellInfo[y,x].code := 0;
-
-    cellAttr[ny,nx div 8].x[nx and $7] := cellAttr[y,x div 8].x[x and $7];
-    cellAttr[ny,nx div 8].y[nx and $7] := cellAttr[y,x div 8].y[x and $7];
-    cellAttr[ny,nx div 8].vX[nx and $7] := cellAttr[y,x div 8].vX[x and $7];
-    cellAttr[ny,nx div 8].vY[nx and $7] := cellAttr[y,x div 8].vY[x and $7];
-    cellAttr[y,x div 8].x[x and $7] := 0;
-    cellAttr[y,x div 8].y[x and $7] := 0;
-    cellAttr[y,x div 8].vX[x and $7] := 0;
-    cellAttr[y,x div 8].vY[x and $7] := 0;
-
-    dec(blockInfo[y, x div 8].count);
-    inc(blockInfo[ny, nx div 8].count);
-    {cellColor.setPixel(nx,ny,RGB(128,128,128));
-    cellColor.setPixel(x,y,RGB(0,0,0,0));}
-  end;
-
-begin
-  {process lines bottom up}
-  for i := 0 to 7 do begin
-    y := gy*8+(8-i);
-    for j := 0 to 7 do begin
-      x := gx*8+j;
-      if cellInfo[y,x].dtype = DT_EMPTY then continue;
-      py := cellAttr [y,x div 8].y[x and $7] + cellAttr[y,x div 8].vy[x and $7];
-      cellAttr[y,x div 8].y[x and $7] := byte(py);
-      if (py <= -127) then doMove(0,-1);
-      if (py >= 128) then doMove(0,+1);
-    end;
-  end;
-end;
-
-           *)
 {-----------------------------------------------------------}
 
 procedure generateTerrainColorLookup();
