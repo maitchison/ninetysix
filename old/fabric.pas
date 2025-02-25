@@ -23,7 +23,9 @@ uses
   crt,
   graph32,
   engine,
-  screen,
+  vesa,
+  utils,
+  uScreen,
   time,
   graph3d;
 
@@ -37,6 +39,7 @@ const
 
 var
   updateImpact: procedure;
+  videoDriver: tVesaDriver;
 
 type TStats = record
   updates: int32;
@@ -74,16 +77,20 @@ var
   stats: tStats;
 
 
-procedure putPixel(x, y: int32; col:rgba);
+procedure putPixel(x, y: int32; col:rgba); overload;
 var
     address: int32;
     ofs: int32;
+    lfb: word;
 begin
 
   if (x < 0) or (x >= 320) then exit;
   if (y < 0) or (y >= 200) then exit;
 
   ofs := x + (y * 320);
+
+  lfb := videoDriver.LFB_SEG;
+
 
   asm
     push es
@@ -103,7 +110,7 @@ begin
     end
 end;
 
-procedure putPixel(x, y: int32; col:byte);
+procedure putPixel(x, y: int32; col:byte); overload;
 var
     address: int32;
     ofs: int32;
@@ -377,8 +384,10 @@ var
 
 begin
 
+  videoDriver := tVesaDriver.create();
+
   randomize();
-  init_320x200x8();
+  videoDriver.setMode(320,200,8);
 
   initGrid();
 

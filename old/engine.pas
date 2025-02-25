@@ -1,5 +1,7 @@
 unit engine;
 
+{$MODE FPC}
+
 interface
 
 const
@@ -96,7 +98,7 @@ begin
     asm
 
       xor eax, eax
-      mov ah, y
+      mov ah, byte ptr y
       mov al, 1
       shl eax, 1
       mov edi, eax
@@ -130,7 +132,7 @@ begin
 
       xor eax, eax
       mov ah, 1
-      mov al, x
+      mov al, byte ptr x
       shl eax, 1
       mov edi, eax
 

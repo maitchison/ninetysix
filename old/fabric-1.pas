@@ -21,8 +21,10 @@ simulations on a p166
 uses
   crt,
   graph32,
-  screen,
+  uScreen,
   time,
+  vesa,
+  utils,
   graph3d;
 
 
@@ -33,7 +35,6 @@ const
   CHUNK_SHIFT = 4;
   CHUNKS_WIDTH = GRID_WIDTH div CHUNK_SIZE;
   CHUNKS_HEIGHT = GRID_HEIGHT div CHUNK_SIZE;
-
 
 type TStats = record
   updates: int32;
@@ -62,15 +63,18 @@ type tSlot = packed record
   didUpdate: boolean;
   end;
 
+type
+  tImpactGrid = array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
+
 var
   grid: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of tCell;
   gridPos: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of tCellPos;
-  impact: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
-  impactTMP: array[0..GRID_HEIGHT-1, 0..GRID_WIDTH-1] of single;
+  impact, impactTMP: tImpactGrid;
   step: word;
-
-
   stats: tStats;
+
+  screen: tScreen;
+  videoDriver: tVesaDriver;
 
 
 {propigate impact force}
@@ -133,16 +137,18 @@ begin
 
 end;
 
-procedure putPixel(x, y: int32; col:rgba);
+procedure putPixel(x, y: int32; col:rgba); overload;
 var
     address: int32;
     ofs: int32;
+    lfb: word;
 begin
 
   if (x < 0) or (x >= 320) then exit;
   if (y < 0) or (y >= 200) then exit;
 
   ofs := x + (y * 320);
+  lfb := videoDriver.LFB_SEG;
 
   asm
     push es
@@ -162,7 +168,7 @@ begin
     end
 end;
 
-procedure putPixel(x, y: int32; col:byte);
+procedure putPixel(x, y: int32; col:byte); overload;
 var
     address: int32;
     ofs: int32;
@@ -435,14 +441,15 @@ var
   den1,den2: single;
 
 begin
+  videoDriver := tVesaDriver.create();
 
   randomize();
-  init_320x200x8();
+  videoDriver.setMode(320,200,8);
+  screen := tScreen.create();
 
   initGrid();
 
   drawGrid();
-
 
   stats.startTime := getSec();
 
@@ -452,7 +459,7 @@ begin
 
   for i := 0 to 50 do begin
 
-    {updateGrid();}
+    updateGrid();
     den2 := updateImpact();
     drawGrid();
     stats.updates := stats.updates + 1;

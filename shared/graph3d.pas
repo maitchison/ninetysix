@@ -8,6 +8,7 @@ interface
 uses
     vertex,
     graph32,
+    bmp,
     crt;
 
 type RGBA = packed record

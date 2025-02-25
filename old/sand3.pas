@@ -17,14 +17,19 @@ simulations on a p166
 [ ] interaction via mouse clicks.
 }
 
+{$MODE FPC}
 
 uses
   crt,
   graph32,
-  screen,
+  uScreen,
+  utils,
+  vesa,
   time,
   graph3d;
 
+var
+  videoDriver: tVesaDriver;
 
 const
   GRID_WIDTH = 256;
@@ -137,12 +142,15 @@ procedure putPixel(x, y: int32; col:rgba);
 var
     address: int32;
     ofs: int32;
+    lfb: word;
 begin
 
   if (x < 0) or (x >= 320) then exit;
   if (y < 0) or (y >= 200) then exit;
 
   ofs := x + (y * 320);
+
+  lfb := videoDriver.LFB_SEG;
 
   asm
     push es
@@ -436,13 +444,14 @@ var
 
 begin
 
+  videoDriver := tVesaDriver.create();
+
   randomize();
-  init_320x200x8();
+  videoDriver.setMode(320,200,8);
 
   initGrid();
 
   drawGrid();
-
 
   stats.startTime := getSec();
 
@@ -452,7 +461,7 @@ begin
 
   for i := 0 to 50 do begin
 
-    {updateGrid();}
+    updateGrid();
     den2 := updateImpact();
     drawGrid();
     stats.updates := stats.updates + 1;
