@@ -12,7 +12,7 @@ uses
   graph2d, graph32, uScreen;
 
 const
-  BS_LOCKED = 1;   // no updates required as no particles can move
+  BS_INACTIVE = 1;   // no updates required as no cells can move
   BS_DIRTY = 2;    // must redraw this block as it's changed
 
 type
@@ -153,7 +153,8 @@ begin
   cellInfo[y, x] := cell;
   bi := @blockInfo[y div 8, x div 8];
   if cell.dType <> DT_EMPTY then inc(bi^.count);
-  bi^.status := bi^.status or BS_DIRTY;
+  {set DIRTY clear INACTIVE}
+  bi^.status := BS_DIRTY;
 end;
 
 function tTerrain.isEmpty(x, y: integer): boolean; inline;
@@ -312,14 +313,14 @@ var
     bi: tBlockInfo;
   begin
     r := Rect(32+gx*8, gy*8, 9,9);
-    c := RGB(128,128,128);
+    c := RGB(0,0,0);
     bi := blockInfo[gy, gx];
-    if bi.count = 0 then
-      c.r := 0;
-    if bi.count = 64 then
-      c.r := 255;
+    {red = dirty}
+    {blue = inactive}
     if (bi.status and BS_DIRTY = BS_DIRTY) then
-      c.g := 255;
+      c.r := 255;
+    if (bi.status and BS_INACTIVE = BS_INACTIVE) then
+      c.b := 255;
     screen.canvas.drawRect(r, c);
     screen.markRegion(r);
   end;
@@ -494,10 +495,18 @@ begin
     end;
   end;
   {keep track of block stats}
-  if (selfChanged) then blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
+  if (not selfChanged) then begin
+    blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_INACTIVE;
+    exit;
+  end;
+
+  blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
+
   for cx := -1 to 1 do begin
     for cy := -1 to 1 do begin
       delta := changes[cx,cy];
+      // let all neighbours know to check themselves
+      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
       if delta = 0 then continue;
       blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
       blockInfo[gy+cy, gx+cx].count += delta;
@@ -513,7 +522,8 @@ var
 begin
   for gy := 31-1 downto 1 do begin
     for gx := 0 to 32-1 do begin
-      if blockInfo[gy, gx].count = 0 then continue;
+      //if blockInfo[gy, gx].count = 0 then continue;
+      if (blockInfo[gy, gx].status and BS_INACTIVE) = BS_INACTIVE then continue;
       updateBlockFalling_REF(gx, gy, blockInfo, cellInfo);
     end;
   end;
