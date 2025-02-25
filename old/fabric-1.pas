@@ -21,7 +21,6 @@ simulations on a p166
 uses
   crt,
   graph32,
-  uScreen,
   time,
   vesa,
   utils,
@@ -73,7 +72,6 @@ var
   step: word;
   stats: tStats;
 
-  screen: tScreen;
   videoDriver: tVesaDriver;
 
 
@@ -221,15 +219,15 @@ begin
 
     for x := 0 to GRID_WIDTH-1 do begin
       col := 0;
-      {
+
       if grid[y,x].typeid = 0 then begin
         putPixel(x, y, 0);
         continue;
       end;
-       }
+
       col := grid[y,x].col;
 
-      //col := col + grid[y, x].typeid;
+      col := col + grid[y, x].typeid;
       //col := col + chunkStatus[y shr CHUNK_SHIFT, x shr CHUNK_SHIFT] * 4;
 
 
@@ -238,12 +236,12 @@ begin
         col := 5;}
 
       {show new impact}
-      putScala(x,y,impact[y,x] / 15);
+      //putScala(x,y,impact[y,x] / 15);
 
 
       {putPixel(x,y,byte(trunc(impact[y,x]))); }
 
-      {putPixel(x, y, col);}
+      putPixel(x, y, col);
 
 
       {putScala(x,y,gridPos[y,x].vx);}
@@ -280,6 +278,7 @@ begin
   end;
 
 
+  {
   for i := 30 to 100 do begin
     placeWall(64-1,i);
     placeWall(64+1,i);
@@ -291,6 +290,7 @@ begin
 
   impact[64,64] := 32*256;
   impact[74,64] := 32*256;
+  }
 
   {
   impact[65,64] := 4*256;
@@ -445,7 +445,6 @@ begin
 
   randomize();
   videoDriver.setMode(320,200,8);
-  screen := tScreen.create();
 
   initGrid();
 
@@ -457,7 +456,7 @@ begin
 
   den1 := 256;
 
-  for i := 0 to 50 do begin
+  for i := 0 to 350 do begin
 
     updateGrid();
     den2 := updateImpact();
@@ -466,7 +465,7 @@ begin
     if i >= 200 then begin
       {if readkey = 'q' then break;}
     end;
-    if i = 100 then begin
+    if i = 200 then begin
       explosion(128, 158, 40, 100);
       drawGrid();
       {if readkey = 'q' then break;}
