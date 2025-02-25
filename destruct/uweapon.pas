@@ -161,7 +161,7 @@ begin
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
-      terrain.addDirtCircle(xPos, yPos, damage);
+      terrain.putCircle(xPos, yPos, damage, DT_WATER);
       targetDamage := 0;
     end;
     PT_LASER:

@@ -17,7 +17,7 @@ const
 
 type
 
-  tDirtType = (DT_EMPTY, DT_DIRT, DT_ROCK, DT_GRASS);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER);
 
   tCellInfo = record
     case byte of
@@ -74,7 +74,7 @@ type
     function  isEmpty(x, y: integer): boolean; inline;
     function  isSolid(x, y: integer): boolean; inline;
 
-    procedure addDirtCircle(atX,atY: integer;r: integer);
+    procedure putCircle(atX,atY: integer;r: integer; dType: tDirtType=DT_DIRT);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     function  getTerrainHeight(xPos: integer): integer;
 
@@ -92,14 +92,21 @@ uses
 const
 
   TERRAIN_DECAY: array[tDirtType] of integer = (
-    0, 6, 2, 32
+    0, //empty
+    6, //dirt
+    3, //sand
+    2, //rock
+    32,//grass
+    0  //water
   );
 
   TERRAIN_COLOR: array[tDirtType] of RGBA = (
-    (b:$00; g:$00; r:$00; a: $ff),
-    (b:$44; g:$80; r:$8d; a: $ff),
-    (b:$44; g:$44; r:$44; a: $ff),
-    (b:$5d; g:$80; r:$0d; a: $ff)
+    (b:$00; g:$00; r:$00; a: $ff), //none
+    (b:$44; g:$80; r:$8d; a: $ff), //dirt
+    (b:$99; g:$e5; r:$ff; a: $ff), //sand
+    (b:$44; g:$44; r:$44; a: $ff), //rock
+    (b:$5d; g:$80; r:$0d; a: $ff), //grass
+    (b:$fd; g:$30; r:$2d; a: $ff)  //water
   );
 
 var
@@ -209,7 +216,7 @@ begin
 end;
 
 {creates a circle of dirt at location}
-procedure tTerrain.addDirtCircle(atX,atY: integer;r: integer);
+procedure tTerrain.putCircle(atX,atY: integer;r: integer; dType: tDirtType=DT_DIRT);
 var
   dx, dy: integer;
   x,y: integer;
@@ -229,7 +236,7 @@ begin
       dst2 := (dx*dx)+(dy*dy);
       if (dst2 > r2) then continue;
       if not isEmpty(x, y) then continue;
-      cell.dType := DT_DIRT;
+      cell.dType := dType;
       cell.strength := 128+rnd(16);
       setCell(x, y, cell);
     end;
@@ -425,31 +432,73 @@ var
   idx: integer;
   px,py: integer;
   empty, cell: tCellInfo;
-  selfChanges, belowChanges: integer;
+  selfChanged: boolean;
+  changes: array[-1..1, -1..1] of int8;
+  delta: integer;
+  cx,cy: integer;
+  coin: integer;
+
+  procedure doMove(dx,dy: integer); inline;
+  begin
+    selfChanged := true;
+    if (j+dx < 0) then cx := -1 else if (j+dx >= 8) then cx := +1 else cx := 0;
+    if ((7-i)+dy < 0) then cy := -1 else if ((7-i)+dy >= 8) then cy := +1 else cy := 0;
+    inc(changes[cx,cy]);
+    cellInfo[y+dy, x+dx] := cell;
+    cellInfo[y, x] := empty;
+  end;
+
+  function checkAndMove(dx,dy: integer): boolean; inline;
+  begin
+    {todo: no bounds checking..}
+    if (x+dx < 0) or (y+dy < 0) or (x+dx>255) or (y+dy>255) then exit(false);
+    result := cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
+    if result then doMove(dx,dy);
+  end;
+
 begin
   empty.code := 0;
-  selfChanges := 0;
-  belowChanges := 0;
-  {process lines bottom up}
+  fillchar(changes, sizeof(changes), 0);
+  selfChanged := false;
   for i := 0 to 7 do begin
     y := gy*8+(7-i);
     for j := 0 to 7 do begin
       x := gx*8+j;
       cell := cellInfo[y,x];
-      if cell.dtype = DT_EMPTY then continue;
-      if cellInfo[y+1,x].dtype = DT_EMPTY then begin
-        inc(selfChanges);
-        if i = 0 then inc(belowChanges);
-        cellInfo[y+1, x] := cell;
-        cellInfo[y, x] := empty;
+      case cell.dtype of
+        DT_EMPTY: ;
+        DT_ROCK: ;
+        DT_DIRT: begin
+          checkAndMove(0,1);
+        end;
+        DT_SAND: begin
+          if checkAndMove(0,1) then continue;
+          coin := (rnd and $2) * 2 - 1;
+          if checkAndMove(coin,1) then continue;
+          if checkAndMove(-coin,1) then continue;
+        end;
+        DT_WATER: begin
+          if checkAndMove(0,1) then continue;
+          coin := (rnd and $2) * 2 - 1;
+          if checkAndMove(coin,1) then continue;
+          if checkAndMove(-coin,1) then continue;
+          if checkAndMove(coin,0) then continue;
+          if checkAndMove(-coin,0) then continue;
+        end;
       end;
     end;
   end;
   {keep track of block stats}
-  if (selfChanges > 0) then blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
-  if (belowChanges > 0) then blockInfo[gy+1, gx].status := blockInfo[gy+1, gx].status or BS_DIRTY;
-  blockInfo[gy, gx].count -= belowChanges;
-  blockInfo[gy+1, gx].count += belowChanges;
+  if (selfChanged) then blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
+  for cx := -1 to 1 do begin
+    for cy := -1 to 1 do begin
+      delta := changes[cx,cy];
+      if delta = 0 then continue;
+      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
+      blockInfo[gy+cy, gx+cx].count += delta;
+      blockInfo[gy, gx].count -= delta;
+    end;
+  end;
 end;
 
 
@@ -457,7 +506,7 @@ procedure tTerrain.updateFalling();
 var
   gx,gy: integer;
 begin
-  for gy := 30-1 downto 0 do begin
+  for gy := 31-1 downto 1 do begin
     for gx := 0 to 32-1 do begin
       if blockInfo[gy, gx].count = 0 then continue;
       updateBlockFalling_REF(gx, gy, blockInfo, cellInfo);

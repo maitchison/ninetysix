@@ -358,7 +358,7 @@ begin
 
     {update ui}
     if elapsed > 0 then
-      fps.text := format('%f', [1/elapsed]);
+      fps.text := format('%f', [1/getTimer('main').avElapsed]);
 
     {stub:}
     //player1.process(elapsed);
