@@ -488,8 +488,6 @@ begin
           stats.copyRegions += 1;
         end;
       end;
-      // todo: clear flip bit but not clearBit
-      //fillchar(flipLines, sizeof(flipLines), 0);
     end;
     else fatal('Invalid copy mode');
   end;

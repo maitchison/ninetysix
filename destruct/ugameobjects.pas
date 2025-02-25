@@ -251,11 +251,8 @@ procedure tParticle.update(elapsed: single);
 begin
   inherited update(elapsed);
   col.a := clamp(round(255*(1-(age/ttl))), 0, 255);
-  if solid and terrain.isSolid(xPos, yPos) then begin
-    pos -= vel * elapsed;
-    vel.x := -vel.x * 0.8;
-    vel.y := -vel.y * 0.8;
-  end;
+  if solid and terrain.isSolid(xPos, yPos) then
+    markForRemoval();
 end;
 
 procedure tParticle.draw(screen: tScreen);
