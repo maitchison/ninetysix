@@ -64,6 +64,7 @@ end;
 procedure masterGFX();
 begin
   convertPNG('title');
+  convertPNG('template');
   convertPNG('sprites');
   convertPNG('netfont1');
   convertPNG('netfont2');

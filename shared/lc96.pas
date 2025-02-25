@@ -494,8 +494,6 @@ begin
 
   if (page.width <= 0) or (page.height <= 0) then
     fatal('Invalid page dims');
-  if (not page.bpp in [24,32]) then
-    fatal('Invalid page bits-per-pixel');
 
   if not assigned(s) then
     s := tMemoryStream.Create();

@@ -102,9 +102,8 @@ begin
 
   result.Width := InfoHeader.Width;
   result.Height := InfoHeader.Height;
-  result.BPP := InfoHeader.BitsPerPixel;
 
-  BytesPerPixel := result.BPP div 8;
+  BytesPerPixel := InfoHeader.BitsPerPixel div 8;
   LineWidth := result.Width * BytesPerPixel;
   while LineWidth mod 4 <> 0 do
     inc(LineWidth);
@@ -120,7 +119,7 @@ begin
     BlockRead(F, LineData[0], LineWidth, BytesRead);
     for x := 0 to result.Width-1 do begin
       {ignore alpha for the moment}
-      case Result.BPP of
+      case InfoHeader.BitsPerPixel of
         8:
           {assume 8bit is monochrome}
           c.init(LineData[x], LineData[x], LineData[x], 255);
@@ -129,7 +128,7 @@ begin
         32:
           c.init(LineData[x*4+2], LineData[x*4+1], LineData[x*4+0], LineData[x*4+3]);
         else
-          fatal('Invalid Bitmap depth '+IntToStr(Result.BPP));
+          fatal('Invalid Bitmap depth '+IntToStr(InfoHeader.BitsPerPixel));
       end;
       result.PutPixel(x, y, c);
     end;
@@ -137,8 +136,6 @@ begin
 
   Close(F);
 
-  {todo: don't store bitmap depth in result.bpp}
-  result.BPP := 32;
 end;
 
 {----------------------------------------------}

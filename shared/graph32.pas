@@ -27,7 +27,6 @@ type
     class function Random(): RGBA; static;
     class function Lerp(a,b: RGBA; factor: single): RGBA; static;
 
-
     class operator add(a,b: RGBA): RGBA;
     class operator multiply(a: RGBA; b: single): RGBA;
     class operator equal(a,b: RGBA): boolean;
@@ -47,6 +46,7 @@ type
     function to16_(): uint16;
     function to12(): uint16;
     function to12_(): uint16;
+    function lumance(): byte;
 
   end;
 
@@ -79,14 +79,15 @@ const
 
 type
 
+  {page using 32bit RGBA color}
   tPage = class(tResource)
-    width, height, bpp: Word;
+    width, height: Word;
     isRef: boolean;
     pixels: pointer;
     defaultColor: RGBA;
 
-    destructor  destroy(); override;
     constructor create(); overload;
+    destructor  destroy(); override;
     constructor create(AWidth, AHeight: word); overload;
     constructor createAsReference(AWidth, AHeight: word;PixelData: Pointer);
 
@@ -112,6 +113,17 @@ type
     function  checkForAlpha: boolean;
 
     class function Load(filename: string): tPage;
+  end;
+
+  {page stored as 8bit lumance}
+  tPage8 = class(tResource)
+    width, height: Word;
+    pixels: pointer;
+    constructor create(); overload;
+    destructor  destroy(); override;
+    constructor create(AWidth, AHeight: word); overload;
+    procedure   putPixel(x, y: integer;v: byte);
+    class function Load(filename: string): tPage8;
   end;
 
   tImageLoaderProc = function(filename: string): tPage;
@@ -300,6 +312,11 @@ begin
   b := clamp(round(linear(b) * 255), 0, 255);
 end;
 
+function RGBA.lumance: byte; inline;
+begin
+  result := (int16(r)+int16(g)+int16(b)) div 3;
+end;
+
 procedure RGBA.toSRGB();
 begin
   r := SRGB(r/255.0);
@@ -413,7 +430,6 @@ begin
   inherited create();
   self.width := 0;
   self.height := 0;
-  self.bpp := 0;
   self.pixels := nil;
   self.defaultColor := ERR_COL;
   self.isRef := false;
@@ -424,7 +440,6 @@ begin
   create();
   self.width := AWidth;
   self.height := AHeight;
-  self.bpp := 32;
   self.pixels := getMem(AWidth * AHeight * 4);
   self.clear(RGBA.Create(0,0,0));
 end;
@@ -435,7 +450,6 @@ begin
   create();
   self.width := AWidth;
   self.height := AHeight;
-  self.bpp := 32;
   self.pixels := PixelData;
   self.isRef := true;
 end;
@@ -447,7 +461,6 @@ begin
   self.pixels := nil;
   self.width := 0;
   self.height := 0;
-  self.bpp := 0;
   self.isRef := false;
   inherited destroy();
 end;
@@ -841,7 +854,6 @@ begin
   result := tPage.create();
   result.width := self.width;
   result.height := self.height;
-  result.bpp := self.bpp;
   result.pixels := getMem(self.width*self.height*4);
   result.isRef := false;
   result.defaultColor := self.defaultColor;
@@ -851,7 +863,6 @@ end;
 {make a copy of page using RGBA}
 function tPage.asBytes: tBytes;
 begin
-  if BPP <> 32 then fatal('As bytes only supports BPP=32bit');
   result := nil;
   setLength(result, width*height*4);
   move(pixels^, result[0], width*height*4);
@@ -862,7 +873,6 @@ function tPage.asRGBBytes: tBytes;
 var
   i: int32;
 begin
-  if BPP <> 32 then fatal('As bytes only supports BPP=32bit');
   result := nil;
   setLength(result, width*height*3);
   for i := 0 to width*height-1 do begin
@@ -955,6 +965,46 @@ end;
 
 {-------------------------------------------------}
 
+constructor tPage8.create();
+begin
+  inherited create();
+  self.width := 0;
+  self.height := 0;
+  self.pixels := nil;
+end;
+
+destructor tPage8.destroy();
+begin
+  if assigned(pixels) then freeAndNil(pixels);
+end;
+
+constructor tPage8.create(aWidth, aHeight: word);
+begin
+  create();
+  self.width := aWidth;
+  self.height := aHeight;
+  self.pixels := getMem(aWidth * aHeight);
+end;
+
+procedure tPage8.putPixel(x, y: integer;v: byte);
+begin
+  pByte(pixels + (x+y*width))^ := v;
+end;
+
+class function tPage8.Load(filename: string): tPage8;
+var
+  page: tPage;
+  x,y: integer;
+begin
+  page := tPage.load(filename);
+  result := tPage8.create(page.width, page.height);
+  for y := 0 to page.height-1 do
+    for x := 0 to page.width-1 do
+      result.putPixel(x, y, page.getPixel(x,y).lumance);
+end;
+
+{-------------------------------------------------}
+
 procedure makePageRandom(page: tPage);
 var
   x,y: int32;
@@ -978,9 +1028,6 @@ begin
 
   if (a.width <> b.width) or (a.height <> b.height) then
     assertError(Format('Images differ in their dimensions, expected (%d,%d) but found (%d,%d)', [a.width, a.height, b.width, b.height]));
-  if a.bpp <> b.bpp then begin
-    assertError(Format('Images differ in their bits per pixel, expected %d but found %d', [a.bpp, b.bpp]));
-  end;
   for y := 0 to a.height-1 do
     for x := 0 to a.width-1 do
       assertEqual(a.getPixel(x,y), b.getPixel(x,y), format('at %d,%d ',[x, y]));
