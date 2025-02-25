@@ -28,12 +28,16 @@ type
     1: (code: word);
   end;
 
+  tCellAttributes = record
+    x,y,vx,vy: int8;
+  end;
+
   {optimized for MMX reads, also is 32bytes so fits into a cache line.}
   tTerrainLine = packed record
-    x: array[0..7] of byte;
-    y: array[0..7] of byte;
-    vx: array[0..7] of byte;
-    vy: array[0..7] of byte;
+    x: array[0..7] of int8;
+    y: array[0..7] of int8;
+    vx: array[0..7] of int8;
+    vy: array[0..7] of int8;
   end;
 
   tBlockInfo = record
@@ -72,6 +76,10 @@ type
     procedure setCell(x,y: integer; cell: tCellInfo); inline;
     function  isEmpty(x, y: integer): boolean; inline;
     function  isSolid(x, y: integer): boolean; inline;
+
+    {attributes}
+    function  getAttr(x,y: integer): tCellAttributes; inline;
+    procedure setAttr(x,y: integer; attr: tCellAttributes); inline;
 
     procedure putCircle(atX,atY: integer;r: integer; dType: tDirtType=DT_DIRT);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
@@ -171,6 +179,22 @@ begin
   end;
 end;
 
+function tTerrain.getAttr(x,y: integer): tCellAttributes; inline;
+begin
+  result.x := cellAttr[y, x div 8].x[x and $7];
+  result.y := cellAttr[y, x div 8].y[x and $7];
+  result.vx := cellAttr[y, x div 8].vx[x and $7];
+  result.vy := cellAttr[y, x div 8].vy[x and $7];
+end;
+
+procedure tTerrain.setAttr(x,y: integer; attr: tCellAttributes); inline;
+begin
+  cellAttr[y, x div 8].x[x and $7] := attr.x;
+  cellAttr[y, x div 8].y[x and $7] := attr.y;
+  cellAttr[y, x div 8].vx[x and $7] := attr.vx;
+  cellAttr[y, x div 8].vy[x and $7] := attr.vy;
+end;
+
 {removes terrain in given radius, and burns edges}
 procedure tTerrain.burn(atX,atY: integer;r: integer;power:integer=255);
 var
@@ -231,6 +255,7 @@ var
   dimFactor: integer;
   c: RGBA;
   cell: tCellInfo;
+  attr: tCellAttributes;
 begin
   if r <= 0 then exit;
   r2 := r*r;
@@ -244,6 +269,11 @@ begin
       cell.dType := dType;
       cell.strength := 128+rnd(16);
       setCell(x, y, cell);
+      attr.x := 0;
+      attr.y := 0;
+      attr.vx := clamp(dx*4, -100, 100);
+      attr.vy := clamp(dy*4, -100, 100);
+      setAttr(x, y, attr);
     end;
   end;
 end;
@@ -577,9 +607,7 @@ begin
       px := cellAttr[y, x div 8].x[x and $7];
       py := cellAttr[y, x div 8].y[x and $7];
       {gravity}
-      if hasSupport then
-        vy := 0
-      else
+      if not hasSupport then
         vy := clamp(vy + 3, -120, 120);
       cellAttr[y, x div 8].vy[x and $7] := vy;
       {move particle}
@@ -591,8 +619,8 @@ begin
       cellAttr[y, x div 8].y[x and $7] := int8(byte(word(py) and $ff));
       if (dx <> 0) or (dy <> 0) then begin
         if not checkAndMove(dx, dy) then begin
-          if dx <> 0 then cellAttr[y, x div 8].vx[x and $7] := 0;
-          if dy <> 0 then cellAttr[y, x div 8].vy[x and $7] := 0;
+          if dx <> 0 then cellAttr[y, x div 8].vx[x and $7] := vx div 2;
+          if dy <> 0 then cellAttr[y, x div 8].vy[x and $7] := vy div 2;
         end;
       end;
     end;
