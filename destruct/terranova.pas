@@ -163,7 +163,11 @@ end;
 
 function tTerrain.isSolid(x, y: integer): boolean; inline;
 begin
-  result := getCell(x, y).dType <> DT_EMPTY;
+  case getCell(x, y).dType of
+    DT_EMPTY,
+    DT_WATER: exit(false);
+    else exit(true);
+  end;
 end;
 
 {removes terrain in given radius, and burns edges}
@@ -235,7 +239,7 @@ begin
       y := atY+dy;
       dst2 := (dx*dx)+(dy*dy);
       if (dst2 > r2) then continue;
-      if not isEmpty(x, y) then continue;
+      if isSolid(x, y) then continue;
       cell.dType := dType;
       cell.strength := 128+rnd(16);
       setCell(x, y, cell);
@@ -451,7 +455,8 @@ var
   function checkAndMove(dx,dy: integer): boolean; inline;
   begin
     {todo: no bounds checking..}
-    if (x+dx < 0) or (y+dy < 0) or (x+dx>255) or (y+dy>255) then exit(false);
+    if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
+    if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
     result := cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
     if result then doMove(dx,dy);
   end;

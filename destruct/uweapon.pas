@@ -217,10 +217,8 @@ begin
   end;
 
   {check if we collided with terrain}
-  if terrain.isSolid(xPos, yPos) then begin
+  if terrain.isSolid(xPos, yPos) then
     hit(nil);
-    exit;
-  end;
 end;
 
 procedure tProjectile.draw(screen: tScreen);
