@@ -44,7 +44,6 @@ type
 
   tBlockInfo = record
     status: byte;
-    count: byte;
   end;
 
   tCellMovedArray = array[0..256-1, 0..32-1] of byte;
@@ -164,10 +163,8 @@ var
   bi: ^tBlockInfo;
 begin
   if (x < 0) or (x > 255) or (y < 0) or (y > 255) then exit;
-  if cellInfo[y, x].dType <> DT_EMPTY then dec(blockInfo[y div 8, x div 8].count);
   cellInfo[y, x] := cell;
   bi := @blockInfo[y div 8, x div 8];
-  if cell.dType <> DT_EMPTY then inc(bi^.count);
   {set DIRTY clear INACTIVE}
   {todo: really we should to to active all blocks within 1 cell of this one}
   bi^.status := BS_DIRTY;
@@ -495,7 +492,7 @@ var
   end;
 
   {returns if cell is open}
-  function check(dx,dy: integer): boolean; inline;
+  function checkEmpty(dx,dy: integer): boolean; inline;
   begin
     {todo: no bounds checking..}
     if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
@@ -553,7 +550,7 @@ begin
 
           {ash and sparks}
           if (rnd = 0) then begin
-            if check(0, -1) then begin
+            if checkEmpty(0, -1) then begin
               {spark}
               p := nextParticle();
               p.pos.x := x;
@@ -631,8 +628,6 @@ begin
       terrain.blockInfo[gy+cy, gx+cx].status := terrain.blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
       if delta = 0 then continue;
       terrain.blockInfo[gy+cy, gx+cx].status := terrain.blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
-      terrain.blockInfo[gy+cy, gx+cx].count += delta;
-      terrain.blockInfo[gy, gx].count -= delta;
     end;
   end;
 end;
@@ -741,8 +736,6 @@ begin
       blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
       if delta = 0 then continue;
       blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
-      blockInfo[gy+cy, gx+cx].count += delta;
-      blockInfo[gy, gx].count -= delta;
     end;
   end;
 end;
@@ -762,7 +755,6 @@ begin
 
     for gy := 31-1 downto 1 do begin
       for gx := 1 to 31-1 do begin
-        //if blockInfo[gy, gx].count = 0 then continue;
         if ((blockInfo[gy, gx].status and BS_INACTIVE) <> 0) then continue;
         if ((blockInfo[gy, gx].status and BS_LOWP) <> 0) and (tick and $3 <> 0) then continue;
         case solver of
