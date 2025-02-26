@@ -63,7 +63,7 @@ begin
     templatePtr := template.getAddress(bounds.left-originX, y-originY);
     for x := bounds.left to bounds.right-1 do begin
       v := pByte(templatePtr)^ * col.a;
-      //if v = 0 then continue;
+      if v < 255 then continue;
       c := pRGBA(pagePtr)^;
       c.init(
         c.r + (dword(col.r*v) shr 16),
@@ -73,6 +73,107 @@ begin
       pRGBA(pagePtr)^ := c;
       inc(pagePtr, 4);
       inc(templatePtr);
+    end;
+  end;
+end;
+
+procedure drawTemplateAdd_ASM(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA);
+var
+  x,y: integer;
+  c: RGBA;
+  v: word;
+  templatePtr, pagePtr: pointer;
+  width,height: integer;
+  len, alpha: byte;
+begin
+  {for centering we have all images stored with 1 pixel padding on lower right
+   i.e. a 3x3 template would be 4x4
+
+   ***-
+   ***-
+   ***-
+   ----
+  }
+  templatePtr := template.pixels;
+
+  for y := bounds.top to bounds.bottom-1 do begin
+    pagePtr := dst.getAddress(bounds.left, y);
+    templatePtr := template.getAddress(bounds.left-originX, y-originY);
+
+    len := bounds.width;
+    alpha := col.a;
+
+    asm
+      pushad
+
+      xor ecx, ecx
+      mov cl, LEN
+      mov ch, ALPHA     // ecx = 0 | 0 | a | len
+
+      mov esi, TEMPLATEPTR
+      mov edi, PAGEPTR
+
+    @XLOOP:
+
+      mov edx, COL      // edx = a | r | g | b
+
+      mov al, [esi]
+      mul ch            // ax = template.a * col.a
+      mov bl, ah        // bl = (template.a * col.a) div 256
+      test ah, ah
+      jz @SKIP
+
+    @MIX_B:
+      mov al, dl
+      mul bl
+      mov dl, ah
+      ror edx, 8        // save and store new value
+    @MIX_G:
+      mov al, dl
+      mul bl
+      mov dl, ah
+      ror edx, 8        // save and store new value
+    @MIX_R:
+      mov al, dl
+      mul bl
+      mov dl, ah
+      rol edx, 16       // save and restore the ARGB order
+
+      // edx is now c ARGB multiplied by alpha
+
+      mov eax, [edi]
+
+    @ADD_B:
+      add dl, al
+      jnc @SKIP_B
+      mov dl, 255
+    @SKIP_B:
+      ror edx, 8
+      ror eax, 8
+    @ADD_G:
+      add dl, al
+      jnc @SKIP_G
+      mov dl, 255
+    @SKIP_G:
+      ror edx, 8
+      ror eax, 8
+    @ADD_R:
+      add dl, al
+      jnc @SKIP_R
+      mov dl, 255
+    @SKIP_R:
+      rol edx, 16
+
+      mov [edi], edx
+
+    @SKIP:
+      inc esi
+      add edi,4
+
+      dec cl
+      jnz @XLOOP
+
+      popad
     end;
   end;
 end;
@@ -115,6 +216,8 @@ var
   xPos, yPos: integer;
   bounds: tRect;
 begin
+
+  if (col.a = 0) then exit;
 
   template := mipMaps[size];
 

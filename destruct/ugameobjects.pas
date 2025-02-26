@@ -263,7 +263,7 @@ begin
 
   //stub:
 
-  r := particleTemplate.drawAdd(screen.canvas, 32+xPos, yPos, 1, col);
+  r := particleTemplate.drawAdd(screen.canvas, 32+xPos, yPos, 4, col);
   screen.markRegion(r);
                        {
   if radius = 1 then begin
