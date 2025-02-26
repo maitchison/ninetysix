@@ -52,7 +52,8 @@ type
     weaponIdx: integer;
   protected
     procedure updateAnimation();
-    procedure updateFalling(elapsed:single);
+    procedure updateTankCollision(elapsed:single);
+    procedure updateHeliCollision(elapsed:single);
   public
     function  weapon: tWeaponSpec;
     procedure init(aPos: tPoint; aTeam: tTeam; aChassisType: tChassisType);
@@ -257,10 +258,10 @@ begin
   );
 end;
 
-procedure tTank.updateFalling(elapsed: single);
+procedure tTank.updateTankCollision(elapsed: single);
 var
   support: integer;
-  i, x, y, xlp: integer;
+  i, x, y, xlp, ylp: integer;
   bounds: tRect;
   hitPower: integer;
   p: tParticle;
@@ -269,7 +270,6 @@ begin
 
   support := 0;
   bounds := Rect(xPos-8, yPos-8, 16, 16);
-  if chassis.animationType = AT_HELI then fallSpeed := GRAVITY/4 else fallSpeed := GRAVITY;
 
   {todo: these insets should not be hard coded, better to check pixels of
    texture, or maybe specify as part of the tank}
@@ -278,30 +278,73 @@ begin
       screen.canvas.putPixel(xlp, bounds.bottom-3, RGB(255,0,255));
     if terrain.isSolid(xlp, bounds.bottom-3) then inc(support);
   end;
-  if support = 0 then
-    vel.y += fallSpeed * elapsed
-  else begin
-    if vel.y > 0 then begin
-      hitPower := round(10*vel.y);
-      {weaken blocks holding us up}
-      y := bounds.bottom;
-      for x := bounds.left+3 to bounds.right-3 do begin
-        {make a little cloud}
-        for i := 1 to 3 do begin
-          p := nextParticle();
-          p.pos := V2(x, y);
-          p.vel := V2(rnd-128, rnd-128) * 0.2;
-          p.solid := true;
-          //p.col := terrain.dirtColor.getPixel(x, y);
-          //if p.col.a = 0 then p.col := RGB(200,200,200);
-          p.col := RGB(200,200,200);
-          p.ttl := 0.5;
-          p.radius := 2;
-        end;
-        {burn it}
-        terrain.burn(x, bounds.bottom-3, 2, round(hitPower/support/16));
+
+  if support = 0 then begin
+    vel.y += GRAVITY * elapsed;
+    exit;
+  end;
+
+  {falling...}
+  if vel.y > 0 then begin
+    hitPower := round(10*vel.y);
+    {weaken blocks holding us up}
+    y := bounds.bottom;
+    for x := bounds.left+3 to bounds.right-3 do begin
+      {make a little cloud}
+      for i := 1 to 1 do begin
+        p := nextParticle();
+        p.pos := V2(x, y);
+        p.vel := V2(rnd-128, rnd-128) * 0.2;
+        p.solid := true;
+        //p.col := terrain.dirtColor.getPixel(x, y);
+        //if p.col.a = 0 then p.col := RGB(200,200,200);
+        p.col := RGB(128,128,128);
+        p.ttl := 0.25;
+        p.radius := 1;
       end;
-      vel.y := 0;
+      {burn it}
+      terrain.burn(x, bounds.bottom-3, 2, round(hitPower/support/16));
+    end;
+    vel.y := 0;
+  end;
+end;
+
+procedure tTank.updateHeliCollision(elapsed: single);
+var
+  support: integer;
+  i, x, y, xlp, ylp: integer;
+  bounds: tRect;
+  hitPower: integer;
+  p: tParticle;
+  dx,dy: integer;
+  delta: V2D;
+begin
+
+  support := 0;
+  bounds := Rect(xPos-8, yPos-8, 16, 16);
+
+  {always falling a little bit}
+  vel.y += (GRAVITY/4) * elapsed;
+
+  {heli needs a full check}
+  {todo could be faster if we trim the bounds to sprite}
+  for ylp := bounds.top+3 to bounds.bottom-3 do begin
+    for xlp := bounds.left+3 to bounds.right-3 do begin
+      if (getWorldPixel(xlp, ylp).a > 0) and (terrain.isSolid(xlp, ylp)) then begin
+        {bump}
+        delta := V2(xlp - xPos, ylp - yPos) * 0.5;
+        vel -= delta;
+
+        {create cloud}
+        p := nextParticle();
+        p.pos := V2(xlp, ylp);
+        p.vel := V2(rnd-128, rnd-128) * 0.1;
+        p.vel -= delta;
+        p.solid := false;
+        p.col := RGB(128,128,128);
+        p.ttl := 0.25;
+        p.radius := 1;
+      end;
     end;
   end;
 end;
@@ -328,8 +371,11 @@ begin
   if cooldown > 0 then cooldown -= elapsed;
 
   updateAnimation();
-  updateFalling(elapsed);
-
+  case chassis.animationType of
+    AT_NONE: ;
+    AT_TANK: updateTankCollision(elapsed);
+    AT_HELI: updateHeliCollision(elapsed);
+  end;
 end;
 
 {---------------}
@@ -439,7 +485,7 @@ begin
       }
       vel *= 0.95;
 
-      if yAction < 0 then speed := 500 else speed := 1000;
+      if yAction < 0 then speed := 750 else speed := 1000;
       vel.y -= yAction * speed * elapsed;
       vel.x += xAction * 750 * elapsed;
 
