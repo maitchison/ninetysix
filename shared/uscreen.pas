@@ -398,6 +398,8 @@ var
 begin
   rect.clipTo(bounds);
 
+  if (rect.width <= 0) or (rect.height <= 0) then exit;
+
   x1 := rect.x div 8;
   y1 := rect.y div 8;
   x2 := (rect.right-1) div 8;
