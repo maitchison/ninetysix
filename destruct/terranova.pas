@@ -15,6 +15,7 @@ uses
 const
   BS_INACTIVE = 1;   // no updates required as no cells can move
   BS_DIRTY = 2;      // must redraw this block as it's changed
+  BS_LOWP = 4;       // update every 4th tick (if active)
 
 type
 
@@ -63,7 +64,7 @@ type
     cellMoved: tCellMovedArray;
     solver: tTerrainSolver;
     timeUntilNextSolve: single;
-
+    tick: dword;
   public
 
     sky: tPage;
@@ -350,10 +351,12 @@ var
     bi := blockInfo[gy, gx];
     {red = dirty}
     {blue = inactive}
-    if (bi.status and BS_DIRTY = BS_DIRTY) then
+    if (bi.status and BS_DIRTY <> 0) then
       c.r := 255;
-    if (bi.status and BS_INACTIVE = BS_INACTIVE) then
+    if (bi.status and BS_INACTIVE <> 0) then
       c.b := 255;
+    if (bi.status and BS_LOWP <> 0) then
+      c.g := 255;
     screen.canvas.drawRect(r, c);
     screen.markRegion(r);
   end;
@@ -462,16 +465,18 @@ var
   px,py: integer;
   empty, cell: tCellInfo;
   selfChanged: boolean;
+  selfNeedsLowP: boolean;
   changes: array[-1..1, -1..1] of int8;
   delta: integer;
   cx,cy: integer;
   coin: integer;
   p: tParticle;
   heatLost: integer;
+  oldChanged: boolean;
 
   procedure doMove(dx,dy: integer); inline;
   begin
-    selfChanged := true;
+    if (cell.dType <> DT_LAVA) then selfChanged := true;
     if (j+dx < 0) then cx := -1 else if (j+dx >= 8) then cx := +1 else cx := 0;
     if ((7-i)+dy < 0) then cy := -1 else if ((7-i)+dy >= 8) then cy := +1 else cy := 0;
     inc(changes[cx,cy]);
@@ -513,6 +518,7 @@ begin
   empty.code := 0;
   fillchar(changes, sizeof(changes), 0);
   selfChanged := false;
+  selfNeedsLowP := false;
   for i := 0 to 7 do begin
     y := gy*8+(7-i);
     for j := 0 to 7 do begin
@@ -540,9 +546,10 @@ begin
         end;
         DT_LAVA: begin
           {lava always keeps block active}
-          selfChanged := true;
+          selfNeedsLowP := true;
+
           {lava moves and updates very slowly}
-          if rnd and $2 <> 0 then continue;
+          if (terrain.tick and $3 <> 0) then continue;
 
           {ash and sparks}
           if (rnd = 0) then begin
@@ -602,10 +609,17 @@ begin
       end;
     end;
   end;
+
   {keep track of block stats}
+  terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status and (not BS_LOWP);
   if (not selfChanged) then begin
-    terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status or BS_INACTIVE;
-    exit;
+    {if nothing moved then we sleep the block. if there's lava go into lowPriotiy mode instead}
+    if selfNeedsLowP then begin
+      terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status or (BS_LOWP and BS_DIRTY);
+    end else begin
+      terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status or BS_INACTIVE;
+      exit;
+    end;
   end;
 
   terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status or BS_DIRTY;
@@ -744,10 +758,13 @@ begin
     if solver = TS_PARTICLE then
       fillchar(cellMoved, sizeof(cellMoved), 0);
 
+    inc(tick);
+
     for gy := 31-1 downto 1 do begin
       for gx := 1 to 31-1 do begin
         //if blockInfo[gy, gx].count = 0 then continue;
-        if (blockInfo[gy, gx].status and BS_INACTIVE) = BS_INACTIVE then continue;
+        if ((blockInfo[gy, gx].status and BS_INACTIVE) <> 0) then continue;
+        if ((blockInfo[gy, gx].status and BS_LOWP) <> 0) and (tick and $3 <> 0) then continue;
         case solver of
           TS_STATIC: ;
           TS_FALLING: updateBlockFalling_REF(gx, gy, self);
