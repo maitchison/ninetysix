@@ -3,7 +3,8 @@ unit uGameObjects;
 interface
 
 uses
-  {$i units};
+  {$i units},
+  template;
 
 type
 
@@ -60,6 +61,7 @@ type
   public
     solid: boolean;
     burn: integer;
+    blend: tTemplateDrawMode;
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
@@ -72,7 +74,7 @@ var
 implementation
 
 uses
-  uTank, uWeapon, terraNova, fx, game, template, res;
+  uTank, uWeapon, terraNova, fx, game, res;
 
 {----------------------------------------------------------}
 { tGameObjects }
@@ -247,6 +249,7 @@ begin
   col := RGB(255,0,0);
   solid := false;
   burn := 3;
+  blend := TDM_BLEND;
 end;
 
 procedure tParticle.update(elapsed: single);
@@ -271,12 +274,13 @@ var
 begin
   if radius <= 0 then exit;
 
-  {
-  // faster for radius=1, but performs blend instead of add / sub
-  screen.canvas.putPixel(32+xPos, yPos, col);
-  screen.markPixel(32+xPos, yPos);
-  }
-  r := particleTemplate.draw(screen.canvas, 32+xPos, yPos, radius-1, col, TDM_SUB);
+  // faster special case for radius=1
+  if (radius = 1) and (blend = TDM_BLEND) then begin
+    screen.canvas.putPixel(32+xPos, yPos, col);
+    screen.markPixel(32+xPos, yPos);
+    exit;
+  end;
+  r := particleTemplate.draw(screen.canvas, 32+xPos, yPos, radius-1, col, blend);
   screen.markRegion(r);
 end;
 

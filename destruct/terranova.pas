@@ -9,15 +9,16 @@ Every pixel is a particle, that can moves and collide
 uses
   test, debug,
   utils,
+  template,
   graph2d, graph32, uScreen;
 
 const
   BS_INACTIVE = 1;   // no updates required as no cells can move
-  BS_DIRTY = 2;    // must redraw this block as it's changed
+  BS_DIRTY = 2;      // must redraw this block as it's changed
 
 type
 
-  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER, DT_LAVA, DT_OBSIDIAN);
 
   tCellInfo = record
     case byte of
@@ -94,6 +95,8 @@ type
 implementation
 
 uses
+  uGameObjects,
+  game,
   keyboard; {for debugging}
 
 const
@@ -104,7 +107,9 @@ const
     3, //sand
     2, //rock
     32,//grass
-    0  //water
+    0, //water
+    0, //lava
+    1  //obsidian
   );
 
   TERRAIN_COLOR: array[tDirtType] of RGBA = (
@@ -113,7 +118,9 @@ const
     (b:$99; g:$e5; r:$ff; a: $ff), //sand
     (b:$44; g:$44; r:$44; a: $ff), //rock
     (b:$5d; g:$80; r:$0d; a: $ff), //grass
-    (b:$fd; g:$30; r:$2d; a: $ff)  //water
+    (b:$fd; g:$30; r:$2d; a: $ff), //water
+    (b:$04; g:$08; r:$ad; a: $ff), //lava
+    (b:$6e; g:$40; r:$39; a: $ff)  //obsidian
   );
 
 var
@@ -172,11 +179,7 @@ end;
 
 function tTerrain.isSolid(x, y: integer): boolean; inline;
 begin
-  case getCell(x, y).dType of
-    DT_EMPTY,
-    DT_WATER: exit(false);
-    else exit(true);
-  end;
+  result := TERRAIN_DECAY[getCell(x, y).dType] <> 0;
 end;
 
 function tTerrain.getAttr(x,y: integer): tCellAttributes; inline;
@@ -452,7 +455,7 @@ begin
   end;
 end;
 
-procedure updateBlockFalling_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray);
+procedure updateBlockFalling_REF(gx,gy: integer; terrain: tTerrain);
 var
   i,j,x,y: integer;
   idx: integer;
@@ -463,6 +466,8 @@ var
   delta: integer;
   cx,cy: integer;
   coin: integer;
+  p: tParticle;
+  heatLost: integer;
 
   procedure doMove(dx,dy: integer); inline;
   begin
@@ -470,17 +475,38 @@ var
     if (j+dx < 0) then cx := -1 else if (j+dx >= 8) then cx := +1 else cx := 0;
     if ((7-i)+dy < 0) then cy := -1 else if ((7-i)+dy >= 8) then cy := +1 else cy := 0;
     inc(changes[cx,cy]);
-    cellInfo[y+dy, x+dx] := cell;
-    cellInfo[y, x] := empty;
+    terrain.cellInfo[y+dy, x+dx] := cell;
+    terrain.cellInfo[y, x] := empty;
   end;
 
+  {returns if move completed}
   function checkAndMove(dx,dy: integer): boolean; inline;
   begin
     {todo: no bounds checking..}
     if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
     if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
-    result := cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
+    result := terrain.cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
     if result then doMove(dx,dy);
+  end;
+
+  {returns if cell is open}
+  function check(dx,dy: integer): boolean; inline;
+  begin
+    {todo: no bounds checking..}
+    if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
+    if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
+    result := terrain.cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
+  end;
+
+  {returns head transfered}
+  function doBurn(dx,dy: integer;burn: integer): integer; inline;
+  begin
+    {todo: no bounds checking..}
+    if (dword(x+dx) and $ffffff00) <> 0 then exit(0);
+    if (dword(y+dy) and $ffffff00) <> 0 then exit(0);
+    if (terrain.cellInfo[y+dy,x+dx].dtype in [DT_EMPTY, DT_LAVA, DT_OBSIDIAN]) then exit(0);
+    terrain.burn(x+dx, y+dy, 1, burn);
+    result := 1;
   end;
 
 begin
@@ -491,11 +517,11 @@ begin
     y := gy*8+(7-i);
     for j := 0 to 7 do begin
       x := gx*8+j;
-      cell := cellInfo[y,x];
+      cell := terrain.cellInfo[y,x];
       case cell.dtype of
         DT_EMPTY: ;
         DT_ROCK: ;
-        DT_DIRT: begin
+        DT_DIRT, DT_OBSIDIAN: begin
           checkAndMove(0,1);
         end;
         DT_SAND: begin
@@ -512,26 +538,87 @@ begin
           if checkAndMove(coin,0) then continue;
           if checkAndMove(-coin,0) then continue;
         end;
+        DT_LAVA: begin
+          {lava always keeps block active}
+          selfChanged := true;
+          {lava moves and updates very slowly}
+          if rnd and $2 <> 0 then continue;
+
+          {ash and sparks}
+          if (rnd = 0) then begin
+            if check(0, -1) then begin
+              {spark}
+              p := nextParticle();
+              p.pos.x := x;
+              p.pos.y := y;
+              p.solid := false;
+              p.col.init(200,100,2);
+              p.vel.x := (rnd-128) div 16;
+              p.vel.y := (rnd div 16)-12;
+              p.blend := TDM_ADD;
+              p.radius := 1;
+              p.ttl := 0.5;
+            end else if (rnd and $7 = 0) then begin
+              {ash}
+              p := nextParticle();
+              p.pos.x := x;
+              p.pos.y := y;
+              p.solid := false;
+              p.col.init(50-rnd(32),100-rnd(64),100-rnd(32));
+              p.vel.x := (rnd div 16)-8;
+              p.vel.y := (rnd div 16)-8;
+              p.blend := TDM_SUB;
+              p.radius := 1;
+              p.ttl := 0.5;
+            end
+          end;
+
+          {burn neighbours}
+          heatLost := 0;
+          heatLost += doBurn(0, 1, 1);
+          heatLost += doBurn(-1, 1, 1);
+          heatLost += doBurn(+1, 1, 1);
+          heatLost += doBurn(-1, 0, 1);
+          heatLost += doBurn(+1, 0, 1);
+
+          {update heat}
+          if terrain.cellInfo[y,x].strength <= heatLost then begin
+            {replace with stone}
+            terrain.cellInfo[y,x].strength := 200+rnd(40);
+            terrain.cellInfo[y,x].dType := DT_OBSIDIAN;
+            continue;
+          end else begin
+            terrain.cellInfo[y,x].strength -= heatLost;
+          end;
+
+          {move}
+          coin := (rnd and $2) * 2 - 1;
+          if checkAndMove(0,1) then continue;
+          if checkAndMove(coin,1) then continue;
+          if checkAndMove(-coin,1) then continue;
+          if checkAndMove(coin,0) then continue;
+          if checkAndMove(-coin,0) then continue;
+        end;
       end;
     end;
   end;
   {keep track of block stats}
   if (not selfChanged) then begin
-    blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_INACTIVE;
+    terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status or BS_INACTIVE;
     exit;
   end;
 
-  blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
+  terrain.blockInfo[gy, gx].status := terrain.blockInfo[gy, gx].status or BS_DIRTY;
 
   for cx := -1 to 1 do begin
     for cy := -1 to 1 do begin
       delta := changes[cx,cy];
       // let all neighbours know to check themselves
-      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
+      terrain.blockInfo[gy+cy, gx+cx].status := terrain.blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
       if delta = 0 then continue;
-      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
-      blockInfo[gy+cy, gx+cx].count += delta;
-      blockInfo[gy, gx].count -= delta;
+      terrain.blockInfo[gy+cy, gx+cx].status := terrain.blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
+      terrain.blockInfo[gy+cy, gx+cx].count += delta;
+      terrain.blockInfo[gy, gx].count -= delta;
     end;
   end;
 end;
@@ -658,12 +745,12 @@ begin
       fillchar(cellMoved, sizeof(cellMoved), 0);
 
     for gy := 31-1 downto 1 do begin
-      for gx := 0 to 32-1 do begin
+      for gx := 1 to 31-1 do begin
         //if blockInfo[gy, gx].count = 0 then continue;
         if (blockInfo[gy, gx].status and BS_INACTIVE) = BS_INACTIVE then continue;
         case solver of
           TS_STATIC: ;
-          TS_FALLING: updateBlockFalling_REF(gx, gy, blockInfo, cellInfo);
+          TS_FALLING: updateBlockFalling_REF(gx, gy, self);
           TS_PARTICLE: updateBlockParticle_REF(gx, gy, blockInfo, cellInfo, cellAttr, cellMoved);
         end;
       end;
