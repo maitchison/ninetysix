@@ -317,13 +317,13 @@ begin
     tank.status := GO_EMPTY;
   end;
 
-  tanks[0].init(findNewTankPosition(1), 1, CT_TANK);
-  tanks[1].init(findNewTankPosition(1), 1, CT_LAUNCHER);
-  tanks[2].init(findNewTankPosition(1), 1, CT_HEAVY);
+  tanks[0].init(findNewTankPosition(1), TEAM_1, CT_TANK);
+  tanks[1].init(findNewTankPosition(1), TEAM_1, CT_LAUNCHER);
+  tanks[2].init(findNewTankPosition(1), TEAM_1, CT_HEAVY);
 
-  tanks[5].init(findNewTankPosition(2), 2, CT_TANK);
-  tanks[6].init(findNewTankPosition(2), 2, CT_LAUNCHER);
-  tanks[7].init(findNewTankPosition(2), 2, CT_HEAVY);
+  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_TANK);
+  tanks[6].init(findNewTankPosition(2), TEAM_2, CT_LAUNCHER);
+  tanks[7].init(findNewTankPosition(2), TEAM_2, CT_HEAVY);
 
   for tank in tanks do
     if tank.isActive then tank.clearTerrain();

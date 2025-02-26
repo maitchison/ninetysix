@@ -21,18 +21,19 @@ type
     tag: string;
     cType: tChassisType;
     health: integer;
-    spriteIdx: integer;
+    baseSpriteIdx: integer;
     defaultWeapons: array of tWeaponType;
   end;
+
+  tTeam = (TEAM_1, TEAM_2);
 
   tTank = class(tGameObject)
   protected
     spriteSheet: tSpriteSheet;
-    spriteIdx: word;
     procedure fireProjectile();
     procedure fireLaser();
   public
-    team: integer;
+    team: tTeam;
     weapons: array of tWeaponSpec;
     chassis: tChassis;
     cooldown: single;
@@ -41,9 +42,11 @@ type
     health: integer;
     lastProjectile: tProjectile;
     weaponIdx: integer;
+  protected
+    procedure updateAnimation();
   public
     function  weapon: tWeaponSpec;
-    procedure init(aPos: tPoint; aTeam: integer; aChassisType: tChassisType);
+    procedure init(aPos: tPoint; aTeam: tTeam; aChassisType: tChassisType);
     function  isSelected: boolean;
     procedure clearTerrain();
     procedure applyChassis(aChassis: tChassis);
@@ -58,8 +61,8 @@ type
 
 const
   CHASSIS_DEF: array[tChassisType] of tChassis = (
-    (tag: 'Null';       cType: CT_NULL;     health: 0;   spriteIdx: 0; defaultWeapons: []),
-    (tag: 'Tank';       cType: CT_TANK;     health: 350; spriteIdx: 0;
+    (tag: 'Null';       cType: CT_NULL;     health: 0;   baseSpriteIdx: 0; defaultWeapons: []),
+    (tag: 'Tank';       cType: CT_TANK;     health: 350; baseSpriteIdx: 0;
       defaultWeapons: [
         tWeaponType.tracer,
         tWeaponType.blast,
@@ -67,13 +70,13 @@ const
         tWeaponType.largeDirt
       ]
     ),
-    (tag: 'Launcher';   cType: CT_LAUNCHER; health: 200; spriteIdx: 5;
+    (tag: 'Launcher';   cType: CT_LAUNCHER; health: 200; baseSpriteIdx: 5;
       defaultWeapons: [
         tWeaponType.microNuke,
         tWeaponType.miniNuke
       ];
     ),
-    (tag: 'Heavy Tank'; cType: CT_HEAVY;    health: 700; spriteIdx: 10;
+    (tag: 'Heavy Tank'; cType: CT_HEAVY;    health: 700; baseSpriteIdx: 10;
       defaultWeapons: [
         tWeaponType.blast,
         tWeaponType.megaBlast,
@@ -94,7 +97,7 @@ const
 
 {initializes tank to given chassis and team.
  yPosition defaults to ground level.}
-procedure tTank.init(aPos: tPoint; aTeam: integer; aChassisType: tChassisType);
+procedure tTank.init(aPos: tPoint; aTeam: tTeam; aChassisType: tChassisType);
 begin
   note('Initializing tank at position %s', [aPos.toString]);
   reset();
@@ -103,6 +106,23 @@ begin
   pos.y := aPos.y;
   team := aTeam;
   applyChassis(CHASSIS_DEF[aChassisType]);
+end;
+
+{selects corect sprite for tank}
+procedure tTank.updateAnimation();
+var
+  spriteIdx: integer;
+  angleFrame: integer;
+begin
+  spriteIdx := chassis.baseSpriteIdx;
+
+  {team}
+  if team = TEAM_2 then spriteIdx += 16;
+  {angle}
+  spriteIdx += clamp(round((90-abs(angle)) * 5 / 90), 0, 4);
+
+  sprite := spriteSheet.sprites[spriteIdx];
+
 end;
 
 function tTank.isSelected: boolean;
@@ -135,10 +155,10 @@ var
 begin
   self.chassis := aChassis;
   self.health := aChassis.health;
-  self.spriteIdx := aChassis.spriteIdx;
   setLength(self.weapons, length(aChassis.defaultWeapons));
   for i := 0 to length(aChassis.defaultWeapons)-1 do
     self.weapons[i] := WEAPON_SPEC[aChassis.defaultWeapons[i]];
+  self.updateAnimation();
 end;
 
 procedure tTank.reset();
@@ -147,7 +167,6 @@ begin
   weaponIdx := 0;
   angle := 0;
   power := 10;
-  spriteIdx := 0;
   health := 500;
   fillchar(chassis, sizeof(chassis), 0);
   col := RGB(255,255,255);
@@ -166,7 +185,7 @@ begin
 
   p := Point(xPos+32, yPos);
 
-  if angle < 0 then
+  if angle > 0 then
     r := sprite.drawFlipped(screen.canvas, p.x, p.y)
   else
     r := sprite.draw(screen.canvas, p.x, p.y);
@@ -203,7 +222,7 @@ begin
   if cooldown > 0 then cooldown -= elapsed;
 
   {animation}
-  sprite := spriteSheet.sprites[spriteIdx + clamp(round((90-abs(angle)) * 5 / 90), 0, 4)];
+  updateAnimation();
 
   bounds := rect(xPos-8, yPos-8, 16, 16);
 

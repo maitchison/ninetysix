@@ -44,7 +44,7 @@ function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
 
 procedure damagePlayers(x, y: integer; radius: integer; damage: integer;sender: tGameObject=nil);
-function  randomTank(aTeam: integer): tTank;
+function  randomTank(aTeam: tTeam): tTank;
 
 procedure screenDone();
 procedure screenInit();
@@ -108,7 +108,7 @@ begin
 end;
 
 {returns a random tank belonging to given team, or nil if there are none}
-function randomTank(aTeam: integer): tTank;
+function randomTank(aTeam: tTeam): tTank;
 var
   teamTanks: tIntList;
   i: integer;

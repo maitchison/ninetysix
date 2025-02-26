@@ -266,7 +266,7 @@ begin
   if not assigned(target) then begin
     note('Selecting new target');
     stateTimer := 0;
-    target := randomTank(2);
+    target := randomTank(TEAM_2);
 
     switchDelay := rnd(10);
 
