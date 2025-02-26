@@ -23,6 +23,9 @@ uses
   graph32;
 
 type
+
+  tTemplateDrawMode = (TDM_ADD, TDM_SUB);
+
   tTemplate = class(tResource)
     mipMaps: array of tPage8; // prescaled versions
     page: tPage8; // our base template;
@@ -32,7 +35,7 @@ type
     procedure   buildMipMaps();
     function    getValue(atX,atY,size: single): single;
 
-    function    drawAdd(dst: tPage; x,y: integer; size: word; col: RGBA): tRect;
+    function    draw(dst: tPage; x,y: integer; size: word; col: RGBA;mode: tTemplateDrawMode = TDM_ADD): tRect;
 
     class function Load(filename: string): tTemplate;
   end;
@@ -41,11 +44,11 @@ implementation
 
 {-------------------------------------------------------------------}
 
-procedure drawTemplateAdd_REF(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA);
+procedure drawTemplate_REF(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA;mode: tTemplateDrawMode);
 var
   x,y: integer;
   c: RGBA;
-  v: word;
+  v: int32;
   templatePtr, pagePtr: pointer;
   width,height: integer;
 begin
@@ -65,11 +68,13 @@ begin
     for x := bounds.left to bounds.right-1 do begin
       v := pByte(templatePtr)^ * col.a;
       if v < 255 then continue;
+      if mode = TDM_SUB then v := -v;
+
       c := pRGBA(pagePtr)^;
       c.init(
-        c.r + (dword(col.r*v) shr 16),
-        c.g + (dword(col.g*v) shr 16),
-        c.b + (dword(col.b*v) shr 16)
+        c.r + (v*col.r) div 65536,
+        c.g + (v*col.g) div 65536,
+        c.b + (v*col.b) div 65536
       );
       pRGBA(pagePtr)^ := c;
       inc(pagePtr, 4);
@@ -78,7 +83,7 @@ begin
   end;
 end;
 
-procedure drawTemplateAdd_ASM(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA);
+procedure drawTemplate_ASM(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA;mode: tTemplateDrawMode);
 var
   x,y: integer;
   c: RGBA;
@@ -87,14 +92,13 @@ var
   width,height: integer;
   len, alpha: byte;
 begin
-  {for centering we have all images stored with 1 pixel padding on lower right
-   i.e. a 3x3 template would be 4x4
 
-   ***-
-   ***-
-   ***-
-   ----
-  }
+  {todo: support sub blending mode}
+  if mode <> TDM_ADD then begin
+    drawTemplate_REF(dst, template, originX,originY, bounds, col, mode);
+    exit;
+  end;
+
   templatePtr := template.pixels;
 
   for y := bounds.top to bounds.bottom-1 do begin
@@ -179,7 +183,7 @@ begin
   end;
 end;
 
-procedure drawTemplateAdd_MMX(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA);
+procedure drawTemplate_MMX(dst: tPage; template: tPage8; originX,originY: integer; bounds: tRect; col: RGBA; mode: tTemplateDrawMode);
 var
   y: integer;
   templatePtr, pagePtr: pointer;
@@ -246,9 +250,11 @@ begin
 
     {if value is too low then skip it}
     {this actually makes things slower...}
-{    movd      eax, mm1
+    {
+    movd      eax, mm1
     test      ah, ah
-    jz        @SKIP}
+    jz        @SKIP
+    }
 
     {mm1 <- (col*template.a*col.a) div 65536}
     pmulhw    mm1, mm6
@@ -259,6 +265,7 @@ begin
     movd      mm2, [edi]
 
     {mm1 <- screen + template ARGB}
+  @PADD:
     paddusb   mm1, mm2
 
     {mm1 <- screen + template ARGB (as bytes, and saturated)}
@@ -276,7 +283,6 @@ begin
 
     dec ch
     jnz @YLOOP
-
 
     popad
     emms;
@@ -313,7 +319,7 @@ radius 2 =
   ***
    *
 }
-function tTemplate.drawAdd(dst: tPage; x,y: integer; size: word; col: RGBA): tRect;
+function tTemplate.draw(dst: tPage; x,y: integer; size: word; col: RGBA; mode: tTemplateDrawMode=TDM_ADD): tRect;
 var
   i: integer;
   width, height: integer;
@@ -339,11 +345,10 @@ begin
 
   if (bounds.width <= 0) or (bounds.height <= 0) then exit;
 
-  if cpuInfo.hasMMX then
-    drawTemplateAdd_MMX(dst, template, xPos, yPos, bounds, col)
-  else
-    drawTemplateAdd_ASM(dst, template, xPos, yPos, bounds, col);
-
+{  if cpuInfo.hasMMX then
+    drawTemplateAdd_MMX(dst, template, xPos, yPos, bounds, col, mode)
+  else}
+    drawTemplate_ASM(dst, template, xPos, yPos, bounds, col, mode);
 end;
 
 {returns the average value in a rect centered at x,y and of width size.

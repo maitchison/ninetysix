@@ -248,9 +248,18 @@ begin
 end;
 
 procedure tParticle.update(elapsed: single);
+var
+  factor: single;
 begin
   inherited update(elapsed);
-  col.a := clamp(round(255*(1-(age/ttl))), 0, 255);
+  factor := age/ttl;
+
+  // stub:
+  radius := 4;
+  col.r := 255; col.g := 255; col.b := 255;
+
+  col.a := clamp(round(255*(1-factor)), 0, 255);
+
   if solid and terrain.isSolid(xPos, yPos) then
     markForRemoval();
 end;
@@ -259,19 +268,15 @@ procedure tParticle.draw(screen: tScreen);
 var
   r: tRect;
 begin
-  {todo: implement template based particles}
+  if radius <= 0 then exit;
 
-  //stub:
-
-  r := particleTemplate.drawAdd(screen.canvas, 32+xPos, yPos, 4, col);
-  screen.markRegion(r);
-                       {
-  if radius = 1 then begin
-    screen.canvas.putPixel(32+xPos, yPos, col);
-    screen.markPixel(32+xPos, yPos);
-  end else
-    drawMarker(screen, xPos, yPos, col);
+  {
+  // faster for radius=1, but performs blend instead of add / sub
+  screen.canvas.putPixel(32+xPos, yPos, col);
+  screen.markPixel(32+xPos, yPos);
   }
+  r := particleTemplate.draw(screen.canvas, 32+xPos, yPos, radius-1, col, TDM_SUB);
+  screen.markRegion(r);
 end;
 
 begin
