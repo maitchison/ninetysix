@@ -545,8 +545,8 @@ begin
           {lava always keeps block active}
           selfNeedsLowP := true;
 
-          {lava moves and updates very slowly}
-          if (terrain.tick and $3 <> 0) then continue;
+          {lava moves and updates at half speed}
+          if (terrain.tick and $1 <> 0) then continue;
 
           {ash and sparks}
           if (rnd = 0) then begin
@@ -756,7 +756,7 @@ begin
     for gy := 31-1 downto 1 do begin
       for gx := 1 to 31-1 do begin
         if ((blockInfo[gy, gx].status and BS_INACTIVE) <> 0) then continue;
-        if ((blockInfo[gy, gx].status and BS_LOWP) <> 0) and (tick and $3 <> 0) then continue;
+        if ((blockInfo[gy, gx].status and BS_LOWP) <> 0) and (tick and $1 <> 0) then continue;
         case solver of
           TS_STATIC: ;
           TS_FALLING: updateBlockFalling_REF(gx, gy, self);
@@ -764,7 +764,7 @@ begin
         end;
       end;
     end;
-    timeUntilNextSolve += (1/60)
+    timeUntilNextSolve += (1/30)
   end;
 end;
 
