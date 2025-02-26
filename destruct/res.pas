@@ -13,7 +13,7 @@ var
   titleGFX: tPage;
   sfx: tSFXLibrary;
   sprites: tSpriteSheet;
-  template: tPage8;
+  templateGFX: tPage8;
   tankGuiSprite: tSprite;
 
 implementation
@@ -41,7 +41,7 @@ begin
   sprites.grid(16, 16, true);
   tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 155, 16));
 
-  template := tPage8.Load('res\template.p96');
+  templateGFX := tPage8.Load('res\template.p96');
 end;
 
 procedure freeResources();

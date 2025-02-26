@@ -16,66 +16,65 @@ uses
   debug,
   test,
   utils,
+  graph2d,
   graph32;
 
-procedure drawTemplateAdd(dst: tPage; x,y: integer; radius: word; col: RGBA);
+procedure drawTemplateAdd(dst: tPage; template: tPage8; x,y: integer; radius: word; col: RGBA);
 
 implementation
 
+procedure drawTemplateAdd_REF(dst: tPage; template: tPage8; atX,atY: integer; col: RGBA);
 var
-  {returns F(sqr(16*x)) * 255; for x=0..1}
-  LOOKUP: array[0..1, 0..255] of byte;
-
-procedure drawTemplateAdd_REF(dst: tPage; x,y: integer; radius: word; col: RGBA);
-var
-  dx,dy: integer;
-  r2, d2: integer;
+  x,y: integer;
   c: RGBA;
-  f: integer;
-  v: single;
+  v: word;
+  templatePtr, pagePtr: pointer;
+  width,height: integer;
+  xPos, yPos: integer;
+  xLen,yLen: integer;
+  bounds: tRect;
 begin
-  if radius <= 0 then exit;
-  r2 := radius*radius;
-  dec(radius); {radius=1 means 0..0}
-  {todo: outside of radius trimming}
-  for dy := -radius to + radius do begin
-    for dx := -radius to +radius do begin
-      d2 := dy*dy+dx*dx;
-      if d2 >= r2 then continue;
-      //v := (1-(sqrt(d2) / radius)) * (col.a/255);
-      f := clamp(round((d2/r2)*16 * (col.a/255)), 0, 255);
-      v := LOOKUP[0, f] / 255;
-      c := dst.getPixel(x+dx, y+dy);
+  {for centering we have all images stored with 1 pixel padding on lower right
+   i.e. a 3x3 template would be 4x4
+
+   ***-
+   ***-
+   ***-
+   ----
+  }
+  templatePtr := template.pixels;
+  width := template.width-1;
+  height := template.height-1;
+
+  xPos := atX-(width div 2);
+  yPos := atY-(height div 2);
+  bounds := rect(xPos, yPos, width, height);
+  bounds.clipTo(dst.bounds);
+
+  for y := bounds.top to bounds.bottom-1 do begin
+    pagePtr := dst.getAddress(bounds.left-xPos, y-ypos);
+    for x := bounds.left to bounds.right-1 do begin
+      v := pByte(templatePtr)^ * col.a;
+      //if v = 0 then continue;
+      c := pRGBA(pagePtr)^;
       c.init(
-        round(c.r + col.r*v),
-        round(c.g + col.g*v),
-        round(c.b + col.b*v)
+        c.r + word(col.r*v) shr 16,
+        c.g + word(col.g*v) shr 16,
+        c.b + word(col.b*v) shr 16
       );
-      dst.setPixel(x+dx, y+dy, c);
+      c.r := 255;
+      c.a := 128;
+      pRGBA(pagePtr)^ := c;
+      inc(pagePtr, 4);
+      inc(templatePtr);
     end;
   end;
 end;
 
-procedure drawTemplateAdd(dst: tPage; x,y: integer; radius: word; col: RGBA);
+procedure drawTemplateAdd(dst: tPage; template: tPage8; x,y: integer; radius: word; col: RGBA);
 begin
-  drawTemplateAdd_REF(dst, x, y, radius, col);
-end;
-
-procedure generateLookups();
-var
-  i: integer;
-  x: single;
-  f: single;
-begin
-  for i := 0 to 255 do begin
-    x := (i/255);
-    f := 1-x;
-    // quadratic falloff
-    LOOKUP[0, i] := clamp(round(sqr(16*f)), 0, 255);
-    note(intToStr(LOOKUP[0, i]));
-  end;
+  drawTemplateAdd_REF(dst, template, x, y, col);
 end;
 
 begin
-  generateLookups();
 end.

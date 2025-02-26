@@ -108,6 +108,7 @@ type
     function  scaled(aWidth, aHeight: integer): tPage;
     function  resized(aWidth, aHeight: integer): tPage;
     procedure resize(aWidth, aHeight: integer);
+    function  bounds(): tRect; inline;
 
     procedure setTransparent(col: RGBA);
     function  checkForAlpha: boolean;
@@ -921,6 +922,11 @@ begin
   s.free();
   note(hexStr(tmp));
   tmp.free();
+end;
+
+function tPage.bounds(): tRect; inline;
+begin
+  result := Rect(0,0,width,height);
 end;
 
 function tPage.scaled(aWidth, aHeight: integer): tPage;

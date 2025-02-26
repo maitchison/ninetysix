@@ -71,7 +71,7 @@ var
 implementation
 
 uses
-  uTank, uWeapon, terraNova, fx, game, template;
+  uTank, uWeapon, terraNova, fx, game, template, res;
 
 {----------------------------------------------------------}
 { tGameObjects }
@@ -258,7 +258,7 @@ end;
 procedure tParticle.draw(screen: tScreen);
 begin
   {todo: implement template based particles}
-  drawTemplateAdd(screen.canvas, 32+xPos, yPos, 4, col);
+  drawTemplateAdd(screen.canvas, templateGFX, 32+xPos, yPos, 4, col);
   screen.markRegion(Rect(32+xPos-4, yPos-4, 8, 8));
   {
   if radius = 1 then begin
