@@ -24,7 +24,7 @@ uses
 
 type
 
-  tTemplateDrawMode = (TDM_ADD, TDM_SUB);
+  tTemplateDrawMode = (TDM_ADD, TDM_SUB, TDM_BLEND);
 
   tTemplate = class(tResource)
     mipMaps: array of tPage8; // prescaled versions
@@ -66,16 +66,26 @@ begin
     pagePtr := dst.getAddress(bounds.left, y);
     templatePtr := template.getAddress(bounds.left-originX, y-originY);
     for x := bounds.left to bounds.right-1 do begin
-      v := pByte(templatePtr)^ * col.a;
-      if v < 255 then continue;
-      if mode = TDM_SUB then v := -v;
-
+      v := (pByte(templatePtr)^ * col.a) div 256;
+      if v = 0 then continue;
       c := pRGBA(pagePtr)^;
-      c.init(
-        c.r + (v*col.r) div 65536,
-        c.g + (v*col.g) div 65536,
-        c.b + (v*col.b) div 65536
-      );
+      case mode of
+        TDM_ADD: c.init(
+          c.r + (v*col.r) div 256,
+          c.g + (v*col.g) div 256,
+          c.b + (v*col.b) div 256
+        );
+        TDM_SUB: c.init(
+          c.r - (v*col.r) div 256,
+          c.g - (v*col.g) div 256,
+          c.b - (v*col.b) div 256
+        );
+        TDM_BLEND: c.init(
+          (((255-v)*c.r) + (v*col.r)) div 256,
+          (((255-v)*c.g) + (v*col.g)) div 256,
+          (((255-v)*c.b) + (v*col.b)) div 256
+        );
+      end;
       pRGBA(pagePtr)^ := c;
       inc(pagePtr, 4);
       inc(templatePtr);
@@ -206,6 +216,8 @@ begin
     xor ecx, ecx
     mov ch, HEIGHT
 
+    mov dl, MODE
+
     mov esi, TEMPLATEPTR
     mov edi, PAGEPTR
 
@@ -219,6 +231,10 @@ begin
     punpcklwd mm7, mm7
     punpckldq mm7, mm7
 
+    mov       eax, $00FF00FF
+    movd      mm5, eax
+    punpckldq mm5, mm5
+
     {
 
       (these are all 16bit 4-vectors)
@@ -227,8 +243,8 @@ begin
       MM1 tmp
       MM2 tmp
       MM3 tmp
-      MM4
-      MM5
+      MM4             template*(col.a/2) AAAA
+      MM5             255 (duplicated as int16 4-vector)
       MM6             col       ARGB
       MM7             col       AAAA
     }
@@ -245,8 +261,13 @@ begin
     punpcklwd mm1, mm1
     punpckldq mm1, mm1
 
-    {mm1 <- template*col AAAA}
+    {mm1 <- template*(col.a/2)}
     pmullw    mm1, mm7
+
+    {mm4 <- template*col.a div 256}
+    movq      mm4, mm1
+    {note: I think there's a bug here, where mm4 is actually template*col.a div 512}
+    psrlw     mm4, 8
 
     {if value is too low then skip it}
     {this actually makes things slower...}
@@ -256,7 +277,7 @@ begin
     jz        @SKIP
     }
 
-    {mm1 <- (col*template.a*col.a) div 65536}
+    {mm1 <- (col*template*col.a) div 65536}
     pmulhw    mm1, mm6
     psllw     mm1, 1      // we had to halve col.a so adjust for it here.
     packuswb  mm1, mm0
@@ -264,12 +285,32 @@ begin
     {mm2 <- screen ARGB (as 8bit bytes}
     movd      mm2, [edi]
 
-    {mm1 <- screen + template ARGB}
+    cmp       dl, TDM_SUB
+    je        @PSUB
+    ja        @PBLEND
   @PADD:
-    paddusb   mm1, mm2
+    paddusb   mm2, mm1
+    jmp @DONE
+  @PSUB:
+    psubusb   mm2, mm1
+    jmp @DONE
+  @PBLEND:
+
+    {mm2 <- screen ARGB (extended to 16bit words)}
+    punpcklbw mm2, mm0
+    {mm3 <- 255 - template*col.a}
+    movq      mm3, mm5
+    psubw     mm3, mm4
+    {mm3 <- ((255 - template*col.a) * screen ARGB) div 256}
+    pmullw    mm2, mm3
+    psrlw     mm2, 8
+    packuswb  mm2, mm2
+    paddw     mm2, mm1
+
+  @DONE:
 
     {mm1 <- screen + template ARGB (as bytes, and saturated)}
-    movd      [edi], mm1
+    movd      [edi], mm2
 
   @SKIP:
     inc esi
@@ -345,9 +386,9 @@ begin
 
   if (bounds.width <= 0) or (bounds.height <= 0) then exit;
 
-{  if cpuInfo.hasMMX then
-    drawTemplateAdd_MMX(dst, template, xPos, yPos, bounds, col, mode)
-  else}
+  if cpuInfo.hasMMX then
+    drawTemplate_MMX(dst, template, xPos, yPos, bounds, col, mode)
+  else
     drawTemplate_ASM(dst, template, xPos, yPos, bounds, col, mode);
 end;
 
@@ -404,7 +445,7 @@ begin
   setLength(mipMaps, 16);
 
   for i := 0 to 15 do begin
-    note('Mips:%d', [i]);
+    //note('Mips:%d', [i]);
     radius := (i*2)+1; {1,3,5...}
     width := radius + 1;
     mipMaps[i] := tPage8.create(width, width);

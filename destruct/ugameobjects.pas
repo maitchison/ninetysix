@@ -254,14 +254,11 @@ begin
   inherited update(elapsed);
   factor := age/ttl;
 
-  // stub:
-  radius := 4;
-  col.r := 255; col.g := 255; col.b := 255;
-
   col.a := clamp(round(255*(1-factor)), 0, 255);
 
-  if solid and terrain.isSolid(xPos, yPos) then
+  if solid and terrain.isSolid(xPos, yPos) then begin
     markForRemoval();
+  end;
 end;
 
 procedure tParticle.draw(screen: tScreen);
