@@ -14,12 +14,20 @@ type
     CT_NULL,
     CT_TANK,
     CT_LAUNCHER,
-    CT_HEAVY
+    CT_HEAVY,
+    CT_HELI
+  );
+
+  tAnimationType = (
+    AT_NONE, // static sprite
+    AT_TANK, // tank with aim and flip
+    AT_HELI  // helicopter animation
   );
 
   tChassis = record
     tag: string;
-    cType: tChassisType;
+    chassisType: tChassisType;
+    animationType: tAnimationType;
     health: integer;
     baseSpriteIdx: integer;
     defaultWeapons: array of tWeaponType;
@@ -61,8 +69,20 @@ type
 
 const
   CHASSIS_DEF: array[tChassisType] of tChassis = (
-    (tag: 'Null';       cType: CT_NULL;     health: 0;   baseSpriteIdx: 0; defaultWeapons: []),
-    (tag: 'Tank';       cType: CT_TANK;     health: 350; baseSpriteIdx: 0;
+    (
+      tag: 'Null';
+      chassisType: CT_NULL;
+      animationType: AT_NONE;
+      health: 0;
+      baseSpriteIdx: 0;
+      defaultWeapons: []
+    ),
+    (
+      tag: 'Tank';
+      chassisType: CT_TANK;
+      animationType: AT_TANK;
+      health: 350;
+      baseSpriteIdx: 0;
       defaultWeapons: [
         tWeaponType.tracer,
         tWeaponType.blast,
@@ -70,13 +90,35 @@ const
         tWeaponType.largeDirt
       ]
     ),
-    (tag: 'Launcher';   cType: CT_LAUNCHER; health: 200; baseSpriteIdx: 5;
+    (
+      tag: 'Launcher';
+      chassisType: CT_LAUNCHER;
+      animationType: AT_TANK;
+      health: 200;
+      baseSpriteIdx: 5;
       defaultWeapons: [
         tWeaponType.microNuke,
         tWeaponType.miniNuke
       ];
     ),
-    (tag: 'Heavy Tank'; cType: CT_HEAVY;    health: 700; baseSpriteIdx: 10;
+    (
+      tag: 'Heavy Tank';
+      chassisType: CT_HEAVY;
+      animationType: AT_TANK;
+      health: 700;
+      baseSpriteIdx: 10;
+      defaultWeapons: [
+        tWeaponType.blast,
+        tWeaponType.megaBlast,
+        tWeaponType.plasma
+      ];
+    ),
+    (
+      tag: 'Helicopter';
+      chassisType: CT_HELI;
+      animationType: AT_HELI;
+      health: 700;
+      baseSpriteIdx: 16*8;
       defaultWeapons: [
         tWeaponType.blast,
         tWeaponType.megaBlast,
@@ -115,11 +157,17 @@ var
   angleFrame: integer;
 begin
   spriteIdx := chassis.baseSpriteIdx;
-
-  {team}
   if team = TEAM_2 then spriteIdx += 16;
-  {angle}
-  spriteIdx += clamp(round((90-abs(angle)) * 5 / 90), 0, 4);
+
+  case chassis.animationType of
+    AT_NONE: ;
+    AT_TANK: begin
+      spriteIdx += clamp(round((90-abs(angle)) * 5 / 90), 0, 4);
+    end;
+    AT_HELI: begin
+      spriteIdx += (gameTick div 8) and $3;
+    end;
+  end;
 
   sprite := spriteSheet.sprites[spriteIdx];
 
@@ -185,13 +233,14 @@ begin
 
   p := Point(xPos+32, yPos);
 
-  if angle > 0 then
+  if (angle > 0) and (chassis.animationType = AT_TANK) then
     r := sprite.drawFlipped(screen.canvas, p.x, p.y)
   else
     r := sprite.draw(screen.canvas, p.x, p.y);
 
   screen.markRegion(r);
 
+  {marker}
   if isSelected then
     markerColor.init(255, 255, 128)
   else

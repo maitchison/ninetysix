@@ -54,6 +54,7 @@ var
   tanks: tTankList;
   player1, player2: tController;
   terrain: tTerrain;
+  gameTick: dword;
 
 const
   GRAVITY = 241.5;
@@ -265,6 +266,7 @@ begin
     for tank in tanks do if tank.isActive then tank.update(stepSize);
     projectiles.update(stepSize);
     updateAccumlator -= stepSize;
+    inc(gameTick);
   end;
 end;
 
