@@ -52,6 +52,7 @@ type
     weaponIdx: integer;
   protected
     procedure updateAnimation();
+    procedure updateFalling(elapsed:single);
   public
     function  weapon: tWeaponSpec;
     procedure init(aPos: tPoint; aTeam: tTeam; aChassisType: tChassisType);
@@ -61,7 +62,8 @@ type
     procedure reset(); override;
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
-    procedure adjust(deltaAngle, deltaPower: single);
+    procedure applyControl(xAction, yAction: single; elapsed: single);
+    procedure adjustAim(deltaAngle, deltaPower: single);
     procedure takeDamage(atX,atY: integer; damage: integer;sender: tObject=nil);
     procedure explode();
     procedure fire();
@@ -255,28 +257,20 @@ begin
   );
 end;
 
-procedure tTank.update(elapsed: single);
+procedure tTank.updateFalling(elapsed: single);
 var
-  xlp: integer;
-  x,y: integer;
   support: integer;
+  i, x, y, xlp: integer;
+  bounds: tRect;
   hitPower: integer;
   p: tParticle;
-  i: integer;
-  bounds: tRect;
+  fallSpeed: single;
 begin
 
-  {inherited update stuff}
-  inherited update(elapsed);
-  if cooldown > 0 then cooldown -= elapsed;
-
-  {animation}
-  updateAnimation();
-
-  bounds := rect(xPos-8, yPos-8, 16, 16);
-
-  {falling}
   support := 0;
+  bounds := Rect(xPos-8, yPos-8, 16, 16);
+  if chassis.animationType = AT_HELI then fallSpeed := GRAVITY/4 else fallSpeed := GRAVITY;
+
   {todo: these insets should not be hard coded, better to check pixels of
    texture, or maybe specify as part of the tank}
   for xlp := bounds.left+3 to bounds.right-3 do begin
@@ -285,7 +279,7 @@ begin
     if terrain.isSolid(xlp, bounds.bottom-3) then inc(support);
   end;
   if support = 0 then
-    vel.y := clamp(vel.y + 100 * elapsed, -800, 800)
+    vel.y += fallSpeed * elapsed
   else begin
     if vel.y > 0 then begin
       hitPower := round(10*vel.y);
@@ -310,6 +304,32 @@ begin
       vel.y := 0;
     end;
   end;
+end;
+
+procedure tTank.update(elapsed: single);
+var
+  xlp: integer;
+  x,y: integer;
+  support: integer;
+  hitPower: integer;
+  p: tParticle;
+  i: integer;
+  bounds: tRect;
+  drag: V2D;
+begin
+
+  {enforce a strict speed limit}
+  vel.x := clamp(vel.x, -500, 500);
+  vel.y := clamp(vel.y, -500, 500);
+
+  {inherited update stuff}
+  inherited update(elapsed);
+
+  if cooldown > 0 then cooldown -= elapsed;
+
+  updateAnimation();
+  updateFalling(elapsed);
+
 end;
 
 {---------------}
@@ -393,7 +413,41 @@ begin
   markForRemoval();
 end;
 
-procedure tTank.adjust(deltaAngle, deltaPower: single);
+procedure tTank.applyControl(xAction, yAction: single; elapsed: single);
+var
+  speed: single;
+  drag: single;
+begin
+  {check for nans}
+  if (xAction <> xAction) or (yAction <> yAction) then exit;
+
+  xAction := clamp(xAction, -1, 1);
+  yAction := clamp(yAction, -1, 1);
+
+  case chassis.animationType of
+    AT_NONE: ;
+    AT_TANK: adjustAim(xAction * 100 * elapsed, yAction * 10 * elapsed);
+    AT_HELI: begin
+      {custom heli logic}
+
+      {drag}
+      {
+      drag := sign(vel.x) * (elapsed * -150);
+      if abs(drag) >= abs(vel.x) then vel.x := 0 else vel.x += drag;
+      drag := vel.y * (elapsed * -25);
+      if abs(drag) >= abs(vel.y) then vel.y := 0 else vel.y += drag;
+      }
+      vel *= 0.95;
+
+      if yAction < 0 then speed := 500 else speed := 1000;
+      vel.y -= yAction * speed * elapsed;
+      vel.x += xAction * 750 * elapsed;
+
+    end;
+  end;
+end;
+
+procedure tTank.adjustAim(deltaAngle, deltaPower: single);
 var
   pre,post: double;
 begin

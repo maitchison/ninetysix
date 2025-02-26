@@ -29,7 +29,7 @@ type
     doFire: boolean;
     changeTank: integer;
     changeWeapon: integer;
-    xVel, yVel: single;
+    xAction, yAction: single;
     tankIdx: integer;
     target: tTank;
     constructor create(aTankIdx: integer);
@@ -116,13 +116,12 @@ procedure tController.apply(elapsed: single);
 begin
 
   {sometimes these are nan}
-  if (xVel <> xVel) or (yVel <> yVel) then exit;
-
-  xVel := clamp(xVel, -100, 100);
-  yVel := clamp(yVel, -10, 10);
+  if (xAction <> xAction) or (yAction <> yAction) then exit;
 
   if doFire then tank.fire();
-  tank.adjust(xVel * elapsed, yVel *elapsed);
+  {this doesn't feel right... we should just set the control actions and
+   not apply them. Then remove elapsed I think?}
+  tank.applyControl(xAction, yAction, elapsed);
 
   if (changeWeapon <> 0) then
     cycleWeapon(changeWeapon)
@@ -141,8 +140,8 @@ end;
 procedure tController.process(elapsed: single);
 begin
   doFire := false;
-  xVel := 0;
-  yVel := 0;
+  xAction := 0;
+  yAction := 0;
   changeTank := 0;
   changeWeapon := 0;
 end;
@@ -158,10 +157,10 @@ procedure tHumanController.process(elapsed: single);
 begin
   inherited process(elapsed);
   if keyDown(key_space) then doFire := true;
-  if keyDown(key_left) then xVel := -100;
-  if keyDown(key_right) then xVel := +100;
-  if keyDown(key_up) then yVel := +10;
-  if keyDown(key_down) then yVel := -10;
+  if keyDown(key_left) then xAction := -100;
+  if keyDown(key_right) then xAction := +100;
+  if keyDown(key_up) then yAction := +100;
+  if keyDown(key_down) then yAction := -100;
   if keyDown(Key_openSquareBracket) then changeWeapon := +1;
   if keyDown(Key_closeSquareBracket) then changeWeapon := -1;
   if keyDown(Key_n) then changeTank := +1;
@@ -273,7 +272,7 @@ begin
     if not assigned(target) then begin
       {nothing to shoot, stand at attention}
       delta := 0 - tank.angle;
-      xVel := clamp(delta*4, -50, 50);
+      xAction := clamp(delta*100, -1, 1);
       exit;
     end;
     solutionY := 8+rnd(5);
@@ -284,12 +283,12 @@ begin
   tickTimer += elapsed;
 
   {just fire all the time basically}
-  doFire := (xVel < 10) and (yVel < 1) and (stateTimer > 1) and (abs(tank.angle)>1);
+  doFire := (xAction < 10) and (yAction < 1) and (stateTimer > 1) and (abs(tank.angle)>1);
   solutionX := firingSolution(Point(errorX+target.xPos, errorY+target.yPos), 20*solutionY);
   delta := solutionX - tank.angle;
-  xVel := clamp(delta*4, -50, 50);
+  xAction := clamp(delta*100, -1, 1);
   delta := solutionY - tank.power;
-  yVel := clamp(delta, -5, 5);
+  yAction := clamp(delta*10, -1, 1);
 end;
 
 begin
