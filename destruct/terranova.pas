@@ -46,13 +46,10 @@ type
     status: byte;
   end;
 
-  tCellMovedArray = array[0..256-1, 0..32-1] of byte;
   tCellInfoArray = array[0..256-1, 0..256-1] of tCellInfo;
   tCellAttrArray = array[0..256-1, 0..32-1] of tTerrainLine;
 
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
-
-  tTerrainSolver = (TS_STATIC, TS_FALLING, TS_PARTICLE);
 
   tTerrain = class
   protected
@@ -60,15 +57,13 @@ type
     cellAttr: tCellAttrArray;
     cellInfo: tCellInfoArray;
     blockInfo: tBlockInfoArray;
-    cellMoved: tCellMovedArray;
-    solver: tTerrainSolver;
     timeUntilNextSolve: single;
     tick: dword;
   public
 
     sky: tPage;
 
-    constructor create(aSolver: tTerrainSolver = TS_FALLING);
+    constructor create();
     destructor destroy(); override;
 
     procedure clear(); virtual;
@@ -128,10 +123,9 @@ var
 
 {-----------------------------------------------------------}
 
-constructor tTerrain.create(aSolver: tTerrainSolver = TS_FALLING);
+constructor tTerrain.create();
 begin
   inherited create();
-  solver := aSolver;
   sky := tPage.create(256, 256);
   clear();
 end;
@@ -470,6 +464,9 @@ var
   p: tParticle;
   heatLost: integer;
   oldChanged: boolean;
+  otherCell: tCellInfo;
+  dtype: tDirtType;
+  rng: byte;
 
   procedure doMove(dx,dy: integer); inline;
   begin
@@ -477,8 +474,9 @@ var
     if (j+dx < 0) then cx := -1 else if (j+dx >= 8) then cx := +1 else cx := 0;
     if ((7-i)+dy < 0) then cy := -1 else if ((7-i)+dy >= 8) then cy := +1 else cy := 0;
     inc(changes[cx,cy]);
+    otherCell := terrain.cellInfo[y+dy, x+dx];
     terrain.cellInfo[y+dy, x+dx] := cell;
-    terrain.cellInfo[y, x] := empty;
+    terrain.cellInfo[y, x] := otherCell;
   end;
 
   {returns if move completed}
@@ -487,11 +485,25 @@ var
     {todo: no bounds checking..}
     if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
     if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
-    result := terrain.cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
+    dtype := terrain.cellInfo[y+dy,x+dx].dtype;
+    {we can swap with liquids, but liquids so not self swap}
+    result := (dType = DT_EMPTY);
     if result then doMove(dx,dy);
   end;
 
-  {returns if cell is open}
+  {returns if move completed, swaps with liquid}
+  function checkAndSwap(dx,dy: integer): boolean; inline;
+  begin
+    {todo: no bounds checking..}
+    if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
+    if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
+    dtype := terrain.cellInfo[y+dy,x+dx].dtype;
+    {we can swap with liquids, but liquids so not self swap}
+    result := (TERRAIN_DECAY[dType] = 0) and (dtype <> cell.dType);
+    if result then doMove(dx,dy);
+  end;
+
+  {returns if cell is empty}
   function checkEmpty(dx,dy: integer): boolean; inline;
   begin
     {todo: no bounds checking..}
@@ -524,12 +536,23 @@ begin
       case cell.dtype of
         DT_EMPTY: ;
         DT_ROCK: ;
-        DT_DIRT, DT_OBSIDIAN: begin
-          checkAndMove(0,1);
+        DT_DIRT: checkAndMove(0,1);
+        DT_OBSIDIAN: begin
+          {slowly move down in water}
+          if (rnd > 128) then
+            checkAndSwap(0,1)
+          else
+            checkAndMove(0,1);
         end;
         DT_SAND: begin
-          if checkAndMove(0,1) then continue;
-          coin := (rnd and $2) * 2 - 1;
+          rng := rnd;
+          if (rnd > 10) then begin
+            if checkAndMove(0,1) then continue
+          end else begin
+            {disolve into lava / water}
+            if checkAndSwap(0,1) then continue;
+          end;
+          if rng > 128 then coin := 1 else coin := -1;
           if checkAndMove(coin,1) then continue;
           if checkAndMove(-coin,1) then continue;
         end;
@@ -579,9 +602,9 @@ begin
 
           {burn neighbours}
           heatLost := 0;
-          heatLost += doBurn(0, 1, 1);
-          heatLost += doBurn(-1, 1, 1);
-          heatLost += doBurn(+1, 1, 1);
+          heatLost += doBurn(0, 1, 3);
+          heatLost += doBurn(-1, 1, 2);
+          heatLost += doBurn(+1, 1, 2);
           heatLost += doBurn(-1, 0, 1);
           heatLost += doBurn(+1, 0, 1);
 
@@ -632,114 +655,6 @@ begin
   end;
 end;
 
-procedure updateBlockParticle_REF(gx,gy: integer; var blockInfo: tBlockInfoArray; var cellInfo: tCellInfoArray; var cellAttr: tCellAttrArray;var cellMoved: tCellMovedArray);
-var
-  i,j,x,y: integer;
-  idx: integer;
-  px,py,vx,vy: int32;
-  empty, cell: tCellInfo;
-  selfChanged: boolean;
-  changes: array[-1..1, -1..1] of int8;
-  delta: integer;
-  cx,cy: integer;
-  coin: integer;
-  dx,dy: integer;
-  hasSupport: boolean;
-  nx,ny: integer;
-
-  procedure doMove(dx,dy: integer); inline;
-  begin
-    selfChanged := true;
-    if (j+dx < 0) then cx := -1 else if (j+dx >= 8) then cx := +1 else cx := 0;
-    if ((7-i)+dy < 0) then cy := -1 else if ((7-i)+dy >= 8) then cy := +1 else cy := 0;
-    inc(changes[cx,cy]);
-    nx := x+dx;
-    ny := y+dy;
-    cellInfo[ny, nx] := cell;
-    cellInfo[y, x] := empty;
-
-    {grr...}
-    cellAttr[ny, nx div 8].x[nx and $7] := cellAttr[y, x div 8].x[x and $7];
-    cellAttr[ny, nx div 8].y[nx and $7] := cellAttr[y, x div 8].y[x and $7];
-    cellAttr[ny, nx div 8].vx[nx and $7] := cellAttr[y, x div 8].vx[x and $7];
-    cellAttr[ny, nx div 8].vy[nx and $7] := cellAttr[y, x div 8].vy[x and $7];
-    cellAttr[y, x div 8].x[x and $7] := 0;
-    cellAttr[y, x div 8].y[x and $7] := 0;
-    cellAttr[y, x div 8].vx[x and $7] := 0;
-    cellAttr[y, x div 8].vy[x and $7] := 0;
-
-    cellMoved[ny, nx div 8] := cellMoved[ny, nx div 8] or (1 shl (nx and $7));
-  end;
-
-  function checkAndMove(dx,dy: integer): boolean; inline;
-  begin
-    {todo: no bounds checking..}
-    if (dword(x+dx) and $ffffff00) <> 0 then exit(false);
-    if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
-    result := cellInfo[y+dy,x+dx].dtype = DT_EMPTY;
-    if result then doMove(dx,dy);
-  end;
-
-begin
-  empty.code := 0;
-  fillchar(changes, sizeof(changes), 0);
-  selfChanged := false;
-  for i := 0 to 7 do begin
-    y := gy*8+(7-i);
-    for j := 0 to 7 do begin
-      x := gx*8+j;
-
-      {check if we have already moved}
-      if (cellMoved[y, gx] and (1 shl j)) <> 0 then continue;
-
-      cell := cellInfo[y,x];
-      if cell.dtype in [DT_EMPTY, DT_ROCK] then continue;
-      hasSupport := cellInfo[y+1, x].dtype <> DT_EMPTY;
-      {get particle}
-      vx := cellAttr[y, x div 8].vx[x and $7];
-      vy := cellAttr[y, x div 8].vy[x and $7];
-      if (vx = 0) and (vy = 0) and hasSupport then continue;
-      selfChanged := true;
-      px := cellAttr[y, x div 8].x[x and $7];
-      py := cellAttr[y, x div 8].y[x and $7];
-      {gravity}
-      if not hasSupport then
-        vy := clamp(vy + 3, -120, 120);
-      cellAttr[y, x div 8].vy[x and $7] := vy;
-      {move particle}
-      px += vx;
-      py += vy;
-      if (px <= -127) then dx := -1 else if (px >= 128) then dx := +1 else dx := 0;
-      if (py <= -127) then dy := -1 else if (py >= 128) then dy := +1 else dy := 0;
-      cellAttr[y, x div 8].x[x and $7] := int8(byte(word(px) and $ff));
-      cellAttr[y, x div 8].y[x and $7] := int8(byte(word(py) and $ff));
-      if (dx <> 0) or (dy <> 0) then begin
-        if not checkAndMove(dx, dy) then begin
-          if dx <> 0 then cellAttr[y, x div 8].vx[x and $7] := vx div 2;
-          if dy <> 0 then cellAttr[y, x div 8].vy[x and $7] := vy div 2;
-        end;
-      end;
-    end;
-  end;
-  {keep track of block stats}
-  if (not selfChanged) then begin
-    blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_INACTIVE;
-    exit;
-  end;
-
-  blockInfo[gy, gx].status := blockInfo[gy, gx].status or BS_DIRTY;
-
-  for cx := -1 to 1 do begin
-    for cy := -1 to 1 do begin
-      delta := changes[cx,cy];
-      // let all neighbours know to check themselves
-      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
-      if delta = 0 then continue;
-      blockInfo[gy+cy, gx+cx].status := blockInfo[gy+cy, gx+cx].status or BS_DIRTY;
-    end;
-  end;
-end;
-
 procedure tTerrain.update(elapsed: single);
 var
   gx,gy: integer;
@@ -748,20 +663,13 @@ begin
   timeUntilNextSolve -= elapsed;
   while timeUntilNextSolve < 0 do begin
 
-    if solver = TS_PARTICLE then
-      fillchar(cellMoved, sizeof(cellMoved), 0);
-
     inc(tick);
 
     for gy := 31-1 downto 1 do begin
       for gx := 1 to 31-1 do begin
         if ((blockInfo[gy, gx].status and BS_INACTIVE) <> 0) then continue;
         if ((blockInfo[gy, gx].status and BS_LOWP) <> 0) and (tick and $1 <> 0) then continue;
-        case solver of
-          TS_STATIC: ;
-          TS_FALLING: updateBlockFalling_REF(gx, gy, self);
-          TS_PARTICLE: updateBlockParticle_REF(gx, gy, blockInfo, cellInfo, cellAttr, cellMoved);
-        end;
+        updateBlockFalling_REF(gx, gy, self);
       end;
     end;
     timeUntilNextSolve += (1/30)
