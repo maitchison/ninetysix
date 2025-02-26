@@ -183,91 +183,102 @@ procedure drawTemplateAdd_MMX(dst: tPage; template: tPage8; originX,originY: int
 var
   y: integer;
   templatePtr, pagePtr: pointer;
-  len, alpha: word;
+  templateStride, pageStride: dword;
+  width, height: byte;
+  alpha: word;
 begin
-  len := bounds.width;
+  width := bounds.width;
+  height := bounds.height;
   alpha := col.a div 2; // due to sign we need to divide this by two...
-  for y := bounds.top to bounds.bottom-1 do begin
-    pagePtr := dst.getAddress(bounds.left, y);
-    templatePtr := template.getAddress(bounds.left-originX, y-originY);
-    asm
-      pushad
-
-      movzx ecx, word ptr LEN
-
-      mov esi, TEMPLATEPTR
-      mov edi, PAGEPTR
-
-      {setup}
-
-      pxor      mm0, mm0
-
-      movd      mm6, COL
-      punpcklbw mm6, mm0
-
-      movzx     eax, ALPHA
-      movd      mm7, eax
-      punpcklwd mm7, mm7
-      punpckldq mm7, mm7
-
-      {
-
-        (these are all 16bit 4-vectors)
-
-        MM0             all zeros
-        MM1 tmp
-        MM2 tmp
-        MM3 tmp
-        MM4
-        MM5             template  AAAA
-        MM6             col       ARGB
-        MM7             col       AAAA
-      }
-
-    @XLOOP:
-
-      {mm5 <- template AAAA }
-      movzx     eax, byte ptr [esi]
-      movd      mm5, eax
-      punpcklwd mm5, mm5
-      punpckldq mm5, mm5
-
-      {mm1 <- template*col AAAA}
-      movq      mm1, mm7
-      pmullw    mm1, mm5
-
-      {if value is too low then skip it}
-      movd      eax, mm1
-      test      ah, ah
-      jz        @SKIP
-
-      {mm1 <- (col*template.a*col.a) div 65536}
-      pmulhw    mm1, mm6
-      psllw     mm1, 1      // we had to halve col.a so adjust for it here.
-
-      {mm2 <- screen ARGB}
-      movd      mm2, [edi]
-      punpcklbw mm2, mm0
-
-      {mm1 <- screen + template ARGB}
-      paddw     mm1, mm2
-
-      {mm1 <- screen + template ARGB (as bytes, and saturated)}
-      packuswb  mm1, mm1
-      movd      [edi], mm1
-
-    @SKIP:
-      inc esi
-      add edi,4
-
-      dec ecx
-      jnz @XLOOP
-
-      popad
-    end;
-  end;
+  pagePtr := dst.getAddress(bounds.left, bounds.top);
+  templatePtr := template.getAddress(bounds.left-originX, bounds.top-originY);
+  templateStride := template.width - width;
+  pageStride := (dst.width - width) * 4;
 
   asm
+    pushad
+
+  @SETUP:
+    xor ecx, ecx
+    mov ch, HEIGHT
+
+    mov esi, TEMPLATEPTR
+    mov edi, PAGEPTR
+
+    pxor      mm0, mm0
+
+    movd      mm6, COL
+    punpcklbw mm6, mm0
+
+    movzx     eax, ALPHA
+    movd      mm7, eax
+    punpcklwd mm7, mm7
+    punpckldq mm7, mm7
+
+    {
+
+      (these are all 16bit 4-vectors)
+
+      MM0             all zeros
+      MM1 tmp
+      MM2 tmp
+      MM3 tmp
+      MM4
+      MM5
+      MM6             col       ARGB
+      MM7             col       AAAA
+    }
+
+  @YLOOP:
+
+    mov       cl, WIDTH
+
+  @XLOOP:
+
+    {mm1 <- template AAAA }
+    movzx     eax, byte ptr [esi]
+    movd      mm1, eax
+    punpcklwd mm1, mm1
+    punpckldq mm1, mm1
+
+    {mm1 <- template*col AAAA}
+    pmullw    mm1, mm7
+
+    {if value is too low then skip it}
+    movd      eax, mm1
+    test      ah, ah
+    jz        @SKIP
+
+    {mm1 <- (col*template.a*col.a) div 65536}
+    pmulhw    mm1, mm6
+    psllw     mm1, 1      // we had to halve col.a so adjust for it here.
+
+    {mm2 <- screen ARGB}
+    movd      mm2, [edi]
+    punpcklbw mm2, mm0
+
+    {mm1 <- screen + template ARGB}
+    paddw     mm1, mm2
+
+    {mm1 <- screen + template ARGB (as bytes, and saturated)}
+    packuswb  mm1, mm1
+    movd      [edi], mm1
+
+  @SKIP:
+    inc esi
+    add edi,4
+
+    dec cl
+    jnz @XLOOP
+
+    add esi, TEMPLATESTRIDE
+    add edi, PAGESTRIDE
+
+    dec ch
+    jnz @YLOOP
+
+
+    popad
     emms;
   end;
 end;
@@ -325,6 +336,8 @@ begin
   bounds := Rect(xPos, yPos, width, height);
   bounds.clipTo(dst.bounds);
   result := bounds;
+
+  if (bounds.width <= 0) or (bounds.height <= 0) then exit;
 
   if cpuInfo.hasMMX then
     drawTemplateAdd_MMX(dst, template, xPos, yPos, bounds, col)
