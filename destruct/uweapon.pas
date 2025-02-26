@@ -142,8 +142,10 @@ begin
     end;
     PT_SHELL: begin
       mixer.play(sfx['explode'] , 0.10);
+      {todo: before burn turn half of pixels into particles}
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, hitRadius);
+
     end;
     PT_ROCKET: begin
       mixer.play(sfx['explode'] , 0.3);
@@ -237,8 +239,8 @@ begin
     PT_ROCKET,
     PT_PLASMA: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
-      angle := round(angle/45) * 45;
-      r := sprite.drawRotated(screen.canvas, Point(xPos+32, yPos), angle, 1.0);
+      //angle := round(angle/45) * 45;
+      r := sprite.drawRotated(screen.canvas, Point(xPos+32, yPos), angle, 0.75);
     end;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;

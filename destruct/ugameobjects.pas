@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  terraNova,
   template;
 
 type
@@ -18,6 +19,7 @@ type
     col: RGBA;
     age: single;
     ttl: single;
+    hasGravity: boolean;
     status: tGameObjectStatus;
   protected
     function getX: integer;
@@ -62,6 +64,7 @@ type
     solid: boolean;
     burn: integer;
     blend: tTemplateDrawMode;
+    dType: tDirtType; {will create this kind of particle on contact}
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
@@ -74,7 +77,7 @@ var
 implementation
 
 uses
-  uTank, uWeapon, terraNova, fx, game, res;
+  uTank, uWeapon, fx, game, res;
 
 {----------------------------------------------------------}
 { tGameObjects }
@@ -156,6 +159,7 @@ begin
   age := 0;
   ttl := 0;
   status := GO_ACTIVE;
+  hasGravity := false;
 end;
 
 procedure tGameObject.markForRemoval();
@@ -234,6 +238,9 @@ begin
   pos := pos + (vel * elapsed);
   age += elapsed;
 
+  if hasGravity then
+    vel.y += elapsed * GRAVITY;
+
   if ttl > 0 then begin
     if age >= ttl then
       status := GO_PENDING_REMOVAL;
@@ -248,8 +255,9 @@ begin
   ttl := 1;
   col := RGB(255,0,0);
   solid := false;
-  burn := 3;
+  burn := 0;
   blend := TDM_BLEND;
+  dType := DT_EMPTY;
 end;
 
 procedure tParticle.update(elapsed: single);
@@ -261,9 +269,11 @@ begin
 
   col.a := clamp(round(255*(1-factor)), 0, 255);
 
-  if solid and terrain.isSolid(xPos, yPos) then begin
+  if solid and (not terrain.isEmpty(xPos, yPos)) then begin
     if burn > 0 then
       terrain.burn(xPos, yPos, 1, burn);
+    if dType <> DT_EMPTY then
+      terrain.putDirt(xPos, yPos, dType);
     markForRemoval();
   end;
 end;

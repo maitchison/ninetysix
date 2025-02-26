@@ -5,11 +5,13 @@ interface
 
 uses
   {$i units},
+  template,
   uGameObjects;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
+procedure makeDust(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
 procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
 
 implementation
@@ -99,14 +101,15 @@ begin
     p.pos := V2Polar(angle, z*radius);
     p.pos += V2(atX, atY);
     case clamp(round(z*3), 0, 2) of
-      0: p.col := RGB($FF3F3F3F);
-      1: p.col := RGB($FFAFAFAF);
-      2: p.col := RGB($FF7F7F7F);
+      0: p.col := RGB(32,32,32);
+      1: p.col := RGB(64,64,64);
+      2: p.col := RGB(48,48,48);
     end;
     p.vel := V2Polar(angle, (vel+z));
-    p.ttl := 0.5;
+    p.ttl := 0.25 + 0.1*(rnd/256);
     p.solid := true;
-    p.radius := 2;
+    p.radius := 2+rnd(3);
+    p.blend := TDM_BLEND
   end;
 end;
 
@@ -134,6 +137,31 @@ begin
     p.ttl := 0.25;
     p.solid := true;
     p.radius := 1;
+  end;
+end;
+
+procedure makeDust(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0; n: integer=-1);
+var
+  i: integer;
+  p: tParticle;
+  z: single;
+  angle: single;
+begin
+  if n < 0 then
+    n := round(radius * radius);
+  for i := 0 to n-1 do begin
+    p := nextParticle();
+    z := (rnd/255);
+    angle := rnd/255*360;
+    p.pos := V2Polar(angle, z*radius);
+    p.pos += V2(atX, atY);
+    p.col := TERRAIN_COLOR[DT_DIRT];
+    p.vel := V2Polar(angle, (vel+z)) + V2(vx, vy);
+    p.ttl := 10;
+    p.solid := true;
+    p.radius := 1;
+    p.dType := DT_DIRT;
+    p.hasGravity := true;
   end;
 end;
 

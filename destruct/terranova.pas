@@ -78,6 +78,7 @@ type
     procedure setAttr(x,y: integer; attr: tCellAttributes); inline;
 
     procedure putCircle(atX,atY: integer;r: integer; dType: tDirtType=DT_DIRT);
+    procedure putDirt(atX,atY: integer;dType: tDirtType=DT_DIRT);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     function  getTerrainHeight(xPos: integer): integer;
 
@@ -86,6 +87,19 @@ type
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
   end;
+
+const
+  TERRAIN_COLOR: array[tDirtType] of RGBA = (
+    (b:$00; g:$00; r:$00; a: $ff), //none
+    (b:$44; g:$80; r:$8d; a: $ff), //dirt
+    (b:$99; g:$e5; r:$ff; a: $ff), //sand
+    (b:$44; g:$44; r:$44; a: $ff), //rock
+    (b:$5d; g:$80; r:$0d; a: $ff), //grass
+    (b:$fd; g:$30; r:$2d; a: $ff), //water
+    (b:$04; g:$08; r:$ad; a: $ff), //lava
+    (b:$6e; g:$40; r:$39; a: $ff)  //obsidian
+  );
+
 
 implementation
 
@@ -105,17 +119,6 @@ const
     0, //water
     0, //lava
     1  //obsidian
-  );
-
-  TERRAIN_COLOR: array[tDirtType] of RGBA = (
-    (b:$00; g:$00; r:$00; a: $ff), //none
-    (b:$44; g:$80; r:$8d; a: $ff), //dirt
-    (b:$99; g:$e5; r:$ff; a: $ff), //sand
-    (b:$44; g:$44; r:$44; a: $ff), //rock
-    (b:$5d; g:$80; r:$0d; a: $ff), //grass
-    (b:$fd; g:$30; r:$2d; a: $ff), //water
-    (b:$04; g:$08; r:$ad; a: $ff), //lava
-    (b:$6e; g:$40; r:$39; a: $ff)  //obsidian
   );
 
 var
@@ -271,6 +274,32 @@ begin
       setAttr(x, y, attr);
     end;
   end;
+end;
+
+{places dirt at location, if location is full will place nearby}
+procedure tTerrain.putDirt(atX,atY: integer;dType: tDirtType=DT_DIRT);
+var
+  cell: tCellInfo;
+  dx,dy: integer;
+
+  function trySet(dx,dy: integer): boolean;
+  begin
+    result := not(isSolid(atX+dx, atY+dy));
+    if result then setCell(atX+dx, atY+dy, cell)
+  end;
+
+begin
+  cell.dType := dtype;
+  cell.strength := 255;
+  if trySet(0, 0) then exit;
+  if trySet(0, -1) then exit;
+  if trySet(+1, -1) then exit;
+  if trySet(-1, -1) then exit;
+  if trySet(+1, 0) then exit;
+  if trySet(-1, 0) then exit;
+  if trySet(+1, 1) then exit;
+  if trySet(-1, 1) then exit;
+  {ok.. failed}
 end;
 
 {returns height of terrain at x position}

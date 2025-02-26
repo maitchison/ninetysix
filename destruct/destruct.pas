@@ -400,6 +400,8 @@ begin
       terrain.putCircle(mouse_x-32, mouse_y, 20, DT_SAND);
     if keyDown(key_3) then
       terrain.putCircle(mouse_x-32, mouse_y, 20, DT_LAVA);
+    if keyDown(key_4) then
+      makeDust(mouse_x-32, mouse_y, 20, 100, 0, 0, round(1000*elapsed));
     if keyDown(key_9) then
       makeSparks(mouse_x-32, mouse_y, 20, 100, 0, 0, round(1000*elapsed));
 
