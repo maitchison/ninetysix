@@ -59,6 +59,7 @@ type
   tParticle = class(tGameObject)
   public
     solid: boolean;
+    burn: integer;
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
@@ -245,6 +246,7 @@ begin
   ttl := 1;
   col := RGB(255,0,0);
   solid := false;
+  burn := 3;
 end;
 
 procedure tParticle.update(elapsed: single);
@@ -257,6 +259,8 @@ begin
   col.a := clamp(round(255*(1-factor)), 0, 255);
 
   if solid and terrain.isSolid(xPos, yPos) then begin
+    if burn > 0 then
+      terrain.burn(xPos, yPos, 1, burn);
     markForRemoval();
   end;
 end;
