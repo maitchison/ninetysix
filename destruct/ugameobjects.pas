@@ -256,11 +256,16 @@ begin
 end;
 
 procedure tParticle.draw(screen: tScreen);
+var
+  r: tRect;
 begin
   {todo: implement template based particles}
-  drawTemplateAdd(screen.canvas, templateGFX, 32+xPos, yPos, 4, col);
-  screen.markRegion(Rect(32+xPos-4, yPos-4, 8, 8));
-  {
+
+  //stub:
+
+  r := particleTemplate.drawAdd(screen.canvas, 32+xPos, yPos, 1, col);
+  screen.markRegion(r);
+                       {
   if radius = 1 then begin
     screen.canvas.putPixel(32+xPos, yPos, col);
     screen.markPixel(32+xPos, yPos);

@@ -81,7 +81,7 @@ type
 
   {page using 32bit RGBA color}
   tPage = class(tResource)
-    width, height: Word;
+    width, height: word;
     isRef: boolean;
     pixels: pointer;
     defaultColor: RGBA;
@@ -118,12 +118,14 @@ type
 
   {page stored as 8bit lumance}
   tPage8 = class(tResource)
-    width, height: Word;
+    width, height: word;
     pixels: pointer;
     constructor create(); overload;
     destructor  destroy(); override;
-    constructor create(AWidth, AHeight: word); overload;
-    procedure   putPixel(x, y: integer;v: byte);
+    constructor create(aWidth, aHeight: word); overload;
+    function    getAddress(x, y: integer): pointer; inline;
+    procedure   putValue(x, y: integer;v: byte);
+    function    getValue(x, y: integer): byte;
     class function Load(filename: string): tPage8;
   end;
 
@@ -441,7 +443,7 @@ begin
   create();
   self.width := AWidth;
   self.height := AHeight;
-  self.pixels := getMem(AWidth * AHeight * 4);
+  self.pixels := getMem(dword(aWidth) * aHeight * 4);
   self.clear(RGBA.Create(0,0,0));
 end;
 
@@ -981,7 +983,11 @@ end;
 
 destructor tPage8.destroy();
 begin
-  if assigned(pixels) then freeAndNil(pixels);
+  if assigned(self.pixels) then begin
+    freeMem(self.pixels);
+    self.pixels := nil;
+  end;
+  inherited destroy();
 end;
 
 constructor tPage8.create(aWidth, aHeight: word);
@@ -990,11 +996,28 @@ begin
   self.width := aWidth;
   self.height := aHeight;
   self.pixels := getMem(aWidth * aHeight);
+  fillchar(self.pixels^, aWidth * aHeight, 0);
 end;
 
-procedure tPage8.putPixel(x, y: integer;v: byte);
+procedure tPage8.putValue(x, y: integer;v: byte);
 begin
+  if dword(x) >= width then exit;
+  if dword(y) >= height then exit;
   pByte(pixels + (x+y*width))^ := v;
+end;
+
+function tPage8.getValue(x, y: integer): byte;
+begin
+  if dword(x) >= width then exit(0);
+  if dword(y) >= height then exit(0);
+  result := pByte(pixels + (x+y*width))^;
+end;
+
+{returns address in memory of given pixel. If out of bounds, returns nil}
+function tPage8.getAddress(x, y: integer): pointer; inline;
+begin
+  if (dword(x) >= self.width) or (dword(y) >= self.height) then exit(nil);
+  result := pixels + (y * width + x);
 end;
 
 class function tPage8.Load(filename: string): tPage8;
@@ -1006,7 +1029,8 @@ begin
   result := tPage8.create(page.width, page.height);
   for y := 0 to page.height-1 do
     for x := 0 to page.width-1 do
-      result.putPixel(x, y, page.getPixel(x,y).lumance);
+      result.putValue(x, y, page.getPixel(x,y).lumance);
+  page.free();
 end;
 
 {-------------------------------------------------}
@@ -1049,11 +1073,16 @@ type
 procedure tGraph32Test.run();
 var
   a,b: RGBA;
+  page8: tPage8;
 begin
   {test RGBA}
   a.init(0, 64, 128);
   b.from16(a.to16);
   assertEqual(a,b);
+  {test page 8}
+  {just make sure we can allocate and deallocate}
+  page8 := tPage8.create(16,16);
+  page8.destroy();
 end;
 
 {--------------------------------------------------------}

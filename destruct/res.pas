@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  template,
   fileSystem;
 
 procedure loadResources();
@@ -13,7 +14,7 @@ var
   titleGFX: tPage;
   sfx: tSFXLibrary;
   sprites: tSpriteSheet;
-  templateGFX: tPage8;
+  particleTemplate: tTemplate;
   tankGuiSprite: tSprite;
 
 implementation
@@ -41,7 +42,7 @@ begin
   sprites.grid(16, 16, true);
   tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 155, 16));
 
-  templateGFX := tPage8.Load('res\template.p96');
+  particleTemplate := tTemplate.Load('res\template.p96');
 end;
 
 procedure freeResources();
@@ -49,6 +50,7 @@ begin
   freeAndNil(titleGFX);
   freeAndNil(sfx);
   freeAndNil(sprites);
+  freeAndNil(particleTemplate);
   freeAndNil(tankGuiSprite);
 end;
 
