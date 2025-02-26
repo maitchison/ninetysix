@@ -245,23 +245,23 @@ begin
     pmullw    mm1, mm7
 
     {if value is too low then skip it}
-    movd      eax, mm1
+    {this actually makes things slower...}
+{    movd      eax, mm1
     test      ah, ah
-    jz        @SKIP
+    jz        @SKIP}
 
     {mm1 <- (col*template.a*col.a) div 65536}
     pmulhw    mm1, mm6
     psllw     mm1, 1      // we had to halve col.a so adjust for it here.
+    packuswb  mm1, mm0
 
-    {mm2 <- screen ARGB}
+    {mm2 <- screen ARGB (as 8bit bytes}
     movd      mm2, [edi]
-    punpcklbw mm2, mm0
 
     {mm1 <- screen + template ARGB}
-    paddw     mm1, mm2
+    paddusb   mm1, mm2
 
     {mm1 <- screen + template ARGB (as bytes, and saturated)}
-    packuswb  mm1, mm1
     movd      [edi], mm1
 
   @SKIP:
