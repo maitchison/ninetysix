@@ -28,38 +28,25 @@ type
     {note: this means fonts should be passed by reference}
     {todo: put this and chars both on the heep}
     kerning: array[0..255, 0..255] of shortint;
+  protected
+    function charOut(Page: tPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
+  public
     constructor create();
+    class function Load(filename: string): tFont; static;
 
-    {todo: move draw commands in here}
+    procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
+    function textExtents(s: string; p: tPoint): tRect; overload;
+    function textExtents(s: string): tRect; overload;
 
   end;
 
-procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
-function textExtents(s: string; p: tPoint): tRect; overload;
-function textExtents(s: string): tRect; overload;
-
-{temp}
-procedure textOutHalf(page: tPage; atX, atY: integer; s: string;col: RGBA);
-function textExtentsHalf(s: string; p: tPoint): tRect; overload;
-function textExtentsHalf(s: string): tRect; overload;
+var
+  DEFAULT_FONT: tFont;
 
 implementation
 
 uses
   filesystem, bmp;
-
-var
-  font1: tFont;
-
-{---------------------------------------------------------}
-
-constructor tFont.create();
-begin
-  inherited create();
-  bitmap := nil;
-  fillchar(chars, sizeof(chars), 0);
-  fillchar(kerning, sizeof(kerning), 0);
-end;
 
 {---------------------------------------------------------}
 
@@ -88,7 +75,35 @@ begin
   result.xadvance := readAttribute(line, 'xadvance');
 end;
 
-function LoadFont(filename: string): tFont;
+procedure drawSubImage(page: tPage; atX, atY: integer; image: TPage; rect:TRect; col: RGBA);
+var
+  x,y: integer;
+  c,putcol: RGBA;
+begin
+  {todo: switch to sprites and use the sprite draw}
+  putcol := col;
+  for y := 0 to rect.height-1 do
+    for x := 0 to rect.width-1 do begin
+      c := image.getPixel(x+rect.x, y+rect.y);
+      {todo: load font with correct alpha channel}
+      {for the moment map r channel to alpha}
+      if c.a < 2 then continue;
+      putcol.a := (integer(c.r) * col.a div 255);
+      page.putPixel(x+atX, y+atY, putcol);
+    end;
+end;
+
+{-----------------------------------------------------}
+
+constructor tFont.create();
+begin
+  inherited create();
+  bitmap := nil;
+  fillchar(chars, sizeof(chars), 0);
+  fillchar(kerning, sizeof(kerning), 0);
+end;
+
+class function tFont.Load(filename: string): tFont;
 var
   TextFile: Text;
   Line: String;
@@ -128,45 +143,25 @@ begin
   end;
 end;
 
-procedure drawSubImage(page: tPage; atX, atY: integer; image: TPage; rect:TRect; col: RGBA);
+function tFont.charOut(Page: tPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
 var
-  x,y: integer;
-  c,putcol: RGBA;
-begin
-  {todo: switch to sprites and use the sprite draw}
-  putcol := col;
-  for y := 0 to rect.height-1 do
-    for x := 0 to rect.width-1 do begin
-      c := image.getPixel(x+rect.x, y+rect.y);
-      {todo: load font with correct alpha channel}
-      {for the moment map r channel to alpha}
-      if c.a < 2 then continue;
-      putcol.a := (integer(c.r) * col.a div 255);
-      page.putPixel(x+atX, y+atY, putcol);
-    end;
-end;
-
-function charOut(Page: tPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
-var
-  char: TChar;
-  kerning: integer;
+  char: tChar;
 begin
 
-  {apply kerning}
-  kerning := font1.kerning[ord(prevc), ord(c)];
-  atX += kerning;
+  atX += kerning[ord(prevc), ord(c)];
 
-  char := font1.chars[ord(c)];
-  drawSubImage(page, atX+char.xoffset, atY+char.yoffset, font1.bitmap, char.rect, col);
+  char := chars[ord(c)];
+  drawSubImage(page, atX+char.xoffset, atY+char.yoffset, bitmap, char.rect, col);
   atX += char.xadvance;
   result := atX;
 end;
 
-procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
+procedure tFont.textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
 var
   i: integer;
   prevChar: char;
 begin
+  if not assigned(self) then exit;
   prevChar := #0;
   for i := 1 to length(s) do begin
     atX := charOut(page, atX, atY, s[i], col, prevChar);
@@ -174,117 +169,32 @@ begin
   end;
 end;
 
-function textExtents(s: string; p: tPoint): tRect;
+function tFont.textExtents(s: string; p: tPoint): tRect;
 var
   i: integer;
   c: TChar;
 begin
+  if not assigned(self) then exit(Rect(0,0));
   {note: note quite right for characters that have offsets?}
   result.x := p.x;
   result.y := p.y;
   result.width := 0;
   result.height := 16;
   for i := 1 to length(s) do begin
-    result.width += font1.chars[ord(s[i])].xadvance;
+    result.width += chars[ord(s[i])].xadvance;
     if i > 1 then
-      result.width += font1.kerning[ord(s[i-1]), ord(s[i])];
+      result.width += kerning[ord(s[i-1]), ord(s[i])];
   end;
 end;
 
-function textExtents(s: string): tRect;
+function tFont.textExtents(s: string): tRect;
 begin
+  if not assigned(self) then exit(Rect(0,0));
   result := textExtents(s, point(0,0));
 end;
 
 {-----------------------------------------------------}
-{ half font: temp until we get proper font support}
-{-----------------------------------------------------}
-
-procedure drawSubImageHalf(page: tPage; atX, atY: integer; image: TPage; rect:TRect; col: RGBA);
-var
-  x,y: integer;
-  z: integer;
-  c,putcol: RGBA;
-  v: integer;
-  i,j: integer;
-begin
-  {todo: switch to sprites and use the sprite draw}
-  putcol := col;
-  for y := 0 to ((rect.height+1) div 2)-1 do begin
-    for x := 0 to ((rect.width+1) div 2)-1 do begin
-      v := 0;
-      for i := 0 to 1 do begin
-        for j := 0 to 1 do begin
-          z := image.getPixel((x*2)+i+rect.x, (y*2)+j+rect.y).r;
-          v += z*z;
-        end;
-      end;
-      {something a bit like gamma correction}
-      v := round(sqrt(v/4));
-      {todo: load font with correct alpha channel}
-      {for the moment map r channel to alpha}
-      if v < 2 then continue;
-      putcol.a := (v * col.a div 255);
-      page.putPixel(x+atX, y+atY, putcol);
-    end;
-  end;
-end;
-
-
-function charOutHalf(Page: tPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
-var
-  char: TChar;
-  kerning: integer;
-  r: tRect;
-begin
-
-  {apply kerning}
-  kerning := font1.kerning[ord(prevc), ord(c)];
-  atX += kerning div 2;
-
-  char := font1.chars[ord(c)];
-  drawSubImageHalf(page, atX+(char.xoffset+1) div 2, atY+(char.yoffset+1) div 2, font1.bitmap, char.rect, col);
-  atX += (char.xadvance+1) div 2;
-  result := atX;
-end;
-
-procedure textOutHalf(page: tPage; atX, atY: integer; s: string;col: RGBA);
-var
-  i: integer;
-  prevChar: char;
-begin
-  prevChar := #0;
-  for i := 1 to length(s) do begin
-    atX := charOutHalf(page, atX, atY, s[i], col, prevChar);
-    prevChar := s[i];
-  end;
-end;
-
-function textExtentsHalf(s: string; p: tPoint): tRect;
-var
-  i: integer;
-  c: TChar;
-begin
-  {note: note quite right for characters that have offsets?}
-  result.x := p.x;
-  result.y := p.y;
-  result.width := 0;
-  result.height := 16 div 2;
-  for i := 1 to length(s) do begin
-    result.width += (font1.chars[ord(s[i])].xadvance+1) div 2;
-    if i > 1 then
-      result.width += (font1.kerning[ord(s[i-1]), ord(s[i])]+1) div 2;
-  end;
-end;
-
-function textExtentsHalf(s: string): tRect;
-begin
-  result := textExtentsHalf(s, point(0,0));
-end;
-
-{-----------------------------------------------------}
 
 begin
-  Info('[init] Font');
-  font1 := LoadFont('res/font');
+  DEFAULT_FONT := tFont.Load('res\font');
 end.

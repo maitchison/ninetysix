@@ -18,6 +18,7 @@ type
     showForSeconds: single;
     visible: boolean;
     autoFade: boolean;
+    font: tFont;
   protected
     procedure doDraw(screen: tScreen); virtual;
   public
@@ -39,7 +40,6 @@ type
   public
     textColor: RGBA;
     centered: boolean;
-    halfSize: boolean;
   protected
     procedure doDraw(screen: tScreen); override;
     procedure setText(aText: string);
@@ -85,6 +85,7 @@ begin
   self.autoFade := false;
   self.visible := true;
   self.bounds.init(0,0,0,0);
+  self.font := DEFAULT_FONT;
 end;
 
 procedure tGuiComponent.update(elapsed: single);
@@ -129,18 +130,13 @@ begin
   self.bounds.y := aPos.y;
   self.centered := false;
   self.textColor := RGB(250, 250, 250);
-  self.halfSize := false;
   self.text := aText;
 end;
 
 procedure tGuiLabel.setText(aText: string);
 begin
   fText := aText;
-  if halfSize then
-    {there's a bug here if textTextents ever moves the topleft corner}
-    bounds := textExtentsHalf(text, bounds.topLeft)
-  else
-    bounds := textExtents(text, bounds.topLeft);
+  bounds := font.textExtents(text, bounds.topLeft);
   if centered then bounds.x -= bounds.width div 2;
 end;
 
@@ -150,11 +146,7 @@ var
 begin
   c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
   if c.a = 0 then exit;
-  if halfSize then
-    {todo: remove half size and use a font}
-    textOutHalf(screen.canvas, bounds.x, bounds.y, text, c)
-  else
-    textOut(screen.canvas, bounds.x, bounds.y, text, c);
+  font.textOut(screen.canvas, bounds.x, bounds.y, text, c);
   screen.markRegion(bounds);
 end;
 

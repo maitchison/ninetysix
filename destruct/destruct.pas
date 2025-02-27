@@ -43,7 +43,7 @@ begin
   sprite.blit(screen.canvas, bounds.x, bounds.y);
   weapon := player.tank.weapon;
   weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
-  textOutHalf(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
+  font.textOut(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
   screen.markRegion(bounds);
 end;
 
@@ -81,7 +81,6 @@ begin
 
   verLabel := tGuiLabel.create(Point(320-75, 26));
   verLabel.text := '0.2a (20/02/1996)';
-  verLabel.halfSize := true;
   verLabel.textColor := RGB(255,255,255);
   gui.append(verLabel);
 
@@ -333,7 +332,6 @@ begin
   {setup gui}
   gui := tGuiComponents.create();
   fps := tGuiLabel.create(Point(6, 20));
-  fps.halfSize := true;
   gui.append(fps);
 
   player1Gui := tPlayerGUI.create(Point(0, 0), player1);
