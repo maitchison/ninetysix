@@ -509,7 +509,7 @@ begin
       vel.y -= yAction * speed * elapsed;
       vel.x += xAction * 750 * elapsed;
 
-      adjustAim(-xAction*50*elapsed);
+      adjustAim(-xAction*100*elapsed);
 
     end;
   end;
@@ -527,7 +527,7 @@ begin
       power := clamp(power + deltaPower, 2, 16);
     end;
     AT_HELI: begin
-      angle := clamp(angle + deltaAngle, 90, 270);
+      angle := clamp(angle + deltaAngle, 180-45, 180+45);
     end;
   end;
 end;

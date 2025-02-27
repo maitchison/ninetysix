@@ -23,17 +23,6 @@ uses
   utils;
 
 type
-  {tyrian 2000 style}
-  tOldPlayerGUI = class(tGuiComponent)
-  public
-    player: tController;
-    sprite: tSprite;
-  protected
-    procedure doDraw(screen: tScreen); override;
-  public
-    constructor create(aPos: tPoint; aPlayer: tController);
-  end;
-
   tPlayerGUI = class(tGuiComponent)
   public
     player: tController;
@@ -47,59 +36,14 @@ type
 
 {-------------------------------------------}
 
-procedure tOldPlayerGUI.doDraw(screen: tScreen);
+procedure tPlayerGUI.doDraw(screen: tScreen);
 var
   weapon: tWeaponSpec;
 begin
   sprite.blit(screen.canvas, bounds.x, bounds.y);
-  //screen.canvas.fillRect(bounds, RGB($FF730200));
-  //screen.canvas.drawRect(bounds, RGB($FFFFB93C));
   weapon := player.tank.weapon;
   weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
   textOutHalf(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
-  screen.markRegion(bounds);
-end;
-
-constructor tOldPlayerGUI.create(aPos: tPoint; aPlayer: tController);
-begin
-  inherited create();
-  player := aPlayer;
-  sprite := tankGuiSprite;
-  bounds := Rect(aPos.x, aPos.y, sprite.width, sprite.height);
-end;
-
-{-------------------------------------------}
-
-procedure tPlayerGUI.doDraw(screen: tScreen);
-var
-  weapon: tWeaponSpec;
-  playerSprite: tSprite;
-  tank: tTank;
-  cellIdx: integer;
-begin
-//  screen.canvas.fillRect(bounds, RGB($FF730200));
-//  screen.canvas.drawRect(bounds, RGB($FFFFB93C));
-  sprite.nineSlice(screen.canvas, bounds);
-              {
-  weapon := player.tank.weapon;
-  weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
-  textOutHalf(screen.canvas, bounds.x + 2, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
-  }
-
-  {show current player}
-  playerSprite := player.tank.sprite;
-  playerSprite.drawRotated(screen.canvas, Point(bounds.x + 40, bounds.y + 40), 0, 2.0);
-  //Rect(bounds.x+10, bounds.y+10, playerSprite.width*2, playerSprite.height*2));
-
-  {show all playeres}
-  cellIdx := 0;
-  for tank in tanks do begin
-    if (tank.team = player.tank.team) and assigned(tank.baseSprite) then begin
-      tank.baseSprite.draw(screen.canvas, bounds.x + cellIdx*16 + 8, bounds.y + 60 + 8);
-      inc(cellIdx);
-    end;
-  end;
-
   screen.markRegion(bounds);
 end;
 
@@ -107,11 +51,8 @@ constructor tPlayerGUI.create(aPos: tPoint; aPlayer: tController);
 begin
   inherited create();
   player := aPlayer;
-  sprite := sprites.sprites[16*13+12];
-  sprite.pivot2x.x := 0;
-  sprite.pivot2x.y := 0;
-  sprite.border.init(4,4,4,4);
-  bounds := Rect(aPos.x, aPos.y, 64, 120);
+  sprite := tankGuiSprite;
+  bounds := Rect(aPos.x, aPos.y, sprite.width, sprite.height);
 end;
 
 {-------------------------------------------}
@@ -395,9 +336,9 @@ begin
   fps.halfSize := true;
   gui.append(fps);
 
-  player1Gui := tPlayerGUI.create(Point(256, 0), player1);
+  player1Gui := tPlayerGUI.create(Point(0, 0), player1);
   gui.append(player1Gui);
-  player2Gui := tPlayerGUI.create(Point(256, 120), player2);
+  player2Gui := tPlayerGUI.create(Point(180, 0), player2);
   gui.append(player2Gui);
 
   {main loop}

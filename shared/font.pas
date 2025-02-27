@@ -21,7 +21,7 @@ type
   end;
 
 
-  tFont = object
+  tFont = Object
     bitmap: tPage;
     chars: array[0..255] of tChar;
     {a bit wasteful... but I'll just take the hit}

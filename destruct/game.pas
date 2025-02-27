@@ -62,7 +62,7 @@ const
   {note: I really should have created a viewport... anyway..
    also, it would be good if screen.canvas could be 256x256}
   {this is the mapping from game co-rds to canvas co-ords}
-  VIEWPORT_X = 0;
+  VIEWPORT_X = 32;
   VIEWPORT_Y = 0;
 
 implementation
