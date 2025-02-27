@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  font, netFont,
   template,
   fileSystem;
 
@@ -16,6 +17,7 @@ var
   sprites: tSpriteSheet;
   particleTemplate: tTemplate;
   tankGuiSprite: tSprite;
+  smallFont: tFont;
 
 implementation
 
@@ -43,6 +45,8 @@ begin
   tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 155, 16));
 
   particleTemplate := tTemplate.Load('res\template.p96');
+
+  smallFont := loadNetFont('res\netfont2.p96');
 end;
 
 procedure freeResources();

@@ -12,22 +12,26 @@ uses
 
 type
 
-  TChar = object
+  tChar = record
     {todo support custom kerning}
     id: byte;
-    rect: TRect;
+    rect: tRect;
     xoffset, yoffset: integer;
     xadvance: integer;
   end;
 
 
-  tFont = Object
+  tFont = class
     bitmap: tPage;
     chars: array[0..255] of tChar;
     {a bit wasteful... but I'll just take the hit}
     {note: this means fonts should be passed by reference}
     {todo: put this and chars both on the heep}
     kerning: array[0..255, 0..255] of shortint;
+    constructor create();
+
+    {todo: move draw commands in here}
+
   end;
 
 procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
@@ -45,7 +49,19 @@ uses
   filesystem, bmp;
 
 var
-  font1: TFont;
+  font1: tFont;
+
+{---------------------------------------------------------}
+
+constructor tFont.create();
+begin
+  inherited create();
+  bitmap := nil;
+  fillchar(chars, sizeof(chars), 0);
+  fillchar(kerning, sizeof(kerning), 0);
+end;
+
+{---------------------------------------------------------}
 
 function ReadAttribute(line, attributeName: string): integer;
 var
@@ -72,7 +88,7 @@ begin
   result.xadvance := readAttribute(line, 'xadvance');
 end;
 
-function LoadFont(filename: string): TFont;
+function LoadFont(filename: string): tFont;
 var
   TextFile: Text;
   Line: String;
@@ -80,8 +96,8 @@ var
   a,b: integer;
 
 begin
-  fillchar(result.chars, sizeof(result.chars), 0);
-  fillchar(result.kerning, sizeof(result.kerning), 0);
+
+  result := tFont.create();
 
   if fs.exists(filename+'.p96') then
     result.bitmap := LoadLC96(filename+'.p96')
