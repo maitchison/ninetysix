@@ -64,7 +64,7 @@ type
     procedure update(elapsed: single); override;
     procedure draw(screen: tScreen); override;
     procedure applyControl(xAction, yAction: single; elapsed: single);
-    procedure adjustAim(deltaAngle, deltaPower: single);
+    procedure adjustAim(deltaAngle: single; deltaPower: single = 0);
     procedure takeDamage(atX,atY: integer; damage: integer;sender: tObject=nil);
     procedure explode();
     procedure fire();
@@ -169,6 +169,8 @@ begin
     end;
     AT_HELI: begin
       spriteIdx += (gameTick div 8) and $3;
+      if angle < 180-10 then spriteIdx += 10;
+      if angle > 180+10 then spriteIdx += 5;
     end;
   end;
 
@@ -210,6 +212,11 @@ begin
   for i := 0 to length(aChassis.defaultWeapons)-1 do
     self.weapons[i] := WEAPON_SPEC[aChassis.defaultWeapons[i]];
   self.updateAnimation();
+  case chassis.animationType of
+    AT_NONE: ;
+    AT_TANK: angle := 0;
+    AT_HELI: angle := 180;
+  end;
 end;
 
 procedure tTank.reset();
@@ -483,25 +490,35 @@ begin
       drag := vel.y * (elapsed * -25);
       if abs(drag) >= abs(vel.y) then vel.y := 0 else vel.y += drag;
       }
-      vel *= 0.95;
+      vel *= 0.97;
+      if (yAction = 0) and (xAction=0) then yAction += 0.05; // a bit of hover
 
-      if yAction < 0 then speed := 750 else speed := 1000;
+      if yAction < 0 then speed := 750 else speed := 750;
       vel.y -= yAction * speed * elapsed;
       vel.x += xAction * 750 * elapsed;
+
+      adjustAim(-xAction*50*elapsed);
 
     end;
   end;
 end;
 
-procedure tTank.adjustAim(deltaAngle, deltaPower: single);
+procedure tTank.adjustAim(deltaAngle: single; deltaPower: single = 0);
 var
   pre,post: double;
 begin
   if status <> GO_ACTIVE then exit;
-  angle := clamp(angle + deltaAngle, -90, 90);
-  power := clamp(power + deltaPower, 2, 16);
+  case chassis.animationType of
+    AT_NONE: ;
+    AT_TANK: begin
+      angle := clamp(angle + deltaAngle, -90, 90);
+      power := clamp(power + deltaPower, 2, 16);
+    end;
+    AT_HELI: begin
+      angle := clamp(angle + deltaAngle, 90, 270);
+    end;
+  end;
 end;
-
 
 begin
 end.
