@@ -46,10 +46,7 @@ var
       cRect := readChar(x,y);
       //note('Read char %s as %s', [chr(cIdx), cRect.toString]);
       if (cRect.width = 0) then break;
-      if (cRect.width > 32) or (cRect.height > 32) then begin
-        warning(format('NetFont is invalid. Ignoring characters after "%s"', [chr(cIdx)]));
-        break;
-      end;
+      if (cRect.width > 32) or (cRect.height > 32) then break;
       font.chars[cIdx].rect := cRect;
       font.chars[cIdx].xAdvance := cRect.width;
       charHeight := cRect.height;

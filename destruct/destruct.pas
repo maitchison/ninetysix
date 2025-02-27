@@ -79,9 +79,9 @@ begin
   startLabel.text := 'Press any key to start';
   gui.append(startLabel);
 
-  verLabel := tGuiLabel.create(Point(320-75, 8));
+  verLabel := tGuiLabel.create(Point(320-66, 240-8));
   verLabel.text := '0.3a (28/02/1996)';
-  verLabel.textColor := RGB(255,255,255);
+  verLabel.textColor := RGB(128,128,128);
   gui.append(verLabel);
 
   screen.pageClear();
