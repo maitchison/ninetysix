@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  terraNova,
   uGameObjects;
 
 type
@@ -15,12 +16,14 @@ type
     PT_ROCKET,
     PT_PLASMA,
     PT_DIRT,
+    PT_LAVA,
     PT_LASER
   );
 
   tProjectile = class(tGameObject)
     owner: tGameObject;
     pType: tProjectileType;
+    dType: tDirtType;
     damage: integer;
     procedure reset(); override;
     procedure hit(other: tGameObject = nil);
@@ -35,6 +38,7 @@ type
     spriteIdx: integer;
     damage: integer;
     pType: tProjectileType;
+    dType: tDirtType;
     cooldown: single;
     function projectileSprite: tSprite;
     function weaponSprite: tSprite;
@@ -53,29 +57,33 @@ type
     miniNuke,
     smallDirt,
     largeDirt,
+    lavaBomb,
     plasma
   );
 
 const
 
+  DT_NONE = DT_EMPTY;
+
   WEAPON_SPEC: array[tWeaponType] of tWeaponSpec =
   (
-    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    pType: PT_NONE;   cooldown: 1.0),
-    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    pType: PT_BULLET; cooldown: 0.1),
-    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   pType: PT_SHELL;  cooldown: 1.0),
-    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   pType: PT_SHELL;  cooldown: 2.0),
-    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  pType: PT_ROCKET; cooldown: 2.0),
-    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; pType: PT_ROCKET; cooldown: 4.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 20;   pType: PT_DIRT;   cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 40;   pType: PT_DIRT;   cooldown: 4.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; cooldown: 1.0)
+    (tag: 'Null';         spriteIdx: 16*11 + 0;  damage: 0;    pType: PT_NONE;   dType: DT_NONE; cooldown: 1.0),
+    (tag: 'Tracer';       spriteIdx: 16*11 + 0;  damage: 1;    pType: PT_BULLET; dType: DT_NONE; cooldown: 0.1),
+    (tag: 'Blast';        spriteIdx: 16*11 + 1;  damage: 25;   pType: PT_SHELL;  dType: DT_NONE; cooldown: 1.0),
+    (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   pType: PT_SHELL;  dType: DT_NONE; cooldown: 2.0),
+    (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  pType: PT_ROCKET; dType: DT_NONE; cooldown: 2.0),
+    (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; pType: PT_ROCKET; dType: DT_NONE; cooldown: 4.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 20;   pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 40;   pType: PT_DIRT;   dType: DT_SAND; cooldown: 4.0),
+    (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 6;    pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
+    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0)
   );
 
 
 implementation
 
 uses
-  fx, res, uTank, game, terraNova;
+  fx, res, uTank, game;
 
 {-------------------------------------------------------}
 
@@ -95,6 +103,7 @@ begin
   projectile.sprite := projectileSprite;
   projectile.damage := damage;
   projectile.pType := pType;
+  projectile.dType := dType;
 end;
 
 {-------------------------------------------------------}
@@ -163,7 +172,7 @@ begin
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
-      terrain.putCircle(xPos, yPos, damage, DT_SAND);
+      terrain.putCircle(xPos, yPos, damage, dType);
       targetDamage := 0;
     end;
     PT_LASER:
