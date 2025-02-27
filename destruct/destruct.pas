@@ -43,7 +43,7 @@ begin
   sprite.blit(screen.canvas, bounds.x, bounds.y);
   weapon := player.tank.weapon;
   weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
-  font.textOut(screen.canvas, bounds.x + 20, bounds.y + 3, weapon.tag, RGB(255, 255, 255));
+  font.textOut(screen.canvas, bounds.x + 20, bounds.y + 5, weapon.tag, RGB(255, 255, 255));
   screen.markRegion(bounds);
 end;
 
@@ -74,13 +74,13 @@ begin
 
   {setup gui}
   gui := tGuiComponents.create();
-  startLabel := tGuiLabel.create(Point(160, 218));
+  startLabel := tGuiLabel.create(Point(160, 224));
   startLabel.centered := true;
   startLabel.text := 'Press any key to start';
   gui.append(startLabel);
 
-  verLabel := tGuiLabel.create(Point(320-75, 26));
-  verLabel.text := '0.2a (20/02/1996)';
+  verLabel := tGuiLabel.create(Point(320-75, 8));
+  verLabel.text := '0.3a (28/02/1996)';
   verLabel.textColor := RGB(255,255,255);
   gui.append(verLabel);
 
@@ -336,7 +336,7 @@ begin
 
   player1Gui := tPlayerGUI.create(Point(0, 0), player1);
   gui.append(player1Gui);
-  player2Gui := tPlayerGUI.create(Point(180, 0), player2);
+  player2Gui := tPlayerGUI.create(Point(160, 0), player2);
   gui.append(player2Gui);
 
   {main loop}
@@ -438,9 +438,9 @@ begin
   loadResources();
 
   screenInit();
-  //musicPlay('res\dance1.a96');
+  musicPlay('res\dance1.a96');
   initMouse();
-  //titleScreen();
+  titleScreen();
   battleScreen();
   //cfdScreen();
   screenDone();

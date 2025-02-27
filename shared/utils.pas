@@ -340,6 +340,7 @@ begin
         end;
         's': begin
           case a.VType of
+            vtChar: result += string(args[ArgIndex].VChar);
             vtInteger: result += IntToStr(args[ArgIndex].VInteger);
             vtString: result += string(args[ArgIndex].VString^);
             vtAnsiString: result += AnsiString(args[ArgIndex].VAnsiString);

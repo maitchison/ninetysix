@@ -47,6 +47,7 @@ begin
   particleTemplate := tTemplate.Load('res\template.p96');
 
   smallFont := loadNetFont('res\netfont2.p96');
+  DEFAULT_FONT := smallFont;
 end;
 
 procedure freeResources();

@@ -78,18 +78,17 @@ end;
 procedure drawSubImage(page: tPage; atX, atY: integer; image: TPage; rect:TRect; col: RGBA);
 var
   x,y: integer;
-  c,putcol: RGBA;
+  texel,blended: RGBA;
 begin
   {todo: switch to sprites and use the sprite draw}
-  putcol := col;
+  blended := col;
   for y := 0 to rect.height-1 do
     for x := 0 to rect.width-1 do begin
-      c := image.getPixel(x+rect.x, y+rect.y);
-      {todo: load font with correct alpha channel}
-      {for the moment map r channel to alpha}
-      if c.a < 2 then continue;
-      putcol.a := (integer(c.r) * col.a div 255);
-      page.putPixel(x+atX, y+atY, putcol);
+      texel := image.getPixel(x+rect.x, y+rect.y);
+      if texel.a = 0 then continue;
+      {add bias as we're dividing by 256 instead of 255}
+      blended.a := (255 + word(texel.a) * col.a) div 256;
+      page.putPixel(x+atX, y+atY, blended);
     end;
 end;
 
