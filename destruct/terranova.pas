@@ -366,7 +366,7 @@ var
     c: RGBA;
     bi: tBlockInfo;
   begin
-    r := Rect(32+gx*8, gy*8, 9,9);
+    r := Rect(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y, 9,9);
     c := RGB(0,0,0);
     bi := blockInfo[gy, gx];
     {red = dirty}
@@ -397,10 +397,10 @@ var
           c := sky.getPixel(x,y)
         else
           c := terrainColorLookup[cell.dtype, cell.strength];
-        screen.background.setPixel(32+x, y, c);
+        screen.background.setPixel(x+VIEWPORT_X, y+VIEWPORT_Y, c);
       end;
     end;
-    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
+    screen.markRegion(Rect(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y, 8,8));
   end;
 
   procedure drawBlock_ASM(gx, gy: integer);
@@ -409,7 +409,7 @@ var
     screenInc: dword;
   begin
     lookupPtr := @terrainColorLookup;
-    screenPtr := screen.background.getAddress(32+gx*8, gy*8);
+    screenPtr := screen.background.getAddress(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y);
     skyPtr := sky.getAddress(gx*8, gy*8);
     cellPtr := @cellInfo[gy*8, gx*8];
     screenInc := (screen.canvas.width-8) * 4;
@@ -457,7 +457,7 @@ var
 
     end;
 
-    screen.markRegion(Rect(32+gx*8, gy*8, 8,8));
+    screen.markRegion(Rect(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y, 8,8));
   end;
 
 begin

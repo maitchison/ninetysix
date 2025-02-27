@@ -30,8 +30,8 @@ var
 begin
   c := col;
   c.a := c.a div 2;
-  x := round(atX+32);
-  y := round(atY);
+  x := round(atX+VIEWPORT_X);
+  y := round(atY+VIEWPORT_Y);
 
   screen.canvas.putPixel(x, y, col);
 

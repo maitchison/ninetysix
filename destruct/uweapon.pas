@@ -244,12 +244,12 @@ begin
     PT_SHELL,
     PT_BULLET,
     PT_DIRT:
-      r := sprite.draw(screen.canvas, xPos+32, yPos);
+      r := sprite.draw(screen.canvas, xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
     PT_ROCKET,
     PT_PLASMA: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
       //angle := round(angle/45) * 45;
-      r := sprite.drawRotated(screen.canvas, Point(xPos+32, yPos), angle, 0.75);
+      r := sprite.drawRotated(screen.canvas, Point(xPos+VIEWPORT_X, yPos+VIEWPORT_Y), angle, 0.75);
     end;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;

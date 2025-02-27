@@ -226,7 +226,6 @@ begin
     x := cx + (rnd()-128)*2;
     y := rnd() mod 200;
     a := 255-(y*2);
-    if (x < 32) or (x >= page.width-32) then continue;
 
     c := RGB(255-(rnd div 2), 255-(rnd div 4), 255, a);
 
@@ -395,15 +394,15 @@ begin
       screen.pageFlip();
 
     if keyDown(key_1) then
-      terrain.burn(mouse_x-32, mouse_y, 20, 3);
+      terrain.burn(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 3);
     if keyDown(key_2) then
-      terrain.putCircle(mouse_x-32, mouse_y, 20, DT_SAND);
+      terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND);
     if keyDown(key_3) then
-      terrain.putCircle(mouse_x-32, mouse_y, 20, DT_LAVA);
+      terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_LAVA);
     if keyDown(key_4) then
-      makeDust(mouse_x-32, mouse_y, 20, 100, 0, 0, round(1000*elapsed));
+      makeDust(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
     if keyDown(key_9) then
-      makeSparks(mouse_x-32, mouse_y, 20, 100, 0, 0, round(1000*elapsed));
+      makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
 
     screen.flipAll();
 

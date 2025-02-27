@@ -218,17 +218,17 @@ end;
 
 procedure tGameObject.draw(screen: tScreen);
 begin
-  screen.canvas.putPixel(xPos+32, yPos, col);
-  screen.markRegion(rect(xPos+32, yPos, 1, 1));
+  screen.canvas.putPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, col);
+  screen.markRegion(rect(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, 1, 1));
 end;
 
 procedure tGameObject.drawBounds(screen: tScreen);
 var
   bounds: tRect;
 begin
-  screen.canvas.putPixel(xPos+32, yPos, col);
+  screen.canvas.putPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, col);
   if radius <= 1 then exit;
-  bounds := getBounds(32, 0);
+  bounds := getBounds(VIEWPORT_X, VIEWPORT_Y);
   screen.canvas.drawRect(bounds, col);
   screen.markRegion(bounds);
 end;
@@ -286,11 +286,11 @@ begin
 
   // faster special case for radius=1
   if (radius = 1) and (blend = TDM_BLEND) then begin
-    screen.canvas.putPixel(32+xPos, yPos, col);
-    screen.markPixel(32+xPos, yPos);
+    screen.canvas.putPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, col);
+    screen.markPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
     exit;
   end;
-  r := particleTemplate.draw(screen.canvas, 32+xPos, yPos, radius-1, col, blend);
+  r := particleTemplate.draw(screen.canvas, xPos+VIEWPORT_X, yPos+VIEWPORT_Y, radius-1, col, blend);
   screen.markRegion(r);
 end;
 

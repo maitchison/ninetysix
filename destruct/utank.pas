@@ -243,7 +243,7 @@ begin
 
   if not assigned(sprite) then exit;
 
-  p := Point(xPos+32, yPos);
+  p := Point(xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
 
   if (angle > 0) and (chassis.animationType = AT_TANK) then
     r := sprite.drawFlipped(screen.canvas, p.x, p.y)

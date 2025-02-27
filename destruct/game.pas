@@ -58,11 +58,18 @@ var
 
 const
   GRAVITY = 241.5;
+const
+  {note: I really should have created a viewport... anyway..
+   also, it would be good if screen.canvas could be 256x256}
+  {this is the mapping from game co-rds to canvas co-ords}
+  VIEWPORT_X = 0;
+  VIEWPORT_Y = 0;
 
 implementation
 
 var
   updateAccumlator: single;
+
 
 var
   particles: tGameObjectList;
@@ -204,8 +211,8 @@ begin
   for y := 0 to 255 do
     for x := 0 to 255 do
       if assigned(getObjectAtPos(x,y)) then
-        screen.canvas.putPixel(x+32, y, RGB(255,0,255));
-  screen.markRegion(Rect(32,0,256,256));
+        screen.canvas.putPixel(x+VIEWPORT_X, y+VIEWPORT_Y, RGB(255,0,255));
+  screen.markRegion(Rect(VIEWPORT_X,VIEWPORT_Y,256,256));
 end;
 
 {returns the object at given location}
