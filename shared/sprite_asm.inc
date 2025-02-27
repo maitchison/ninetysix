@@ -55,25 +55,28 @@ var
 
 begin
   {todo: implement proper clipping}
-  if (src.height <= 0) or (src.width <= 0) then
-    fatal('Tried drawing sprite with invalid bounds: '+src.toString);
 
   {for debugging...}
-  //Info(ShortString(src)+' '+ShortString(dst));
+  //info(src.toString+' '+dst.toString);
+
+  if (src.height <= 0) or (src.width <= 0) then
+    exit;
+  if (dst.height <= 0) or (dst.width <= 0) then
+    exit;
 
   {todo: maybe only support power of 2 images...}
   {todo: linear interpolation with MMX, if we can...}
-  deltaX := round(65536.0 * src.width / dst.width);
-  deltaY := round(65536.0 * src.height / dst.height);
+  deltaX := round(65536.0 * src.width / (dst.width));
+  deltaY := round(65536.0 * src.height / (dst.height));
 
   if deltaX >= 0 then
-    sx := src.left * 65536 + (65536 div 2)
+    sx := src.left * 65536 + (65536 div (dst.width))
   else
-    sx := src.right * 65536  - (65536 div 2);
+    sx := src.right * 65536  - (65536 div (dst.width));
   if deltaY >= 0 then
-    sy := src.top * 65536
+    sy := src.top * 65536 + (65536 div (dst.height))
   else
-    sy := src.bottom * 65536;
+    sy := src.bottom * 65536 - (65536 div (dst.height));
 
   dx1 := min(dst.left, dst.right);
   dx2 := max(dst.left, dst.right);
@@ -86,18 +89,17 @@ begin
     dx1 := 0;
   end;
 
-  //check: is this right?
-  cnt := (dx2-dx1)-1;
+  cnt := dx2-dx1;
   if cnt <= 0 then exit;
 
   dstPixels := dstPage.Pixels;
 
   for y := dy1 to dy2-1 do begin
     if y >= dstPage.height then exit;
+    imageOfs := sy div 65536;
+    sy += deltaY;
     if y < 0 then continue;
-    v := (y - dy1) / (dy2 - dy1);
     screenOfs := y * dstPage.width + dx1;
-    imageOfs := min(src.top, src.bottom) + round(src.height * v);
     imageOfs *= srcPage.width * 4;
     imageOfs += dword(srcPage.pixels);
     asm

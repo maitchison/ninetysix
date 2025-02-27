@@ -56,7 +56,7 @@ type
     function  drawStretched(DstPage: TPage; dest: tRect): tRect;
     function  drawRotated(dstPage: tPage; atPos: tPoint;zAngle: single; scale: single=1.0): tRect;
     function  drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4): tRect;
-    procedure nineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
+    procedure nineSlice(dstPage: TPage; drawRect: tRect);
 
     {iIniSerializable}
     procedure writeToIni(ini: tIniWriter);
@@ -244,6 +244,7 @@ end;
 {Draws sprite stetched to cover destination rect}
 function tSprite.drawStretched(dstPage: tPage; dest: tRect): tRect;
 begin
+  {todo: switch to drawTransformed}
   stretchDraw_ASM(dstPage, Self.page, Self.srcRect, dest);
   result := dest;
 end;
@@ -301,10 +302,9 @@ begin
 end;
 
 {Draw sprite using nine-slice method}
-procedure tSprite.NineSlice(DstPage: TPage; atX, atY: Integer; DrawWidth, DrawHeight: Integer);
+procedure tSprite.NineSlice(dstPage: TPage; drawRect: tRect);
 var
   oldRect: tRect;
-  drawRect: tRect;
 begin
 
   if not assigned(self) then
@@ -312,38 +312,38 @@ begin
 
   oldRect := srcRect;
 
-  drawRect := graph2d.Rect(atX, atY, DrawWidth, DrawHeight);
-
   {top part}
-  srcRect := tRect.Inset(oldRect, 0, 0, Border.Left, Border.Top);
-  draw(DstPage, atX, atY);
+  srcRect := tRect.inset(oldRect, 0, 0, border.left, border.top);
+  draw(dstPage, drawRect.x, drawRect.y);
 
   srcRect := tRect.Inset(oldRect,Border.Left, 0, -Border.Right, Border.Top);
-  drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, 0, -Border.Right, Border.Top));
+  drawStretched(DstPage, tRect.Inset(drawRect, border.left, 0, -border.right, border.top));
 
   srcRect := tRect.Inset(oldRect,-Border.Right, 0, 0, Border.Top);
-  draw(DstPage, atX+DrawWidth-Border.Right, atY);
+  draw(DstPage, drawRect.x+drawRect.width-Border.right, drawRect.y);
 
   {middle part}
+
   srcRect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
   drawStretched(DstPage, TRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
 
-  srcRect := tRect.Inset(oldRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom);
-  drawStretched(DstPage, TRect.Inset(DrawRect, Border.Left, Border.Top, -Border.Right, -Border.Bottom));
+  srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
+  drawStretched(dstPage, tRect.Inset(drawRect, border.left, border.top, -border.right, -border.bottom));
 
   srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
   drawStretched(DstPage, TRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 
+
   {bottom part}
 
   srcRect := tRect.Inset(oldRect,0, -Border.Bottom, Border.Left, 0);
-  draw(DstPage, atX, atY+DrawHeight-Border.Bottom);
+  draw(DstPage, drawRect.x, drawRect.y+drawRect.height-Border.Bottom);
 
   srcRect := tRect.Inset(oldRect,Border.Left, -Border.Bottom, -Border.Right, 0);
   drawStretched(DstPage, TRect.Inset(DrawRect,Border.Left, -Border.Bottom, -Border.Right, 0));
 
   srcRect := tRect.Inset(oldRect,-Border.Right, -Border.Bottom, 0, 0);
-  draw(DstPage, atX+DrawWidth-Border.Right, atY+DrawHeight-Border.Bottom);
+  draw(DstPage, drawRect.x+drawRect.width-Border.Right, drawRect.y+drawRect.height-Border.Bottom);
 
   srcRect := oldRect;
 

@@ -56,6 +56,7 @@ type
     procedure updateHeliCollision(elapsed:single);
   public
     function  weapon: tWeaponSpec;
+    function  baseSprite: tSprite;
     procedure init(aPos: tPoint; aTeam: tTeam; aChassisType: tChassisType);
     function  isSelected: boolean;
     procedure clearTerrain();
@@ -395,6 +396,15 @@ begin
     result := WEAPON_SPEC[tWeaponType.null]
   else
     result := weapons[weaponIdx];
+end;
+
+function tTank.baseSprite: tSprite;
+var
+  baseIdx: integer;
+begin
+  baseIdx := chassis.baseSpriteIdx;
+  if team = TEAM_2 then baseIdx += 16;
+  result := sprites.sprites[baseIdx];
 end;
 
 {tank takes damage at given location in world space. Sender is who delt the damage}
