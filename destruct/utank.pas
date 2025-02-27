@@ -275,7 +275,6 @@ var
   bounds: tRect;
   hitPower: integer;
   p: tParticle;
-  fallSpeed: single;
 begin
 
   support := 0;
@@ -328,6 +327,9 @@ var
   p: tParticle;
   dx,dy: integer;
   delta: V2D;
+  l: integer;
+const
+  padding = 16;
 begin
 
   support := 0;
@@ -342,21 +344,29 @@ begin
     for xlp := bounds.left+3 to bounds.right-3 do begin
       if (getWorldPixel(xlp, ylp).a > 0) and (terrain.isSolid(xlp, ylp)) then begin
         {bump}
-        delta := V2(xlp - xPos, ylp - yPos) * 0.5;
-        vel -= delta;
+        delta := V2(xlp - xPos, 2 + ylp - yPos) * 20;
+        vel -= delta * elapsed;
 
         {create cloud}
         p := nextParticle();
-        p.pos := V2(xlp, ylp);
-        p.vel := V2(rnd-128, rnd-128) * 0.1;
-        p.vel -= delta;
-        p.solid := false;
-        p.col := RGB(128,128,128);
-        p.ttl := 0.25;
+        p.pos := V2(xlp + rnd(3)-1, ylp+rnd(3)-1);
+        p.vel := V2(rnd-128, rnd-128) * 0.2;
+        p.vel -= (delta * 0.2);
+        p.solid := true;
+        p.hasGravity := true;
+        l := 64 + rnd(128);
+        p.col := RGB(l,l,l);
+        p.ttl := 0.2 + (rnd/256)*0.2;
         p.radius := 1;
       end;
     end;
   end;
+
+  {soft and hard boundaries}
+  pos.x := clamp(pos.x, 0, 256);
+  if pos.x < padding then vel.x += (padding-pos.x) * 130 * elapsed;
+  if pos.x > 256-padding then vel.x -= (pos.x-(256-padding)) * 130 * elapsed;
+  if pos.y < (16+padding) then vel.y += ((16+padding)-pos.y) * 130 * elapsed;
 end;
 
 procedure tTank.update(elapsed: single);
