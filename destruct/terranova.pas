@@ -99,8 +99,8 @@ const
   {currently -1 -> water or gas, 0+ -> solid}
   TERRAIN_DECAY: array[tDirtType] of integer = (
     -1, //empty
-    6,  //dirt
-    3,  //sand
+    3,  //dirt
+    6,  //sand
     2,  //rock
     32 ,//grass
     -1, //water

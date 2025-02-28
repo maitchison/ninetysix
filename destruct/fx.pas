@@ -71,11 +71,11 @@ begin
       cell := terrain.getCell(atX+dx, atY+dy);
       if cell.dType in [DT_EMPTY, DT_BEDROCK, DT_TANKCORE] then continue;
       decay := TERRAIN_DECAY[cell.dType];
-      if decay <= 1 then decay := 1;
-      if (cell.dType = DT_LAVA) then decay := 10;
+      if decay < 1 then decay := 1;
+      if (cell.dType = DT_LAVA) then decay := 4;
       z := 1-(sqrt(d2)/radius);
       impact := power * z;
-      if impact < (cell.strength/decay) then continue;
+      if 2*decay*impact < (cell.strength) then continue;
 
       terrain.setCell(atX+dx, atY+dy, emptyCell);
       p := nextParticle();
@@ -86,8 +86,8 @@ begin
       p.vel += V2((rnd-128) * 0.1, (rnd-128) * 0.1);
       p.vel.y += -75;
 
-      {make edges of expslosion less serious}
-      factor := minf(z*5, 1.0);
+      {make edges of explosion less serious}
+      factor := minf(z*2, 1.0);
       p.vel *= factor;
 
       p.ttl := 10;
