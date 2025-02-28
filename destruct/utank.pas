@@ -47,6 +47,8 @@ type
     weapons: array of tWeaponSpec;
     chassis: tChassis;
     cooldown: single;
+    laserOn: single;
+    laserMax: single;
     angle: single;
     power: single;
     health: single;
@@ -132,6 +134,7 @@ const
       health: 700;
       baseSpriteIdx: 16*8;
       defaultWeapons: [
+        tWeaponType.pulseLaser,
         tWeaponType.plasma,
         tWeaponType.microNuke,
         tWeaponType.lavaBomb,
@@ -493,6 +496,10 @@ begin
   inherited update(elapsed);
 
   if cooldown > 0 then cooldown -= elapsed;
+  if laserOn > 0 then begin
+    fireLaser();
+    laserOn -= elapsed;
+  end;
 
   updateAnimation();
   case chassis.animationType of
@@ -500,6 +507,7 @@ begin
     AT_TANK: updateTankCollision(elapsed);
     AT_HELI: updateHeliCollision(elapsed);
   end;
+
 end;
 
 {---------------}
@@ -550,7 +558,16 @@ end;
 
 procedure tTank.fire();
 begin
-  fireProjectile();
+  if (weapon.pType = PT_LASER) then begin
+    if (laserOn <= 0) and (cooldown <= 0) then begin
+      mixer.play(sfx['plasma2'], 0.4);
+      mixer.play(sfx['laser'], 0.7, SCS_OLDEST, 0.5);
+      laserMax := weapon.cooldown * 0.75;
+      laserOn := laserMax;
+      cooldown := weapon.cooldown;
+    end;
+  end else
+    fireProjectile();
 end;
 
 procedure tTank.fireProjectile();
@@ -590,12 +607,20 @@ end;
 procedure tTank.fireLaser();
 var
   hit: tHitInfo;
+  laserLength: single;
+  laserPower: single;
+  t: single;
+  delta: V2D;
 begin
+  t := 1-(laserOn / laserMax);
+  laserLength := 150*clamp(t*2, 0, 1.0);
+  laserPower := sin(t*pi);
   {need to do the following...}
   {1. find hit position}
-  hit := traceRay(xPos, yPos, angle, 100, self);
+  hit := traceRay(xPos, yPos, angle, round(laserLength), self, laserPower);
   if hit.didHit then begin
-    makeSparks(hit.x, hit.y, 3, 5, 0, 0);
+    delta := (V2(hit.x, hit.y) - pos).normed()*-50;
+    makeSparks(hit.x, hit.y, 4, 10, delta.x, delta.y, 1);
     terrain.burn(hit.x, hit.y, 2, 10);
   end;
   {1. stretch draw the line}

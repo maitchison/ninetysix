@@ -6,6 +6,7 @@ uses
   {$i units},
   crt,
   list,
+  template,
   terraNova,
   uWeapon, uTank, uGameObjects, controller;
 
@@ -41,7 +42,7 @@ function  nextParticle: tParticle;
 
 procedure debugShowWorldPixels(screen: tScreen);
 function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
-function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
+function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil;power:single=0): tHitInfo;
 
 procedure damagePlayers(x, y: integer; radius: integer; damage: integer;sender: tGameObject=nil);
 function  randomTank(aTeam: tTeam): tTank;
@@ -93,9 +94,9 @@ var
   go: tGameObject;
 begin
   go := objects[idx];
-//  {$ifdef DEBUG}
+  {$ifdef DEBUG}
   assert(go is tTank, 'Object is not a tTank');
-//  {$endif}
+  {$endif}
   result := tTank(go);
 end;
 
@@ -143,7 +144,8 @@ begin
 end;
 
 {returns first object that ray intersects with}
-function traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil): tHitInfo;
+{also adds particles, if power > 0}
+function traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil;power: single=0): tHitInfo;
 var
   x,y: single;
   rx,ry: integer;
@@ -160,12 +162,16 @@ begin
   x := x1+0.5; y := y1+0.5;
   for i := 0 to maxDistance do begin
     rx := round(x); ry := round(y);
+    if word(rx) > 255 then break;
 
-    if rnd > 128 then begin
+    if rnd < (64*power) then begin
       p := nextParticle();
       if assigned(p) then begin
         p.pos.x := x;
         p.pos.y := y;
+        p.col.init(255,round(70*power),round(30*power));
+        p.blend := TDM_ADD;
+        p.radius := 1;
         p.vel.x := gaus * 20;
         p.vel.y := gaus * 20;
         p.ttl := 0.1;

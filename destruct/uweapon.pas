@@ -60,7 +60,8 @@ type
     smallDirt,
     largeDirt,
     lavaBomb,
-    plasma
+    plasma,
+    pulseLaser
   );
 
 const
@@ -78,7 +79,8 @@ const
     (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 100;  pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
     (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 500;  pType: PT_DIRT;   dType: DT_SAND; cooldown: 2.5),
     (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 100;  pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 13; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0)
+    (tag: 'Plasma';       spriteIdx: 16*11 + 13; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0),
+    (tag: 'Pulse Laser';  spriteIdx: 16*11 + 12; damage: 100;  pType: PT_LASER;  dType: DT_NONE; cooldown: 1.0)
   );
 
 
@@ -145,7 +147,8 @@ begin
   targetDamage := damage;
 
   case pType of
-    PT_NONE:
+    PT_NONE,
+    PT_LASER:
       ;
     PT_BULLET: begin
       mixer.play(sfx['hit1'] , 0.8);
@@ -181,8 +184,6 @@ begin
       makeDust(xPos, yPos, round(sqrt(damage)), dType, 25.0, grad.x*25, grad.y*25, 1.0);
       targetDamage := 0;
     end;
-    PT_LASER:
-      ; // pass;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;
 
