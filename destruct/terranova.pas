@@ -325,8 +325,8 @@ begin
     phase[i] := (rnd/256)*2*pi;
 
   for x := 0 to 255 do begin
-    dirtHeight[x] := 128 + round(30*sin(phase[1]+x*0.0197) - 67*cos(phase[2]+x*0.003) + 15*sin(phase[3]+x*0.023));
-    rockHeight[x] := 200 + round(30*sin(phase[4]+x*0.0197) - 67*cos(phase[5]+x*0.003) + 15*sin(phase[6]+x*0.023)) div 4;
+    dirtHeight[x] := 158 + round(30*sin(phase[1]+x*0.0197) - 67*cos(phase[2]+x*0.003) + 15*sin(phase[3]+x*0.023));
+    rockHeight[x] := 220 + round(30*sin(phase[4]+x*0.0197) - 67*cos(phase[5]+x*0.003) + 15*sin(phase[6]+x*0.023)) div 4;
   end;
 
   for y := 0 to 255 do begin

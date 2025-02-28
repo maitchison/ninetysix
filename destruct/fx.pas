@@ -69,7 +69,7 @@ begin
       d2 := (dx*dx)+(dy*dy);
       if d2 > r2 then continue;
       cell := terrain.getCell(atX+dx, atY+dy);
-      if cell.dType in [DT_EMPTY, DT_BEDROCK, DT_TANKCORE] then continue;
+      if cell.dType in [DT_EMPTY, DT_BEDROCK, DT_TANKCORE, DT_ROCK] then continue;
       decay := TERRAIN_DECAY[cell.dType];
       if decay < 1 then decay := 1;
       if (cell.dType = DT_LAVA) then decay := 4;
