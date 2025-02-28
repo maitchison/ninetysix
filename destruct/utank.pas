@@ -50,6 +50,7 @@ type
     health: integer;
     lastProjectile: tProjectile;
     weaponIdx: integer;
+    prevX, prevY: integer;
   protected
     procedure updateAnimation();
     procedure updateTankCollision(elapsed:single);
@@ -88,6 +89,7 @@ const
       health: 350;
       baseSpriteIdx: 0;
       defaultWeapons: [
+        tWeaponType.plasma,
         tWeaponType.blast,
         tWeaponType.microNuke,
         tWeaponType.tracer,
@@ -153,6 +155,8 @@ begin
   status := GO_ACTIVE;
   pos.x := aPos.x;
   pos.y := aPos.y;
+  prevX := -99;
+  prevY := -99;
   team := aTeam;
   applyChassis(CHASSIS_DEF[aChassisType]);
 end;
@@ -269,6 +273,24 @@ begin
   );
 end;
 
+{set tank core tiles at given location}
+procedure setCore(atX, atY: integer; dType: tDirtType);
+var
+  dx,dy: integer;
+  cell: tCellInfo;
+begin
+
+  cell.dType := dType;
+  if dType = DT_EMPTY then
+    cell.strength := 0
+  else
+    cell.strength := 255;
+
+  for dy := 1 to 4 do
+    for dx := -5 to 5 do
+      terrain.setCell(atX+dx, atY+dy, cell);
+end;
+
 procedure tTank.updateTankCollision(elapsed: single);
 var
   support: integer;
@@ -276,6 +298,7 @@ var
   bounds: tRect;
   hitPower: integer;
   p: tParticle;
+  l: integer;
 begin
 
   support := 0;
@@ -301,21 +324,31 @@ begin
     y := bounds.bottom;
     for x := bounds.left+3 to bounds.right-3 do begin
       {make a little cloud}
-      for i := 1 to 1 do begin
+      for i := 1 to 2 do begin
         p := nextParticle();
         p.pos := V2(x, y);
-        p.vel := V2(rnd-128, rnd-128) * 0.2;
-        p.solid := true;
+        p.vel := V2(rnd-128, rnd-128) * 0.1;
+        p.vel.y -= 10;
+        p.solid := false;
         //p.col := terrain.dirtColor.getPixel(x, y);
         //if p.col.a = 0 then p.col := RGB(200,200,200);
-        p.col := RGB(128,128,128);
-        p.ttl := 0.25;
+        l := 70 + rnd(70);
+        p.col := RGB(l,l,l);
+        p.ttl := 0.25+(rnd/256)*0.35;
         p.radius := 1;
       end;
       {burn it}
       terrain.burn(x, bounds.bottom-3, 2, round(hitPower/support/16));
     end;
     vel.y := 0;
+  end;
+
+  {interaction with terrain}
+  if (xPos <> prevX) or (yPos <> prevY) then begin
+    setCore(prevX, prevY, DT_EMPTY);
+    setCore(xPos, yPos, DT_TANKCORE);
+    prevX := xPos;
+    prevY := yPos;
   end;
 end;
 

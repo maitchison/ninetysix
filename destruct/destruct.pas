@@ -365,6 +365,7 @@ begin
     startTimer('update');
     updateAll(elapsed);
     stopTimer('update');
+
     startTimer('draw');
     drawAll(screen);
     stopTimer('draw');
@@ -376,7 +377,6 @@ begin
     startTimer('drawTerrain');
     terrain.draw(screen);
     stopTimer('drawTerrain');
-
 
     {gui}
     startTimer('guiUpdate');

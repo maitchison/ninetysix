@@ -20,7 +20,7 @@ const
 
 type
 
-  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER, DT_LAVA, DT_OBSIDIAN, DT_BEDROCK);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER, DT_LAVA, DT_OBSIDIAN, DT_BEDROCK, DT_TANKCORE);
 
   tCellInfo = record
     case byte of
@@ -82,21 +82,23 @@ const
     (b:$fd; g:$30; r:$2d; a: $ff), //water
     (b:$04; g:$08; r:$ad; a: $ff), //lava
     (b:$6e; g:$40; r:$39; a: $ff), //obsidian
-    (b:$10; g:$20; r:$30; a: $ff)  //bedrock
+    (b:$10; g:$20; r:$30; a: $ff), //bedrock
+    (b:$ff; g:$00; r:$ff; a: $00)  //tankCore
   );
 
   {todo: seperate table for type, i.e solid,liquid,gas}
   {currently -1 -> water or gas, 0+ -> solid}
   TERRAIN_DECAY: array[tDirtType] of integer = (
     -1, //empty
-    6, //dirt
-    3, //sand
-    2, //rock
-    32,//grass
+    6,  //dirt
+    3,  //sand
+    2,  //rock
+    32 ,//grass
     -1, //water
     -1, //lava
-    1, //obsidian
-    0  //bedrock
+    1,  //obsidian
+    0,  //bedrock
+    0   //tank
   );
 
 
@@ -398,6 +400,7 @@ var
           c := sky.getPixel(x,y)
         else
           c := terrainColorLookup[cell.dtype, cell.strength];
+        if c.a = 0 then continue;
         screen.background.setPixel(x+VIEWPORT_X, y+VIEWPORT_Y, c);
       end;
     end;
@@ -432,6 +435,9 @@ var
 
       test ah, ah
       jz  @SKY
+      cmp ah, byte(DT_TANKCORE)
+      je  @SKY
+
       jmp @TERRAIN
     @SKY:
       mov eax, [ebx]
@@ -566,7 +572,8 @@ begin
       case cell.dtype of
         DT_EMPTY,
         DT_ROCK,
-        DT_BEDROCK:
+        DT_BEDROCK,
+        DT_TANKCORE:
           ;
         DT_DIRT: checkAndMove(0,1);
         DT_OBSIDIAN: begin
