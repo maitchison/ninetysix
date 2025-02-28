@@ -11,7 +11,7 @@ uses
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);
-procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
+procedure makeSmoke(atX, atY: single; power: single; vel: single=10;vx: single=0; vy: single=0);
 procedure makeDust(atX, atY: integer; radius: integer; dType: tDirtType; vel: single=25.0; vx: single=0; vy: single=0;density: single = 1.0);
 procedure makeElectricSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0; n: integer=-1);
 procedure makeSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0;n: integer=-1);
@@ -85,7 +85,7 @@ begin
   note('Explosion took explode:%fms burn:%fms', [1000*getTimer('explosion').elapsed, 1000*getTimer('burn').elapsed]);
 end;
 
-procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
+procedure makeSmoke(atX, atY: single; power: single; vel: single=10;vx: single=0;vy: single=0);
 var
   i: integer;
   p: tParticle;
@@ -103,14 +103,14 @@ begin
     p.pos := V2Polar(angle, z*radius);
     p.pos += V2(atX, atY);
     case clamp(round(z*3), 0, 2) of
-      0: p.col := RGB(32,32,32);
-      1: p.col := RGB(64,64,64);
-      2: p.col := RGB(48,48,48);
+      0: p.col := RGB(200,200,200);
+      1: p.col := RGB(170,170,170);
+      2: p.col := RGB(128,128,128);
     end;
-    p.vel := V2Polar(angle, (vel+z));
-    p.ttl := 0.25 + 0.1*(rnd/256);
+    p.vel := V2Polar(angle, (vel+z)) + V2(vx, vy);
+    p.ttl := 0.15 + 0.1*(rnd/256);
     p.solid := true;
-    p.radius := 2+rnd(3);
+    p.radius := 2+rnd(2);
     p.blend := TDM_BLEND
   end;
 end;

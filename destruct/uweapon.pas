@@ -237,7 +237,7 @@ begin
     end;
     PT_ROCKET: begin
       dir := vel.normed();
-      makeSmoke(xPos - round(dir.x*6), yPos - round(dir.y*6), 1, 4);
+      makeSmoke(xPos - round(dir.x*5), yPos - round(dir.y*5), 1, 4, -(dir.x*4), -(dir.y*4));
     end;
   end;
 

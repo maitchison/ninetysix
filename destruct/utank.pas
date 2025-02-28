@@ -88,6 +88,7 @@ const
       health: 350;
       baseSpriteIdx: 0;
       defaultWeapons: [
+        tWeaponType.microNuke,
         tWeaponType.tracer,
         tWeaponType.blast,
         tWeaponType.smallDirt,
