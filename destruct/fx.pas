@@ -74,12 +74,15 @@ begin
     d := sqrt(d2);
     p.pos.x := atX+dx;
     p.pos.y := atY+dy;
+    p.radius := 1;
+    p.ttl := 0.25+(rnd/256)*0.25 + (d2/r2);
     case clamp(round(d/radius*3), 0, 2) of
       0: p.col := RGB($FFFEC729);
       1: p.col := RGB($FFF47817);
       2: p.col := RGB($FFC5361D);
     end;
     p.vel := V2(dx, dy).normed() * (0.5 + sqrt(d)) + V2(rnd-128, rnd-128) * 0.1;
+    p.blend := TDM_BLEND;
   end;
   stopTimer('explosion');
   note('Explosion took explode:%fms burn:%fms', [1000*getTimer('explosion').elapsed, 1000*getTimer('burn').elapsed]);
