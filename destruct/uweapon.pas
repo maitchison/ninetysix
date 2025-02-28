@@ -152,17 +152,19 @@ begin
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
       if assigned(other) then
         makeSparks(xPos, yPos, 2, 10, -(vel.x/2), -(vel.y/2));
+      doBump(xPos, yPos, round(hitRadius*1.25), 10.0);
     end;
     PT_SHELL: begin
       mixer.play(sfx['explode'] , 0.10);
       {todo: before burn turn half of pixels into particles}
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
+      doBump(xPos, yPos, round(hitRadius*1.25), 20.0);
       makeExplosion(xPos, yPos, hitRadius);
     end;
     PT_ROCKET: begin
       mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
-      doBump(xPos, yPos, hitRadius+8, 1.0);
+      doBump(xPos, yPos, round(hitRadius*1.25), 40.0);
       makeExplosion(xPos, yPos, hitRadius);
       targetDamage := damage div 2;
       damagePlayers(xPos, yPos, hitRadius, damage div 2, owner);

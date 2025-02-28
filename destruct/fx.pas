@@ -10,7 +10,7 @@ uses
   uGameObjects;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
-procedure doBump(atX, atY: integer; radius: integer;density: single);
+procedure doBump(atX, atY: integer; radius: integer;power: single);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10;vx: single=0; vy: single=0);
 procedure makeDust(atX, atY: integer; radius: integer; dType: tDirtType; vel: single=25.0; vx: single=0; vy: single=0;density: single = 1.0);
@@ -47,7 +47,7 @@ begin
 end;
 
 {turns cells into dust particles}
-procedure doBump(atX, atY: integer; radius: integer;density: single);
+procedure doBump(atX, atY: integer; radius: integer;power: single);
 var
   i: integer;
   p: tParticle;
@@ -58,10 +58,8 @@ var
   r2,d2: integer;
   cell, emptyCell: tCellInfo;
   decay: integer;
-  power: single;
-const
-  vx = 0.0;
-  vy = -80.0;
+  impact: single;
+  factor: single;
 begin
   r2 := radius*radius;
   emptyCell.dType := DT_EMPTY;
@@ -70,21 +68,27 @@ begin
     for dx := -radius to +radius do begin
       d2 := (dx*dx)+(dy*dy);
       if d2 > r2 then continue;
-      if (rnd/255) > density then continue;
       cell := terrain.getCell(atX+dx, atY+dy);
       if cell.dType = DT_EMPTY then continue;
       decay := TERRAIN_DECAY[cell.dType];
       if decay <= 0 then continue;
-      power := 20 * (sqrt(d2)/sqrt(r2)) + (rnd div 16);
-      if (power) < (cell.strength/decay) then continue;
+      z := (sqrt(d2)/sqrt(r2));
+      impact := power * z;
+      if impact < (cell.strength/decay) then continue;
 
       terrain.setCell(atX+dx, atY+dy, emptyCell);
       p := nextParticle();
       p.pos.x := atX + dx;
       p.pos.y := atY + dy;
 
-      p.vel := V2(vx, vy);
-      p.vel += V2(rnd-128, rnd-128) * 0.2;
+      p.vel := V2(dx,dy).normed()*10;
+      p.vel += V2((rnd-128) * 0.1, (rnd-128) * 0.1);
+      p.vel.y += -75;
+
+      {make edges of explosion less serious}
+      factor := minf(z*1.5, 1.0);
+      p.vel *= factor;
+
       p.ttl := 10;
       p.solid := true;
       p.radius := 1;
