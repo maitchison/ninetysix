@@ -337,6 +337,7 @@ begin
   player2 := nil;
 
   terrain := tTerrain.create();
+  terrain.onCellDamage := uTank.respondToTankCellDamage();
 
 end;
 

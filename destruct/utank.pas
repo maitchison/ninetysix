@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  terraNova,
   uWeapon, uGameObjects;
 
 type
@@ -47,7 +48,7 @@ type
     cooldown: single;
     angle: single;
     power: single;
-    health: integer;
+    health: single;
     lastProjectile: tProjectile;
     weaponIdx: integer;
     prevX, prevY: integer;
@@ -55,6 +56,7 @@ type
     procedure updateAnimation();
     procedure updateTankCollision(elapsed:single);
     procedure updateHeliCollision(elapsed:single);
+    procedure setCore(atX, atY: integer; dType: tDirtType);
   public
     function  weapon: tWeaponSpec;
     function  baseSprite: tSprite;
@@ -67,7 +69,7 @@ type
     procedure draw(screen: tScreen); override;
     procedure applyControl(xAction, yAction: single; elapsed: single);
     procedure adjustAim(deltaAngle: single; deltaPower: single = 0);
-    procedure takeDamage(atX,atY: integer; damage: integer;sender: tObject=nil);
+    procedure takeDamage(atX,atY: integer; damage: single;sender: tObject=nil);
     procedure explode();
     procedure fire();
   end;
@@ -136,13 +138,30 @@ const
     )
   );
 
+procedure respondToTankCellDamage(x,y: integer;damage: integer);
+
 implementation
 
 uses
-  fx, terraNova, res, game;
+  fx, res, game;
 
 const
   DEBUG_SHOW_TANK_SUPPORT = false;
+
+{-----------------------------------------------------------}
+
+{handles tile burning transfering to tank}
+procedure respondToTankCellDamage(x,y: integer;damage: integer);
+var
+  obj: tGameObject;
+  tank: tTank;
+begin
+  obj := game.getObjectAtPos(x,y);
+  if not assigned(obj) then exit;
+  if not (obj is tTank) then exit;
+  tank := tTank(obj);
+  tank.takeDamage(x,y,damage*0.15);
+end;
 
 {-----------------------------------------------------------}
 
@@ -274,10 +293,11 @@ begin
 end;
 
 {set tank core tiles at given location}
-procedure setCore(atX, atY: integer; dType: tDirtType);
+procedure tTank.setCore(atX, atY: integer; dType: tDirtType);
 var
   dx,dy: integer;
   cell: tCellInfo;
+  coreStart: integer;
 begin
 
   cell.dType := dType;
@@ -286,7 +306,12 @@ begin
   else
     cell.strength := 255;
 
-  for dy := 1 to 4 do
+  case chassis.chassisType of
+    CT_LAUNCHER: coreStart := 3;
+    else coreStart := 1;
+  end;
+
+  for dy := coreStart to 4 do
     for dx := -5 to 5 do
       terrain.setCell(atX+dx, atY+dy, cell);
 end;
@@ -422,6 +447,11 @@ var
   drag: V2D;
 begin
 
+  if (health <= 0) then begin
+    explode();
+    exit;
+  end;
+
   {enforce a strict speed limit}
   vel.x := clamp(vel.x, -500, 500);
   vel.y := clamp(vel.y, -500, 500);
@@ -459,18 +489,13 @@ begin
 end;
 
 {tank takes damage at given location in world space. Sender is who delt the damage}
-procedure tTank.takeDamage(atX,atY: integer; damage: integer; sender: tObject=nil);
+procedure tTank.takeDamage(atX,atY: integer; damage: single; sender: tObject=nil);
 var
   v: V2D;
 begin
   health -= damage;
-
   {todo: add debris}
   v := (V2(atX, atY) - pos).normed() * 70;
-
-  if health < 0 then begin
-    explode();
-  end;
 end;
 
 procedure tTank.fire();
@@ -531,7 +556,9 @@ begin
   if status <> GO_ACTIVE then exit;
   mixer.play(sfx['explode'], 0.6);
   makeExplosion(xPos, yPos, 20);
+  doBump(xPos, yPos, 30, 50);
   markForRemoval();
+  setCore(prevX, prevY, DT_EMPTY);
 end;
 
 procedure tTank.applyControl(xAction, yAction: single; elapsed: single);

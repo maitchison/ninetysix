@@ -31,12 +31,17 @@ type
     1: (code: word);
   end;
 
+  pCellInfo = ^tCellInfo;
+
   tBlockInfo = record
     status: byte;
   end;
 
   tCellInfoArray = array[0..256-1, 0..256-1] of tCellInfo;
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
+
+  tCellChangeHook = procedure (x,y: integer;cell: pCellInfo);
+  tCellDamageHook = procedure (x,y: integer;damage: integer);
 
   tTerrain = class
   protected
@@ -46,6 +51,10 @@ type
     timeUntilNextSolve: single;
     tick: dword;
   public
+
+    {fired only for DT_TANKCORE}
+    onCellChange: tCellChangeHook;
+    onCellDamage: tCellDamageHook;
 
     sky: tPage;
 
@@ -83,7 +92,7 @@ const
     (b:$04; g:$08; r:$ad; a: $ff), //lava
     (b:$6e; g:$40; r:$39; a: $ff), //obsidian
     (b:$10; g:$20; r:$30; a: $ff), //bedrock
-    (b:$ff; g:$00; r:$ff; a: $00)  //tankCore
+    (b:$ff; g:$00; r:$ff; a: $00)  //tankcore
   );
 
   {todo: seperate table for type, i.e solid,liquid,gas}
@@ -98,7 +107,7 @@ const
     -1, //lava
     1,  //obsidian
     0,  //bedrock
-    0   //tank
+    1   //tankcore
   );
 
 
@@ -551,11 +560,17 @@ var
   {returns head transfered}
   function doBurn(dx,dy: integer;burn: integer): integer; inline;
   begin
-    {todo: no bounds checking..}
-    if (dword(x+dx) and $ffffff00) <> 0 then exit(0);
-    if (dword(y+dy) and $ffffff00) <> 0 then exit(0);
-    if (terrain.cellInfo[y+dy,x+dx].dtype in [DT_EMPTY, DT_LAVA, DT_OBSIDIAN]) then exit(0);
-    terrain.burn(x+dx, y+dy, 1, burn);
+    if dword(x+dx) > 255 then exit(0);
+    if dword(y+dy) > 255 then exit(0);
+    dType := terrain.cellInfo[y+dy,x+dx].dType;
+    case dType of
+      DT_EMPTY, DT_LAVA, DT_OBSIDIAN: exit(0);
+      DT_TANKCORE: begin
+        if assigned(terrain.onCellDamage) then
+          terrain.onCellDamage(x+dx,y+dy,1);
+      end;
+      else terrain.burn(x+dx, y+dy, 1, burn);
+    end;
     result := 1;
   end;
 
