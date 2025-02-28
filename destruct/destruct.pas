@@ -399,6 +399,10 @@ begin
       terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_LAVA);
     if keyDown(key_4) then
       makeDust(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND, 25.0, 0, 0, elapsed);
+    if keyDown(key_8) then
+      doBump(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 30, 50);
+
+
     if keyDown(key_9) then
       makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
 

@@ -312,7 +312,7 @@ begin
   end;
 
   for dy := coreStart to 4 do
-    for dx := -5 to 5 do
+    for dx := -4 to 4 do
       terrain.setCell(atX+dx, atY+dy, cell);
 end;
 

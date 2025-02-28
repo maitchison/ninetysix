@@ -69,10 +69,11 @@ begin
       d2 := (dx*dx)+(dy*dy);
       if d2 > r2 then continue;
       cell := terrain.getCell(atX+dx, atY+dy);
-      if cell.dType = DT_EMPTY then continue;
+      if cell.dType in [DT_EMPTY, DT_BEDROCK, DT_TANKCORE] then continue;
       decay := TERRAIN_DECAY[cell.dType];
-      if decay <= 0 then continue;
-      z := (sqrt(d2)/sqrt(r2));
+      if decay <= 1 then decay := 1;
+      if (cell.dType = DT_LAVA) then decay := 10;
+      z := 1-(sqrt(d2)/radius);
       impact := power * z;
       if impact < (cell.strength/decay) then continue;
 
