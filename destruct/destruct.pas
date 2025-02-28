@@ -315,17 +315,18 @@ begin
   tanks[1].init(findNewTankPosition(1), TEAM_1, CT_LAUNCHER);
   tanks[2].init(findNewTankPosition(1), TEAM_1, CT_HEAVY);
 
-  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_HELI);
-  //tanks[5].init(findNewTankPosition(2), TEAM_2, CT_TANK);
-{  tanks[6].init(findNewTankPosition(2), TEAM_2, CT_LAUNCHER);
-  tanks[7].init(findNewTankPosition(2), TEAM_2, CT_HEAVY);}
+//  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_HELI);
+  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_TANK);
+  tanks[6].init(findNewTankPosition(2), TEAM_2, CT_LAUNCHER);
+  tanks[7].init(findNewTankPosition(2), TEAM_2, CT_HEAVY);
 
   for tank in tanks do
     if tank.isActive then tank.clearTerrain();
 
   {setup controllers}
   player1 := tAIController.create(0);
-  player2 := tHumanController.create(5);
+  player2 := tAIController.create(5);
+  //player2 := tHumanController.create(5);
 
   {setup gui}
   gui := tGuiComponents.create();
@@ -359,9 +360,9 @@ begin
 
     case gameState of
       GS_PLAYING: begin
-        //player1.process(elapsed);
+        player1.process(elapsed);
         player2.process(elapsed);
-        //player1.apply(elapsed);
+        player1.apply(elapsed);
         player2.apply(elapsed);
       end;
       GS_ENDED: begin

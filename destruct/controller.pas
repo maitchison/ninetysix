@@ -232,6 +232,7 @@ end;
 procedure tAIController.process(elapsed: single);
 var
   delta: single;
+  otherTeam: tTeam;
 begin
   inherited process(elapsed);
 
@@ -265,7 +266,12 @@ begin
   if not assigned(target) then begin
     note('Selecting new target');
     stateTimer := 0;
-    target := randomTank(TEAM_2);
+    if tank.team = TEAM_1 then
+      otherTeam := TEAM_2
+    else
+      otherTeam := TEAM_1;
+
+    target := randomTank(otherTeam);
 
     switchDelay := rnd(10);
 
