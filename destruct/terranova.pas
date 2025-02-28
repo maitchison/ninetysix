@@ -85,16 +85,6 @@ const
     (b:$10; g:$20; r:$30; a: $ff)  //bedrock
   );
 
-
-implementation
-
-uses
-  uGameObjects,
-  game,
-  keyboard; {for debugging}
-
-const
-
   {todo: seperate table for type, i.e solid,liquid,gas}
   {currently -1 -> water or gas, 0+ -> solid}
   TERRAIN_DECAY: array[tDirtType] of integer = (
@@ -108,6 +98,14 @@ const
     1, //obsidian
     0  //bedrock
   );
+
+
+implementation
+
+uses
+  uGameObjects,
+  game,
+  keyboard; {for debugging}
 
 var
   terrainColorLookup: array[tDirtType, 0..255] of RGBA;

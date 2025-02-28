@@ -10,6 +10,7 @@ uses
   uGameObjects;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
+procedure doBump(atX, atY: integer; radius: integer;density: single);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10;vx: single=0; vy: single=0);
 procedure makeDust(atX, atY: integer; radius: integer; dType: tDirtType; vel: single=25.0; vx: single=0; vy: single=0;density: single = 1.0);
@@ -44,6 +45,56 @@ begin
 
   screen.markRegion(rect(x-1, y-1, 3, 3));
 end;
+
+{turns cells into dust particles}
+procedure doBump(atX, atY: integer; radius: integer;density: single);
+var
+  i: integer;
+  p: tParticle;
+  z: single;
+  angle: single;
+  dx,dy: integer;
+  x,y: integer;
+  r2,d2: integer;
+  cell, emptyCell: tCellInfo;
+  decay: integer;
+  power: single;
+const
+  vx = 0.0;
+  vy = -80.0;
+begin
+  r2 := radius*radius;
+  emptyCell.dType := DT_EMPTY;
+  emptyCell.strength := 0;
+  for dy := -radius to + radius do begin
+    for dx := -radius to +radius do begin
+      d2 := (dx*dx)+(dy*dy);
+      if d2 > r2 then continue;
+      if (rnd/255) > density then continue;
+      cell := terrain.getCell(atX+dx, atY+dy);
+      if cell.dType = DT_EMPTY then continue;
+      decay := TERRAIN_DECAY[cell.dType];
+      if decay <= 0 then continue;
+      power := 20 * (sqrt(d2)/sqrt(r2)) + (rnd div 16);
+      if (power) < (cell.strength/decay) then continue;
+
+      terrain.setCell(atX+dx, atY+dy, emptyCell);
+      p := nextParticle();
+      p.pos.x := atX + dx;
+      p.pos.y := atY + dy;
+
+      p.vel := V2(vx, vy);
+      p.vel += V2(rnd-128, rnd-128) * 0.2;
+      p.ttl := 10;
+      p.solid := true;
+      p.radius := 1;
+      p.cell := cell;
+      p.col := terrain.getCellColor(p.cell);
+      p.hasGravity := true;
+    end;
+  end;
+end;
+
 
 procedure makeExplosion(atX, atY: single; power: single);
 var

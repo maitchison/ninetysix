@@ -158,11 +158,11 @@ begin
       {todo: before burn turn half of pixels into particles}
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
       makeExplosion(xPos, yPos, hitRadius);
-
     end;
     PT_ROCKET: begin
       mixer.play(sfx['explode'] , 0.3);
       terrain.burn(xPos, yPos, hitRadius, clamp(damage, 5, 80));
+      doBump(xPos, yPos, hitRadius+8, 1.0);
       makeExplosion(xPos, yPos, hitRadius);
       targetDamage := damage div 2;
       damagePlayers(xPos, yPos, hitRadius, damage div 2, owner);
