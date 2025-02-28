@@ -19,7 +19,7 @@ const
 
 type
 
-  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER, DT_LAVA, DT_OBSIDIAN);
+  tDirtType = (DT_EMPTY, DT_DIRT, DT_SAND, DT_ROCK, DT_GRASS, DT_WATER, DT_LAVA, DT_OBSIDIAN, DT_BEDROCK);
 
   tCellInfo = record
     case byte of
@@ -97,7 +97,8 @@ const
     (b:$5d; g:$80; r:$0d; a: $ff), //grass
     (b:$fd; g:$30; r:$2d; a: $ff), //water
     (b:$04; g:$08; r:$ad; a: $ff), //lava
-    (b:$6e; g:$40; r:$39; a: $ff)  //obsidian
+    (b:$6e; g:$40; r:$39; a: $ff), //obsidian
+    (b:$10; g:$20; r:$30; a: $ff)  //bedrock
   );
 
 
@@ -110,15 +111,18 @@ uses
 
 const
 
+  {todo: seperate table for type, i.e solid,liquid,gas}
+  {currently -1 -> water or gas, 0+ -> solid}
   TERRAIN_DECAY: array[tDirtType] of integer = (
-    0, //empty
+    -1, //empty
     6, //dirt
     3, //sand
     2, //rock
     32,//grass
-    0, //water
-    0, //lava
-    1  //obsidian
+    -1, //water
+    -1, //lava
+    1, //obsidian
+    0  //bedrock
   );
 
 var
@@ -174,7 +178,7 @@ end;
 
 function tTerrain.isSolid(x, y: integer): boolean; inline;
 begin
-  result := TERRAIN_DECAY[getCell(x, y).dType] <> 0;
+  result := TERRAIN_DECAY[getCell(x, y).dType] >= 0;
 end;
 
 function tTerrain.getAttr(x,y: integer): tCellAttributes; inline;
@@ -221,6 +225,7 @@ begin
       if (dst2 > r2) then continue;
       cell := getCell(x,y);
       if cell.dType = DT_EMPTY then continue;
+      if TERRAIN_DECAY[cell.dtype] <= 0 then continue;
       {linear fall off}
       dimFactor := round((1-(dst2/r2)) * power) * TERRAIN_DECAY[cell.dtype];
       {spherical fall off}
@@ -261,6 +266,8 @@ begin
     for dx := -r to +r do begin
       x := atX+dx;
       y := atY+dy;
+      if word(x)>255 then continue;
+      if word(y)>255 then continue;
       dst2 := (dx*dx)+(dy*dy);
       if (dst2 > r2) then continue;
       if isSolid(x, y) then continue;
@@ -320,6 +327,7 @@ var
   c: RGBA;
   cell: tCellInfo;
   v: single;
+  prob: single;
 begin
 
   clear();
@@ -342,6 +350,22 @@ begin
       cell.strength := 220+rnd(30);
       if (y = min(dirtHeight[x], rockHeight[x])) then cell.strength -= 50;
 
+      setCell(x, y, cell);
+    end;
+  end;
+
+  {add bedrock layer}
+  for y := 235 to 255 do begin
+    case y of
+      235: prob := 0.25;
+      236: prob := 0.50;
+      237: prob := 0.75;
+      else prob := 1.0;
+    end;
+    for x := 0 to 255 do begin
+      if (rnd/255) > prob then continue;
+      cell.dType := DT_BEDROCK;
+      cell.strength := 200+rnd(50);
       setCell(x, y, cell);
     end;
   end;
@@ -528,7 +552,7 @@ var
     if (dword(y+dy) and $ffffff00) <> 0 then exit(false);
     dtype := terrain.cellInfo[y+dy,x+dx].dtype;
     {we can swap with liquids, but liquids so not self swap}
-    result := (TERRAIN_DECAY[dType] = 0) and (dtype <> cell.dType);
+    result := (TERRAIN_DECAY[dType] < 0) and (dtype <> cell.dType);
     if result then doMove(dx,dy);
   end;
 
@@ -563,8 +587,10 @@ begin
       x := gx*8+j;
       cell := terrain.cellInfo[y,x];
       case cell.dtype of
-        DT_EMPTY: ;
-        DT_ROCK: ;
+        DT_EMPTY,
+        DT_ROCK,
+        DT_BEDROCK:
+          ;
         DT_DIRT: checkAndMove(0,1);
         DT_OBSIDIAN: begin
           {slowly move down in water}
@@ -676,6 +702,8 @@ begin
   for cx := -1 to 1 do begin
     for cy := -1 to 1 do begin
       delta := changes[cx,cy];
+      if word(gx+cx) >= 32 then continue;
+      if word(gy+cy) >= 32 then continue;
       // let all neighbours know to check themselves
       terrain.blockInfo[gy+cy, gx+cx].status := terrain.blockInfo[gy+cy, gx+cx].status and (not BS_INACTIVE);
       if delta = 0 then continue;
