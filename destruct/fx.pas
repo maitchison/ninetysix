@@ -12,8 +12,8 @@ uses
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
-procedure makeDust(atX, atY: single; radius: single; dType: tDirtType; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
-procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
+procedure makeDust(atX, atY: integer; radius: integer; dType: tDirtType; vel: single=25.0; vx: single=0; vy: single=0;density: single = 1.0);
+procedure makeSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0;n: integer=-1);
 
 implementation
 
@@ -114,7 +114,7 @@ begin
   end;
 end;
 
-procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0; n: integer=-1);
+procedure makeSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0; n: integer=-1);
 var
   i: integer;
   p: tParticle;
@@ -141,29 +141,38 @@ begin
   end;
 end;
 
-procedure makeDust(atX, atY: single; radius: single; dType: tDirtType; vel: single=25; vx: single=0; vy: single=0; n: integer=-1);
+procedure makeDust(atX, atY: integer; radius: integer; dType: tDirtType; vel: single=25.0; vx: single=0; vy: single=0; density: single=1.0);
 var
   i: integer;
   p: tParticle;
   z: single;
   angle: single;
+  dx,dy: integer;
+  x,y: integer;
+  r2,d2: integer;
 begin
-  if n < 0 then
-    n := round(radius * radius);
-  for i := 0 to n-1 do begin
-    p := nextParticle();
-    z := (rnd/255);
-    angle := rnd/255*360;
-    p.pos := V2Polar(angle, z*radius);
-    p.pos += V2(atX, atY);
-    p.col := TERRAIN_COLOR[DT_DIRT];
-    p.vel := V2Polar(angle, (vel+z)) + V2(vx, vy);
-    p.ttl := 10;
-    p.solid := true;
-    p.radius := 1;
-    p.cell.dType := dType;
-    p.cell.strength := 200 + rnd(40);
-    p.hasGravity := true;
+  r2 := radius*radius;
+  for dy := -radius to + radius do begin
+    for dx := -radius to +radius do begin
+      d2 := dx*dx+dy*dy;
+      if (rnd/255) > density then continue;
+      if d2 > r2 then continue;
+      if terrain.isSolid(atX+dx, atY+dy) then continue;
+      p := nextParticle();
+      p.pos.x := atX + dx;
+      p.pos.y := atY + dy;
+      z := sqrt(d2)/sqrt(r2);
+      p.vel := V2(dx, dy) * (vel * z);
+      p.vel += V2(vx, vy);
+      p.vel += V2(rnd-128, rnd-128) * 0.1;
+      p.ttl := 10;
+      p.solid := true;
+      p.radius := 1;
+      p.cell.dType := dType;
+      p.cell.strength := 200 + rnd(40);
+      p.col := terrain.getCellColor(p.cell);
+      p.hasGravity := true;
+    end;
   end;
 end;
 

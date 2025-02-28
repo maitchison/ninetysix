@@ -30,31 +30,16 @@ type
     1: (code: word);
   end;
 
-  tCellAttributes = record
-    x,y,vx,vy: int8;
-  end;
-
-  {optimized for MMX reads, also is 32bytes so fits into a cache line.}
-  tTerrainLine = packed record
-    x: array[0..7] of int8;
-    y: array[0..7] of int8;
-    vx: array[0..7] of int8;
-    vy: array[0..7] of int8;
-  end;
-
   tBlockInfo = record
     status: byte;
   end;
 
   tCellInfoArray = array[0..256-1, 0..256-1] of tCellInfo;
-  tCellAttrArray = array[0..256-1, 0..32-1] of tTerrainLine;
-
   tBlockInfoArray = array[0..32-1, 0..32-1] of tBlockInfo;
 
   tTerrain = class
   protected
     {todo: these need to be aligned to 32 bytes, which means custom getMem}
-    cellAttr: tCellAttrArray;
     cellInfo: tCellInfoArray;
     blockInfo: tBlockInfoArray;
     timeUntilNextSolve: single;
@@ -72,10 +57,7 @@ type
     procedure setCell(x,y: integer; cell: tCellInfo); inline;
     function  isEmpty(x, y: integer): boolean; inline;
     function  isSolid(x, y: integer): boolean; inline;
-
-    {attributes}
-    function  getAttr(x,y: integer): tCellAttributes; inline;
-    procedure setAttr(x,y: integer; attr: tCellAttributes); inline;
+    function  getCellColor(c: tCellInfo): RGBA; inline;
 
     procedure putCircle(atX,atY: integer;r: integer; dType: tDirtType=DT_DIRT);
     procedure putDirt(atX,atY: integer;cell: tCellInfo);
@@ -149,7 +131,6 @@ procedure tTerrain.clear();
 begin
   fillchar(blockInfo, sizeof(blockInfo), 0);
   fillchar(cellInfo, sizeof(cellInfo), 0);
-  fillchar(cellAttr, sizeof(cellAttr), 0);
 end;
 
 function tTerrain.getCell(x,y: integer): tCellInfo; inline;
@@ -181,20 +162,9 @@ begin
   result := TERRAIN_DECAY[getCell(x, y).dType] >= 0;
 end;
 
-function tTerrain.getAttr(x,y: integer): tCellAttributes; inline;
+function tTerrain.getCellColor(c: tCellInfo): RGBA; inline;
 begin
-  result.x := cellAttr[y, x div 8].x[x and $7];
-  result.y := cellAttr[y, x div 8].y[x and $7];
-  result.vx := cellAttr[y, x div 8].vx[x and $7];
-  result.vy := cellAttr[y, x div 8].vy[x and $7];
-end;
-
-procedure tTerrain.setAttr(x,y: integer; attr: tCellAttributes); inline;
-begin
-  cellAttr[y, x div 8].x[x and $7] := attr.x;
-  cellAttr[y, x div 8].y[x and $7] := attr.y;
-  cellAttr[y, x div 8].vx[x and $7] := attr.vx;
-  cellAttr[y, x div 8].vy[x and $7] := attr.vy;
+  result := terrainColorLookup[c.dtype, c.strength];
 end;
 
 {removes terrain in given radius, and burns edges}
@@ -258,7 +228,6 @@ var
   dimFactor: integer;
   c: RGBA;
   cell: tCellInfo;
-  attr: tCellAttributes;
 begin
   if r <= 0 then exit;
   r2 := r*r;
@@ -272,13 +241,8 @@ begin
       if (dst2 > r2) then continue;
       if isSolid(x, y) then continue;
       cell.dType := dType;
-      cell.strength := 128+rnd(16);
+      cell.strength := 200+rnd(40);
       setCell(x, y, cell);
-      attr.x := 0;
-      attr.y := 0;
-      attr.vx := clamp(dx*4, -100, 100);
-      attr.vy := clamp(dy*4, -100, 100);
-      setAttr(x, y, attr);
     end;
   end;
 end;
