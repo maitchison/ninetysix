@@ -186,6 +186,7 @@ begin
   pos.y := aPos.y;
   prevX := -99;
   prevY := -99;
+  fillchar(damageSheet, sizeof(damageSheet), 0);
   team := aTeam;
   applyChassis(CHASSIS_DEF[aChassisType]);
 end;

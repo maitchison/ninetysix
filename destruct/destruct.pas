@@ -33,6 +33,8 @@ type
     constructor create(aPos: tPoint; aPlayer: tController);
   end;
 
+var
+  exitFlag: boolean;
 
 {-------------------------------------------}
 
@@ -59,7 +61,6 @@ end;
 
 procedure titleScreen();
 var
-  exitFlag: boolean;
   gui: tGuiComponents;
   startLabel,verLabel: tGuiLabel;
   elapsed: single;
@@ -86,8 +87,6 @@ begin
 
   screen.pageClear();
 
-  exitFlag := false;
-
   {main loop}
   repeat
 
@@ -109,11 +108,11 @@ begin
 
     stopTimer('main');
 
-    if anyKeyDown then exitFlag := true;
+    if anyKeyDown then break;
 
     idle();
 
-  until exitFlag;
+  until false;
 
 end;
 
@@ -278,9 +277,8 @@ begin
 
 end;
 
-procedure battleScreen();
+procedure playRound();
 var
-  exitFlag: boolean;
   go: tGameObject;
   tank: tTank;
   elapsed: single;
@@ -292,21 +290,20 @@ var
   player1Gui,
   player2Gui: tPlayerGUI;
   sky: tPage;
+  endOfGameTimer: single;
+  roundTimer: single;
+  screenFade: single;
 begin
 
-  screen.background := tPage.create(screen.width, screen.height);
+  screen.background.clear(RGB(0,0,0));
   renderSky(terrain.sky);
-
-  //testSprite := tSprite.create(titleGFX.scaled(255,255));
-  //testSprite := tSprite.create(titleGFX);
-  testSprite := tSprite.create(sprites.page);
 
   screen.pageClear();
   screen.pageFlip();
 
-  exitFlag := false;
-
   terrain.generate();
+
+  {todo: move setup somewhere else}
 
   {setup players}
   for tank in tanks do begin
@@ -340,7 +337,10 @@ begin
   player2Gui := tPlayerGUI.create(Point(160, 0), player2);
   gui.append(player2Gui);
 
-  {main loop}
+  gameState := GS_PLAYING;
+  endOfGameTimer := 0;
+  roundTimer := 0;
+
   repeat
 
     musicUpdate();
@@ -354,11 +354,22 @@ begin
     if elapsed > 0 then
       fps.text := format('%f', [1/getTimer('main').avElapsed]);
 
-    {stub:}
-    //player1.process(elapsed);
-    player2.process(elapsed);
-    //player1.apply(elapsed);
-    player2.apply(elapsed);
+    if (playerCount(TEAM_1)=0) or (playerCount(TEAM_2)=0) then
+      gameState := GS_ENDED;
+
+    case gameState of
+      GS_PLAYING: begin
+        //player1.process(elapsed);
+        player2.process(elapsed);
+        //player1.apply(elapsed);
+        player2.apply(elapsed);
+      end;
+      GS_ENDED: begin
+        endOfGameTimer += elapsed;
+      end;
+    end;
+
+    if endOfGameTimer > 3.0 then break;
 
     screen.clearAll();
 
@@ -386,6 +397,22 @@ begin
     gui.draw(screen);
     stopTimer('guiDraw');
 
+    {screen fading}
+    screenFade := 0;
+    if roundTimer < 1 then
+      screenFade := 1-roundTimer;
+    if endOfGameTimer > 0 then
+      screenFade := endOfGameTimer * 0.5;
+
+    screenFade := clamp(screenFade, 0.0, 1.0);
+    if screenFade = 1.0 then begin
+      screen.canvas.clear(RGB(0,0,0));
+      screen.markRegion(screen.bounds);
+    end else if screenFade > 0 then begin
+      screen.canvas.fillRect(screen.bounds, RGB(0,0,0,round(255*screenFade)));
+      screen.markRegion(screen.bounds);
+    end;
+
     {debug}
     if keyDown(key_f5) then debugShowWorldPixels(screen);
     if keyDown(key_f4) then
@@ -402,7 +429,6 @@ begin
     if keyDown(key_8) then
       doBump(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 30, 50);
 
-
     if keyDown(key_9) then
       makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
 
@@ -410,11 +436,16 @@ begin
 
     stopTimer('main');
 
-    if keyDown(key_esc) then exitFlag := true;
+    if keyDown(key_esc) then begin
+      exitFlag := true;
+      break;
+    end;
+
+    roundTimer += elapsed;
 
     idle();
 
-  until exitFlag;
+  until false;
 
 end;
 
@@ -446,7 +477,12 @@ begin
   musicPlay('res\dance1.a96');
   initMouse();
   titleScreen();
-  battleScreen();
+
+  exitFlag := false;
+  repeat
+    playRound();
+  until exitFlag;
+
   //cfdScreen();
   screenDone();
 

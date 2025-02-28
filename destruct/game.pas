@@ -18,6 +18,8 @@ type
     procedure clear();
   end;
 
+  tGameState = (GS_PLAYING, GS_ENDED);
+
   tTankEnumerator = record
     private
       fIndex: Integer;
@@ -46,6 +48,7 @@ function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: 
 
 procedure damagePlayers(x, y: integer; radius: integer; damage: integer;sender: tGameObject=nil);
 function  randomTank(aTeam: tTeam): tTank;
+function  playerCount(aTeam: tTeam): integer;
 
 procedure screenDone();
 procedure screenInit();
@@ -56,6 +59,7 @@ var
   player1, player2: tController;
   terrain: tTerrain;
   gameTick: dword;
+  gameState: tGameState;
 
 const
   GRAVITY = 241.5;
@@ -123,9 +127,22 @@ var
   i: integer;
 begin
   teamTanks.clear();
-  for i := 0 to length(tanks.objects)-1 do if tanks[i].team = aTeam then teamTanks.append(i);
+  for i := 0 to length(tanks.objects)-1 do
+    if (tanks[i].team = aTeam) and (tanks[i].status = GO_ACTIVE) then
+      teamTanks.append(i);
   if teamTanks.len = 0 then exit(nil);
   result := tanks[teamTanks[rnd(teamTanks.len)]];
+end;
+
+{returns number of players left alive on team}
+function playerCount(aTeam: tTeam): integer;
+var
+  tank: tGameObject;
+begin
+  result := 0;
+  for tank in tanks.objects do
+    if (tTank(tank).team = aTeam) and (tank.status = GO_ACTIVE) then
+      inc(result);
 end;
 
 {damage all players within area, using linear falloff
