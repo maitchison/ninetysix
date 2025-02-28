@@ -695,7 +695,7 @@ begin
     inc(tick);
 
     for gy := 31-1 downto 1 do begin
-      for gx := 1 to 31-1 do begin
+      for gx := 0 to 32-1 do begin
         if ((blockInfo[gy, gx].status and BS_INACTIVE) <> 0) then continue;
         if ((blockInfo[gy, gx].status and BS_LOWP) <> 0) and (tick and $1 <> 0) then continue;
         updateBlockFalling_REF(gx, gy, self);
