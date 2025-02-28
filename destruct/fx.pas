@@ -109,7 +109,8 @@ begin
     end;
     p.vel := V2Polar(angle, (vel+z)) + V2(vx, vy);
     p.ttl := 0.15 + 0.1*(rnd/256);
-    p.solid := true;
+    p.solid := false;
+    p.hasGravity := false;
     p.radius := 2+rnd(2);
     p.blend := TDM_BLEND
   end;
