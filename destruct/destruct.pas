@@ -369,7 +369,7 @@ begin
       end;
     end;
 
-    if endOfGameTimer > 3.0 then break;
+    if endOfGameTimer > 2.0 then break;
 
     screen.clearAll();
 
@@ -399,8 +399,8 @@ begin
 
     {screen fading}
     screenFade := 0;
-    if roundTimer < 1 then
-      screenFade := 1-roundTimer;
+    if roundTimer < 0.5 then
+      screenFade := 1-(2*roundTimer);
     if endOfGameTimer > 0 then
       screenFade := endOfGameTimer * 0.5;
 

@@ -311,18 +311,22 @@ procedure tTerrain.generate();
 var
   dirtHeight: array[0..255] of integer;
   rockHeight: array[0..255] of integer;
-  x,y: integer;
+  i,x,y: integer;
   c: RGBA;
   cell: tCellInfo;
   v: single;
   prob: single;
+  phase: array[1..6] of single;
 begin
 
   clear();
 
+  for i := 1 to 6 do
+    phase[i] := (rnd/256)*2*pi;
+
   for x := 0 to 255 do begin
-    dirtHeight[x] := 128 + round(30*sin(3+x*0.0197) - 67*cos(2+x*0.003) + 15*sin(1+x*0.023));
-    rockHeight[x] := 200 + round(30*sin(30+x*0.0197) - 67*cos(20+x*0.003) + 15*sin(10+x*0.023)) div 4;
+    dirtHeight[x] := 128 + round(30*sin(phase[1]+x*0.0197) - 67*cos(phase[2]+x*0.003) + 15*sin(phase[3]+x*0.023));
+    rockHeight[x] := 200 + round(30*sin(phase[4]+x*0.0197) - 67*cos(phase[5]+x*0.003) + 15*sin(phase[6]+x*0.023)) div 4;
   end;
 
   for y := 0 to 255 do begin
