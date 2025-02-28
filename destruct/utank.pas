@@ -130,6 +130,7 @@ const
       baseSpriteIdx: 16*8;
       defaultWeapons: [
         tWeaponType.plasma,
+        tWeaponType.microNuke,
         tWeaponType.lavaBomb,
         tWeaponType.smallDirt,
         tWeaponType.largeDirt,

@@ -318,8 +318,8 @@ begin
   tanks[1].init(findNewTankPosition(1), TEAM_1, CT_LAUNCHER);
   tanks[2].init(findNewTankPosition(1), TEAM_1, CT_HEAVY);
 
-  //tanks[5].init(findNewTankPosition(2), TEAM_2, CT_HELI);
-  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_TANK);
+  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_HELI);
+  //tanks[5].init(findNewTankPosition(2), TEAM_2, CT_TANK);
 {  tanks[6].init(findNewTankPosition(2), TEAM_2, CT_LAUNCHER);
   tanks[7].init(findNewTankPosition(2), TEAM_2, CT_HEAVY);}
 

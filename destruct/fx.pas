@@ -86,8 +86,8 @@ begin
       p.vel += V2((rnd-128) * 0.1, (rnd-128) * 0.1);
       p.vel.y += -75;
 
-      {make edges of explosion less serious}
-      factor := minf(z*1.5, 1.0);
+      {make edges of expslosion less serious}
+      factor := minf(z*5, 1.0);
       p.vel *= factor;
 
       p.ttl := 10;
