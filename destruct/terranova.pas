@@ -78,7 +78,7 @@ type
     procedure setAttr(x,y: integer; attr: tCellAttributes); inline;
 
     procedure putCircle(atX,atY: integer;r: integer; dType: tDirtType=DT_DIRT);
-    procedure putDirt(atX,atY: integer;dType: tDirtType=DT_DIRT);
+    procedure putDirt(atX,atY: integer;cell: tCellInfo);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     function  getTerrainHeight(xPos: integer): integer;
 
@@ -284,9 +284,8 @@ begin
 end;
 
 {places dirt at location, if location is full will place nearby}
-procedure tTerrain.putDirt(atX,atY: integer;dType: tDirtType=DT_DIRT);
+procedure tTerrain.putDirt(atX,atY: integer;cell: tCellInfo);
 var
-  cell: tCellInfo;
   dx,dy: integer;
 
   function trySet(dx,dy: integer): boolean;
@@ -296,8 +295,6 @@ var
   end;
 
 begin
-  cell.dType := dtype;
-  cell.strength := 255;
   if trySet(0, 0) then exit;
   if trySet(0, -1) then exit;
   if trySet(+1, -1) then exit;

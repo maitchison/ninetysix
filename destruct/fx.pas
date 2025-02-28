@@ -6,18 +6,19 @@ interface
 uses
   {$i units},
   template,
+  terraNova,
   uGameObjects;
 
 procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
-procedure makeDust(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
+procedure makeDust(atX, atY: single; radius: single; dType: tDirtType; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
 procedure makeSparks(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0;n: integer=-1);
 
 implementation
 
 uses
-  terraNova, game;
+  game;
 
 {----------------------------------------------------------}
 { helpers }
@@ -140,7 +141,7 @@ begin
   end;
 end;
 
-procedure makeDust(atX, atY: single; radius: single; vel: single=25; vx: single=0; vy: single=0; n: integer=-1);
+procedure makeDust(atX, atY: single; radius: single; dType: tDirtType; vel: single=25; vx: single=0; vy: single=0; n: integer=-1);
 var
   i: integer;
   p: tParticle;
@@ -160,7 +161,8 @@ begin
     p.ttl := 10;
     p.solid := true;
     p.radius := 1;
-    p.dType := DT_DIRT;
+    p.cell.dType := dType;
+    p.cell.strength := 200 + rnd(40);
     p.hasGravity := true;
   end;
 end;

@@ -64,7 +64,7 @@ type
     solid: boolean;
     burn: integer;
     blend: tTemplateDrawMode;
-    dType: tDirtType; {will create this kind of particle on contact}
+    cell: tCellInfo; {will create this kind of particle on contact}
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
@@ -257,7 +257,8 @@ begin
   solid := false;
   burn := 0;
   blend := TDM_BLEND;
-  dType := DT_EMPTY;
+  cell.dType := DT_EMPTY;
+  cell.strength := 0;
 end;
 
 procedure tParticle.update(elapsed: single);
@@ -272,8 +273,8 @@ begin
   if solid and (not terrain.isEmpty(xPos, yPos)) then begin
     if burn > 0 then
       terrain.burn(xPos, yPos, 1, burn);
-    if dType <> DT_EMPTY then
-      terrain.putDirt(xPos, yPos, dType);
+    if cell.dType <> DT_EMPTY then
+      terrain.putDirt(xPos, yPos, cell);
     markForRemoval();
   end;
 end;

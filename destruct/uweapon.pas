@@ -73,9 +73,9 @@ const
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   pType: PT_SHELL;  dType: DT_NONE; cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  pType: PT_ROCKET; dType: DT_NONE; cooldown: 2.0),
     (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; pType: PT_ROCKET; dType: DT_NONE; cooldown: 4.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 20;   pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 40;   pType: PT_DIRT;   dType: DT_SAND; cooldown: 4.0),
-    (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 6;    pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 80;   pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 250;   pType: PT_DIRT;   dType: DT_SAND; cooldown: 4.0),
+    (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 40;    pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
     (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0)
   );
 
@@ -172,7 +172,8 @@ begin
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
-      terrain.putCircle(xPos, yPos, damage, dType);
+      //terrain.putCircle(xPos, yPos, damage, dType);
+      makeDust(xPos, yPos, round(sqrt(damage)), dType);
       targetDamage := 0;
     end;
     PT_LASER:
