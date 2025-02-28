@@ -23,6 +23,7 @@ type
 
   tProjectile = class(tGameObject)
     owner: tGameObject;
+    thrustTimer: single;
     pType: tProjectileType;
     dType: tDirtType;
     damage: integer;
@@ -114,6 +115,7 @@ begin
   inherited reset();
   col := RGB($ffffff86);
   radius := 1;
+  thrustTimer := 0;
 end;
 
 procedure playRandomHit();
@@ -198,7 +200,7 @@ var
   p: tParticle;
 begin
   {gravity}
-  if pType <> PT_PLASMA then
+  if (pType <> PT_PLASMA) and (thrustTimer <= 0) then
     //open tyrian is 0.05*(FPS^2). If FPS=69.5, this gives us 241.5.
     vel.y += game.GRAVITY * elapsed;
 
@@ -221,6 +223,15 @@ begin
     exit;
   end;
 
+  {rocket thrust}
+  if thrustTimer > 0 then begin
+    dir := vel.normed();
+    makeSmoke(xPos - round(dir.x*5), yPos - round(dir.y*5), 1, 4, -(dir.x*4), -(dir.y*4));
+    vel += dir*elapsed*300;
+    thrustTimer -= elapsed;
+  end;
+
+
   {particle effects}
   case pType of
     PT_PLASMA: begin
@@ -234,10 +245,6 @@ begin
       p.radius := 2;
       p.ttl := 0.1;
       p.blend := TDM_BLEND;
-    end;
-    PT_ROCKET: begin
-      dir := vel.normed();
-      makeSmoke(xPos - round(dir.x*5), yPos - round(dir.y*5), 1, 4, -(dir.x*4), -(dir.y*4));
     end;
   end;
 

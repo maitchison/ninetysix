@@ -461,6 +461,11 @@ begin
     projectile.owner := self;
     cooldown := weapon.cooldown;
 
+    if weapon.pType = PT_ROCKET then begin
+      projectile.thrustTimer := power / 20;
+      projectile.vel *= 0.1;
+    end;
+
     {todo: these should be part of the projectile spec}
     case weapon.pType of
       PT_BULLET: mixer.play(sfx['launch4'], 0.2);
