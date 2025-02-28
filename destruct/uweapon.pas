@@ -136,6 +136,7 @@ var
   hitRadius: integer;
   dir: V2D;
   targetDamage: integer;
+  grad: V2D;
 begin
   hitRadius := round(clamp(2, 2*sqrt(abs(damage)), 100));
   targetDamage := damage;
@@ -172,8 +173,9 @@ begin
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
-      //terrain.putCircle(xPos, yPos, round(sqrt(damage)/2), dType);
-      makeDust(xPos, yPos, round(sqrt(damage)), dType, 4.0, 0, -20);
+      grad := terrain.getGradient(xPos, yPos);
+      {100 gives a real bounce, 50 feels about normal}
+      makeDust(xPos, yPos, round(sqrt(damage)), dType, 3.0, 0, grad.x*75, 25+grad.y*75);
       targetDamage := 0;
     end;
     PT_LASER:

@@ -9,6 +9,7 @@ Every pixel is a particle, that can moves and collide
 uses
   test, debug,
   utils,
+  vertex,
   template,
   graph2d, graph32, uScreen;
 
@@ -63,6 +64,7 @@ type
     procedure putDirt(atX,atY: integer;cell: tCellInfo);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     function  getTerrainHeight(xPos: integer): integer;
+    function  getGradient(x,y: integer): V2D;
 
     procedure generate();
 
@@ -278,6 +280,22 @@ begin
   result := 0;
   for y := 0 to 255 do
     if getCell(xPos, y).dType <> DT_EMPTY then exit(255-y);
+end;
+
+{gets gradient at given location. this is not fast...
+gradient points away from dirt
+}
+function tTerrain.getGradient(x,y: integer): V2D;
+var
+  centerOfMass: V2D;
+  dx,dy: integer;
+begin
+  centerOfMass := V2(0,0);
+  for dy := -2 to +2 do
+    for dx := -2 to +2 do
+      if isSolid(x+dx,y+dy) then
+        centerOfMass += V2(dx,dy);
+  result := centerOfMass * (1/25);
 end;
 
 procedure tTerrain.generate();
