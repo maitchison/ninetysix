@@ -13,6 +13,7 @@ procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10);
 procedure makeDust(atX, atY: integer; radius: integer; dType: tDirtType; vel: single=25.0; vx: single=0; vy: single=0;density: single = 1.0);
+procedure makeElectricSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0; n: integer=-1);
 procedure makeSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0;n: integer=-1);
 
 implementation
@@ -137,7 +138,40 @@ begin
     p.vel := V2Polar(angle, (vel+z)) + V2(vx, vy);
     p.ttl := 0.25;
     p.solid := true;
+    p.hasGravity := false;
+    p.burn := 0;
     p.radius := 1;
+    p.blend := TDM_BLEND;
+  end;
+end;
+
+procedure makeElectricSparks(atX, atY: single; radius: single; vel: single=25.0; vx: single=0; vy: single=0; n: integer=-1);
+var
+  i: integer;
+  p: tParticle;
+  z: single;
+  angle: single;
+begin
+  if n < 0 then
+    n := round(radius * radius);
+  for i := 0 to n-1 do begin
+    p := nextParticle();
+    z := (rnd/255);
+    angle := rnd/255*360;
+    p.pos := V2Polar(angle, z*radius);
+    p.pos += V2(atX, atY);
+    case rnd mod 3 of
+      0: p.col := RGB($FFAFDFFF);
+      1: p.col := RGB($FF2049FF);
+      2: p.col := RGB($FF5A84FF);
+    end;
+    p.vel := V2Polar(angle, (vel+z)) + V2(vx, vy);
+    p.ttl := 2.0;
+    p.solid := true;
+    p.hasGravity := true;
+    p.burn := 3;
+    p.radius := 1;
+    p.blend := TDM_BLEND;
   end;
 end;
 

@@ -167,10 +167,9 @@ begin
     end;
     PT_PLASMA: begin
       mixer.play(sfx['plasma3'] , 0.3);
-      terrain.burn(xPos, yPos, 2, 20);
-      dir := vel.normed();
-      terrain.burn(xPos+round(dir.x*2), yPos+round(dir.y*2), 2, 20);
-      terrain.burn(xPos+round(dir.x*4), yPos+round(dir.y*4), 2, 20);
+      terrain.burn(xPos, yPos, 4, 1+(damage div 5));
+      grad := terrain.getGradient(xPos, yPos);
+      makeElectricSparks(xPos, yPos, 4, 15, grad.x*25, grad.y*25, 50);
     end;
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
