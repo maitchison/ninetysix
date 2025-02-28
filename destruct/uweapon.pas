@@ -73,9 +73,9 @@ const
     (tag: 'Mega Blast';   spriteIdx: 16*11 + 2;  damage: 50;   pType: PT_SHELL;  dType: DT_NONE; cooldown: 2.0),
     (tag: 'Micro Nuke';   spriteIdx: 16*11 + 3;  damage: 500;  pType: PT_ROCKET; dType: DT_NONE; cooldown: 2.0),
     (tag: 'Mini Nuke';    spriteIdx: 16*11 + 7;  damage: 1000; pType: PT_ROCKET; dType: DT_NONE; cooldown: 4.0),
-    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 80;   pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
-    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 250;   pType: PT_DIRT;   dType: DT_SAND; cooldown: 2.5),
-    (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 40;    pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
+    (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 100;  pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
+    (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 500;  pType: PT_DIRT;   dType: DT_SAND; cooldown: 2.5),
+    (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 100;  pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
     (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0)
   );
 
@@ -174,8 +174,7 @@ begin
     PT_DIRT: begin
       mixer.play(sfx['dirt'] , 0.3);
       grad := terrain.getGradient(xPos, yPos);
-      {100 gives a real bounce, 50 feels about normal}
-      makeDust(xPos, yPos, round(sqrt(damage)), dType, 3.0, 0, grad.x*75, 25+grad.y*75);
+      makeDust(xPos, yPos, round(sqrt(damage)), dType, 25.0, grad.x*25, grad.y*25, 1.0);
       targetDamage := 0;
     end;
     PT_LASER:

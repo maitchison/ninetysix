@@ -64,7 +64,7 @@ type
     procedure putDirt(atX,atY: integer;cell: tCellInfo);
     procedure burn(atX,atY: integer;r: integer;power:integer=255);
     function  getTerrainHeight(xPos: integer): integer;
-    function  getGradient(x,y: integer): V2D;
+    function  getGradient(x,y: integer;radius: integer=2): V2D;
 
     procedure generate();
 
@@ -285,17 +285,17 @@ end;
 {gets gradient at given location. this is not fast...
 gradient points away from dirt
 }
-function tTerrain.getGradient(x,y: integer): V2D;
+function tTerrain.getGradient(x,y: integer;radius: integer=2): V2D;
 var
   centerOfMass: V2D;
   dx,dy: integer;
 begin
   centerOfMass := V2(0,0);
-  for dy := -2 to +2 do
-    for dx := -2 to +2 do
+  for dy := -radius to +radius do
+    for dx := -radius to +radius do
       if isSolid(x+dx,y+dy) then
         centerOfMass += V2(dx,dy);
-  result := centerOfMass * (1/25);
+  result := centerOfMass * (-1/sqr(2*radius+1));
 end;
 
 procedure tTerrain.generate();

@@ -154,7 +154,7 @@ begin
   r2 := radius*radius;
   for dy := -radius to + radius do begin
     for dx := -radius to +radius do begin
-      d2 := dx*dx+dy*dy;
+      d2 := (dx*dx)+(dy*dy);
       if (rnd/255) > density then continue;
       if d2 > r2 then continue;
       if terrain.isSolid(atX+dx, atY+dy) then continue;
@@ -162,7 +162,7 @@ begin
       p.pos.x := atX + dx;
       p.pos.y := atY + dy;
       z := sqrt(d2)/sqrt(r2);
-      p.vel := V2(dx, dy) * (vel * z);
+      p.vel := V2(dx, dy).normed() * (vel * z);
       p.vel += V2(vx, vy);
       p.vel += V2(rnd-128, rnd-128) * 0.1;
       p.ttl := 10;

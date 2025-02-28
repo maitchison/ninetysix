@@ -328,6 +328,8 @@ var
   dx,dy: integer;
   delta: V2D;
   l: integer;
+  grad: V2D;
+  didCollide: boolean;
 const
   padding = 16;
 begin
@@ -340,13 +342,13 @@ begin
 
   {heli needs a full check}
   {todo could be faster if we trim the bounds to sprite}
+  didCollide := false;
   for ylp := bounds.top+3 to bounds.bottom-3 do begin
     for xlp := bounds.left+3 to bounds.right-3 do begin
       if (getWorldPixel(xlp, ylp).a > 0) and (terrain.isSolid(xlp, ylp)) then begin
         {bump}
         delta := V2(xlp - xPos, 2 + ylp - yPos) * 20;
-        vel -= delta * elapsed;
-
+        didCollide := true;
         {create cloud}
         p := nextParticle();
         p.pos := V2(xlp + rnd(3)-1, ylp+rnd(3)-1);
@@ -360,6 +362,11 @@ begin
         p.radius := 1;
       end;
     end;
+  end;
+
+  if didCollide then begin
+    grad := terrain.getGradient(xPos,yPos,8).normed();
+    vel += grad * elapsed * 3000;
   end;
 
   {soft and hard boundaries}
@@ -515,7 +522,7 @@ begin
       vel *= 0.97;
       if (yAction = 0) and (xAction=0) then yAction += 0.05; // a bit of hover
 
-      if yAction < 0 then speed := 750 else speed := 750;
+      if yAction < 0 then speed := 250 else speed := 750;
       vel.y -= yAction * speed * elapsed;
       vel.x += xAction * 750 * elapsed;
 
