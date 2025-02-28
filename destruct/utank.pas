@@ -39,6 +39,7 @@ type
   tTank = class(tGameObject)
   protected
     spriteSheet: tSpriteSheet;
+    damageSheet: array[0..15,0..15] of byte; {indicates where damage is}
     procedure fireProjectile();
     procedure fireLaser();
   public
@@ -57,6 +58,8 @@ type
     procedure updateTankCollision(elapsed:single);
     procedure updateHeliCollision(elapsed:single);
     procedure setCore(atX, atY: integer; dType: tDirtType);
+    function  isFlipped: boolean;
+    procedure drawDamage(screen: tScreen);
   public
     function  weapon: tWeaponSpec;
     function  baseSprite: tSprite;
@@ -148,6 +151,9 @@ uses
 
 const
   DEBUG_SHOW_TANK_SUPPORT = false;
+
+var
+  damageColors: array[0..15,0..15] of RGBA;
 
 {-----------------------------------------------------------}
 
@@ -260,6 +266,30 @@ begin
   sprite := nil; // will be set on update
 end;
 
+{this is quite slow... but it'll do the trick}
+procedure tTank.drawDamage(screen: tScreen);
+var
+  xlp,ylp: integer;
+  c: RGBA;
+begin
+  {todo: make this faster.}
+  if not assigned(sprite) then exit;
+  for ylp := 0 to sprite.height-1 do begin
+    for xlp := 0 to sprite.width-1 do begin
+      if damageSheet[ylp,xlp] = 0 then continue;
+      if sprite.getPixel(xlp,ylp).a = 0 then continue;
+      c := damageColors[xlp, ylp];
+      c.a := damageSheet[ylp,xlp];
+      screen.canvas.putPixel(VIEWPORT_X+xPos+xlp-(sprite.pivot2x.x div 2),VIEWPORT_Y+yPos+ylp-(sprite.pivot2x.y div 2),c);
+    end;
+  end;
+end;
+
+function tTank.isFlipped: boolean;
+begin
+  result := (angle < 0) and (chassis.animationType = AT_TANK);
+end;
+
 procedure tTank.draw(screen: tScreen);
 var
   p: tPoint;
@@ -271,10 +301,12 @@ begin
 
   p := Point(xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
 
-  if (angle < 0) and (chassis.animationType = AT_TANK) then
+  if isFlipped() then
     r := sprite.drawFlipped(screen.canvas, p.x, p.y)
   else
     r := sprite.draw(screen.canvas, p.x, p.y);
+
+  drawDamage(screen);
 
   screen.markRegion(r);
 
@@ -493,10 +525,27 @@ end;
 procedure tTank.takeDamage(atX,atY: integer; damage: single; sender: tObject=nil);
 var
   v: V2D;
+  dx,dy: integer;
+  intDamage: integer;
+  gx,gy: integer;
+  i: integer;
 begin
+  if damage <= 0 then exit;
   health -= damage;
+  {indicate damage}
+  damage *= 3;
+  for i := 1 to 9 do begin
+    dx := clamp(round(1.5*gaus)+atX-xPos+(sprite.pivot2x.x div 2), 0, 15);
+    dy := clamp(round(1.5*gaus)+atY-yPos+(sprite.pivot2x.y div 2), 0, 15);
+    if damage >= 1 then intDamage := round(damage) else begin
+      intDamage := 0;
+      if (rnd/255) < damage then intDamage := 1;
+    end;
+    damageSheet[dy, dx] := clamp(damageSheet[dy, dx]+intDamage, 0, 255);
+  end;
+
   {todo: add debris}
-  v := (V2(atX, atY) - pos).normed() * 70;
+  //v := (V2(atX, atY) - pos).normed() * 70;
 end;
 
 procedure tTank.fire();
@@ -616,5 +665,11 @@ begin
   end;
 end;
 
+var
+  x,y: integer;
+
 begin
+  for x := 0 to 15 do
+    for y := 0 to 15 do
+      damageColors[x,y] := RGB(rnd(30), rnd(10), rnd(10));
 end.

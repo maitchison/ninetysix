@@ -136,6 +136,7 @@ function  toDWords(x: array of dword): tDWords; overload;
 
 procedure Wait(ms: integer);
 function  rnd(max: integer): integer; overload;
+function  gaus(): single;
 function  rnd(): byte; assembler; register; overload;
 function  Quantize(value, levels: byte): byte;
 function  clamp(x, a, b: int32): int32; inline; overload;
@@ -776,6 +777,19 @@ begin
   while GetMsCount() < MSTarget do begin
     {pass}
   end;
+end;
+
+
+{returns std=1, mu=0}
+function gaus: single;
+var
+  i: integer;
+begin
+  result := 0;
+  for i := 1 to 6 do
+    result += rnd;
+  result *= (1/256);
+  result -= 3;
 end;
 
 {generates a random number from 0..max-1}

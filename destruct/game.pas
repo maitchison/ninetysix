@@ -152,18 +152,6 @@ var
   go: tGameObject;
   p: tParticle;
 
-  {mu=0, var=~1}
-  function fakeGausian: single;
-  var
-    i: integer;
-  begin
-    result := 0;
-    for i := 1 to 6 do
-      result += rnd;
-    result *= (1/256);
-    result -= 3;
-  end;
-
 begin
 
   result.clear();
@@ -178,8 +166,8 @@ begin
       if assigned(p) then begin
         p.pos.x := x;
         p.pos.y := y;
-        p.vel.x := fakeGausian * 20;
-        p.vel.y := fakeGausian * 20;
+        p.vel.x := gaus * 20;
+        p.vel.y := gaus * 20;
         p.ttl := 0.1;
       end;
     end;
