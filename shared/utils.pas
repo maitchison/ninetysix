@@ -163,6 +163,9 @@ procedure freeAndNil(var obj);
 const
   WORD_CHARS: set of char = ['a'..'z','A'..'Z','0'..'9'];
 
+var
+  NOISE_BUFFER: array[0..255] of byte;
+
 implementation
 
 uses
@@ -1438,10 +1441,17 @@ end;
 
 {--------------------------------------------------------}
 
+var
+  i: integer;
+
 initialization
   programStartTSC := getTSC();
   SEED := 97;
+  for i := low(NOISE_BUFFER) to high(NOISE_BUFFER) do
+    NOISE_BUFFER[i] := rnd;
+
   tUtilsTest.create('Utils');
+
 finalization
 
 end.

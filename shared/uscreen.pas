@@ -38,6 +38,13 @@ type
    however do support on-the-fly conversion to any of these depths}
   tVideoDepth = (VD_15, VD_16, VD_24, VD_32);
 
+  tFlipEffect = (
+    FX_NONE,
+    FX_SCANLINE,    // every other line is dim
+    FX_DOTS,        // looks like dots
+    FX_NOISE        // adds noise. helpful for debugging when screen is updated.
+    );
+
   tScreen = class
 
   private
@@ -56,14 +63,15 @@ type
     stats: tScreenStats;
     bounds: tRect;    // logical bounds of canvas
     scrollMode: tScreenScrollMode;
+    flipEffect: tFlipEffect;
 
-  private
+  protected
     procedure copyLine(x1, x2, y: int32);
+    procedure flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
   public
 
     constructor create();
     destructor destroy(); override;
-
 
     function width: word;
     function height: word;
@@ -105,12 +113,138 @@ end;
 
 {-------------------------------------------------}
 
+procedure shiftLineToScreen(canvas: tPage; srcX,srcY,dstX,dstY: int32; pixelCnt: int32; shift1,shift2: byte);
+var
+  lfb_seg: word;
+  srcOffset,dstOffset: dword;
+  sourceShift: byte;
+  mask1,mask2: dword;
+begin
+  {only 32bit supported right now}
+  lfb_seg := videoDriver.LFB_SEG;
+  dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*4;
+  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  mask1 := $ff shr shift1;
+  mask1 := mask1 + (mask1 shl 8) + (mask1 shl 16) + (mask1 shl 24);
+  mask2 := $ff shr shift2;
+  mask2 := mask2 + (mask2 shl 8) + (mask2 shl 16) + (mask2 shl 24);
+  asm
+    cli
+    pushad
+    push es
+
+    mov ax,  LFB_SEG
+    mov es,  ax
+    mov edi, DSTOFFSET
+    mov esi, SRCOFFSET
+
+    mov ebx, MASK1
+    mov cl,  SHIFT1
+    mov ch,  SHIFT2
+    mov edx, PIXELCNT
+    shr edx, 1
+
+  @X32:
+
+    mov eax, dword ptr ds:[esi]
+    shr eax, cl
+    and eax, ebx
+    mov dword ptr es:[edi], eax
+
+    add esi, 4
+    add edi, 4
+
+    mov eax, dword ptr ds:[esi]
+    ror ecx, 8
+    shr eax, cl
+    rol ecx, 8
+    and eax, MASK2
+    mov dword ptr es:[edi], eax
+
+    add esi, 4
+    add edi, 4
+    dec edx
+    jnz @X32
+
+    pop es
+    popad
+    sti
+  end;
+end;
+
+procedure noiseLineToScreen(canvas: tPage; srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
+var
+  lfb_seg: word;
+  srcOffset,dstOffset,noisePtr: dword;
+  noiseOffset: dword;
+begin
+  {only 32bit supported right now}
+  lfb_seg := videoDriver.LFB_SEG;
+  dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*4;
+  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  noisePtr := dword(@NOISE_BUFFER);
+  noiseOffset := rnd;
+  asm
+    cli
+    pushad
+    push es
+
+    mov ax,  LFB_SEG
+    mov es,  ax
+
+    mov ebx, NOISEOFFSET
+    mov ecx, PIXELCNT
+    mov edx, NOISEPTR
+
+    mov edi, DSTOFFSET
+    mov esi, SRCOFFSET
+
+    {
+      eax: temp
+      ebx: noise index
+      ecx: loop
+      edx: noise base pointer
+
+      edi: dst
+      esi: source
+
+      MM0 source pixel
+      MM1 noise
+    }
+
+  @X32:
+
+    movd      MM0, dword ptr ds:[esi]
+    mov       al, [edx+ebx]
+    shr       al, 2
+    mov       ah, al
+    movd      MM1, eax
+    punpcklwd MM1, MM1
+    psubusb   MM0, MM1
+    movd      dword ptr es:[edi], MM0
+
+    add esi, 4
+    add edi, 4
+    inc ebx
+    and ebx, $ff
+    dec ecx
+    jnz @X32
+
+    pop es
+    popad
+    emms
+    sti
+  end;
+end;
+
+
 procedure transferLineToScreen(canvas: tPage; srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
 var
   lfb_seg: word;
   srcOffset,dstOffset: dword;
   bytesPerPixel: byte;
   bitsPerPixel: byte;
+  sourceShift: byte;
 begin
   lfb_seg := videoDriver.LFB_SEG;
   bitsPerPixel := videoDriver.bitsPerPixel;
@@ -209,6 +343,7 @@ begin
     jmp @Done
 
   @X32:
+
     cld
     rep movsd
     jmp @Done
@@ -233,6 +368,7 @@ begin
   canvas := nil;
   SHOW_DIRTY_RECTS := false;
   scrollMode := SSM_OFFSET;
+  flipEffect := FX_NONE;
   viewport := Rect(0,0);
   resize(videoDriver.width, videoDriver.height);
 end;
@@ -243,6 +379,28 @@ begin
   canvas := nil;
   inherited destroy();
 end;
+
+procedure tScreen.flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
+begin
+
+  //stub:
+  flipEffect := FX_NOISE;
+
+  case flipEffect of
+    FX_NONE: transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
+    FX_SCANLINE: if (dstY and $1) = 0 then
+      transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt)
+    else
+      shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,1);
+    FX_DOTS: if (dstY and $1) = 0 then
+      shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,0,1)
+    else
+      shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,2);
+    FX_NOISE:
+      noiseLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
+  end;
+end;
+
 
 {must be called whenever a resolution change occurs after creation.}
 procedure tScreen.resize(aWidth: word; aHeight: word);
@@ -304,7 +462,7 @@ begin
 
   cnt := rect.width;
   for i := 0 to rect.height-1 do
-    transferLineToScreen(canvas, srcX, srcY+i, dstX, dstY+i, cnt);
+    flipLineToScreen(srcX, srcY+i, dstX, dstY+i, cnt);
 end;
 
 {draw line from x1,y -> x2,y, including final point}
@@ -465,7 +623,7 @@ begin
     SSM_COPY: begin
       {todo: if viewport did not move then copy only changed regions (e.g. from below)}
       for y := 0 to videoDriver.physicalHeight-1 do
-        transferLineToScreen(canvas, viewport.x, viewport.y+y, 0, y, videoDriver.physicalWidth);
+        flipLineToScreen(viewport.x, viewport.y+y, 0, y, videoDriver.physicalWidth);
       end;
     SSM_OFFSET: begin
       videoDriver.setDisplayStart(viewport.x, viewport.y);
