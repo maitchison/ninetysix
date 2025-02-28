@@ -203,7 +203,8 @@ var
 begin
   width := bounds.width;
   height := bounds.height;
-  alpha := col.a div 2; // due to sign we need to divide this by two...
+  if (height = 0) or (width = 0) then exit;
+  alpha := col.a;
   pagePtr := dst.getAddress(bounds.left, bounds.top);
   templatePtr := template.getAddress(bounds.left-originX, bounds.top-originY);
   templateStride := template.width - width;
@@ -261,13 +262,12 @@ begin
     punpcklwd mm1, mm1
     punpckldq mm1, mm1
 
-    {mm1 <- template*(col.a/2)}
+    {mm1 <- (template*col.a) div 256}
     pmullw    mm1, mm7
+    psrlw     mm1, 8
 
-    {mm4 <- template*col.a div 256}
+    {mm4 <- (template*col.a) div 256 = V}
     movq      mm4, mm1
-    {note: I think there's a bug here, where mm4 is actually template*col.a div 512}
-    psrlw     mm4, 8
 
     {if value is too low then skip it}
     {this actually makes things slower...}
@@ -277,9 +277,9 @@ begin
     jz        @SKIP
     }
 
-    {mm1 <- (col*template*col.a) div 65536}
-    pmulhw    mm1, mm6
-    psllw     mm1, 1      // we had to halve col.a so adjust for it here.
+    {mm1 <- (col*V) div 256}
+    pmullw    mm1, mm6
+    psrlw     mm1, 8
     packuswb  mm1, mm0
 
     {mm2 <- screen ARGB (as 8bit bytes}
@@ -298,10 +298,10 @@ begin
 
     {mm2 <- screen ARGB (extended to 16bit words)}
     punpcklbw mm2, mm0
-    {mm3 <- 255 - template*col.a}
+    {mm3 <- 255 - V}
     movq      mm3, mm5
     psubw     mm3, mm4
-    {mm3 <- ((255 - template*col.a) * screen ARGB) div 256}
+    {mm3 <- ((255 - V) * screen ARGB) div 256 }
     pmullw    mm2, mm3
     psrlw     mm2, 8
     packuswb  mm2, mm2
@@ -372,6 +372,7 @@ begin
   result.init(0,0,0,0);
 
   if (col.a = 0) then exit;
+  if (size > 15) then exit;
 
   template := mipMaps[size];
 
@@ -449,8 +450,8 @@ begin
     radius := (i*2)+1; {1,3,5...}
     width := radius + 1;
     mipMaps[i] := tPage8.create(width, width);
-    {normalize so that centre value is 255}
-    normFactor := 255/getValue(page.width/2, page.height/2, page.width/radius);
+    {normalize so that center value is 250}
+    normFactor := 250/getValue(page.width/2, page.height/2, page.width/radius);
     for y := 0 to radius-1 do begin
       //debugStr := '';
       for x := 0 to radius-1 do begin

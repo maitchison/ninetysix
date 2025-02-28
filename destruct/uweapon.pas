@@ -4,6 +4,7 @@ interface
 
 uses
   {$i units},
+  template,
   terraNova,
   uGameObjects;
 
@@ -76,7 +77,7 @@ const
     (tag: 'Small Dirt';   spriteIdx: 16*11 + 8;  damage: 100;  pType: PT_DIRT;   dType: DT_DIRT; cooldown: 1.0),
     (tag: 'Large Dirt';   spriteIdx: 16*11 + 9;  damage: 500;  pType: PT_DIRT;   dType: DT_SAND; cooldown: 2.5),
     (tag: 'Lava Bomb';    spriteIdx: 16*11 + 2;  damage: 100;  pType: PT_DIRT;   dType: DT_LAVA; cooldown: 1.0),
-    (tag: 'Plasma';       spriteIdx: 16*11 + 11; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0)
+    (tag: 'Plasma';       spriteIdx: 16*11 + 13; damage: 75;   pType: PT_PLASMA; dType: DT_NONE; cooldown: 1.0)
   );
 
 
@@ -195,23 +196,46 @@ var
   go: tGameObject;
   tank: tTank;
   dir: V2D;
+  p: tParticle;
 begin
   {gravity}
   if pType <> PT_PLASMA then
     //open tyrian is 0.05*(FPS^2). If FPS=69.5, this gives us 241.5.
     vel.y += game.GRAVITY * elapsed;
 
+  {edge bouncing}
+  if pType in [PT_PLASMA] then begin
+    if pos.x+(vel.x*elapsed) < 0 then
+      vel.x := -vel.x;
+    if pos.x+(vel.x*elapsed) > 255 then
+      vel.x := -vel.x;
+    if pos.y+(vel.y*elapsed) < 0 then
+      vel.y := -vel.y;
+  end;
+
   {move}
   inherited update(elapsed);
 
   {see if we're out of bounds}
-  if (xPos < 0) or (xPos > 255) or (yPos > 255) then begin
+  if (word(xPos) > 255) or (word(yPos) > 255) then begin
     markForRemoval();
     exit;
   end;
 
   {particle effects}
   case pType of
+    PT_PLASMA: begin
+      p := nextParticle();
+      p.pos := V2(xPos, yPos);
+      case rnd(3) of
+        0: p.col := RGB($FF367EFF);
+        1: p.col := RGB($FF2049FF);
+        2: p.col := RGB($FF5A84FF);
+      end;
+      p.radius := 2;
+      p.ttl := 0.1;
+      p.blend := TDM_BLEND;
+    end;
     PT_ROCKET: begin
       dir := vel.normed();
       makeSmoke(xPos - round(dir.x*6), yPos - round(dir.y*6), 1, 4);

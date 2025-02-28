@@ -124,11 +124,11 @@ const
       health: 700;
       baseSpriteIdx: 16*8;
       defaultWeapons: [
+        tWeaponType.plasma,
         tWeaponType.lavaBomb,
         tWeaponType.smallDirt,
         tWeaponType.largeDirt,
-        tWeaponType.blast,
-        tWeaponType.plasma
+        tWeaponType.blast
       ];
     )
   );
