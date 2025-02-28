@@ -277,6 +277,10 @@ begin
 
 end;
 
+procedure setupAIvsAI();
+begin
+end;
+
 procedure playRound();
 var
   go: tGameObject;
@@ -331,7 +335,6 @@ begin
   {setup gui}
   gui := tGuiComponents.create();
   fps := tGuiLabel.create(Point(6, 20));
-  gui.append(fps);
 
   player1Gui := tPlayerGUI.create(Point(0, 0), player1);
   gui.append(player1Gui);
@@ -391,12 +394,14 @@ begin
     stopTimer('drawTerrain');
 
     {gui}
-    startTimer('guiUpdate');
-    gui.update(elapsed);
-    stopTimer('guiUpdate');
-    startTimer('guiDraw');
-    gui.draw(screen);
-    stopTimer('guiDraw');
+    if (player1 is tHumanController) or (player2 is tHumanController) then begin
+      startTimer('guiUpdate');
+      gui.update(elapsed);
+      stopTimer('guiUpdate');
+      startTimer('guiDraw');
+      gui.draw(screen);
+      stopTimer('guiDraw');
+    end;
 
     {screen fading}
     screenFade := 0;

@@ -383,19 +383,18 @@ end;
 procedure tScreen.flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
 begin
 
-  //stub:
-  flipEffect := FX_NOISE;
-
   case flipEffect of
     FX_NONE: transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
     FX_SCANLINE: if (dstY and $1) = 0 then
       transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt)
     else
       shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,1);
-    FX_DOTS: if (dstY and $1) = 0 then
-      shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,0,1)
-    else
-      shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,2);
+    FX_DOTS: case (dstY and $3) of
+      0: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,0,1);
+      1: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,2,1);
+      2: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,0);
+      3: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,2);
+    end;
     FX_NOISE:
       noiseLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
   end;
