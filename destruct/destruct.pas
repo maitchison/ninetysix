@@ -120,7 +120,7 @@ end;
 procedure setupGUI();
 begin
   gui := tGuiComponents.create();
-  fpsLabel := tGuiLabel.create(Point(6, 3));
+  fpsLabel := tGuiLabel.create(Point(6, 18));
   gui.append(fpsLabel);
 
   player1Gui := tPlayerGUI.create(Point(0, 0), player1);
@@ -224,12 +224,11 @@ begin
   for tank in tanks do
     if tank.isActive then tank.clearTerrain();
 
+  {todo: seperate out player and controller, so we can perm link to player1}
   if assigned(player1) then player1.free;
   if assigned(player2) then player2.free;
   player1 := tAIController.create(0);
   player2 := tAIController.create(5);
-
-  {todo: hide gui}
 end;
 
 procedure setupHumanVsAI();
@@ -376,6 +375,7 @@ begin
         gs.endOfRoundTimer := 1.0;
         case gs.state of
           GS_TITLE: begin
+            screen.fx := FX_DOTS;
             terrain.generate(-16);
             setupAIvsAI();
             {note: would make sense to have a 'scene' with it's own ui to handle this}
@@ -385,6 +385,7 @@ begin
             verLabel.visible := true;
           end;
           GS_BATTLE: begin
+            screen.fx := FX_NONE;
             terrain.generate();
             setupHumanvsAI();
             player1Gui.visible := true;
@@ -393,6 +394,9 @@ begin
             verLabel.visible := false;
           end;
         end;
+        {todo: it's annoying to do this, make 'player' and a 'controller'}
+        player1Gui.player := player1;
+        player2Gui.player := player2;
         gs.subState := SS_PLAYING;
       end;
     end;

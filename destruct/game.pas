@@ -125,7 +125,7 @@ var
 begin
   teamTanks.clear();
   for i := 0 to length(tanks.objects)-1 do
-    if (tanks[i].team = aTeam) and (tanks[i].status = GO_ACTIVE) then
+    if (tanks[i].team = aTeam) and tanks[i].isActive then
       teamTanks.append(i);
   if teamTanks.len = 0 then exit(nil);
   result := tanks[teamTanks[rnd(teamTanks.len)]];
@@ -138,7 +138,7 @@ var
 begin
   result := 0;
   for tank in tanks.objects do
-    if (tTank(tank).team = aTeam) and (tank.status = GO_ACTIVE) then
+    if (tTank(tank).team = aTeam) and tank.isActive then
       inc(result);
 end;
 

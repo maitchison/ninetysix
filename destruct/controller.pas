@@ -149,6 +149,8 @@ end;
 
 function tController.tank: tTank;
 begin
+  if word(tankIdx) >= 10 then
+    fatal('Invalid tank index, found %d', [tankIdx]);
   result := tanks[tankIdx];
 end;
 
@@ -171,6 +173,7 @@ end;
 
 procedure tAIController.reset();
 begin
+  inherited reset();
   solutionX := 0;
   solutionY := 0;
   shotsFired := 0;
