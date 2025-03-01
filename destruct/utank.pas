@@ -96,10 +96,8 @@ const
       health: 350;
       baseSpriteIdx: 0;
       defaultWeapons: [
-        tWeaponType.plasma,
-        tWeaponType.blast,
-        tWeaponType.microNuke,
         tWeaponType.tracer,
+        tWeaponType.blast,
         tWeaponType.smallDirt,
         tWeaponType.largeDirt
       ]
@@ -134,12 +132,9 @@ const
       health: 700;
       baseSpriteIdx: 16*8;
       defaultWeapons: [
-        tWeaponType.pulseLaser,
         tWeaponType.plasma,
-        tWeaponType.microNuke,
+        tWeaponType.pulseLaser,
         tWeaponType.lavaBomb,
-        tWeaponType.smallDirt,
-        tWeaponType.largeDirt,
         tWeaponType.blast
       ];
     )
