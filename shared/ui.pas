@@ -39,6 +39,7 @@ type
     fText: string;
   public
     textColor: RGBA;
+    shadow: boolean;
     centered: boolean;
   protected
     procedure doDraw(screen: tScreen); override;
@@ -131,6 +132,7 @@ begin
   self.centered := false;
   self.textColor := RGB(250, 250, 250);
   self.text := aText;
+  self.shadow := false;
 end;
 
 procedure tGuiLabel.setText(aText: string);
@@ -146,6 +148,9 @@ var
 begin
   c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
   if c.a = 0 then exit;
+  if shadow then
+    {todo: fix up rect}
+    font.textOut(screen.canvas, bounds.x+1, bounds.y+1, text, RGB(0,0,0,c.a div 2));
   font.textOut(screen.canvas, bounds.x, bounds.y, text, c);
   screen.markRegion(bounds);
 end;

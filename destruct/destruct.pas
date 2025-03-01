@@ -39,6 +39,7 @@ type
 type
   tGlobalState = class
     state: tGameState;
+    nextState: tGameState;
     subState: tSubState;
     roundTimer: single; {seconds round has been playing}
     endOfRoundTimer: single; {seconds until round terminates}
@@ -128,14 +129,15 @@ begin
   gui.append(player2Gui);
 
   {title stuff}
-  startLabel := tGuiLabel.create(Point(160, 224));
+  startLabel := tGuiLabel.create(Point(160, 240-20));
   startLabel.centered := true;
   startLabel.text := 'Press any key to start';
+  startLabel.shadow := true;
   gui.append(startLabel);
 
-  verLabel := tGuiLabel.create(Point(320-66, 240-8));
+  verLabel := tGuiLabel.create(Point(320-100, 6));
   verLabel.text := '0.4a (28/02/1996)';
-  verLabel.textColor := RGB(128,128,128);
+  verLabel.textColor := RGB(228,228,238);
   gui.append(verLabel);
 
 end;
@@ -326,8 +328,8 @@ begin
   screenFade := 0;
   if gs.roundTimer < 0.5 then
     screenFade := 1-(2*gs.roundTimer);
-  if gs.endOfRoundTimer > 0 then
-    screenFade := gs.endOfRoundTimer * 0.5;
+  if (gs.subState = SS_ENDING) and (gs.endOfRoundTimer > 0) then
+    screenFade := 1.0-gs.endOfRoundTimer;
 
   screenFade := clamp(screenFade, 0.0, 1.0);
   if screenFade = 1.0 then begin
@@ -353,6 +355,7 @@ begin
 
   setupGui();
   gs.state := GS_TITLE;
+  gs.nextState := GS_TITLE;
   gs.subState := SS_INIT;
 
   repeat
@@ -370,11 +373,9 @@ begin
     case gs.subState of
       SS_INIT: begin
         gs.roundTimer := 0;
-        gs.endOfRoundTimer := 0;
-
+        gs.endOfRoundTimer := 1.0;
         case gs.state of
           GS_TITLE: begin
-            screen.fx := FX_NONE;
             terrain.generate(-16);
             setupAIvsAI();
             {note: would make sense to have a 'scene' with it's own ui to handle this}
@@ -382,10 +383,8 @@ begin
             player2Gui.visible := false;
             startLabel.visible := true;
             verLabel.visible := true;
-            screen.fx := FX_NOISE;
           end;
           GS_BATTLE: begin
-            screen.fx := FX_NONE;
             terrain.generate();
             setupHumanvsAI();
             player1Gui.visible := true;
@@ -398,27 +397,34 @@ begin
       end;
     end;
 
-    {special case for title screen}
+    case gs.state of
+      GS_TITLE: begin
+        if (gs.subState=SS_PLAYING) and anyKeyDown then begin
+          gs.subState := SS_ENDING;
+          gs.nextState := GS_BATTLE;
+        end;
+        startLabel.textColor.init(round((sin(getSec)*64)+196), round((sin(2*getSec)*32)+128), 20);
+      end;
+    end;
 
     screen.clearAll();
 
     doUpdate(elapsed);
     doDraw(elapsed);
 
-    case gs.state of
-      GS_TITLE: begin
-        screen.canvas.fillRect(Rect(0,0,320,32),RGB(0,0,0));
-        screen.canvas.fillRect(Rect(0,240-32,320,32),RGB(0,0,0));
-      end;
-    end;
-
     screen.flipAll();
 
     {end of game detection}
-    if (playerCount(TEAM_1)=0) or (playerCount(TEAM_2)=0) then
-      gs.endOfRoundTimer += elapsed;
-    if gs.endOfRoundTimer >= 2.0 then
-      gs.subState := SS_INIT;
+    if (gs.subState = SS_PLAYING) and (playerCount(TEAM_1)=0) or (playerCount(TEAM_2)=0) then
+      gs.subState := SS_ENDING;
+
+    if (gs.subState = SS_ENDING) then begin
+      gs.endOfRoundTimer -= elapsed;
+      if gs.endOfRoundTimer <= 0 then begin
+        gs.subState := SS_INIT;
+        gs.state := gs.nextState;
+      end;
+    end;
 
     if keyDown(key_esc) then gs.state := GS_EXIT;
 

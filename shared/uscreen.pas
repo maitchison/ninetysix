@@ -20,7 +20,6 @@ const
   FG_CLEAR = 2;
 
 type
-
   tScreenStats = record
     copyRegions: int32;
     copyCells: int32;
@@ -62,6 +61,7 @@ type
     SHOW_DIRTY_RECTS: boolean;
     stats: tScreenStats;
     bounds: tRect;    // logical bounds of canvas
+    clip: tRect;      // clipping rect
     scrollMode: tScreenScrollMode;
     fx: tFlipEffect;
 
@@ -382,6 +382,7 @@ end;
 
 procedure tScreen.flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
 begin
+  if word(dstY) >= videoDriver.height then exit;
 
   case fx of
     FX_NONE: transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
@@ -418,6 +419,7 @@ begin
 
   viewport := Rect(videoDriver.physicalWidth, videoDriver.physicalHeight);
   bounds := Rect(aWidth, aHeight);
+  clip := bounds;
 
   stats.reset();
 end;
@@ -621,7 +623,7 @@ begin
   case scrollMode of
     SSM_COPY: begin
       {todo: if viewport did not move then copy only changed regions (e.g. from below)}
-      for y := 0 to videoDriver.physicalHeight-1 do
+      for y := clip.top to clip.bottom-1 do
         flipLineToScreen(viewport.x, viewport.y+y, 0, y, videoDriver.physicalWidth);
       end;
     SSM_OFFSET: begin
