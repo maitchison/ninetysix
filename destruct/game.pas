@@ -18,8 +18,6 @@ type
     procedure clear();
   end;
 
-  tGameState = (GS_PLAYING, GS_ENDED);
-
   tTankEnumerator = record
     private
       fIndex: Integer;
@@ -59,16 +57,15 @@ var
   player1, player2: tController;
   terrain: tTerrain;
   gameTick: dword;
-  gameState: tGameState;
 
 const
   GRAVITY = 241.5;
-const
+var
   {note: I really should have created a viewport... anyway..
    also, it would be good if screen.canvas could be 256x256}
   {this is the mapping from game co-rds to canvas co-ords}
-  VIEWPORT_X = 32;
-  VIEWPORT_Y = 0;
+  VIEWPORT_X: integer = 32;
+  VIEWPORT_Y: integer = 0;
 
 implementation
 
@@ -308,6 +305,7 @@ begin
 
   videoDriver.setTrueColor(320, 240);
   screen := tScreen.create();
+  screen.background := tPage.create(screen.width, screen.height);
   screen.scrollMode := SSM_COPY;
 end;
 

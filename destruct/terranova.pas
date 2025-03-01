@@ -75,7 +75,7 @@ type
     function  getTerrainHeight(xPos: integer): integer;
     function  getGradient(x,y: integer;radius: integer=2): V2D;
 
-    procedure generate();
+    procedure generate(minHeight: integer=0);
 
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
@@ -307,7 +307,7 @@ begin
   result := centerOfMass * (-1/sqr(2*radius+1));
 end;
 
-procedure tTerrain.generate();
+procedure tTerrain.generate(minHeight: integer);
 var
   dirtHeight: array[0..255] of integer;
   rockHeight: array[0..255] of integer;
@@ -325,8 +325,8 @@ begin
     phase[i] := (rnd/256)*2*pi;
 
   for x := 0 to 255 do begin
-    dirtHeight[x] := 158 + round(30*sin(phase[1]+x*0.0197) - 67*cos(phase[2]+x*0.003) + 15*sin(phase[3]+x*0.023));
-    rockHeight[x] := 220 + round(30*sin(phase[4]+x*0.0197) - 67*cos(phase[5]+x*0.003) + 15*sin(phase[6]+x*0.023)) div 4;
+    dirtHeight[x] := minHeight+158 + round(30*sin(phase[1]+x*0.0197) - 67*cos(phase[2]+x*0.003) + 15*sin(phase[3]+x*0.023));
+    rockHeight[x] := minHeight+220 + round(30*sin(phase[4]+x*0.0197) - 67*cos(phase[5]+x*0.003) + 15*sin(phase[6]+x*0.023)) div 4;
   end;
 
   for y := 0 to 255 do begin

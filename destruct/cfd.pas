@@ -429,5 +429,67 @@ begin
   screen.markRegion(Rect(xPos, yPos, 128, 128));
 end;
 
+{--------------------------------------------------------}
+
+(*
+procedure cfdScreen();
+var
+  cg: tCFDGrid;
+  fpsLabel, densityLabel: tGuiLabel;
+  gui: tGuiComponents;
+  elapsed: single;
+  ofsX, ofsY: integer;
+  timeUntilNextUpdate: single;
+begin
+  //cg := tDiffusionGrid.create();
+  cg := tMethod2Grid.create();
+  //cg := tLatticeBoltzmannGrid.create();
+  cg.init();
+  gui := tGuiComponents.create();
+  fpsLabel := tGuiLabel.create(Point(10, 10));
+  gui.append(fpsLabel);
+  densityLabel := tGuiLabel.create(Point(10, 200));
+  gui.append(densityLabel);
+
+
+  ofsX := (320-128) div 2;
+  ofsY := (240-128) div 2;
+
+  timeUntilNextUpdate := 0;
+
+  {main loop}
+  repeat
+    startTimer('main');
+
+    screen.clearAll();
+
+    elapsed := clamp(getTimer('main').elapsed, 0.001, 1.0);
+
+    gui.update(elapsed);
+    gui.draw(screen);
+
+    if (MOUSE_B = 1) then
+      cg.addDensity(mouse_x-ofsX, mouse_y-ofsY, clamp(100*elapsed, 0, 1))
+    else
+      densityLabel.text := format('%.3f', [cg.getDensity(mouse_x-ofsX, mouse_y-ofsY)]);
+
+    timeUntilNextUpdate -= elapsed;
+    if timeUntilNextUpdate <= 0 then begin
+      startTimer('cfd');
+      cg.update();
+      stopTimer('cfd');
+      fpsLabel.text := format('CFD: %fms', [1000*getTimer('cfd').avElapsed]);
+      timeUntilNextUpdate := 1/30;
+    end;
+
+    cg.draw(screen, ofsX, ofsY);
+
+    screen.pageFlip();
+    stopTimer('main');
+  until keyDown(key_esc);
+
+end;
+*)
+
 begin
 end.

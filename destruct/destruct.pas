@@ -33,8 +33,24 @@ type
     constructor create(aPos: tPoint; aPlayer: tController);
   end;
 
+  tGameState = (GS_LOADING, GS_TITLE, GS_BATTLE, GS_EXIT);
+  tSubState = (SS_INIT, SS_PLAYING, SS_ENDING);
+
+type
+  tGlobalState = class
+    state: tGameState;
+    subState: tSubState;
+    roundTimer: single; {seconds round has been playing}
+    endOfRoundTimer: single; {seconds until round terminates}
+  end;
+
+
 var
-  exitFlag: boolean;
+  gs: tGlobalState;
+  gui: tGuiComponents;
+  fpsLabel: tGuiLabel;
+  startLabel, verLabel: tGuiLabel;
+  player1Gui, player2Gui: tPlayerGUI;
 
 {-------------------------------------------}
 
@@ -59,120 +75,68 @@ end;
 
 {-------------------------------------------}
 
-procedure titleScreen();
+{look for a good place to put a new tank}
+function findNewTankPosition(team: integer): tPoint;
 var
-  gui: tGuiComponents;
-  startLabel,verLabel: tGuiLabel;
-  elapsed: single;
+  mask: array[0..255] of boolean;
+  options: array[0..255] of byte;
+  numOptions: integer;
+  xStart: integer;
+  xlp: integer;
+  xPos: integer;
+  tank: tTank;
 begin
 
-  {load background and refresh screen}
-  screen.background := tPage.create(320,240);
-  tSprite.create(titleGFX).blit(screen.background, 0, -16);
+  fillchar(mask, sizeof(mask), true);
+  for tank in tanks do begin
+    if not tank.isActive then continue;
+    for xlp := -12 to +12 do begin
+      xPos := xlp + tank.xPos;
+      if (xPos < 0) or (xPos > 255) then continue;
+      mask[xPos] := false;
+    end;
+  end;
 
-  screen.background.fillRect(Rect(0,0,320,24),RGB(0,0,0));
-  screen.background.fillRect(Rect(0,240-24,320,24),RGB(0,0,0));
+  if team = 1 then xStart := 10 else xStart := 128+10;
 
-  {setup gui}
+  numOptions := 0;
+  for xlp := xStart to xStart + 108 do begin
+    if not mask[xlp] then continue;
+    options[numOptions] := xlp;
+    inc(numOptions);
+  end;
+
+  if numOptions = 0 then
+    result.x := xStart+random(108)
+  else
+    result.x := options[random(numOptions)];
+
+  {find y pos}
+  result.y := 255-terrain.getTerrainHeight(result.x)-5;
+
+end;
+
+procedure setupGUI();
+begin
   gui := tGuiComponents.create();
+  fpsLabel := tGuiLabel.create(Point(6, 3));
+  gui.append(fpsLabel);
+
+  player1Gui := tPlayerGUI.create(Point(0, 0), player1);
+  player2Gui := tPlayerGUI.create(Point(160, 0), player2);
+  gui.append(player1Gui);
+  gui.append(player2Gui);
+
+  {title stuff}
   startLabel := tGuiLabel.create(Point(160, 224));
   startLabel.centered := true;
   startLabel.text := 'Press any key to start';
   gui.append(startLabel);
 
   verLabel := tGuiLabel.create(Point(320-66, 240-8));
-  verLabel.text := '0.3a (28/02/1996)';
+  verLabel.text := '0.4a (28/02/1996)';
   verLabel.textColor := RGB(128,128,128);
   gui.append(verLabel);
-
-  screen.pageClear();
-
-  {main loop}
-  repeat
-
-    musicUpdate();
-    startTimer('main');
-    screen.clearAll();
-
-    elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
-
-    startLabel.textColor := RGB(
-      round((sin(getSec)*64)+196),
-      round((sin(2*getSec)*32)+128),
-      20
-    );
-    gui.update(elapsed);
-    gui.draw(screen);
-
-    screen.flipAll();
-
-    stopTimer('main');
-
-    if anyKeyDown then break;
-
-    idle();
-
-  until false;
-
-end;
-
-procedure cfdScreen();
-var
-  cg: tCFDGrid;
-  fpsLabel, densityLabel: tGuiLabel;
-  gui: tGuiComponents;
-  elapsed: single;
-  ofsX, ofsY: integer;
-  timeUntilNextUpdate: single;
-begin
-  //cg := tDiffusionGrid.create();
-  cg := tMethod2Grid.create();
-  //cg := tLatticeBoltzmannGrid.create();
-  cg.init();
-
-
-  gui := tGuiComponents.create();
-  fpsLabel := tGuiLabel.create(Point(10, 10));
-  gui.append(fpsLabel);
-  densityLabel := tGuiLabel.create(Point(10, 200));
-  gui.append(densityLabel);
-
-
-  ofsX := (320-128) div 2;
-  ofsY := (240-128) div 2;
-
-  timeUntilNextUpdate := 0;
-
-  {main loop}
-  repeat
-    startTimer('main');
-
-    screen.clearAll();
-
-    elapsed := clamp(getTimer('main').elapsed, 0.001, 1.0);
-
-    gui.update(elapsed);
-    gui.draw(screen);
-
-    if (MOUSE_B = 1) then
-      cg.addDensity(mouse_x-ofsX, mouse_y-ofsY, clamp(100*elapsed, 0, 1))
-    else
-      densityLabel.text := format('%.3f', [cg.getDensity(mouse_x-ofsX, mouse_y-ofsY)]);
-
-    timeUntilNextUpdate -= elapsed;
-    if timeUntilNextUpdate <= 0 then begin
-      startTimer('cfd');
-      cg.update();
-      stopTimer('cfd');
-      fpsLabel.text := format('CFD: %fms', [1000*getTimer('cfd').avElapsed]);
-      timeUntilNextUpdate := 1/30;
-    end;
-
-    cg.draw(screen, ofsX, ofsY);
-
-    screen.pageFlip();
-    stopTimer('main');
-  until keyDown(key_esc);
 
 end;
 
@@ -236,80 +200,12 @@ begin
   end;
 end;
 
-{look for a good place to put a new tank}
-function findNewTankPosition(team: integer): tPoint;
-var
-  mask: array[0..255] of boolean;
-  options: array[0..255] of byte;
-  numOptions: integer;
-  xStart: integer;
-  xlp: integer;
-  xPos: integer;
-  tank: tTank;
-begin
-
-  fillchar(mask, sizeof(mask), true);
-  for tank in tanks do begin
-    if not tank.isActive then continue;
-    for xlp := -12 to +12 do begin
-      xPos := xlp + tank.xPos;
-      if (xPos < 0) or (xPos > 255) then continue;
-      mask[xPos] := false;
-    end;
-  end;
-
-  if team = 1 then xStart := 10 else xStart := 128+10;
-
-  numOptions := 0;
-  for xlp := xStart to xStart + 108 do begin
-    if not mask[xlp] then continue;
-    options[numOptions] := xlp;
-    inc(numOptions);
-  end;
-
-  if numOptions = 0 then
-    result.x := xStart+random(108)
-  else
-    result.x := options[random(numOptions)];
-
-  {find y pos}
-  result.y := 255-terrain.getTerrainHeight(result.x)-5;
-
-end;
+{-------------------------------------------}
 
 procedure setupAIvsAI();
-begin
-end;
-
-procedure playRound();
 var
-  go: tGameObject;
   tank: tTank;
-  elapsed: single;
-  gui: tGuiComponents;
-  fps: tGuiLabel;
-  xlp,ylp: integer;
-  testSprite: tSprite;
-  m: tMatrix4x4;
-  player1Gui,
-  player2Gui: tPlayerGUI;
-  sky: tPage;
-  endOfGameTimer: single;
-  roundTimer: single;
-  screenFade: single;
 begin
-
-  screen.background.clear(RGB(0,0,0));
-  renderSky(terrain.sky);
-
-  screen.pageClear();
-  screen.pageFlip();
-
-  terrain.generate();
-
-  {todo: move setup somewhere else}
-
-  {setup players}
   for tank in tanks do begin
     tank.reset();
     tank.status := GO_EMPTY;
@@ -319,7 +215,6 @@ begin
   tanks[1].init(findNewTankPosition(1), TEAM_1, CT_LAUNCHER);
   tanks[2].init(findNewTankPosition(1), TEAM_1, CT_HEAVY);
 
-//  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_HELI);
   tanks[5].init(findNewTankPosition(2), TEAM_2, CT_TANK);
   tanks[6].init(findNewTankPosition(2), TEAM_2, CT_LAUNCHER);
   tanks[7].init(findNewTankPosition(2), TEAM_2, CT_HEAVY);
@@ -327,141 +222,220 @@ begin
   for tank in tanks do
     if tank.isActive then tank.clearTerrain();
 
-  {setup controllers}
+  if assigned(player1) then player1.free;
+  if assigned(player2) then player2.free;
   player1 := tAIController.create(0);
   player2 := tAIController.create(5);
-  //player2 := tHumanController.create(5);
 
-  {setup gui}
-  gui := tGuiComponents.create();
-  fps := tGuiLabel.create(Point(6, 20));
+  {todo: hide gui}
+end;
 
-  player1Gui := tPlayerGUI.create(Point(0, 0), player1);
-  gui.append(player1Gui);
-  player2Gui := tPlayerGUI.create(Point(160, 0), player2);
-  gui.append(player2Gui);
+procedure setupHumanVsAI();
+var
+  tank: tTank;
+begin
+  for tank in tanks do begin
+    tank.reset();
+    tank.status := GO_EMPTY;
+  end;
 
-  gameState := GS_PLAYING;
-  endOfGameTimer := 0;
-  roundTimer := 0;
+  tanks[0].init(findNewTankPosition(1), TEAM_1, CT_TANK);
+  tanks[1].init(findNewTankPosition(1), TEAM_1, CT_LAUNCHER);
+  tanks[2].init(findNewTankPosition(1), TEAM_1, CT_HEAVY);
 
-  repeat
+  tanks[5].init(findNewTankPosition(2), TEAM_2, CT_HELI);
+  tanks[6].init(findNewTankPosition(2), TEAM_2, CT_LAUNCHER);
+  tanks[7].init(findNewTankPosition(2), TEAM_2, CT_HEAVY);
 
-    musicUpdate();
-    startTimer('main');
-    elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
+  for tank in tanks do
+    if tank.isActive then tank.clearTerrain();
 
-    if keydown(key_z) then elapsed := 0.001;
-    DEBUG_DRAW_BOUNDS := keydown(key_b);
-
-    {update ui}
-    if elapsed > 0 then
-      fps.text := format('%f', [1/getTimer('main').avElapsed]);
-
-    if (playerCount(TEAM_1)=0) or (playerCount(TEAM_2)=0) then
-      gameState := GS_ENDED;
-
-    case gameState of
-      GS_PLAYING: begin
-        player1.process(elapsed);
-        player2.process(elapsed);
-        player1.apply(elapsed);
-        player2.apply(elapsed);
-      end;
-      GS_ENDED: begin
-        endOfGameTimer += elapsed;
-      end;
-    end;
-
-    if endOfGameTimer > 2.0 then break;
-
-    screen.clearAll();
-
-    startTimer('update');
-    updateAll(elapsed);
-    stopTimer('update');
-
-    startTimer('draw');
-    drawAll(screen);
-    stopTimer('draw');
-
-    startTimer('updateTerrain');
-    terrain.update(elapsed);
-    stopTimer('updateTerrain');
-
-    startTimer('drawTerrain');
-    terrain.draw(screen);
-    stopTimer('drawTerrain');
-
-    {gui}
-    if (player1 is tHumanController) or (player2 is tHumanController) then begin
-      startTimer('guiUpdate');
-      gui.update(elapsed);
-      stopTimer('guiUpdate');
-      startTimer('guiDraw');
-      gui.draw(screen);
-      stopTimer('guiDraw');
-    end;
-
-    {screen fading}
-    screenFade := 0;
-    if roundTimer < 0.5 then
-      screenFade := 1-(2*roundTimer);
-    if endOfGameTimer > 0 then
-      screenFade := endOfGameTimer * 0.5;
-
-    screenFade := clamp(screenFade, 0.0, 1.0);
-    if screenFade = 1.0 then begin
-      screen.canvas.clear(RGB(0,0,0));
-      screen.markRegion(screen.bounds);
-    end else if screenFade > 0 then begin
-      screen.canvas.fillRect(screen.bounds, RGB(0,0,0,round(255*screenFade)));
-      screen.markRegion(screen.bounds);
-    end;
-
-    {debug}
-    if keyDown(key_f5) then debugShowWorldPixels(screen);
-    if keyDown(key_f4) then
-      screen.pageFlip();
-
-    if keyDown(key_1) then
-      terrain.burn(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 3);
-    if keyDown(key_2) then
-      terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND);
-    if keyDown(key_3) then
-      terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_LAVA);
-    if keyDown(key_4) then
-      makeDust(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND, 25.0, 0, 0, elapsed);
-    if keyDown(key_8) then
-      doBump(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 30, 50);
-
-    if keyDown(key_9) then
-      makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
-
-    screen.flipAll();
-
-    stopTimer('main');
-
-    if keyDown(key_esc) then begin
-      exitFlag := true;
-      break;
-    end;
-
-    roundTimer += elapsed;
-
-    idle();
-
-  until false;
+  if assigned(player1) then player1.free;
+  if assigned(player2) then player2.free;
+  player1 := tAIController.create(0);
+  player2 := tHumanController.create(5);
 
 end;
 
+{-------------------------------------------}
+
+procedure doDebugKeys(elapsed: single);
+begin
+  if keyDown(key_f5) then debugShowWorldPixels(screen);
+  if keyDown(key_f4) then
+    screen.pageFlip();
+
+  if keyDown(key_1) then
+    terrain.burn(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 3);
+  if keyDown(key_2) then
+    terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND);
+  if keyDown(key_3) then
+    terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_LAVA);
+  if keyDown(key_4) then
+    makeDust(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND, 25.0, 0, 0, elapsed);
+  if keyDown(key_8) then
+    doBump(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 30, 50);
+
+  if keyDown(key_9) then
+    makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
+
+  if keydown(key_z) then elapsed := 0.001;
+    DEBUG_DRAW_BOUNDS := keydown(key_b);
+
+end;
+
+procedure doUpdate(elapsed: single);
+begin
+  startTimer('update');
+  updateAll(elapsed);
+  stopTimer('update');
+  startTimer('updateTerrain');
+  terrain.update(elapsed);
+  stopTimer('updateTerrain');
+  startTimer('guiUpdate');
+  gui.update(elapsed);
+  stopTimer('guiUpdate');
+
+  startTimer('controller');
+  player1.process(elapsed);
+  player2.process(elapsed);
+  player1.apply(elapsed);
+  player2.apply(elapsed);
+  stopTimer('controller');
+
+  gs.roundTimer += elapsed;
+end;
+
+procedure doDraw(elapsed: single);
 var
-  i: integer;
-  mode: string;
+  screenFade: single;
+begin
+  startTimer('draw');
+  drawAll(screen);
+  stopTimer('draw');
+
+  startTimer('drawTerrain');
+  terrain.draw(screen);
+  stopTimer('drawTerrain');
+
+  startTimer('guiDraw');
+  gui.draw(screen);
+  stopTimer('guiDraw');
+
+  {screen fading}
+  screenFade := 0;
+  if gs.roundTimer < 0.5 then
+    screenFade := 1-(2*gs.roundTimer);
+  if gs.endOfRoundTimer > 0 then
+    screenFade := gs.endOfRoundTimer * 0.5;
+
+  screenFade := clamp(screenFade, 0.0, 1.0);
+  if screenFade = 1.0 then begin
+    screen.canvas.clear(RGB(0,0,0));
+    screen.markRegion(screen.bounds);
+  end else if screenFade > 0 then begin
+    screen.canvas.fillRect(screen.bounds, RGB(0,0,0,round(255*screenFade)));
+    screen.markRegion(screen.bounds);
+  end;
+
+end;
+
+procedure mainLoop();
+var
+  elapsed: single;
+begin
+
+  screen.background.clear(RGB(0,0,0));
+  renderSky(terrain.sky);
+
+  screen.pageClear();
+  screen.pageFlip();
+
+  setupGui();
+  gs.state := GS_TITLE;
+  gs.subState := SS_INIT;
+
+  repeat
+
+    startTimer('main');
+    musicUpdate();
+
+    elapsed := clamp(getTimer('main').elapsed, 0.001, 0.10);
+
+    {update ui}
+    if elapsed > 0 then
+      fpsLabel.text := format('%f', [1/getTimer('main').avElapsed]);
+
+    {handle resets}
+    case gs.subState of
+      SS_INIT: begin
+        gs.roundTimer := 0;
+        gs.endOfRoundTimer := 0;
+
+        case gs.state of
+          GS_TITLE: begin
+            screen.fx := FX_NONE;
+            terrain.generate(-16);
+            setupAIvsAI();
+            {note: would make sense to have a 'scene' with it's own ui to handle this}
+            player1Gui.visible := false;
+            player2Gui.visible := false;
+            startLabel.visible := true;
+            verLabel.visible := true;
+            screen.fx := FX_NOISE;
+          end;
+          GS_BATTLE: begin
+            screen.fx := FX_NONE;
+            terrain.generate();
+            setupHumanvsAI();
+            player1Gui.visible := true;
+            player2Gui.visible := true;
+            startLabel.visible := false;
+            verLabel.visible := false;
+          end;
+        end;
+        gs.subState := SS_PLAYING;
+      end;
+    end;
+
+    {special case for title screen}
+
+    screen.clearAll();
+
+    doUpdate(elapsed);
+    doDraw(elapsed);
+
+    case gs.state of
+      GS_TITLE: begin
+        screen.canvas.fillRect(Rect(0,0,320,32),RGB(0,0,0));
+        screen.canvas.fillRect(Rect(0,240-32,320,32),RGB(0,0,0));
+      end;
+    end;
+
+    screen.flipAll();
+
+    {end of game detection}
+    if (playerCount(TEAM_1)=0) or (playerCount(TEAM_2)=0) then
+      gs.endOfRoundTimer += elapsed;
+    if gs.endOfRoundTimer >= 2.0 then
+      gs.subState := SS_INIT;
+
+    if keyDown(key_esc) then gs.state := GS_EXIT;
+
+    idle();
+
+    stopTimer('main');
+
+  until gs.state = GS_EXIT;
+
+end;
 
 begin
 
   CALL_OLD_KBH := false;
+
+  gs := tGlobalState.create();
+  gs.state := GS_LOADING;
 
   {show useful stuff}
   cpuInfo.printToLog();
@@ -476,22 +450,14 @@ begin
 
   runTestSuites();
   initKeyboard();
-
   loadResources();
-
   screenInit();
   musicPlay('res\dance1.a96');
   initMouse();
-  titleScreen();
 
-  exitFlag := false;
-  repeat
-    playRound();
-  until exitFlag;
+  mainLoop();
 
-  //cfdScreen();
   screenDone();
-
   logTimers();
   freeResources();
 

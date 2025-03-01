@@ -63,7 +63,7 @@ type
     stats: tScreenStats;
     bounds: tRect;    // logical bounds of canvas
     scrollMode: tScreenScrollMode;
-    flipEffect: tFlipEffect;
+    fx: tFlipEffect;
 
   protected
     procedure copyLine(x1, x2, y: int32);
@@ -368,7 +368,7 @@ begin
   canvas := nil;
   SHOW_DIRTY_RECTS := false;
   scrollMode := SSM_OFFSET;
-  flipEffect := FX_NONE;
+  fx := FX_NONE;
   viewport := Rect(0,0);
   resize(videoDriver.width, videoDriver.height);
 end;
@@ -383,7 +383,7 @@ end;
 procedure tScreen.flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
 begin
 
-  case flipEffect of
+  case fx of
     FX_NONE: transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
     FX_SCANLINE: if (dstY and $1) = 0 then
       transferLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt)

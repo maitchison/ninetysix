@@ -67,6 +67,7 @@ uses
 
 constructor tController.create(aTankIdx: integer);
 begin
+  inherited create();
   reset();
   tankIdx := aTankIdx;
 end;
@@ -264,7 +265,6 @@ begin
   end;
 
   if not assigned(target) then begin
-    note('Selecting new target');
     stateTimer := 0;
     if tank.team = TEAM_1 then
       otherTeam := TEAM_2
