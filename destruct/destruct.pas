@@ -136,7 +136,7 @@ begin
   gui.append(startLabel);
 
   verLabel := tGuiLabel.create(Point(320-100, 6));
-  verLabel.text := '0.4a (28/02/1996)';
+  verLabel.text := '0.3a (01/03/1996)';
   verLabel.textColor := RGB(228,228,238);
   gui.append(verLabel);
 
@@ -271,7 +271,7 @@ begin
   if keyDown(key_2) then
     terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND);
   if keyDown(key_3) then
-    terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_LAVA);
+    terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 15, DT_LAVA);
   if keyDown(key_4) then
     makeDust(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND, 25.0, 0, 0, elapsed);
   if keyDown(key_8) then
@@ -281,7 +281,7 @@ begin
     makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
 
   if keydown(key_z) then elapsed := 0.001;
-    DEBUG_DRAW_BOUNDS := keydown(key_b);
+  DEBUG_DRAW_BOUNDS := keydown(key_b);
 
 end;
 
@@ -310,6 +310,7 @@ end;
 procedure doDraw(elapsed: single);
 var
   screenFade: single;
+  y: integer;
 begin
   startTimer('draw');
   drawAll(screen);
@@ -318,6 +319,19 @@ begin
   startTimer('drawTerrain');
   terrain.draw(screen);
   stopTimer('drawTerrain');
+
+  {special case}
+  if gs.state = GS_TITLE then begin
+    for y := 0 to 240 do begin
+      case y and $3 of
+        0: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
+        1: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
+        2: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
+        3: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
+      end;
+    end;
+    screen.markRegion(screen.bounds);
+  end;
 
   startTimer('guiDraw');
   gui.draw(screen);
@@ -375,7 +389,6 @@ begin
         gs.endOfRoundTimer := 1.0;
         case gs.state of
           GS_TITLE: begin
-            screen.fx := FX_DOTS;
             terrain.generate(-16);
             setupAIvsAI();
             {note: would make sense to have a 'scene' with it's own ui to handle this}
@@ -385,7 +398,6 @@ begin
             verLabel.visible := true;
           end;
           GS_BATTLE: begin
-            screen.fx := FX_NONE;
             terrain.generate();
             setupHumanvsAI();
             player1Gui.visible := true;
@@ -408,6 +420,9 @@ begin
           gs.nextState := GS_BATTLE;
         end;
         startLabel.textColor.init(round((sin(getSec)*64)+196), round((sin(2*getSec)*32)+128), 20);
+      end;
+      GS_BATTLE: begin
+        doDebugKeys(elapsed);
       end;
     end;
 

@@ -41,7 +41,8 @@ type
     FX_NONE,
     FX_SCANLINE,    // every other line is dim
     FX_DOTS,        // looks like dots
-    FX_NOISE        // adds noise. helpful for debugging when screen is updated.
+    FX_NOISE,       // adds noise. helpful for debugging when screen is updated.
+    FX_GREEN        // a bit like a simulation
     );
 
   tScreen = class
@@ -238,6 +239,82 @@ begin
 end;
 
 
+procedure greenLineToScreen(canvas: tPage; srcX,srcY,dstX,dstY: int32; pixelCnt: int32;power:byte);
+var
+  lfb_seg: word;
+  srcOffset,dstOffset,noisePtr: dword;
+  noiseOffset: dword;
+  colorMask: dword;
+  shiftMask: dword;
+begin
+  {only 32bit supported right now}
+  lfb_seg := videoDriver.LFB_SEG;
+  dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*4;
+  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  noisePtr := dword(@NOISE_BUFFER);
+  noiseOffset := rnd;
+  colorMask := $ff3f003f;
+  shiftMask := $ff shr power;
+  shiftMask := shiftMask + (shiftMask shl 8) + (shiftMask shl 16) + (shiftMask shl 24);
+
+  asm
+    cli
+    pushad
+    push es
+
+    mov ax,  LFB_SEG
+    mov es,  ax
+
+    mov ebx, NOISEOFFSET
+    mov ecx, PIXELCNT
+    mov edx, NOISEPTR
+
+    mov edi, DSTOFFSET
+    mov esi, SRCOFFSET
+
+    movd MM2, COLORMASK
+
+  @X32:
+
+    mov       eax, dword ptr ds:[esi]
+
+    push cx
+
+    mov cl, POWER
+    shr eax, cl
+    and eax, SHIFTMASK
+
+    movd      MM0, eax
+
+    mov       al, [edx+ebx]
+    mov       cl, 2
+    shr       al, cl
+
+    pop cx
+
+    mov       ah, al
+
+    movd      MM1, eax
+    paddusb   MM1, MM2
+    punpcklwd MM1, MM1
+    psubusb   MM0, MM1
+
+    movd      dword ptr es:[edi], MM0
+
+    add esi, 4
+    add edi, 4
+    inc ebx
+    and ebx, $ff
+    dec ecx
+    jnz @X32
+
+    pop es
+    popad
+    emms
+    sti
+  end;
+end;
+
 procedure transferLineToScreen(canvas: tPage; srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
 var
   lfb_seg: word;
@@ -395,6 +472,12 @@ begin
       1: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,2,1);
       2: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,0);
       3: shiftLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1,2);
+    end;
+    FX_GREEN: case (dstY and $3) of
+      0: greenLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,1);
+      1: greenLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,0);
+      2: greenLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,2);
+      3: greenLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt,0);
     end;
     FX_NOISE:
       noiseLineToScreen(canvas,srcX,srcY,dstX,dstY,pixelCnt);
