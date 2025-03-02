@@ -5,135 +5,8 @@ interface
 uses
   Classes, SysUtils, Generics.Collections; // For TList<T>
 
-// ----------------------------------------------------------
-// Stubs for attributes, base classes, and engine references
-// ----------------------------------------------------------
+
 type
-  // A stub attribute to replace [DataObjectAttribute("Area", ...)]
-  DataObjectAttribute = class(TCustomAttribute)
-  private
-    fName: string;
-    fFlag: Boolean;
-  public
-    constructor Create(const aName: string; aFlag: Boolean);
-    property name: string read fName;
-    property flag: Boolean read fFlag;
-  end;
-
-  // Another stub attribute to replace [FieldAttr(true)] if needed
-  FieldAttr = class(TCustomAttribute)
-  private
-    fIsKey: Boolean;
-  public
-    constructor Create(aIsKey: Boolean);
-    property isKey: Boolean read fIsKey;
-  end;
-
-  // Stub base class for "DataObject"
-  tDataObject = class
-  public
-    procedure writeNode(node: TObject); virtual;
-    procedure readNode(node: TObject); virtual;
-  end;
-
-// ----------------------------------------------------------
-// Further stubs for referencing other classes
-// ----------------------------------------------------------
-type
-  // Forward declarations
-  tMdrMonster = class; 
-  tMdrMonsterInstance = class;
-  tMdrSpawnMask = class;
-  tMdrMap = class;
-
-  tMdrLocation = record
-    x,y: Integer;    
-    floor: Integer;
-    function toString: string;     
-  end;
-
-  // This would represent your "MDRMonster" class
-  tMdrMonster = class
-  private
-    fid: Integer;
-    fspawnCount: Integer;
-    fcompanion: tMdrMonster; // For "selectedMonster.Companion"
-  public
-    property id: Integer read fid write fid;
-    property spawnCount: Integer read fspawnCount write fspawnCount;
-    property companion: tMdrMonster read fcompanion write fcompanion;
-  end;
-
-  // Stub for "MDRMonsterInstance"
-  tMdrMonsterInstance = class
-  public
-    class function create(monster: tMdrMonster): tMdrMonsterInstance; static;
-  end;
-
-  // Stub for "MDRSpawnMask"
-  tMdrSpawnMask = class
-  private
-    fMask: Integer;
-  public
-    constructor Create(aMask: Integer);
-    property mask: Integer read fMask write fMask;
-  end;
-
-  // Stub for "SpawnTable"
-  tSpawnTable = class
-  public
-    procedure buildList(area: TObject; minLevel, maxLevel: Integer);
-    function selectRandomItem: tMdrMonster;
-  end;
-
-  // Stub for "MDRMap"
-  tMdrMap = class
-  private
-    fFloorNumber: Integer;
-    fWidth, fHeight: Integer;
-  public
-    // We'll replicate the key properties
-    property width: Integer read fWidth;
-    property height: Integer read fHeight;
-    property floorNumber: Integer read fFloorNumber write fFloorNumber;
-
-    // A 2D index property returning some FieldRecord
-    function getField(ax, ay: Integer): TObject; // We'll adapt below
-    function getMonsterAtLocation(ax, ay: Integer): tMdrMonsterInstance;
-
-    // For example, returns a field that has "stud" or "area" or ...
-    // Real code would return tFieldRecord. We just return TObject here as a stub.
-    property fields[ax, ay: Integer]: TObject read getField; default;
-  end;
-
-  // Stub for "CoM" environment
-  tSpawnManager = class
-  public
-    function getRespawnTime(aArea: TObject): Int64;
-    procedure setRespawnTime(aArea: TObject; ticks: Int64);
-    function getSpawnedMonsters(aArea: TObject): TList<tMdrMonsterInstance>;
-  end;
-
-  tCoMState = class
-  public
-    spawnManager: tSpawnManager;
-  end;
-
-  tCoM = class
-    class var state: tCoMState;
-    class var monsters: TObject; // Stub for "CoM.Monsters"
-  end;
-
-  // Stub for "Trace.LogDebug"
-  tTrace = class
-    class procedure logDebug(const msg: string; args: array of const); static;
-  end;
-
-// ----------------------------------------------------------
-// The tMdrArea class (translation of MDRArea)
-// ----------------------------------------------------------
-type
-  [DataObjectAttribute('Area', True)]
   tMdrArea = class(tDataObject)
   private
     // Fields corresponding to the public fields from C#
@@ -185,38 +58,8 @@ type
     function spawnMonster(selectedMonster: tMdrMonster): tMdrMonsterInstance;
   end;
 
-// ----------------------------------------------------------
-// Implementation
-// ----------------------------------------------------------
 implementation
 
-{ DataObjectAttribute }
-constructor DataObjectAttribute.Create(const aName: string; aFlag: Boolean);
-begin
-  inherited Create;
-  fName := aName;
-  fFlag := aFlag;
-end;
-
-{ FieldAttr }
-constructor FieldAttr.Create(aIsKey: Boolean);
-begin
-  inherited Create;
-  fIsKey := aIsKey;
-end;
-
-{ tDataObject }
-procedure tDataObject.writeNode(node: TObject);
-begin
-  // Stub
-end;
-
-procedure tDataObject.readNode(node: TObject);
-begin
-  // Stub
-end;
-
-{ tMdrLocation }
 constructor tMdrLocation.Create(ax, ay, aFloor: Integer);
 begin
   x := ax;
@@ -229,14 +72,13 @@ begin
   Result := Format('(%d,%d,%d)', [x, y, floor]);
 end;
 
-{ tMdrMonsterInstance }
 class function tMdrMonsterInstance.create(monster: tMdrMonster): tMdrMonsterInstance;
 begin
   // Real code should store a reference to monster, etc.
   Result := tMdrMonsterInstance(inherited Create);
 end;
 
-{ tMdrSpawnMask }
+
 constructor tMdrSpawnMask.Create(aMask: Integer);
 begin
   inherited Create;

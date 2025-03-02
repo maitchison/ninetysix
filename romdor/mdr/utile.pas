@@ -20,7 +20,6 @@ type
     wtArch
   );
 
-  // -- Sample record for walls
   tWallRecord = record
     wall  : Boolean;
     door  : Boolean;
@@ -29,7 +28,6 @@ type
     arch  : Boolean;
   end;
 
-  // Helper to create an empty tWallRecord quickly
   function emptyWallRecord: tWallRecord;
   
   tTileCopyMode = (
@@ -37,16 +35,7 @@ type
     tcmFull
   );
 
-  // Stub direction record
-  tDirection = record
-    sector: Integer;
-  end;
-
-  // Stub classes
-  tMDRArea = class
-  end;
-
-  tMDRAreaList = class(TObject)
+  tAreaList = class(TObject)
   private
     fList: TList;
     function getCount: Integer;
@@ -58,29 +47,18 @@ type
     property Items[index: Integer]: tMDRArea read getItem; default;
   end;
 
-  // -- Stub for your MDRMap class
-  tMDRMap = class
-  private
-    fArea: tMDRAreaList;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    function getField(ax, ay: Integer): class of TObject; // forward ref changed below
-    property Area: tMDRAreaList read fArea;
-  end;
-
   // Forward declaration so tMDRMap.getField can return tMapField
   tMapField = class;
 
   // Now correct the signature of getField:
   tMDRMap = class
   private
-    fArea: tMDRAreaList;
+    fArea: tAreaList;
   public
     constructor Create;
     destructor Destroy; override;
     function getField(ax, ay: Integer): tMapField;
-    property Area: tMDRAreaList read fArea;
+    property Area: tAreaList read fArea;
   end;
 
   // -- This is your "FieldRecord"
@@ -213,25 +191,25 @@ begin
   Result.arch   := False;
 end;
 
-// -------------- tMDRAreaList --------------
-constructor tMDRAreaList.Create;
+// -------------- tAreaList --------------
+constructor tAreaList.Create;
 begin
   inherited Create;
   fList := TList.Create;
 end;
 
-destructor tMDRAreaList.Destroy;
+destructor tAreaList.Destroy;
 begin
   fList.Free;
   inherited Destroy;
 end;
 
-function tMDRAreaList.getCount: Integer;
+function tAreaList.getCount: Integer;
 begin
   Result := fList.Count;
 end;
 
-function tMDRAreaList.getItem(index: Integer): tMDRArea;
+function tAreaList.getItem(index: Integer): tMDRArea;
 begin
   if (index < 0) or (index >= fList.Count) then
     Exit(nil);
@@ -242,7 +220,7 @@ end;
 constructor tMDRMap.Create;
 begin
   inherited Create;
-  fArea := tMDRAreaList.Create;
+  fArea := tAreaList.Create;
 end;
 
 destructor tMDRMap.Destroy;
