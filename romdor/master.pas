@@ -28,7 +28,7 @@ var
   srcPath, dstPath: string;
   img: tPage;
 begin
-  srcPath := joinPath('c:\dev\masters\destruct', filename+'.png');
+  srcPath := joinPath('c:\dev\masters\romdor', filename+'.png');
   dstPath := 'res\'+filename+'.p96';
   if (not FORCE) and fs.exists(dstPath) then exit;
   img := tPage.Load(srcPath);
@@ -45,7 +45,7 @@ var
   writer: tLA96Writer;
   sfx: tSoundEffect;
 begin
-  srcPath := joinPath('c:\dev\masters\destruct', filename+'.wav');
+  srcPath := joinPath('c:\dev\masters\romdor', filename+'.wav');
   dstPath := 'res\'+filename+'.a96';
   if (not FORCE) and fs.exists(dstPath) then exit;
   sfx := tSoundEffect.Load(srcPath);
@@ -63,12 +63,6 @@ end;
 
 procedure masterGFX();
 begin
-  convertPNG('title');
-  convertPNG('template');
-  convertPNG('sprites');
-  convertPNG('netfont1');
-  convertPNG('netfont2');
-  convertPNG('font');
 end;
 
 {create compressed copies of master music tracks}
@@ -78,7 +72,7 @@ var
   tag: string;
   root: string;
 begin
-  root := 'c:\dev\masters\destruct';
+  root := 'c:\dev\masters\romdor';
   for filename in fs.listFiles(joinPath(root, '\*.wav')) do begin
     {only load 'short' audio'}
     if fs.getFileSize(joinPath(root, filename)) > 128*1024 then continue;
@@ -91,7 +85,7 @@ end;
 procedure masterMusic();
 var
   verbose: boolean;
-  sourceFiles: array of string = ['dance1'];
+  sourceFiles: array of string = ['Mordor', 'Prologue'];
   writer: tLA96Writer;
   filename: string;
   srcPath, dstPath: string;
@@ -108,7 +102,7 @@ begin
   writer := tLA96Writer.create();
 
   for filename in sourceFiles do begin
-    srcPath := joinPath('c:\dev\masters\destruct', filename+'.wav');
+    srcPath := joinPath('c:\dev\masters\romdor', filename+'.wav');
     if not fs.exists(srcPath) then begin
       warning('File not found '+srcPath);
       continue;
