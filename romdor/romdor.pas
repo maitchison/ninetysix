@@ -94,9 +94,9 @@ var
 begin
   //screen.pageClear();
 
-  frame := tSprite.Create(tPage.Load('res/frame.p96'));
-  m1 := tSprite.Create(tPage.Load('res/wolf96.p96'));
-  m2 := tSprite.Create(tPage.Load('res/hobgob96.p96'));
+  frame := tSprite.Create(gfx['frame']);
+  m1 := tSprite.Create(gfx['wolf96']);
+  m2 := tSprite.Create(gfx['hobgob96']);
 
   atX := 100;
   atY := 200;
@@ -131,7 +131,34 @@ end;
 
 {renders a single map tile}
 procedure tMapGUI.drawTile(screen: tScreen; x,y: integer);
+var
+  tile: tTile;
+  atX, atY: integer;
+  dx,dy: integer;
+  id: integer;
+  i: integer;
 begin
+  atX := bounds.x + x*15;
+  atY := bounds.y + y*15;
+  tile := map.tile[x,y];
+
+  {floor}
+  id := FLOOR_SPRITE[tile.floor.t];
+  if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
+
+  {medium}
+  id := MEDIUM_SPRITE[tile.medium.t];
+  if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
+
+  {walls}
+  for i in [0,2,1,3] do begin
+    id := WALL_SPRITE[tile.wall[i].t];
+    if id < 0 then continue;
+    dx := WALL_DX[i];
+    dy := WALL_DY[i];
+    if dy <> 0 then inc(id); // rotated varient
+    mapSprites.sprites[id].draw(screen.canvas, atX+dx, atY+dy);
+  end;
 
 end;
 
@@ -145,7 +172,7 @@ begin
   if not assigned(map) then exit();
   for y := 0 to map.height-1 do begin
     for x := 0 to map.width-1 do begin
-      drawTile(screen, x,y);
+      drawTile(screen, x, y);
     end;
   end;
 end;
@@ -159,12 +186,32 @@ begin
   map.clear();
   for y := 0 to map.height-1 do begin
     for x := 0 to map.width-1 do begin
-      case rnd(2) of
-        0: map.tile[x,y].floor.t := ftStone;
+      case rnd(10) of
         1: map.tile[x,y].floor.t := ftWater;
+        2: map.tile[x,y].floor.t := ftDirt;
+        3: map.tile[x,y].floor.t := ftGrass;
+        else map.tile[x,y].floor.t := ftStone;
+      end;
+      case rnd(10) of
+        1: map.tile[x,y].medium.t := mtMist;
+        2: map.tile[x,y].medium.t := mtRock;
       end;
     end;
   end;
+
+  {stub: walls}
+  map.tile[0,0].medium.t := mtRock;
+  map.tile[1,0].medium.t := mtRock;
+  map.tile[0,1].medium.t := mtRock;
+  map.tile[1,1].medium.t := mtRock;
+  map.tile[0,0].wall[0].t := wtWall;
+  map.tile[0,0].wall[1].t := wtWall;
+  map.tile[0,0].wall[2].t := wtWall;
+  map.tile[0,0].wall[3].t := wtWall;
+  map.tile[1,1].wall[0].t := wtWall;
+  map.tile[1,1].wall[1].t := wtWall;
+  map.tile[1,1].wall[2].t := wtWall;
+  map.tile[1,1].wall[3].t := wtWall;
 end;
 
 {-------------------------------------------------------}

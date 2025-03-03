@@ -10,10 +10,25 @@ uses
 
 type
 
-  tWallType = (wtNone, wtSecret, wtWall, twDoor);
-  tFloorType = (ftNone, ftStone, ftWater);
+  tWallType = (wtNone, wtWall, wtDoor, wtSecret, wtLockedDoor);
+  tFloorType = (ftNone, ftStone, ftWater, ftDirt, ftGrass);
   tMediumType = (mtNone, mtMist, mtRock);
 
+const
+  FLOOR_SPRITE: array[tFloorType] of integer =
+    (-1, -1, 15, 16, 26);
+
+  MEDIUM_SPRITE: array[tMediumType] of integer =
+    (-1, 20, 19);
+
+  {+1 for rotated varient}
+  WALL_SPRITE: array[tWallType] of integer =
+    (-1, 0, 2, 4, 32+4);
+
+  WALL_DX: array[0..3] of integer = (0,+8,0,-7);
+  WALL_DY: array[0..3] of integer = (-7,0,+8,0);
+
+type
   tWallSpec = packed record
     t: tWallType;
     variation: byte;
