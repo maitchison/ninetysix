@@ -18,6 +18,7 @@ uses
   lc96,
   utils,
   ui,
+  resource,
   {game stuff}
   uScene,
   uMap
@@ -25,6 +26,8 @@ uses
 
 var
   screen: tScreen;
+  gfx: tGFXLibrary;
+  mapSprites: tSpriteSheet;
 
 type
   tMapGUI = class(tGuiComponent)
@@ -32,6 +35,7 @@ type
     map: tMap;
   public
     constructor Create();
+    procedure drawTile(screen: tScreen; x,y: integer);
     procedure doDraw(screen: tScreen); override;
   end;
 
@@ -44,7 +48,6 @@ type
     destructor Destroy(); override;
     procedure run(); override;
   end;
-
 
 procedure setup();
 begin
@@ -61,11 +64,18 @@ begin
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 
+  {load resources}
+  gfx := tGFXLibrary.Create();
+  gfx.loadFromFolder('res', '*.p96');
+
+  mapSprites := tSpriteSheet.create(gfx['map']);
+  mapSprites.grid(16,16);
+
 end;
 
 procedure titleScreen();
 begin
-  screen.background := tPage.load('res\title800.p96');
+  screen.background := gfx['title800.p96'];
   screen.pageClear();
   screen.pageFlip();
 
@@ -119,11 +129,42 @@ begin
   bounds.height := 32*8;
 end;
 
+{renders a single map tile}
+procedure tMapGUI.drawTile(screen: tScreen; x,y: integer);
+begin
+
+end;
+
 procedure tMapGUI.doDraw(screen: tScreen);
+var
+  x,y: integer;
 begin
   screen.canvas.fillRect(bounds, RGB(0,0,0));
   screen.canvas.drawRect(bounds, RGB(128,128,128));
   screen.markRegion(bounds);
+  if not assigned(map) then exit();
+  for y := 0 to map.height-1 do begin
+    for x := 0 to map.width-1 do begin
+      drawTile(screen, x,y);
+    end;
+  end;
+end;
+
+{-------------------------------------------------------}
+
+procedure makeRandomMap(map: tMap);
+var
+  x,y: integer;
+begin
+  map.clear();
+  for y := 0 to map.height-1 do begin
+    for x := 0 to map.width-1 do begin
+      case rnd(2) of
+        0: map.tile[x,y].floor.t := ftStone;
+        1: map.tile[x,y].floor.t := ftWater;
+      end;
+    end;
+  end;
 end;
 
 {-------------------------------------------------------}
@@ -146,7 +187,7 @@ var
   mapGUI: tMapGUI;
 begin
 
-  screen.background := tPage.load('res\title800.p96');
+  screen.background := gfx['title800'];
   screen.pageClear();
   screen.pageFlip();
 
@@ -158,7 +199,7 @@ begin
   mapGUI.bounds.y := 100;
   gui.append(mapGUI);
 
-  {make a map}
+  makeRandomMap(map);
 
   repeat
     screen.clearAll();

@@ -19,7 +19,7 @@ type
   public
     function addResource(filename: string): tResource; virtual;
     procedure loadFromFolder(root: string; pattern: string; filter: tResourceLoaderFilter = nil);
-    constructor create();
+    constructor Create();
     destructor destroy(); override;
     property items[tag: string]: tResource read getByTag; default;
   end;

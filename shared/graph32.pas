@@ -131,6 +131,15 @@ type
 
   tImageLoaderProc = function(filename: string): tPage;
 
+  tGFXLibrary = class(tResourceLibrary)
+  protected
+    function getGFXByTag(aTag: string): tPage;
+  public
+    function addResource(filename: string): tResource; override;
+    property items[tag: string]: tPage read getGFXByTag; default;
+  end;
+
+
 function RGB(d: dword): RGBA; inline; overload;
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline; overload;
 procedure makePageRandom(page: tPage);
@@ -143,6 +152,29 @@ implementation
 uses
   sprite,
   bmp;
+
+{-------------------------------------------------------------}
+
+function tGFXLibrary.getGFXByTag(aTag: string): tPage;
+var
+  res: tResource;
+begin
+  res := getByTag(aTag);
+  assert(res is tPage);
+  result := tPage(res);
+end;
+
+function tGFXLibrary.addResource(filename: string): tResource;
+var
+  res: tResource;
+begin
+  res := inherited addResource(filename);
+  assert(res is tPage);
+  result := res;
+end;
+
+{-------------------------------------------------------------}
+
 
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
 begin

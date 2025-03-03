@@ -77,7 +77,7 @@ begin
 
   img := tPage.Load(srcPath);
   saveLC96(dstPath, img);
-  textAttr := Green;
+  textAttr := LightGreen;
   writeLn(format('[%dx%d]',[img.width, img.height]));
   textAttr := White;
   img.free();
