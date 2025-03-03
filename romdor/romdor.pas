@@ -13,6 +13,7 @@ uses
   mouse,
   uScreen,
   graph32,
+  sprite,
   lc96,
   utils;
 
@@ -44,6 +45,39 @@ begin
 
   repeat
     musicUpdate();
+  until keyDown(key_esc) or keyDown(key_space);
+
+  freeAndNil(screen.background);
+end;
+
+procedure encounterScreen();
+
+var
+  frame,m1,m2: tSprite;
+  atX,atY: integer;
+begin
+  //screen.pageClear();
+
+  frame := tSprite.Create(tPage.Load('res/frame.p96'));
+  m1 := tSprite.Create(tPage.Load('res/wolf96.p96'));
+  m2 := tSprite.Create(tPage.Load('res/hobgob96.p96'));
+
+  atX := 100;
+  atY := 200;
+
+  m1.draw(screen.canvas, atX,atY);
+  frame.draw(screen.canvas, atX,atY);
+  m2.draw(screen.canvas, atX+(96+10)*1,atY);
+  frame.draw(screen.canvas, atX+(96+10)*1,atY);
+  m1.draw(screen.canvas, atX+(96+10)*2,atY);
+  frame.draw(screen.canvas, atX+(96+10)*2,atY);
+  m1.draw(screen.canvas, atX+(96+10)*3,atY);
+  frame.draw(screen.canvas, atX+(96+10)*3,atY);
+
+  screen.pageFlip();
+
+  repeat
+    musicUpdate();
   until keyDown(key_esc);
 
   freeAndNil(screen.background);
@@ -63,6 +97,7 @@ begin
   setup();
 
   titleScreen();
+  encounterScreen();
 
   videoDriver.setText();
 
