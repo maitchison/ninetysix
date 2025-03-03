@@ -3,19 +3,24 @@ unit uMap;
 
 interface
 
+uses
+  test,
+  debug,
+  utils;
+
 type
 
   tWallType = (wtNone, wtSecret, wtWall, twDoor);
   tFloorType = (ftStone, ftWater);
 
-  tWallSpec: packed record
+  tWallSpec = packed record
     t: tWallType;
     variation: byte;
     decoration1: byte;
     decoration2: byte;
   end;
 
-  tFloorSpec: packed record
+  tFloorSpec = packed record
     t: tFloorType;
     variation: byte;
     decoration1: byte;
@@ -31,10 +36,16 @@ type
   tMap = class
   protected
     fTile: array of tTile;
+    fWidth,fHeight: integer;
+    function getTile(x,y: integer): tTile;
+    procedure setTile(x,y: integer;aTile: tTile);
+
   public
     constructor Create(aWidth, aHeight: word);
-    width, height: integer;
-    tile[x,y: integer]: tTile read getTile write setTile default;
+  public
+    property width: integer read fWidth;
+    property height: integer read fHeight;
+    property tile[x,y: integer]: tTile read getTile write setTile;
   end;
 
 implementation

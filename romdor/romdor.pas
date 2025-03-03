@@ -1,6 +1,7 @@
 program romdor;
 
 uses
+  {engine stuff}
   debug,
   test,
   sbDriver,
@@ -15,10 +16,30 @@ uses
   graph32,
   sprite,
   lc96,
-  utils;
+  utils,
+  ui,
+  {game stuff}
+  uScene,
+  uMap
+  ;
 
 var
   screen: tScreen;
+
+type
+  tMapGUI = class(tGuiComponent)
+  end;
+
+type
+  tMapEditScene = class(tScene)
+  protected
+    map: tMap;
+  public
+    constructor Create();
+    destructor Destroy(); override;
+    procedure run(); override;
+  end;
+
 
 procedure setup();
 begin
@@ -83,6 +104,33 @@ begin
   freeAndNil(screen.background);
 end;
 
+{-------------------------------------------------------}
+
+constructor tMapEditScene.Create();
+begin
+  inherited Create();
+  map := tMap.create(32,32);
+end;
+
+destructor tMapEditScene.destroy();
+begin
+  map.free();
+  inherited destroy();
+end;
+
+procedure tMapEditScene.run();
+begin
+  screen.pageFlip();
+  repeat
+    musicUpdate();
+  until keyDown(key_esc);
+end;
+
+{-------------------------------------------------------}
+
+var
+  scene: tScene;
+
 begin
 
   autoHeapSize();
@@ -96,8 +144,11 @@ begin
 
   setup();
 
-  titleScreen();
-  encounterScreen();
+  //titleScreen();
+  //encounterScreen();
+  scene := tMapEditScene.create();
+  scene.run();
+  scene.free();
 
   videoDriver.setText();
 
