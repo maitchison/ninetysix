@@ -28,6 +28,11 @@ var
 
 type
   tMapGUI = class(tGuiComponent)
+  protected
+    map: tMap;
+  public
+    constructor Create();
+    procedure doDraw(screen: tScreen); override;
   end;
 
 type
@@ -106,6 +111,23 @@ end;
 
 {-------------------------------------------------------}
 
+constructor tMapGUI.Create();
+begin
+  inherited Create();
+  map := nil;
+  bounds.width := 32*8;
+  bounds.height := 32*8;
+end;
+
+procedure tMapGUI.doDraw(screen: tScreen);
+begin
+  screen.canvas.fillRect(bounds, RGB(0,0,0));
+  screen.canvas.drawRect(bounds, RGB(128,128,128));
+  screen.markRegion(bounds);
+end;
+
+{-------------------------------------------------------}
+
 constructor tMapEditScene.Create();
 begin
   inherited Create();
@@ -119,10 +141,31 @@ begin
 end;
 
 procedure tMapEditScene.run();
+var
+  elapsed: single;
+  mapGUI: tMapGUI;
 begin
+
+  screen.background := tPage.load('res\title800.p96');
+  screen.pageClear();
   screen.pageFlip();
+
+  elapsed := 0.01; // todo: update this}
+
+  mapGUI := tMapGui.create();
+  mapGUI.map := map;
+  mapGUI.bounds.x := 100;
+  mapGUI.bounds.y := 100;
+  gui.append(mapGUI);
+
   repeat
+    screen.clearAll();
     musicUpdate();
+
+    gui.update(elapsed);
+    gui.draw(screen);
+
+    screen.flipAll();
   until keyDown(key_esc);
 end;
 
