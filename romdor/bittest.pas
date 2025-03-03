@@ -17,4 +17,4 @@ begin
   tile.northWall := True;
   writeln(tile.northWall);
   writeln(tile.southWall);
-end.                 c
+end.

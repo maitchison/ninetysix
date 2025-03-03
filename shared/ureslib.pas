@@ -1,8 +1,4 @@
-unit resLib;
-
-{todo: this needs a big update, or perhaps to just be removed.
- airtime uses this... but no one else
- also tResource overlaps with the resources unit}
+unit uResLib;
 
 {$mode delphi}
 
@@ -23,13 +19,12 @@ type
     dstFile: string;
     modifiedTime: int64;
     procedure clear();
+    function isEmpty: boolean;
   end;
 
   tResourceLibrary = class
 
-    numResources: word;
-
-    resource: array[0..63] of tResourceInfo;
+    resources: array of tResourceInfo;
 
     procedure addResource(res: tResourceInfo);
 
@@ -38,11 +33,14 @@ type
     constructor CreateOrLoad(filename: string); overload;
     destructor Destroy; override;
 
+    function  len(): integer;
+
     procedure serialize(fileName: string);
     procedure deserialize(fileName: string);
 
-    function findResourceIndex(dstFile: string): integer;
+    function  findResourceIndex(dstFile: string): integer;
     procedure updateResource(res: tResourceInfo);
+    function  needsUpdate(dstFile: string): boolean;
 
   end;
 
@@ -59,13 +57,20 @@ begin
   modifiedTime := 0;
 end;
 
+function tResourceInfo.isEmpty(): boolean;
+begin
+  result := dstFile = '';
+end;
 {-----------------------------------------------}
 
 constructor tResourceLibrary.Create(); overload;
 begin
   inherited create();
-  numResources := 0;
-  fillchar(resource, sizeOf(resource), 0);
+end;
+
+function tResourceLibrary.len(): integer;
+begin
+  result := length(resources);
 end;
 
 constructor tResourceLibrary.Create(fileName: string); overload;
@@ -89,10 +94,8 @@ end;
 
 procedure tResourceLibrary.addResource(res: tResourceInfo);
 begin
-  if numResources = length(resource) then
-    fatal('Too many resources, limit is '+intToStr(length(resource)));
-  resource[numResources] := res;
-  inc(numResources);
+  setLength(resources, length(resources)+1);
+  resources[len-1] := res;
 end;
 
 {returns index of resource, or -1 of not found}
@@ -100,8 +103,8 @@ function tResourceLibrary.findResourceIndex(dstFile: string): integer;
 var
   i: int32;
 begin
-  for i := 0 to numResources-1 do
-    if resource[i].dstFile = dstFile then exit(i);
+  for i := 0 to len-1 do
+    if resources[i].dstFile = dstFile then exit(i);
   exit(-1);
 end;
 
@@ -114,7 +117,22 @@ begin
   if id < 0 then
     addResource(res)
   else
-    resource[id] := res;
+    resources[id] := res;
+end;
+
+{returns true if resource source file changed, or if no entry exists}
+function tResourceLibrary.needsUpdate(dstFile: string): boolean;
+var
+  id: int32;
+begin
+  result := false;
+  {does it exit}
+  id := findResourceIndex(dstFile);
+  if id < 0 then
+    exit(true);
+  {has it changed}
+  if resources[id].modifiedTime <> fs.getModified(resources[id].srcFile) then
+    exit(true);
 end;
 
 procedure tResourceLibrary.serialize(fileName: string);
@@ -133,8 +151,8 @@ begin
 
   {todo: update to new inifile unit}
   try
-    for i := 0 to numResources-1 do begin
-      res := resource[i];
+    for i := 0 to len-1 do begin
+      res := resources[i];
       writeln(t, '[resource]');
       writeln(t, 'srcFile=',res.srcFile);
       writeln(t, 'dstFile=',res.dstFile);
@@ -161,18 +179,16 @@ begin
   ioError := ioResult;
   if ioError <> 0 then fatal('Error reading '+fileName+' (error:'+intToStr(ioError)+')');
 
-  try
+  res.clear();
 
-    numResources := 0;
+  try
 
     while not eof(t) do begin
       readln(t, s);
       s := trim(s);
       if s = '[resource]' then begin
-        if numResources > 0 then
-          resource[numResources-1] := res;
-        res.clear();
-        inc(numResources);
+        if not res.isEmpty then addResource(res);
+        res.clear();  {add previous resource}
         continue;
       end;
       split(s, '=', k, v);
@@ -188,8 +204,7 @@ begin
     end;
 
     {write final}
-    if numResources > 0 then
-      resource[numResources-1] := res;
+    if not res.isEmpty then addResource(res);
 
   finally
     close(t);
@@ -222,8 +237,8 @@ begin
   rl.free();
 
   rl := tResourceLibrary.Create('_test.ini');
-  assertEqual(rl.numResources, 2);
-  res := rl.resource[0];
+  assertEqual(rl.len, 2);
+  res := rl.resources[0];
   assertEqual(res.srcFile, 'a');
   assertEqual(res.dstFile, 'b');
   assertEqual(res.modifiedTime, 123);
