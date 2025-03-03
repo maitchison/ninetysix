@@ -30,7 +30,7 @@ Block header
 
 uses
   {$I baseunits.inc},
-  crt, {remove this?}
+  crt,
   diff,
   hashMap,
   checkpoint,
@@ -441,10 +441,16 @@ var
   old,new: tCheckpoint;
   checkpointDiff: tCheckpointDiff;
 begin
+  startTimer('Scan');
   repo := tCheckpointRepo.create(REPO_PATH);
   old := repo.loadHead();
   new := tCheckpoint.create(repo, WORKSPACE);
+  stopTimer('Scan');
+
+  startTimer('Diff');
   checkpointDiff := repo.generateCheckpointDiff(old, new, FORCE);
+  stopTimer('Diff');
+  logTimers();
   checkpointDiff.showChanges();
 
   new.free;
@@ -458,10 +464,25 @@ var
   old,new: tCheckpoint;
   checkpointDiff: tCheckpointDiff;
 begin
+  startTimer('Scan');
   repo := tCheckpointRepo.create(REPO_PATH);
+  stopTimer('Scan');
+
+  startTimer('Load');
   old := repo.loadHead();
+  stopTimer('Load');
+
+
+  startTimer('ScanWorkspace');
   new := tCheckpoint.create(repo, WORKSPACE);
+  stopTimer('ScanWorkspace');
+
+  startTimer('Diff');
   checkpointDiff := repo.generateCheckpointDiff(old, new, FORCE);
+  stopTimer('Diff');
+
+  logTimers();
+
   checkpointDiff.showStatus();
 
   new.free;
@@ -827,9 +848,6 @@ begin
   // for visibility.
   textAttr := WHITE;
   clrscr;
-
-  {todo: remove these}
-  runTestSuites();
 
   {todo: proper parameter handling}
   if (paramCount = 0) then

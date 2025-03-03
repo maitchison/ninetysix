@@ -158,6 +158,8 @@ begin
   mapGUI.bounds.y := 100;
   gui.append(mapGUI);
 
+  {make a map}
+
   repeat
     screen.clearAll();
     musicUpdate();
