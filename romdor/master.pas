@@ -63,6 +63,7 @@ end;
 
 procedure masterGFX();
 begin
+  convertPNG('title800');
 end;
 
 {create compressed copies of master music tracks}
