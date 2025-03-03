@@ -18,6 +18,7 @@ uses
   lc96,
   utils,
   ui,
+  graph2d,
   resource,
   {game stuff}
   uScene,
@@ -33,6 +34,9 @@ type
   tMapGUI = class(tGuiComponent)
   protected
     map: tMap;
+    background: tSprite;
+  const
+    TILE_SIZE = 15;
   public
     constructor Create();
     procedure drawTile(screen: tScreen; x,y: integer);
@@ -99,7 +103,7 @@ begin
   m2 := tSprite.Create(gfx['hobgob96']);
 
   atX := 100;
-  atY := 200;
+  atY := 100;
 
   m1.draw(screen.canvas, atX,atY);
   frame.draw(screen.canvas, atX,atY);
@@ -125,8 +129,9 @@ constructor tMapGUI.Create();
 begin
   inherited Create();
   map := nil;
-  bounds.width := 32*8;
-  bounds.height := 32*8;
+  background := tSprite.create(gfx['darkmap']);
+  bounds.width := 512;
+  bounds.height := 512;
 end;
 
 {renders a single map tile}
@@ -137,10 +142,15 @@ var
   dx,dy: integer;
   id: integer;
   i: integer;
+  padding : integer;
 begin
-  atX := bounds.x + x*15;
-  atY := bounds.y + y*15;
+  padding:= (512 - ((TILE_SIZE * 32)+1)) div 2;
+  atX := bounds.x + x*TILE_SIZE+padding;
+  atY := bounds.y + y*TILE_SIZE+padding;
   tile := map.tile[x,y];
+
+  {grid}
+  screen.canvas.drawRect(Rect(atX, atY, 16, 16), RGB(0,0,0,32));
 
   {floor}
   id := FLOOR_SPRITE[tile.floor.t];
@@ -151,7 +161,7 @@ begin
   if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
 
   {walls}
-  for i in [0,2,1,3] do begin
+  for i := 0 to 3 do begin
     id := WALL_SPRITE[tile.wall[i].t];
     if id < 0 then continue;
     dx := WALL_DX[i];
@@ -166,8 +176,10 @@ procedure tMapGUI.doDraw(screen: tScreen);
 var
   x,y: integer;
 begin
-  screen.canvas.fillRect(bounds, RGB(0,0,0));
-  screen.canvas.drawRect(bounds, RGB(128,128,128));
+  //screen.canvas.fillRect(bounds, RGB(0,0,0));
+  //screen.canvas.drawRect(bounds, RGB(128,128,128));
+  background.draw(screen.canvas, bounds.x, bounds.y);
+
   screen.markRegion(bounds);
   if not assigned(map) then exit();
   for y := 0 to map.height-1 do begin
@@ -182,6 +194,7 @@ end;
 procedure makeRandomMap(map: tMap);
 var
   x,y: integer;
+  i: integer;
 begin
   map.clear();
   for y := 0 to map.height-1 do begin
@@ -197,6 +210,14 @@ begin
         2: map.tile[x,y].medium.t := mtRock;
       end;
     end;
+  end;
+
+  {boundary}
+  for i := 0 to 31 do begin
+    map.tile[i,0].medium.t := mtRock;
+    map.tile[i,31].medium.t := mtRock;
+    map.tile[0,i].medium.t := mtRock;
+    map.tile[31,i].medium.t := mtRock;
   end;
 
   {stub: walls}
@@ -242,8 +263,8 @@ begin
 
   mapGUI := tMapGui.create();
   mapGUI.map := map;
-  mapGUI.bounds.x := 100;
-  mapGUI.bounds.y := 100;
+  mapGUI.bounds.x := 50;
+  mapGUI.bounds.y := 50;
   gui.append(mapGUI);
 
   makeRandomMap(map);
