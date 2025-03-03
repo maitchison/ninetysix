@@ -17,6 +17,11 @@ var
   {force processing of all files}
   FORCE: boolean = false;
 
+const
+  {TODO: from CWD}
+  SRC_ROOT = 'c:\dev\masters\romdor';
+  DST_ROOT = 'c:\masters\romdor\res';
+
 procedure updateEncodeProgress(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
 begin
   {todo: do something fancy here, like eta, speed etc}
@@ -28,8 +33,8 @@ var
   srcPath, dstPath: string;
   img: tPage;
 begin
-  srcPath := joinPath('c:\dev\masters\romdor', filename+'.png');
-  dstPath := 'res\'+filename+'.p96';
+  srcPath := joinPath(SRC_ROOT, filename+'.png');
+  dstPath := joinPath(DST_ROOT, filename+'.p96');
   if (not FORCE) and fs.exists(dstPath) then exit;
   img := tPage.Load(srcPath);
   saveLC96(dstPath, img);
@@ -45,8 +50,8 @@ var
   writer: tLA96Writer;
   sfx: tSoundEffect;
 begin
-  srcPath := joinPath('c:\dev\masters\romdor', filename+'.wav');
-  dstPath := 'res\'+filename+'.a96';
+  srcPath := joinPath(SRC_ROOT, filename+'.wav');
+  dstPath := DST_ROOT+filename+'.a96';
   if (not FORCE) and fs.exists(dstPath) then exit;
   sfx := tSoundEffect.Load(srcPath);
 
@@ -62,8 +67,13 @@ begin
 end;
 
 procedure masterGFX();
+var
+  filename,tag: string;
 begin
-  convertPNG('title800');
+  for filename in fs.listFiles(joinPath(SRC_ROOT, '*.png')) do begin
+    tag := removeExtension(extractFilename(filename));
+    convertPNG(tag);
+  end;
 end;
 
 {create compressed copies of master music tracks}
@@ -73,10 +83,9 @@ var
   tag: string;
   root: string;
 begin
-  root := 'c:\dev\masters\romdor';
-  for filename in fs.listFiles(joinPath(root, '\*.wav')) do begin
+  for filename in fs.listFiles(joinPath(SRC_ROOT, '*.wav')) do begin
     {only load 'short' audio'}
-    if fs.getFileSize(joinPath(root, filename)) > 128*1024 then continue;
+    if fs.getFileSize(joinPath(SRC_ROOT, filename)) > 128*1024 then continue;
     tag := removeExtension(extractFilename(filename));
     convertWave(tag);
   end;
@@ -103,13 +112,13 @@ begin
   writer := tLA96Writer.create();
 
   for filename in sourceFiles do begin
-    srcPath := joinPath('c:\dev\masters\romdor', filename+'.wav');
+    srcPath := joinPath(SRC_ROOT, filename+'.wav');
     if not fs.exists(srcPath) then begin
       warning('File not found '+srcPath);
       continue;
     end;
 
-    dstPath := joinPath('res', filename+'.a96');
+    dstPath := joinPath(DST_ROOT, filename+'.a96');
     if (not FORCE) and fs.exists(dstPath) then begin
       note('Skipping '+srcPath);
       continue;
