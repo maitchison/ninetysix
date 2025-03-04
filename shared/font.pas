@@ -106,19 +106,30 @@ class function tFont.Load(filename: string): tFont;
 var
   TextFile: Text;
   Line: String;
-   Char: TChar;
+  Char: TChar;
   a,b: integer;
-
+  x,y: integer;
+  bitmap: tPage;
+  c: RGBA;
 begin
 
-  result := tFont.create();
+  result := tFont.Create();
 
   if fs.exists(filename+'.p96') then
-    result.bitmap := LoadLC96(filename+'.p96')
+    bitmap := LoadLC96(filename+'.p96')
   else if fs.exists(filename+'.bmp') then
-    result.bitmap := LoadBMP(filename+'.bmp')
+    bitmap := LoadBMP(filename+'.bmp')
   else
     fatal('File not found "'+filename+'.[p96|bmp]"');
+
+  {need to convert from format to new alpha format}
+  for y := 0 to bitmap.height-1 do
+    for x := 0 to bitmap.width-1 do begin
+      c := bitmap.getPixel(x,y);
+      bitmap.setPixel(x,y,RGB(255,255,255,c.r));
+    end;
+
+  result.bitmap := bitmap;
 
   {$I-}
   Assign(TextFile, filename+'.fnt');

@@ -150,7 +150,6 @@ end;
 constructor tMapEditScene.Create();
 begin
   inherited Create();
-  map := tMap.create(32,32);
 end;
 
 destructor tMapEditScene.destroy();
@@ -163,32 +162,49 @@ procedure tMapEditScene.run();
 var
   elapsed: single;
   mapGUI: tMapGUI;
+  fpsLabel: tGuiLabel;
+  timer: tTimer;
 begin
+
+  map := tMap.create(32,32);
 
   screen.background := gfx['title800'];
   screen.pageClear();
   screen.pageFlip();
 
-  elapsed := 0.01; // todo: update this}
-
-  mapGUI := tMapGui.create();
+  mapGUI := tMapGui.Create();
   mapGUI.map := map;
   mapGUI.bounds.x := 50;
   mapGUI.bounds.y := 50;
   gui.append(mapGUI);
 
+  fpsLabel := tGuiLabel.Create(Point(10,10));
+  gui.append(fpsLabel);
+
   makeRandomMap(map);
   mapGUI.refresh();
 
+  timer := tTimer.create('main');
+
   repeat
+
+    timer.start();
+
+    elapsed := clamp(timer.elapsed, 0.001, 0.1);
+    if timer.avElapsed > 0 then
+      fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
+
     musicUpdate();
 
-    screen.clearAll();
     gui.update(elapsed);
+    screen.clearAll();
     gui.draw(screen);
     screen.flipAll();
 
+    timer.stop();
+
   until keyDown(key_esc);
+
 end;
 
 {-------------------------------------------------------}
