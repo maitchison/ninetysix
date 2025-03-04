@@ -92,7 +92,7 @@ end;
 
 procedure tMapGUI.doDraw(screen: tScreen);
 begin
-  background.draw(screen.canvas, bounds.x, bounds.y);
+  {can be blit}
   cSprite.draw(screen.canvas, bounds.x, bounds.y);
   screen.markRegion(bounds);
 end;
@@ -101,7 +101,7 @@ procedure tMapGui.refresh();
 var
   x,y: integer;
 begin
-  canvas.clear(RGB(0,0,0,0));
+  background.draw(canvas, 0, 0);
   if not assigned(map) then exit();
   for y := 0 to map.height-1 do
     for x := 0 to map.width-1 do
