@@ -70,6 +70,7 @@ function maxf(a,b,c: single): single; overload;
 function power(Base, Exponent: double): double; inline;
 function log10(x: double): double;
 function log2(x: double): double;
+function isPowerOfTwo(x: dword): boolean;
 function roundUpToPowerOfTwo(x: dword): dword;
 function shiftRight(x: int32; shift: byte): int32; inline; register;
 
@@ -241,6 +242,11 @@ function Log2(x: double): double; inline;
 begin
   result := ln(x) / ln(2);
 end;
+
+function isPowerOfTwo(x: dword): boolean;
+begin
+  result := roundUpToPowerOfTwo(x) = x;
+end
 
 function roundUpToPowerOfTwo(x: dword): dword;
 begin

@@ -593,7 +593,6 @@ begin
   filldword(pixels^, width*height, c.to32);
 end;
 
-
 procedure TPage.PutPixel(atX,atY: int16;c: RGBA); inline; assembler; register;
 {
 Standard (Screen)
