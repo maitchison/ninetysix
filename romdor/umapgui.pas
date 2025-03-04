@@ -92,8 +92,7 @@ end;
 
 procedure tMapGUI.doDraw(screen: tScreen);
 begin
-  {can be blit}
-  cSprite.draw(screen.canvas, bounds.x, bounds.y);
+  cSprite.blit(screen.canvas, bounds.x, bounds.y);
   screen.markRegion(bounds);
 end;
 

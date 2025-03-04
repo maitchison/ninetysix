@@ -209,6 +209,7 @@ function tSprite.draw(dstPage: tPage; atX, atY: integer): tRect;
 begin
   atX -= pivot2x.x div 2;
   atY -= pivot2x.y div 2;
+  {todo: make this ASM/MMX!}
   draw_REF(dstPage, self.page, srcRect, atX, atY);
   result.init(atX, atY, width, height);
 end;
