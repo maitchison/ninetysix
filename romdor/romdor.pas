@@ -35,12 +35,16 @@ type
   protected
     map: tMap;
     background: tSprite;
+    canvas: tPage;
+    cSprite: tSprite; // todo: remove this and enabled pages to draw
   const
     TILE_SIZE = 15;
   public
     constructor Create();
-    procedure drawTile(screen: tScreen; x,y: integer);
+    destructor destroy(); override;
+    procedure renderTile(x,y: integer);
     procedure doDraw(screen: tScreen); override;
+    procedure refresh();
   end;
 
 type
@@ -132,10 +136,19 @@ begin
   background := tSprite.create(gfx['darkmap']);
   bounds.width := 512;
   bounds.height := 512;
+  canvas := tPage.create(bounds.width, bounds.height);
+  cSprite := tSprite.create(canvas);
+end;
+
+destructor tMapGUI.destroy();
+begin
+  canvas.free;
+  cSprite.free;
+  inherited destroy;
 end;
 
 {renders a single map tile}
-procedure tMapGUI.drawTile(screen: tScreen; x,y: integer);
+procedure tMapGUI.renderTile(x,y: integer);
 var
   tile: tTile;
   atX, atY: integer;
@@ -145,20 +158,17 @@ var
   padding : integer;
 begin
   padding:= (512 - ((TILE_SIZE * 32)+1)) div 2;
-  atX := bounds.x + x*TILE_SIZE+padding;
-  atY := bounds.y + y*TILE_SIZE+padding;
+  atX := x*TILE_SIZE+padding;
+  atY := y*TILE_SIZE+padding;
   tile := map.tile[x,y];
-
-  {grid}
-  screen.canvas.drawRect(Rect(atX, atY, 16, 16), RGB(0,0,0,32));
 
   {floor}
   id := FLOOR_SPRITE[tile.floorType];
-  if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
+  if id >= 0 then mapSprites.sprites[id].draw(canvas, atX, atY);
 
   {medium}
   id := MEDIUM_SPRITE[tile.mediumType];
-  if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
+  if id >= 0 then mapSprites.sprites[id].draw(canvas, atX, atY);
 
   {walls}
   {
@@ -174,20 +184,21 @@ begin
 end;
 
 procedure tMapGUI.doDraw(screen: tScreen);
+begin
+  background.draw(screen.canvas, bounds.x, bounds.y);
+  cSprite.draw(screen.canvas, bounds.x, bounds.y);
+  screen.markRegion(bounds);
+end;
+
+procedure tMapGui.refresh();
 var
   x,y: integer;
 begin
-  //screen.canvas.fillRect(bounds, RGB(0,0,0));
-  //screen.canvas.drawRect(bounds, RGB(128,128,128));
-  background.draw(screen.canvas, bounds.x, bounds.y);
-
-  screen.markRegion(bounds);
+  canvas.clear(RGB(0,0,0,0));
   if not assigned(map) then exit();
-  for y := 0 to map.height-1 do begin
-    for x := 0 to map.width-1 do begin
-      drawTile(screen, x, y);
-    end;
-  end;
+  for y := 0 to map.height-1 do
+    for x := 0 to map.width-1 do
+      renderTile(x, y);
 end;
 
 {-------------------------------------------------------}
@@ -263,6 +274,7 @@ begin
   gui.append(mapGUI);
 
   makeRandomMap(map);
+  mapGUI.refresh();
 
   repeat
     screen.clearAll();
