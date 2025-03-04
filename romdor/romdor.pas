@@ -153,14 +153,15 @@ begin
   screen.canvas.drawRect(Rect(atX, atY, 16, 16), RGB(0,0,0,32));
 
   {floor}
-  id := FLOOR_SPRITE[tile.floor.t];
+  id := FLOOR_SPRITE[tile.floorType];
   if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
 
   {medium}
-  id := MEDIUM_SPRITE[tile.medium.t];
+  id := MEDIUM_SPRITE[tile.mediumType];
   if id >= 0 then mapSprites.sprites[id].draw(screen.canvas, atX, atY);
 
   {walls}
+  {
   for i := 0 to 3 do begin
     id := WALL_SPRITE[tile.wall[i].t];
     if id < 0 then continue;
@@ -169,7 +170,7 @@ begin
     if dy <> 0 then inc(id); // rotated varient
     mapSprites.sprites[id].draw(screen.canvas, atX+dx, atY+dy);
   end;
-
+  }
 end;
 
 procedure tMapGUI.doDraw(screen: tScreen);
@@ -195,31 +196,24 @@ procedure makeRandomMap(map: tMap);
 var
   x,y: integer;
   i: integer;
+  tile: tTile;
 begin
   map.clear();
   for y := 0 to map.height-1 do begin
     for x := 0 to map.width-1 do begin
+      tile.clear();
       case rnd(10) of
-        1: map.tile[x,y].floor.t := ftWater;
-        2: map.tile[x,y].floor.t := ftDirt;
-        3: map.tile[x,y].floor.t := ftGrass;
-        else map.tile[x,y].floor.t := ftStone;
+        0: tile.floorType := ftStone;
+        else tile.floorType := ftStone;
       end;
       case rnd(10) of
-        1: map.tile[x,y].medium.t := mtMist;
-        2: map.tile[x,y].medium.t := mtRock;
+        2: tile.mediumType := mtRock;
       end;
+      map.tile[x,y] := tile;
     end;
   end;
 
-  {boundary}
-  for i := 0 to 31 do begin
-    map.tile[i,0].medium.t := mtRock;
-    map.tile[i,31].medium.t := mtRock;
-    map.tile[0,i].medium.t := mtRock;
-    map.tile[31,i].medium.t := mtRock;
-  end;
-
+  (*
   {stub: walls}
   map.tile[0,0].medium.t := mtRock;
   map.tile[1,0].medium.t := mtRock;
@@ -233,6 +227,7 @@ begin
   map.tile[1,1].wall[1].t := wtWall;
   map.tile[1,1].wall[2].t := wtWall;
   map.tile[1,1].wall[3].t := wtWall;
+  *)
 end;
 
 {-------------------------------------------------------}
