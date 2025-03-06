@@ -7,6 +7,7 @@ uses
   debug,
   utils,
   ui,
+  graph2d,
   graph32,
   sprite,
   uScreen,
@@ -16,15 +17,24 @@ uses
   ;
 
 type
+
+  tMapMode = (mmView, mmEdit);
   tMapGUI = class(tGuiComponent)
+  const
+    CURSOR_SPRITE = 19+32;
   protected
     background: tSprite;
     canvas: tPage;
     cSprite: tSprite; // todo: remove this and enabled pages to draw
+    cursor: tPoint;
+  protected
+  function tilePos(x,y: integer): tPoint;
+    procedure drawCursor();
   const
     TILE_SIZE = 15;
   public
     map: tMap;
+    mode: tMapMode;
     constructor Create();
     destructor destroy(); override;
     procedure renderTile(x,y: integer);
@@ -40,6 +50,9 @@ constructor tMapGUI.Create();
 begin
   inherited Create();
   map := nil;
+  mode := mmView;
+  cursor.x := 0;
+  cursor.y := 0;
   background := tSprite.create(gfx['darkmap']);
   bounds.width := 512;
   bounds.height := 512;
@@ -54,28 +67,39 @@ begin
   inherited destroy;
 end;
 
+function tMapGUI.tilePos(x,y: integer): tPoint;
+var
+  padding: integer;
+begin
+  padding:= (512 - ((TILE_SIZE * 32)+1)) div 2;
+  result.x := x*TILE_SIZE+padding;
+  result.y := y*TILE_SIZE+padding;
+end;
+
 {renders a single map tile}
 procedure tMapGUI.renderTile(x,y: integer);
 var
   tile: tTile;
-  atX, atY: integer;
+  pos: tPoint;
   dx,dy: integer;
   id: integer;
   i: integer;
   padding : integer;
 begin
-  padding:= (512 - ((TILE_SIZE * 32)+1)) div 2;
-  atX := x*TILE_SIZE+padding;
-  atY := y*TILE_SIZE+padding;
+
   tile := map.tile[x,y];
+
+  pos := tilePos(x,y);
+
+  {todo: redraw background part}
 
   {floor}
   id := FLOOR_SPRITE[tile.floorType];
-  if id >= 0 then mapSprites.sprites[id].draw(canvas, atX, atY);
+  if id >= 0 then mapSprites.sprites[id].draw(canvas, pos.x, pos.y);
 
   {medium}
   id := MEDIUM_SPRITE[tile.mediumType];
-  if id >= 0 then mapSprites.sprites[id].draw(canvas, atX, atY);
+  if id >= 0 then mapSprites.sprites[id].draw(canvas, pos.x, pos.y);
 
   {walls}
   {
@@ -88,12 +112,22 @@ begin
     mapSprites.sprites[id].draw(screen.canvas, atX+dx, atY+dy);
   end;
   }
+
 end;
 
 procedure tMapGUI.doDraw(screen: tScreen);
 begin
   cSprite.blit(screen.canvas, bounds.x, bounds.y);
   screen.markRegion(bounds);
+end;
+
+procedure tMapGui.drawCursor();
+begin
+  mapSprites.sprites[CURSOR_SPRITE].draw(
+    canvas,
+    tilePos(cursor.x,cursor.y).x,
+    tilePos(cursor.x,cursor.y).y
+  );
 end;
 
 procedure tMapGui.refresh();
@@ -105,6 +139,8 @@ begin
   for y := 0 to map.height-1 do
     for x := 0 to map.width-1 do
       renderTile(x, y);
+  if mode = mmEdit then
+    drawCursor();
 end;
 
 end.

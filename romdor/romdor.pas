@@ -174,6 +174,7 @@ begin
 
   mapGUI := tMapGui.Create();
   mapGUI.map := map;
+  mapGUI.mode := mmEdit;
   mapGUI.bounds.x := 50;
   mapGUI.bounds.y := 50;
   gui.append(mapGUI);
