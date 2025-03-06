@@ -38,6 +38,7 @@ type
     constructor Create();
     destructor destroy(); override;
     procedure renderTile(x,y: integer);
+    procedure moveCursor(dx,dy: integer);
     procedure doDraw(screen: tScreen); override;
     procedure refresh();
   end;
@@ -53,7 +54,7 @@ begin
   mode := mmView;
   cursor.x := 0;
   cursor.y := 0;
-  background := tSprite.create(gfx['darkmap']);
+  //background := tSprite.create(gfx['darkmap']);
   bounds.width := 512;
   bounds.height := 512;
   canvas := tPage.create(bounds.width, bounds.height);
@@ -91,7 +92,8 @@ begin
 
   pos := tilePos(x,y);
 
-  {todo: redraw background part}
+  {todo: support background}
+  canvas.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
 
   {floor}
   id := FLOOR_SPRITE[tile.floorType];
@@ -130,11 +132,23 @@ begin
   );
 end;
 
+procedure tMapGui.moveCursor(dx,dy: integer);
+var
+  oldCursor: tPoint;
+begin
+  oldCursor := cursor;
+  cursor.x := clamp(cursor.x + dx, 0, map.width-1);
+  cursor.y := clamp(cursor.y + dy, 0, map.height-1);
+  renderTile(oldCursor.x, oldCursor.y);
+  drawCursor;
+end;
+
 procedure tMapGui.refresh();
 var
   x,y: integer;
 begin
-  background.draw(canvas, 0, 0);
+  if assigned(background) then
+    background.draw(canvas, 0, 0);
   if not assigned(map) then exit();
   for y := 0 to map.height-1 do
     for x := 0 to map.width-1 do

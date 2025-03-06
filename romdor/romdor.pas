@@ -164,6 +164,19 @@ var
   mapGUI: tMapGUI;
   fpsLabel: tGuiLabel;
   timer: tTimer;
+  moveDelay: single;
+  isRepeat: boolean;
+
+  procedure moveCursor(dx,dy: integer);
+  begin
+    if isRepeat then
+      moveDelay := 0.025
+    else
+      moveDelay := 0.250;
+    mapGui.moveCursor(dx,dy);
+    isRepeat := true;
+  end;
+
 begin
 
   map := tMap.create(32,32);
@@ -186,6 +199,8 @@ begin
   mapGUI.refresh();
 
   timer := tTimer.create('main');
+  moveDelay := 0;
+  isRepeat := false;
 
   repeat
 
@@ -196,6 +211,20 @@ begin
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
     musicUpdate();
+
+    if moveDelay <= 0 then begin
+      if keyDown(key_left) then moveCursor(-1,0);
+      if keyDown(key_right) then moveCursor(+1,0);
+      if keyDown(key_up) then moveCursor(0,-1);
+      if keyDown(key_down) then moveCursor(0,+1);
+    end;
+
+    if not anyKeyDown then begin
+      moveDelay := 0;
+      isRepeat := false;
+    end;
+
+    if moveDelay > 0 then moveDelay -= elapsed;
 
     gui.update(elapsed);
     screen.clearAll();
