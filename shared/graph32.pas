@@ -169,7 +169,7 @@ var
   res: tResource;
 begin
   res := inherited addResource(filename);
-  assert(res is tPage);
+  assert((res is tPage) or (res is tLazyResource));
   result := res;
 end;
 

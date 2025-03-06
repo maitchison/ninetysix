@@ -246,7 +246,7 @@ end;
 function isPowerOfTwo(x: dword): boolean;
 begin
   result := roundUpToPowerOfTwo(x) = x;
-end
+end;
 
 function roundUpToPowerOfTwo(x: dword): dword;
 begin

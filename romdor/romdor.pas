@@ -49,7 +49,7 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     fatal('Requires 1MB video card.');
   videoDriver.setTrueColor(800, 600);
-  musicPlay('res\mordor.a96');
+  //musicPlay('res\mordor.a96');
   initMouse();
   initKeyboard();
   screen := tScreen.create();

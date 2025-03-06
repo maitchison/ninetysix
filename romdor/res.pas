@@ -18,7 +18,7 @@ implementation
 
 procedure loadResources();
 begin
-  gfx := tGFXLibrary.Create();
+  gfx := tGFXLibrary.Create(true);
   gfx.loadFromFolder('res', '*.p96');
 
   mapSprites := tSpriteSheet.create(gfx['map']);

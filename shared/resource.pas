@@ -12,14 +12,20 @@ type
 
   tResourceLoaderFilter = function(path: string): boolean;
 
+  tLazyResource = class(tResource)
+    path: string;
+    constructor Create(aPath: string);
+  end;
+
   tResourceLibrary = class
   protected
+    lazy: boolean;
     resources: array of tResource;
     function getByTag(aTag: string): tResource;
   public
     function addResource(filename: string): tResource; virtual;
     procedure loadFromFolder(root: string; pattern: string; filter: tResourceLoaderFilter = nil);
-    constructor Create();
+    constructor Create(aLazy: boolean=false);
     destructor destroy(); override;
     property items[tag: string]: tResource read getByTag; default;
   end;
@@ -47,9 +53,17 @@ var
 
 {--------------------------------------------------------}
 
-constructor tResourceLibrary.create();
+constructor tLazyResource.Create(aPath: string);
+begin
+  path := aPath;
+end;
+
+{--------------------------------------------------------}
+
+constructor tResourceLibrary.create(aLazy: boolean=false);
 begin
   inherited create();
+  lazy := aLazy;
   setLength(resources, 0);
 end;
 
@@ -69,7 +83,11 @@ function tResourceLibrary.addResource(filename: string): tResource;
 var
   res: tResource;
 begin
-  res := loadResource(filename);
+  if lazy then
+    res := tLazyResource.Create(filename)
+  else
+    res := loadResource(filename);
+
   setLength(resources, length(resources)+1);
   resources[length(resources)-1] := res;
   res.tag := removeExtension(extractFilename(filename)).toLower();
@@ -89,14 +107,23 @@ begin
   end;
 end;
 
-
 function tResourceLibrary.getByTag(aTag: string): tResource;
 var
-  res: tResource;
+  i, id: integer;
 begin
-  for res in resources do
-    if res.tag = aTag then exit(res);
-  raise ValueError('No resource named "%s"', [aTag]);
+  id := -1;
+  for i := 0 to length(resources)-1 do
+    if resources[i].tag = aTag then begin
+      id := i;
+      break;
+    end;
+  if id < 0 then raise ValueError('No resource named "%s"', [aTag]);
+  if (resources[id] is tLazyResource) then begin
+    result := loadResource(tLazyResource(resources[id]).path);
+    resources[id].free;
+    resources[id] := result;
+  end else
+    result := resources[id];
 end;
 
 {--------------------------------------------------------}
