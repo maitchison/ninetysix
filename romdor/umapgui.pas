@@ -12,6 +12,7 @@ uses
   sprite,
   uScreen,
   keyboard,
+  font,
   {game stuff}
   res,
   uMap
@@ -82,17 +83,20 @@ end;
 procedure tFloorSelectionGUI.doDraw(screen: tScreen);
 var
   ft: tFloorType;
-  i, spriteIdx: integer;
+  fs: tFloorSpec;
+  i: integer;
 begin
   screen.canvas.fillRect(bounds, RGB(0,0,0));
   screen.canvas.drawRect(bounds, RGB(255,255,255));
   for ft in tFloorType do begin
     i := ord(ft);
-    spriteIdx := FLOOR_SPRITE[ft];
-    if spriteIdx >= 0 then
-      mapSprites.sprites[spriteIdx].draw(screen.canvas, bounds.x+i*16, bounds.y);
-    if i = selectedID then
+    fs := FLOOR_SPEC[ft];
+    if fs.spriteIdx >= 0 then
+      mapSprites.sprites[fs.spriteIdx].draw(screen.canvas, bounds.x+i*16, bounds.y);
+    if i = selectedID then begin
       mapSprites.sprites[CURSOR_SPRITE].draw(screen.canvas, bounds.x+i*16, bounds.y);
+      DEFAULT_FONT.textOut(screen.canvas, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
+    end;
   end;
   screen.markRegion(bounds);
 end;
@@ -148,7 +152,7 @@ begin
   canvas.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
 
   {floor}
-  id := FLOOR_SPRITE[tile.floorType];
+  id := tile.floorSpec.spriteIdx;
   if id >= 0 then mapSprites.sprites[id].draw(canvas, pos.x, pos.y);
 
   {medium}

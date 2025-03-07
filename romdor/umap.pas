@@ -15,9 +15,20 @@ type
   tMediumType = (mtNone, mtMist, mtRock);
   tMapDirection = (mdNorth, mdEast, mdSouth, mdWest);
 
+  tFloorSpec = record
+    tag: string;
+    spriteIdx: integer;
+  end;
+
 const
-  FLOOR_SPRITE: array[tFloorType] of integer =
-    (-1, -1, 15, 16, 26);
+  FLOOR_SPEC: array[tFloorType] of tFloorSpec =
+   (
+    (tag: 'None'; spriteIdx: -1),
+    (tag: 'Stone'; spriteIdx: -1),
+    (tag: 'Water'; spriteIdx: 15),
+    (tag: 'Dirt'; spriteIdx: 16),
+    (tag: 'Grass'; spriteIdx: 26)
+   );
 
   MEDIUM_SPRITE: array[tMediumType] of integer =
     (-1, 20, 19);
@@ -46,6 +57,7 @@ type
     floorType: tFloorType;
     mediumType: tMediumType;
     procedure clear();
+    function floorSpec: tFloorSpec;
   end;
 
   tMap = class
@@ -75,6 +87,11 @@ implementation
 procedure tTile.clear();
 begin
   fillchar(self, sizeof(self), 0);
+end;
+
+function tTile.floorSpec: tFloorSpec;
+begin
+  result := FLOOR_SPEC[floorType];
 end;
 
 {-------------------------------------------------}
