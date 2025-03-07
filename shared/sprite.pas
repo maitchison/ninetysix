@@ -66,6 +66,7 @@ type
 
   tSpriteSheet = class
   protected
+    function getByVar(tag: variant): tSprite;
     function getByTag(tag: string): tSprite;
     function getByIndex(idx: integer): tSprite;
   public
@@ -76,7 +77,7 @@ type
     procedure append(sprite: tSprite);
     procedure load(filename: string);
     procedure grid(cellWidth, cellHeight: word;centered: boolean=false);
-    property items[tag: string]: tSprite read getByTag; default;
+    property items[tag: Variant]: tSprite read getByVar; default;
   end;
 
 implementation
@@ -438,6 +439,15 @@ begin
 end;
 
 {---------------}
+
+function tSpriteSheet.getByVar(tag: variant): tSprite;
+begin
+  case tVarData(tag).vType of
+    vtInteger: result := getByIndex(tag.VInteger);
+    vtString: result := getByTag(tag.VString);
+  end;
+  raise ValueError('Invalid index type');
+end;
 
 function tSpriteSheet.getByTag(tag: string): tSprite;
 var

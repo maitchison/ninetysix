@@ -162,6 +162,7 @@ procedure tMapEditScene.run();
 var
   elapsed: single;
   mapGUI: tMapGUI;
+  floorGUI: tFloorSelectionGUI;
   fpsLabel: tGuiLabel;
   timer: tTimer;
   moveDelay: single;
@@ -191,6 +192,9 @@ begin
   mapGUI.bounds.x := 50;
   mapGUI.bounds.y := 50;
   gui.append(mapGUI);
+
+  floorGui := tFloorSelectionGUI.Create(300,10);
+  gui.append(floorGUI);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);

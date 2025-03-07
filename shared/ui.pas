@@ -21,9 +21,10 @@ type
     font: tFont;
   protected
     procedure doDraw(screen: tScreen); virtual;
+    procedure doUpdate(elapsed: single); virtual;
   public
     procedure draw(screen: tScreen);
-    procedure update(elapsed: single); virtual;
+    procedure update(elapsed: single);
     constructor create();
   end;
 
@@ -89,7 +90,7 @@ begin
   self.font := DEFAULT_FONT;
 end;
 
-procedure tGuiComponent.update(elapsed: single);
+procedure tGuiComponent.doUpdate(elapsed: single);
 const
   FADE_IN = 0.04;
   FADE_OUT = 0.03;
@@ -111,16 +112,23 @@ begin
   end;
 end;
 
+procedure tGuiComponent.doDraw(screen: tScreen);
+begin
+  // pass
+end;
+
 procedure tGuiComponent.draw(screen: tScreen);
 begin
   if not visible then exit;
   doDraw(screen);
 end;
 
-procedure tGuiComponent.doDraw(screen: tScreen);
+procedure tGuiComponent.update(elapsed: single);
 begin
-  // pass
+  {todo: check active}
+  doUpdate(elapsed);
 end;
+
 
 {-----------------------}
 

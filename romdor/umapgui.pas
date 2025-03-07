@@ -11,6 +11,7 @@ uses
   graph32,
   sprite,
   uScreen,
+  keyboard,
   {game stuff}
   res,
   uMap
@@ -19,9 +20,19 @@ uses
 type
 
   tMapMode = (mmView, mmEdit);
+
+  tFloorSelectionGUI = class(tGuiComponent)
+  protected
+    selectedID: integer;
+  public
+    constructor Create(x,y: integer);
+    procedure changeSelection(delta: integer);
+
+    procedure doUpdate(elapsed: single); override;
+    procedure doDraw(screen: tScreen); override;
+  end;
+
   tMapGUI = class(tGuiComponent)
-  const
-    CURSOR_SPRITE = 19+32;
   protected
     background: tSprite;
     canvas: tPage;
@@ -44,6 +55,47 @@ type
   end;
 
 implementation
+
+{-------------------------------------------------------}
+
+constructor tFloorSelectionGUI.Create(x,y: integer);
+begin
+  inherited Create();
+  bounds.init(x, y, 200, 32);
+  selectedID := 0;
+end;
+
+procedure tFloorSelectionGUI.changeSelection(delta: integer);
+begin
+  {delta := delta mod length(tFloorTypes);
+  selectedID := ((selectedID + delta + length(tiles)) mod length(tiles);
+  }
+end;
+
+procedure tFloorSelectionGUI.doUpdate(elapsed: single);
+begin
+  {for the moment just global keys}
+  if keyDown(Key_OpenSquareBracket) then changeSelection(-1);
+  if keyDown(Key_CloseSquareBracket) then changeSelection(-1);
+end;
+
+procedure tFloorSelectionGUI.doDraw(screen: tScreen);
+var
+  ft: tFloorType;
+  i, spriteIdx: integer;
+begin
+  screen.canvas.fillRect(bounds, RGB(0,0,0));
+  screen.canvas.drawRect(bounds, RGB(255,255,255));
+  for ft in tFloorType do begin
+    i := ord(ft);
+    spriteIdx := FLOOR_SPRITE[ft];
+    if spriteIdx >= 0 then
+      mapSprites.sprites[spriteIdx].draw(screen.canvas, bounds.x+i*16, bounds.y);
+    if i = selectedID then
+      mapSprites.sprites[CURSOR_SPRITE].draw(screen.canvas, bounds.x+i*16, bounds.y);
+  end;
+  screen.markRegion(bounds);
+end;
 
 {-------------------------------------------------------}
 

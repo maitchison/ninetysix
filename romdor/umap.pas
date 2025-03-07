@@ -26,6 +26,8 @@ const
   WALL_SPRITE: array[tWallType] of integer =
     (-1, 0, 2, 4, 32+4);
 
+  CURSOR_SPRITE = 19+32;
+
   MD_X: array[tMapDirection] of integer = (0,+8,0,-7);
   MD_Y: array[tMapDirection] of integer = (-7,0,+8,0);
 
