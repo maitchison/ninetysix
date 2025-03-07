@@ -28,8 +28,7 @@ type
   public
     constructor Create(x,y: integer);
     procedure changeSelection(delta: integer);
-
-    procedure doUpdate(elapsed: single); override;
+    procedure onKeyPress(code: word); override;
     procedure doDraw(screen: tScreen); override;
   end;
 
@@ -73,11 +72,12 @@ begin
   }
 end;
 
-procedure tFloorSelectionGUI.doUpdate(elapsed: single);
+procedure tFloorSelectionGUI.onKeyPress(code: word);
 begin
-  {for the moment just global keys}
-  if keyDown(Key_OpenSquareBracket) then changeSelection(-1);
-  if keyDown(Key_CloseSquareBracket) then changeSelection(-1);
+  case code of:
+    Key_OpenSquareBracket: changeSelection(-1);
+    Key_CloseSquareBracket: changeSelection(+1);
+  end;
 end;
 
 procedure tFloorSelectionGUI.doDraw(screen: tScreen);

@@ -23,6 +23,7 @@ type
     procedure doDraw(screen: tScreen); virtual;
     procedure doUpdate(elapsed: single); virtual;
   public
+    procedure onKeyPress(code: word); virtual;
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
     constructor create();
@@ -129,6 +130,10 @@ begin
   doUpdate(elapsed);
 end;
 
+procedure tGuiComponent.onKeyPress(code: word);
+begin
+  // do nothing;
+end;
 
 {-----------------------}
 
