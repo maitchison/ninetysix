@@ -48,6 +48,10 @@ type
     function to12_(): uint16;
     function lumance(): byte;
 
+    class function White(): RGBA; static;
+    class function Black(): RGBA; static;
+    class function Clear(): RGBA; static;
+
   end;
 
   pRGBA = ^RGBA;
@@ -248,6 +252,21 @@ end;
 
 {----------------------------------------------}
 
+class function RGBA.White(): RGBA;
+begin
+  result := RGB(255,255,255);
+end;
+
+class function RGBA.Black(): RGBA;
+begin
+  result := RGB(0,0,0);
+end;
+
+class function RGBA.Clear(): RGBA;
+begin
+  result := RGB(0,0,0,0);
+end;
+
 Constructor RGBA.Create(r,g,b: integer;a: integer=255);
 begin
   self.init(r,g,b,a);
@@ -290,12 +309,14 @@ begin
   b += other.b;
 end;
 
-class function RGBA.lerp(a,b: RGBA; factor: single): RGBA;
+class function RGBA.Lerp(a,b: RGBA; factor: single): RGBA;
 begin
-  result.r := round(a.r * (1-factor)) + round(b.r * factor);
-  result.g := round(a.g * (1-factor)) + round(b.g * factor);
-  result.b := round(a.b * (1-factor)) + round(b.b * factor);
-  result.a := round(a.a * (1-factor)) + round(b.a * factor);
+  result.init(
+    round(a.r * (1-factor)) + round(b.r * factor),
+    round(a.g * (1-factor)) + round(b.g * factor),
+    round(a.b * (1-factor)) + round(b.b * factor),
+    round(a.a * (1-factor)) + round(b.a * factor)
+  );
 end;
 
 procedure RGBA.gammaAdjust(v: single);

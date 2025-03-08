@@ -8,6 +8,7 @@ uses
   test,
   font,
   utils,
+  mouse,
   graph2d,
   graph32,
   keyboard,
@@ -23,24 +24,30 @@ type
     procedure setDefault();
   end;
 
+  tGuiState = (gsNormal, gsDisabled, gsHover, gsPressed, gsSelected);
+
   tGuiComponent = class
   protected
     bounds: tRect;
     visible: boolean;
     enabled: boolean;
+    autoStyle: boolean; {if true will autostyle the component based on state}
     {standard label like draw}
     fText: string;
     fTextStyle: tTextStyle;
     fCol: RGBA;
+    mouseOverThisFrame, mouseOverLastFrame: boolean;
   protected
     procedure doDraw(screen: tScreen); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
   public
-    procedure onKeyPress(code: word); virtual;
+    constructor Create();
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
-    constructor create();
+    function  state: tGuiState;
+  public
+    procedure onKeyPress(code: word); virtual;
   public
     property x: integer read bounds.x write bounds.x;
     property y: integer read bounds.y write bounds.y;
@@ -119,6 +126,13 @@ begin
   for gc in elements do gc.update(elapsed);
 end;
 
+function tGuiComponent.state: tGuiState;
+begin
+  if not enabled then exit(gsDisabled);
+  if mouseOverThisFrame then exit(gsHover);
+  exit(gsNormal);
+end;
+
 {--------------------------------------------------------}
 { UI Components }
 
@@ -142,11 +156,21 @@ procedure tGuiComponent.doDraw(screen: tScreen);
 var
   drawX, drawY: integer;
   textRect: tRect;
+  backCol, frameCol: RGBA;
 begin
-  if col.a > 0 then begin
-    screen.canvas.fillRect(bounds, col);
-    screen.canvas.drawRect(bounds, RGB(0,0,0,128));
+  backCol := col;
+  frameCol := RGB(0,0,0,96);
+  if autoStyle then begin
+    case state of
+      gsNormal: ;
+      gsDisabled: backCol := RGBA.Lerp(backCol, RGBA.Black, 0.5);
+      gsHover: backCol := RGBA.Lerp(backCol, RGB(255,255,0), 0.33);
+      gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,0), 0.33);
+    end;
   end;
+
+  screen.canvas.fillRect(bounds, backCol);
+  screen.canvas.drawRect(bounds, frameCol);
 
   if textStyle.col.a > 0 then begin
     if textStyle.centered then begin
@@ -173,7 +197,10 @@ end;
 
 procedure tGuiComponent.update(elapsed: single);
 begin
+  mouseOverLastFrame := mouseOverThisFrame;
+  mouseOverThisFrame := false;
   if not enabled then exit;
+  mouseOverThisFrame := bounds.isInside(mouse_x, mouse_y);
   doUpdate(elapsed);
 end;
 
@@ -198,6 +225,7 @@ begin
   fTextStyle.centered := false;
   fTextStyle.shadow := false;
   fTextStyle.col := RGB(250, 250, 250);
+  col := RGBA.Clear;
   text := aText;
   autoSize := true;
 end;
@@ -215,14 +243,15 @@ end;
 constructor tGuiButton.create(aPos: tPoint; aText: string='');
 begin
   inherited create();
-  self.bounds.x := aPos.x;
-  self.bounds.y := aPos.y;
-  self.fTextStyle.centered := true;
-  self.fTextStyle.shadow := true;
-  self.fTextStyle.col := RGB(250, 250, 250);
-  self.fText := aText;
-  self.width := 100;
-  self.height := 18;
+  bounds.x := aPos.x;
+  bounds.y := aPos.y;
+  fTextStyle.centered := true;
+  fTextStyle.shadow := true;
+  fTextStyle.col := RGB(250, 250, 250);
+  fText := aText;
+  width := 100;
+  height := 18;
+  autoStyle := true;
 end;
 
 procedure tGuiButton.doDraw(screen: tScreen);
