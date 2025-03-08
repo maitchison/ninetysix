@@ -162,21 +162,9 @@ procedure tMapEditScene.run();
 var
   elapsed: single;
   mapGUI: tMapGUI;
-  floorGUI: tFloorSelectionGUI;
+  editGUI: tTileEditorGUI;
   fpsLabel: tGuiLabel;
   timer: tTimer;
-  moveDelay: single;
-  isRepeat: boolean;
-
-  procedure moveCursor(dx,dy: integer);
-  begin
-    if isRepeat then
-      moveDelay := 0.025
-    else
-      moveDelay := 0.250;
-    mapGui.moveCursor(dx,dy);
-    isRepeat := true;
-  end;
 
 begin
 
@@ -186,15 +174,16 @@ begin
   screen.pageClear();
   screen.pageFlip();
 
+  editGui := tTileEditorGUI.Create(512+20+20,10);
+  gui.append(editGUI);
+
   mapGUI := tMapGui.Create();
   mapGUI.map := map;
   mapGUI.mode := mmEdit;
-  mapGUI.bounds.x := 50;
+  mapGUI.bounds.x := 20;
   mapGUI.bounds.y := 50;
+  mapGUI.tileEditor := editGui;
   gui.append(mapGUI);
-
-  floorGui := tFloorSelectionGUI.Create(300,10);
-  gui.append(floorGUI);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
@@ -203,8 +192,6 @@ begin
   mapGUI.refresh();
 
   timer := tTimer.create('main');
-  moveDelay := 0;
-  isRepeat := false;
 
   repeat
 
@@ -215,20 +202,6 @@ begin
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
     musicUpdate();
-
-    if moveDelay <= 0 then begin
-      if keyDown(key_left) then moveCursor(-1,0);
-      if keyDown(key_right) then moveCursor(+1,0);
-      if keyDown(key_up) then moveCursor(0,-1);
-      if keyDown(key_down) then moveCursor(0,+1);
-    end;
-
-    if not anyKeyDown then begin
-      moveDelay := 0;
-      isRepeat := false;
-    end;
-
-    if moveDelay > 0 then moveDelay -= elapsed;
 
     gui.update(elapsed);
     screen.clearAll();

@@ -21,15 +21,21 @@ uses
 type
 
   tMapMode = (mmView, mmEdit);
+  tEditMode = (emFloor);
 
-  tFloorSelectionGUI = class(tGuiComponent)
+  {todo: change to tile editor, and show / change all types}
+  tTileEditorGUI = class(tGuiComponent)
   protected
-    selectedID: integer;
+    fFloorType: tFloorType;
+    fEditMode: tEditMode;
   public
     constructor Create(x,y: integer);
     procedure changeSelection(delta: integer);
+    procedure applyToMapTile(map: tMap; atX, atY: integer);
     procedure onKeyPress(code: word); override;
     procedure doDraw(screen: tScreen); override;
+    property floorType: tFloorType read fFloorType;
+    property editMode: tEditMode read fEditMode;
   end;
 
   tMapGUI = class(tGuiComponent)
@@ -46,10 +52,13 @@ type
   public
     map: tMap;
     mode: tMapMode;
+    tileEditor: tTileEditorGUI;
     constructor Create();
     destructor destroy(); override;
+    procedure onKeyPress(code: word); override;
     procedure renderTile(x,y: integer);
     procedure moveCursor(dx,dy: integer);
+    procedure doUpdate(elapsed: single); override;
     procedure doDraw(screen: tScreen); override;
     procedure refresh();
   end;
@@ -58,19 +67,33 @@ implementation
 
 {-------------------------------------------------------}
 
-constructor tFloorSelectionGUI.Create(x,y: integer);
+constructor tTileEditorGUI.Create(x,y: integer);
 begin
   inherited Create();
-  bounds.init(x, y, 200, 32);
-  selectedID := 0;
+  bounds.init(x, y, 200, 200);
+  fEditMode := emFloor;
+  fFloorType := ftStone;
 end;
 
-procedure tFloorSelectionGUI.changeSelection(delta: integer);
+procedure tTileEditorGUI.applyToMapTile(map: tMap; atX, atY: integer);
+var
+  tile: tTile;
 begin
-  selectedID := clamp(selectedID + delta, 0, length(FLOOR_SPEC)-1);
+  case editMode of
+    emFloor: begin
+      tile := map.tile[atX, atY];
+      tile.floorType := fFloorType;
+      map.tile[atX, atY] := tile;
+    end;
+  end;
 end;
 
-procedure tFloorSelectionGUI.onKeyPress(code: word);
+procedure tTileEditorGUI.changeSelection(delta: integer);
+begin
+  fFloorType := tFloorType(clamp(ord(fFloorType) + delta, 0, length(FLOOR_SPEC)-1));
+end;
+
+procedure tTileEditorGUI.onKeyPress(code: word);
 begin
   case code of
     Key_OpenSquareBracket: changeSelection(-1);
@@ -78,7 +101,7 @@ begin
   end;
 end;
 
-procedure tFloorSelectionGUI.doDraw(screen: tScreen);
+procedure tTileEditorGUI.doDraw(screen: tScreen);
 var
   ft: tFloorType;
   fs: tFloorSpec;
@@ -91,7 +114,7 @@ begin
     fs := FLOOR_SPEC[ft];
     if fs.spriteIdx >= 0 then
       mapSprites.sprites[fs.spriteIdx].draw(screen.canvas, bounds.x+i*16, bounds.y);
-    if i = selectedID then begin
+    if ft = floorType then begin
       mapSprites.sprites[CURSOR_SPRITE].draw(screen.canvas, bounds.x+i*16, bounds.y);
       DEFAULT_FONT.textOut(screen.canvas, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
     end;
@@ -113,6 +136,7 @@ begin
   bounds.height := 512;
   canvas := tPage.create(bounds.width, bounds.height);
   cSprite := tSprite.create(canvas);
+  tileEditor := nil;
 end;
 
 destructor tMapGUI.destroy();
@@ -129,6 +153,22 @@ begin
   padding:= (512 - ((TILE_SIZE * 32)+1)) div 2;
   result.x := x*TILE_SIZE+padding;
   result.y := y*TILE_SIZE+padding;
+end;
+
+procedure tMapGUI.onKeyPress(code: word);
+begin
+  case code of
+    key_left: moveCursor(-1,0);
+    key_right: moveCursor(+1,0);
+    key_up: moveCursor(0,-1);
+    key_down: moveCursor(0,+1);
+    key_space:
+      if assigned(map) and assigned(tileEditor) then begin
+        tileEditor.applyToMapTile(map, cursor.x, cursor.y);
+        renderTile(cursor.x, cursor.y);
+        drawCursor();
+      end;
+  end;
 end;
 
 {renders a single map tile}
@@ -169,6 +209,13 @@ begin
   end;
   }
 
+end;
+
+procedure tMapGUI.doUpdate(elapsed: single);
+begin
+  inherited doUpdate(elapsed);
+  {hack for holding space}
+  if keyDown(key_space) then onKeyPress(key_space);
 end;
 
 procedure tMapGUI.doDraw(screen: tScreen);
