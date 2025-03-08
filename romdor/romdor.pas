@@ -181,8 +181,8 @@ begin
   mapGUI := tMapGui.Create();
   mapGUI.map := map;
   mapGUI.mode := mmEdit;
-  mapGUI.bounds.x := 20;
-  mapGUI.bounds.y := 50;
+  mapGUI.x := 20;
+  mapGUI.y := 50;
   mapGUI.tileEditor := editGui;
   gui.append(mapGUI);
 

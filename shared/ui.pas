@@ -14,17 +14,28 @@ uses
   uScreen;
 
 type
-  tGuiComponent = class
-    bounds: tRect;
-    alpha: single;
-    targetAlpha: single;
-    showForSeconds: single;
-    visible: boolean;
-    autoFade: boolean;
+
+  tTextStyle = record
     font: tFont;
+    col: RGBA;
+    shadow: boolean;
+    centered: boolean;
+    procedure setDefault();
+  end;
+
+  tGuiComponent = class
+  protected
+    bounds: tRect;
+    visible: boolean;
+    enabled: boolean;
+    {standard label like draw}
+    fText: string;
+    fTextStyle: tTextStyle;
+    fCol: RGBA;
   protected
     procedure doDraw(screen: tScreen); virtual;
     procedure doUpdate(elapsed: single); virtual;
+    procedure setText(aText: string); virtual;
   public
     procedure onKeyPress(code: word); virtual;
     procedure draw(screen: tScreen);
@@ -35,6 +46,10 @@ type
     property y: integer read bounds.y write bounds.y;
     property width: integer read bounds.width write bounds.width;
     property height: integer read bounds.height write bounds.height;
+    property font: tFont read fTextStyle.font write fTextStyle.font;
+    property text: string read fText write setText;
+    property textStyle: tTextStyle read fTextStyle write fTextStyle;
+    property col: RGBA read fCol write fCol;
   end;
 
   tGuiComponents = class
@@ -46,32 +61,31 @@ type
 
   tGuiLabel = class(tGuiComponent)
   protected
-    fText: string;
+    procedure setText(aText: string); override;
   public
-    textColor: RGBA;
-    shadow: boolean;
-    centered: boolean;
-  protected
-    procedure doDraw(screen: tScreen); override;
-    procedure setText(aText: string);
+    autoSize: boolean;
   public
-    constructor create(aPos: tPoint; aText: string='');
-    property text: string read fText write setText;
+    constructor Create(aPos: tPoint; aText: string='');
   end;
 
   tGuiButton = class(tGuiComponent)
-  public
-    text: string;
-    textColor: RGBA;
-    shadow: boolean;
-    centered: boolean;
   protected
     procedure doDraw(screen: tScreen); override;
   public
-    constructor create(aPos: tPoint; aText: string='');
+    constructor Create(aPos: tPoint; aText: string='');
   end;
 
 implementation
+
+{--------------------------------------------------------}
+
+procedure tTextStyle.setDefault();
+begin
+  col := RGB(255,255,255);
+  font := DEFAULT_FONT;
+  shadow := false;
+  centered := false;
+end;
 
 {--------------------------------------------------------}
 { tGuiComponents }
@@ -111,40 +125,44 @@ end;
 constructor tGuiComponent.create();
 begin
   inherited create();
-  self.alpha := 1;
-  self.targetAlpha := 1;
-  self.showForSeconds := 0;
-  self.autoFade := false;
   self.visible := true;
+  self.enabled := true;
   self.bounds.init(0,0,0,0);
-  self.font := DEFAULT_FONT;
+  text := '';
+  textStyle.setDefault();
+  col := RGB(128,128,128);
 end;
 
 procedure tGuiComponent.doUpdate(elapsed: single);
-const
-  FADE_IN = 0.04;
-  FADE_OUT = 0.03;
-var
-  delta: single;
 begin
-  if autoFade then begin
-    if showForSeconds > 0 then
-      targetAlpha := 1.0
-    else
-      targetAlpha := 0.0;
-    showForSeconds -= elapsed;
-    // todo: respect elapsed
-    delta := targetAlpha - alpha;
-    if delta < 0 then
-      alpha += delta * FADE_OUT
-    else
-      alpha += delta * FADE_IN
-  end;
+  // pass
 end;
 
 procedure tGuiComponent.doDraw(screen: tScreen);
+var
+  drawX, drawY: integer;
+  textRect: tRect;
 begin
-  // pass
+  if col.a > 0 then begin
+    screen.canvas.fillRect(bounds, col);
+    screen.canvas.drawRect(bounds, RGB(0,0,0,128));
+  end;
+
+  if textStyle.col.a > 0 then begin
+    if textStyle.centered then begin
+      textRect := font.textExtents(text);
+      drawX := x+((width - textRect.width) div 2);
+      drawY := y+((height - textRect.height) div 2)-1;
+    end else begin
+      drawX := x+2;
+      drawY := y;
+    end;
+    if textStyle.shadow then
+      font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,textStyle.col.a*3 div 4));
+    font.textOut(screen.canvas, drawX, drawY, text, textStyle.col);
+  end;
+
+  screen.markRegion(bounds);
 end;
 
 procedure tGuiComponent.draw(screen: tScreen);
@@ -155,7 +173,7 @@ end;
 
 procedure tGuiComponent.update(elapsed: single);
 begin
-  {todo: check active}
+  if not enabled then exit;
   doUpdate(elapsed);
 end;
 
@@ -164,37 +182,32 @@ begin
   // do nothing;
 end;
 
+procedure tGuiComponent.setText(aText: string);
+begin
+  // todo: set dirty
+  fText := aText;
+end;
+
 {-----------------------}
 
 constructor tGuiLabel.create(aPos: tPoint; aText: string='');
 begin
   inherited create();
-  self.bounds.x := aPos.x;
-  self.bounds.y := aPos.y;
-  self.centered := false;
-  self.textColor := RGB(250, 250, 250);
-  self.text := aText;
-  self.shadow := false;
+  bounds.x := aPos.x;
+  bounds.y := aPos.y;
+  fTextStyle.centered := false;
+  fTextStyle.shadow := false;
+  fTextStyle.col := RGB(250, 250, 250);
+  text := aText;
+  autoSize := true;
 end;
 
 procedure tGuiLabel.setText(aText: string);
 begin
-  fText := aText;
-  bounds := font.textExtents(text, bounds.topLeft);
-  if centered then bounds.x -= bounds.width div 2;
-end;
-
-procedure tGuiLabel.doDraw(screen: tScreen);
-var
-  c: RGBA;
-begin
-  c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
-  if c.a = 0 then exit;
-  if shadow then
-    {todo: fix up rect}
-    font.textOut(screen.canvas, bounds.x+1, bounds.y+1, text, RGB(0,0,0,c.a div 2));
-  font.textOut(screen.canvas, bounds.x, bounds.y, text, c);
-  screen.markRegion(bounds);
+  {todo: set dirty}
+  inherited setText(aText);
+  if autoSize then
+    bounds := font.textExtents(text, bounds.topLeft);
 end;
 
 {-----------------------}
@@ -204,29 +217,18 @@ begin
   inherited create();
   self.bounds.x := aPos.x;
   self.bounds.y := aPos.y;
-  self.centered := true;
-  self.textColor := RGB(250, 250, 250);
-  self.text := aText;
-  self.shadow := true;
+  self.fTextStyle.centered := true;
+  self.fTextStyle.shadow := true;
+  self.fTextStyle.col := RGB(250, 250, 250);
+  self.fText := aText;
   self.width := 100;
   self.height := 18;
 end;
 
 procedure tGuiButton.doDraw(screen: tScreen);
-var
-  c: RGBA;
 begin
-
-  screen.canvas.fillRect(bounds, RGB(128,128,128));
-  screen.canvas.drawRect(bounds, RGB(0,0,0,128));
-
-  c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
-  if c.a = 0 then exit;
-  if shadow then
-    {todo: fix up rect}
-    font.textOut(screen.canvas, x+3, y+1, text, RGB(0,0,0,c.a div 2));
-  font.textOut(screen.canvas, x+2, y+0, text, c);
-  screen.markRegion(bounds);
+  {todo: use a proper nine-slice background with clicking graphics}
+  inherited doDraw(screen);
 end;
 
 begin
