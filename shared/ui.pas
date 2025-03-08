@@ -8,7 +8,7 @@ uses
   test,
   font,
   utils,
-  mouse,
+  uMouse,
   graph2d,
   graph32,
   keyboard,
@@ -31,6 +31,7 @@ type
     bounds: tRect;
     visible: boolean;
     enabled: boolean;
+    pressed: boolean;
     autoStyle: boolean; {if true will autostyle the component based on state}
     {standard label like draw}
     fText: string;
@@ -201,6 +202,7 @@ begin
   mouseOverThisFrame := false;
   if not enabled then exit;
   mouseOverThisFrame := bounds.isInside(mouse_x, mouse_y);
+  pressed := (mouse_b and 1) = 1;
   doUpdate(elapsed);
 end;
 

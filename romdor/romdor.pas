@@ -11,7 +11,7 @@ uses
   timer,
   vga,
   crt,
-  mouse,
+  uMouse,
   uScreen,
   graph32,
   sprite,

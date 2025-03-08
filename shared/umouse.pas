@@ -1,4 +1,4 @@
-unit Mouse;
+unit uMouse;
 
 {todo: come back and clean this one up}
 
@@ -13,11 +13,6 @@ uses
   go32,
   utils,
   vga;
-
-var
-  {These only update when UpdateMouse is called}
-  MouseX, MouseY: Word;
-  MouseButtons: Word;
 
 var
   { current mouse x and y coordinates, updated automatically. }
@@ -43,7 +38,6 @@ var
   { supplied register structure to the callback }
   mouse_regs    : trealregs; external name '___v2prt0_rmcb_regs';
   userProcLength: int32;
-
 
 const
   {This is around 2 MEGs into the video ram, which is safe for <= 800x600x32}
@@ -82,20 +76,6 @@ begin
     mov cx, x
     mov dx, y
     int $33
-  end;
-end;
-
-procedure UpdateMousePosition();
-begin
-  asm
-    pusha
-    mov ax, $03
-
-    int $33
-    mov MouseX, cx
-    mov MouseY, dx
-    mov MouseButtons, bx;
-    popa
   end;
 end;
 
@@ -436,11 +416,6 @@ initialization
   Mouse_X := 0;
   Mouse_Y := 0;
   Mouse_B := 0;
-
-  {todo: remove}
-  MouseX := 0;
-  MouseY := 0;
-  MouseButtons := 0;
 
 finalization
   closeMouse();
