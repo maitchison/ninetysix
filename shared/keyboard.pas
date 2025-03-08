@@ -127,7 +127,7 @@ function readkey: char;
 procedure waitkey();
 function anyKeyDown: boolean;
 function keyPressed: boolean;
-function getKey: tKeyPair;
+function dosGetKey: tKeyPair;
 
 var
   {if true old CRT keyboard functions will work, but you'll get
@@ -357,11 +357,11 @@ begin
     keyPressed := key_pressed;
 end;
 
-{standard dos readkey, returns asci value, or 0 if no key}
-function getKey: tKeyPair; register;
-var resultValue: tKeyPair;
+{standard dos readkey, returns asci and scan value, or 0 if no key, nonblocking}
+function dosGetKey: tKeyPair; register;
+var
+  resultValue: tKeyPair;
 begin
-  {ok.. actually just use dos}
   asm
     xor ax, ax
     mov ah, 1
@@ -376,15 +376,12 @@ begin
   @Done:
     mov resultValue, ax
   end;
-  getKey := resultValue;
+  dosGetKey := resultValue;
 end;
 
 begin
-
   key_hasbeenpressed := false;
   dosKey := true;
-
   keyPress[0] := False;
-
   addExitProc(@CloseKeyboard);
 end.

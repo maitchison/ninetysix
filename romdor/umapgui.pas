@@ -67,14 +67,12 @@ end;
 
 procedure tFloorSelectionGUI.changeSelection(delta: integer);
 begin
-  {delta := delta mod length(tFloorTypes);
-  selectedID := ((selectedID + delta + length(tiles)) mod length(tiles);
-  }
+  selectedID := clamp(selectedID + delta, 0, length(FLOOR_SPEC)-1);
 end;
 
 procedure tFloorSelectionGUI.onKeyPress(code: word);
 begin
-  case code of:
+  case code of
     Key_OpenSquareBracket: changeSelection(-1);
     Key_CloseSquareBracket: changeSelection(+1);
   end;

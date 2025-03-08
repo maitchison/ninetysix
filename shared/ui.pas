@@ -4,10 +4,13 @@ unit ui;
 interface
 
 uses
-  debug, test,
+  debug,
+  test,
   font,
+  utils,
   graph2d,
   graph32,
+  keyboard,
   uScreen;
 
 type
@@ -72,7 +75,16 @@ end;
 procedure tGuiComponents.update(elapsed: single);
 var
   gc: tGuiComponent;
+  code: word;
 begin
+
+  {process keys, if any}
+  while true do begin
+    code := dosGetKey.code;
+    if code = 0 then break;
+    for gc in elements do gc.onKeyPress(code);
+  end;
+
   for gc in elements do gc.update(elapsed);
 end;
 
