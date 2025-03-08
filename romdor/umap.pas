@@ -6,6 +6,7 @@ interface
 uses
   test,
   debug,
+  stream,
   utils;
 
 type
@@ -44,27 +45,29 @@ const
 
 type
 
+  {4 bytes per wall}
   tWall = packed record
     t: tWallType;
     variation: byte;
-    decoration1: byte;
-    decoration2: byte;
+    padding: word;
     procedure clear();
   end;
 
+  {8 bytes per tile}
   tTile = packed record
-    attributes: bitpacked array[0..31] of boolean;
-    floorType: tFloorType;
-    mediumType: tMediumType;
+    attributes: bitpacked array[0..31] of boolean;  {4 bytes}
+    floorType: tFloorType;                          {1 byte}
+    mediumType: tMediumType;                        {1 byte}
+    padding: word;                                  {2 bytes}
     procedure clear();
     function floorSpec: tFloorSpec;
   end;
 
   tMap = class
   protected
+    fWidth,fHeight: integer;
     fTile: array of tTile;
     fNorthWall, fWestWall: array of tWall;
-    fWidth,fHeight: integer;
     function  getTile(x,y: integer): tTile;
     procedure setTile(x,y: integer; aTile: tTile);
     function  getWall(x,y: integer; d: tMapDirection): tWall;
@@ -72,6 +75,8 @@ type
   public
     constructor Create(aWidth, aHeight: word);
     destructor destroy(); override;
+    procedure save(filename: string);
+    procedure load(filename: string);
     procedure clear();
   public
     property width: integer read fWidth;
@@ -81,6 +86,16 @@ type
   end;
 
 implementation
+
+{-------------------------------------------------}
+
+type
+  {32 bytes}
+  tMapHeader = packed record
+    tag: string[4]; // MDRM     {4 bytes}
+    width, height: word;        {4 bytes}
+    padding: array[1..24] of byte; {24 bytes}
+  end;
 
 {-------------------------------------------------}
 
@@ -159,6 +174,29 @@ begin
   end;
 end;
 
+procedure tMap.save(filename: string);
+var
+  f: tFileStream;
+  header: tMapHeader;
+begin
+
+  fillchar(header, sizeof(header), 0);
+  header.tag := 'MDRM';
+  header.width := width;
+  header.height := height;
+
+  f := tFileStream.create(filename);
+  f.writeBlock(header, sizeof(header));
+  f.writeBlock(fTile, sizeof(fTile));
+  f.writeBlock(fNorthWall, sizeof(fNorthWall));
+  f.writeBlock(fWestWall, sizeof(fWestWall));
+  f.free();
+end;
+
+procedure tMap.load(filename: string);
+begin
+end;
+
 procedure tMap.clear();
 var
   tile: tTile;
@@ -169,4 +207,28 @@ begin
   for wall in fWestWall do wall.clear();
 end;
 
+{----------------------------------------------------------}
+
+type
+  tMapTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tMapTest.run();
+var
+  tile: tTile;
+  wall: tWall;
+begin
+  {make sure everything is the right size, as we'll need this for loading/saving}
+  assertEqual(sizeof(tile), 8);
+  assertEqual(sizeof(wall), 4);
+end;
+
+{--------------------------------------------------------}
+
+var
+  i: integer;
+
+initialization
+  tMapTest.create('Map');
 end.

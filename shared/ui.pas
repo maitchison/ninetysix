@@ -30,6 +30,11 @@ type
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
     constructor create();
+  public
+    property x: integer read bounds.x write bounds.x;
+    property y: integer read bounds.y write bounds.y;
+    property width: integer read bounds.width write bounds.width;
+    property height: integer read bounds.height write bounds.height;
   end;
 
   tGuiComponents = class
@@ -52,6 +57,18 @@ type
   public
     constructor create(aPos: tPoint; aText: string='');
     property text: string read fText write setText;
+  end;
+
+  tGuiButton = class(tGuiComponent)
+  public
+    text: string;
+    textColor: RGBA;
+    shadow: boolean;
+    centered: boolean;
+  protected
+    procedure doDraw(screen: tScreen); override;
+  public
+    constructor create(aPos: tPoint; aText: string='');
   end;
 
 implementation
@@ -180,6 +197,37 @@ begin
   screen.markRegion(bounds);
 end;
 
+{-----------------------}
+
+constructor tGuiButton.create(aPos: tPoint; aText: string='');
+begin
+  inherited create();
+  self.bounds.x := aPos.x;
+  self.bounds.y := aPos.y;
+  self.centered := true;
+  self.textColor := RGB(250, 250, 250);
+  self.text := aText;
+  self.shadow := true;
+  self.width := 100;
+  self.height := 18;
+end;
+
+procedure tGuiButton.doDraw(screen: tScreen);
+var
+  c: RGBA;
+begin
+
+  screen.canvas.fillRect(bounds, RGB(128,128,128));
+  screen.canvas.drawRect(bounds, RGB(0,0,0,128));
+
+  c.init(textColor.r, textColor.g, textColor.b, round(textColor.a * alpha));
+  if c.a = 0 then exit;
+  if shadow then
+    {todo: fix up rect}
+    font.textOut(screen.canvas, x+3, y+1, text, RGB(0,0,0,c.a div 2));
+  font.textOut(screen.canvas, x+2, y+0, text, c);
+  screen.markRegion(bounds);
+end;
 
 begin
 end.

@@ -15,8 +15,7 @@ uses
   font,
   {game stuff}
   res,
-  uMap
-  ;
+  uMap;
 
 type
 

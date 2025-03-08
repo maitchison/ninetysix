@@ -163,6 +163,7 @@ var
   elapsed: single;
   mapGUI: tMapGUI;
   editGUI: tTileEditorGUI;
+  saveButton, loadButton: tGuiButton;
   fpsLabel: tGuiLabel;
   timer: tTimer;
 
@@ -184,6 +185,11 @@ begin
   mapGUI.bounds.y := 50;
   mapGUI.tileEditor := editGui;
   gui.append(mapGUI);
+
+  saveButton := tGuiButton.create(Point(650,400), 'Save');
+  gui.append(saveButton);
+  loadButton := tGuiButton.create(Point(650,450), 'Load');
+  gui.append(loadButton);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
