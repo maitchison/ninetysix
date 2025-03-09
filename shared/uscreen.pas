@@ -752,7 +752,7 @@ begin
 
   {debugging}
   if keyDown(key_f7) then begin
-    canvas.fillRect(rect, rgba.create(rnd, 0, 0));
+    canvas.dc.fillRect(rect, rgba.create(rnd, 0, 0));
     exit;
   end;
 

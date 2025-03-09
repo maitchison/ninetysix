@@ -22,6 +22,27 @@ const
 
 type
 
+  tBlendMode = (bmBlit, bmBlend);
+  tFeatureLevel = (flREF, flASM, flMMX);
+
+  tPage = class;
+
+  tDrawContext = record
+    page: tPage;
+    offset: tPoint;
+    clip: tRect;
+    blendMode: tBlendMode;
+
+    function transform(p: tPoint): tPoint;
+
+    {basic drawing API}
+    procedure putPixel(pos: tPoint;col: RGBA);
+    procedure hLine(x1, y, x2: int32;c: RGBA);
+    procedure vLine(x, y1, y2: int32;c: RGBA);
+    procedure fillRect(aRect: tRect; c: RGBA);
+    procedure drawRect(aRect: tRect; c: RGBA);
+  end;
+
   {page using 32bit RGBA color}
   tPage = class(tResource)
     width, height: word;
@@ -29,22 +50,19 @@ type
     pixels: pointer;
     defaultColor: RGBA;
 
-    constructor create(); overload;
+    constructor Create(); overload;
     destructor  destroy(); override;
-    constructor create(AWidth, AHeight: word); overload;
-    constructor createAsReference(AWidth, AHeight: word;PixelData: Pointer);
+    constructor create(aWidth, aHeight: word); overload;
+    constructor createAsReference(aWidth, aHeight: word;pixelData: Pointer);
 
+    function  dc(blendMode: tBlendMode = bmBlit): tDrawContext;
     function  getAddress(x, y: integer): pointer; inline;
-    function  getPixel(x, y: integer): RGBA; inline; overload;
-    function  getPixel(fx,fy: single): RGBA; overload;
-    function  getPixelScaled(x, y, s: integer;doGamma: boolean=False): RGBA;
-    procedure hLine(x1, y, x2: int16;c: RGBA); pascal;
-    procedure vLine(x, y1, y2: int16;c: RGBA); pascal;
+    function  getPixel(x, y: integer): RGBA; inline;
+    function  getPixelF(fx,fy: single): RGBA;
     procedure putPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure setPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure clear(c: RGBA);
-    procedure fillRect(aRect: TRect; c: RGBA);
-    procedure drawRect(aRect: TRect; c: RGBA);
+
     function  clone(): tPage;
     function  asBytes: tBytes;
     function  asRGBBytes: tBytes;
@@ -63,7 +81,7 @@ type
   tPage8 = class(tResource)
     width, height: word;
     pixels: pointer;
-    constructor create(); overload;
+    constructor Create(); overload;
     destructor  destroy(); override;
     constructor create(aWidth, aHeight: word); overload;
     function    getAddress(x, y: integer): pointer; inline;
@@ -92,6 +110,8 @@ implementation
 uses
   sprite,
   bmp;
+
+{$include graph32_REF.inc}
 
 {-------------------------------------------------------------}
 
@@ -157,6 +177,15 @@ begin
   inherited destroy();
 end;
 
+{gets a default draw context for this page. best to call this once and cache it}
+function tPage.dc(blendMode: tBlendMode = bmBlit): tDrawContext;
+begin
+  result.page := self;
+  result.blendMode := blendMode;
+  result.clip := bounds;
+  result.offset := Point(0,0);
+end;
+
 {returns address in memory of given pixel. If out of bounds, returns nil}
 function tPage.getAddress(x, y: integer): pointer; inline;
 begin
@@ -166,7 +195,7 @@ begin
 end;
 
 {todo: this could be much faster...}
-function tPage.getPixel(x, y: Integer): RGBA; overload; inline;
+function tPage.getPixel(x, y: Integer): RGBA; inline;
 var
   address: dword;
   col: RGBA;
@@ -188,8 +217,8 @@ begin
   result := col;
 end;
 
-{Get pixel with interpolation}
-function TPage.GetPixel(fx, fy: single): RGBA; overload;
+{get pixel with interpolation}
+function TPage.getPixelF(fx, fy: single): RGBA;
 var
   x,y: integer;
   fracX, fracY: single;
@@ -216,41 +245,12 @@ begin
   result := (c1 * p1) + (c2 * p2) + (c3 * p3) + (c4 * p4);
 end;
 
-function TPage.getPixelScaled(x, y, s: integer;doGamma: boolean): RGBA;
-var
-  i,j: int32;
-  factor: single;
-  r,g,b: int32;
-  c: RGBA;
-begin
-  result.init(0,0,0);
-  if x < 0 then exit;
-  if x >= 1024 shr s then exit;
-  if y < 0 then exit;
-  if y >= 1024 shr s then exit;
-  r := 0;
-  g := 0;
-  b := 0;
-  for i := 0 to (1 shl s)-1 do begin
-   for j := 0 to (1 shl s)-1 do begin
-     c := getPixel(x shl s+i, y shl s+j);
-    if doGamma then c.toLinear;
-    r += c.r;
-    g += c.g;
-    b += c.b;
-    end;
-  end;
-  result.init(r shr (s*2), g shr (s*2), b shr (s*2));
-  if doGamma then result.toSRGB;
-end;
-
-
-procedure TPage.clear(c: RGBA);
+procedure tPage.clear(c: RGBA);
 begin
   filldword(pixels^, width*height, c.to32);
 end;
 
-procedure TPage.PutPixel(atX,atY: int16;c: RGBA); inline; assembler; register;
+procedure tPage.putPixel(atX,atY: int16;c: RGBA); inline; assembler; register;
 {
 Standard (Screen)
 --------------------
@@ -392,152 +392,6 @@ asm
     pop esi
     pop edi
   end;
-
-{Draw line from (x1,y) to (x2,y) inclusive at start and exclusive at end.}
-procedure TPage.hLine(x1,y,x2: int16; c: RGBA); pascal;
-var
-  x: int32;
-  count: int32;
-  ofs: dword;
-begin
-
-  if c.a = 0 then exit;
-
-  {clipping}
-  if word(y) >= self.Height then exit;
-  if x1 < 0 then x1 := 0;
-  if x2 > self.width then x2 := self.width;
-  count := x2-x1;
-  if count <= 0 then exit;
-
-  ofs := (y * self.Width + x1) * 4;
-
-  if c.a = 255 then begin
-    {fast, no blending, path}
-    filldword((self.pixels+ofs)^, count, dword(c));
-    exit;
-  end;
-
-  if not cpuInfo.hasMMX then begin
-    for x := x1 to x2 do
-      putPixel(x, y, c);
-    exit;
-  end;
-
-  {MMX blending path}
-  asm
-
-    // if mixer interrupt runs during thi timer then we'll have
-    // fpu in invalid state, so block them during the hline
-    cli
-
-    pushad
-
-    mov esi, self
-
-    mov edi, [esi].Pixels
-    add edi, ofs
-
-    {we need a zero register to expand from byte to word}
-    pxor       mm0, mm0        // MM0 <-  0 0 0 0 | 0 0 0 0
-
-    mov eax, c
-    mov cl, c[3]
-
-    {replicate alpha across the words}
-    mov        ch, cl
-    shl        ecx, 8
-    mov        cl, ch
-    movd       mm3, ecx
-    punpcklbw  mm3, mm0        // MM3 <- 0 0 0 A | 0 A 0 A
-
-    {replicate = 255-alpha accross the words}
-    mov        cl, 255
-    sub        cl, ch
-    mov        ch, cl
-    shl        ecx, 8
-    mov        cl, ch
-    movd       mm4, ecx
-    punpcklbw  mm4, mm0      // MM4 <- 0 `A 0 `A | 0 `A 0 `A}
-
-    {expand and premultiply our source color}
-    movd       mm2, eax      // MM2 <-  0  0  0  0|  0 Rs Gs Bs
-    punpcklbw  mm2, mm0      // MM2 <-  0  0  0 Rs|  0 Gs  0 Bs
-    pmullw     mm2, mm3      // MM2 <-  0  A*Rs A*Gs A*bs
-
-    mov       ecx, count
-
-  @LOOP:
-
-    {read source pixel}
-    mov       edx, [edi]
-
-    {do the blend}
-    movd      mm1, edx      // MM1 <-  0  0  0  0|  0 Rd Gd Bd
-    punpcklbw mm1, mm0      // MM1 <-  0  0  0 Rd|  0 Gd  0 Bd
-    pmullw    mm1, mm4      // MM1 <-  0  (255-A)*Rd (255-A)*Gd (255-A)*bd
-    paddw     mm1, mm2      // MM1 <- A*Rs+(255-A)*Rd ...
-    psrlw     mm1, 8        // MM1 <- (A*Rs+(255-A)*Rd) / 256
-
-    { note, we should have divided by 255 instead of 255 but I don't think
-     anyone will notice. To reduce the error we could do a saturated subtract of 128
-     which makes the expected error 0 over uniform input}
-    packuswb  mm1, mm1      // MM1 = 0 0 0 0 | 0 R G B
-    movd      eax, mm1
-
-    mov dword ptr [edi], eax
-
-    add edi, 4
-
-    dec ecx
-    jnz @LOOP
-
-    popad
-
-    emms
-
-    sti
-
-  end;
-end;
-
-{draw line from (x,y1) to (x,y2) inclusive at start and exclusive at end.}
-procedure tPage.vLine(x,y1,y2: int16; c: RGBA); pascal;
-var
-  y: int32;
-  tmp: int32;
-begin
-  y1 := clamp(y1, 0, height);
-  y2 := clamp(y2, 0, height);
-  if y1 > y2 then begin
-    tmp := y1; y1 := y2; y2 := tmp;
-  end;
-  // +1 should be wrong... but we need it for some reason?
-  for y := y1 to y2+1 do
-    putPixel(x, y, c);
-end;
-
-procedure TPage.FillRect(aRect: TRect; c: RGBA);
-var
-  y: integer;
-begin
-  for y := aRect.top to aRect.bottom-1 do
-    self.Hline(aRect.left, y, aRect.right, c);
-end;
-
-procedure TPage.DrawRect(aRect: TRect; c: RGBA);
-var
-  x,y: integer;
-begin
-  for x := aRect.left to aRect.right-1 do begin
-    PutPixel(x,aRect.top,c);
-    PutPixel(x,aRect.bottom-1,c);
-  end;
-  for y := aRect.top to aRect.bottom-1 do begin
-    PutPixel(aRect.left,y,c);
-    PutPixel(aRect.right-1,y,c);
-  end;
-end;
 
 {deep copy of page}
 function tPage.clone(): tPage;
@@ -719,6 +573,39 @@ begin
     for x := 0 to page.width-1 do
       result.putValue(x, y, page.getPixel(x,y).lumance);
   page.free();
+end;
+
+{-------------------------------------------------}
+
+function tDrawContext.transform(p: tPoint): tPoint;
+begin
+  result.x := p.x + offset.x;
+  result.y := p.y + offset.y;
+end;
+
+procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
+begin
+  putPixel_REF(self, pos, col);
+end;
+
+procedure tDrawContext.hLine(x1, y, x2: int32;c: RGBA);
+begin
+  //NIY
+end;
+
+procedure tDrawContext.vLine(x, y1, y2: int32;c: RGBA);
+begin
+  //NIY
+end;
+
+procedure tDrawContext.fillRect(aRect: tRect; c: RGBA);
+begin
+  //NIY
+end;
+
+procedure tDrawContext.drawRect(aRect: tRect; c: RGBA);
+begin
+  //NIY
 end;
 
 {-------------------------------------------------}

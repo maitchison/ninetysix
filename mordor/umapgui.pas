@@ -107,8 +107,9 @@ var
   fs: tFloorSpec;
   i: integer;
 begin
-  screen.canvas.fillRect(bounds, RGB(0,0,0));
-  screen.canvas.drawRect(bounds, RGB(255,255,255));
+
+  screen.canvas.dc.fillRect(bounds, RGB(0,0,0));
+  screen.canvas.dc.drawRect(bounds, RGB(255,255,255));
   for ft in tFloorType do begin
     i := ord(ft);
     fs := FLOOR_SPEC[ft];
@@ -187,7 +188,7 @@ begin
   pos := tilePos(x,y);
 
   {todo: support background}
-  canvas.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+  canvas.dc.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
 
   {floor}
   id := tile.floorSpec.spriteIdx;

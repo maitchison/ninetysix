@@ -245,8 +245,8 @@ begin
     end;
   end;
 
-  screen.canvas.fillRect(bounds, backCol);
-  screen.canvas.drawRect(bounds, frameCol);
+  screen.canvas.dc.fillRect(bounds, backCol);
+  screen.canvas.dc.drawRect(bounds, frameCol);
 
   if textStyle.centered then begin
     textRect := font.textExtents(text);
@@ -261,7 +261,6 @@ begin
     inc(drawX);
     inc(drawY);
   end;
-
 
   if textStyle.shadow then
     font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,textStyle.col.a*3 div 4));
