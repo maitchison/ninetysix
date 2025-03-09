@@ -6,7 +6,7 @@ uses
   debug,
   test,
   utils,
-  ui,
+  uGui,
   uScreen;
 
 type

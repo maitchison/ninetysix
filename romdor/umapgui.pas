@@ -6,7 +6,7 @@ uses
   test,
   debug,
   utils,
-  ui,
+  uGui,
   graph2d,
   graph32,
   sprite,

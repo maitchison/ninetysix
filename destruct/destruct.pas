@@ -11,7 +11,7 @@ uses
   vertex,
   myMath,
   timer,
-  ui,
+  gui,
   fx,
   crt, //todo: remove
   cfd,

@@ -18,7 +18,7 @@ uses
   sprite,
   lc96,
   utils,
-  ui,
+  uGui,
   graph2d,
   resource,
   {game stuff}

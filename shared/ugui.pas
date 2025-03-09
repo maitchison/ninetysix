@@ -1,5 +1,5 @@
 {A simple retained mode gui}
-unit ui;
+unit uGui;
 
 interface
 
