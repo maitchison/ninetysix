@@ -113,8 +113,6 @@ var
 begin
   id := -1;
   for i := 0 to length(resources)-1 do begin
-    {stub:}
-    note(resources[i].tag);
     if resources[i].tag = aTag then begin
       id := i;
       break;

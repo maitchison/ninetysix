@@ -22,7 +22,7 @@ const
 
 type
 
-  tBlendMode = (bmBlit, bmBlend);
+  tBlendMode = (bmNone, bmBlit, bmBlend);
   tFeatureLevel = (flREF, flASM, flMMX);
 
   tPage = class;
@@ -34,6 +34,8 @@ type
     blendMode: tBlendMode;
 
     function transform(p: tPoint): tPoint;
+    function transformInv(p: tPoint): tPoint;
+    function smartBM(col: RGBA): tBlendMode;
 
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
@@ -55,7 +57,7 @@ type
     constructor create(aWidth, aHeight: word); overload;
     constructor createAsReference(aWidth, aHeight: word;pixelData: Pointer);
 
-    function  dc(blendMode: tBlendMode = bmBlit): tDrawContext;
+    function  dc(blendMode: tBlendMode = bmBlend): tDrawContext;
     function  getAddress(x, y: integer): pointer; inline;
     function  getPixel(x, y: integer): RGBA; inline;
     function  getPixelF(fx,fy: single): RGBA;
@@ -112,6 +114,8 @@ uses
   bmp;
 
 {$include graph32_REF.inc}
+{$include graph32_ASM.inc}
+{$include graph32_MMX.inc}
 
 {-------------------------------------------------------------}
 
@@ -178,7 +182,7 @@ begin
 end;
 
 {gets a default draw context for this page. best to call this once and cache it}
-function tPage.dc(blendMode: tBlendMode = bmBlit): tDrawContext;
+function tPage.dc(blendMode: tBlendMode = bmBlend): tDrawContext;
 begin
   result.page := self;
   result.blendMode := blendMode;
@@ -583,12 +587,29 @@ begin
   result.y := p.y + offset.y;
 end;
 
+function tDrawContext.transformInv(p: tPoint): tPoint;
+begin
+  result.x := p.x - offset.x;
+  result.y := p.y - offset.y;
+end;
+
+{figure out the blend mode based on alpha etc.}
+function tDrawContext.smartBM(col: RGBA): tBlendMode;
+begin
+  result := blendMode;
+  if (result = bmBlend) then begin
+    if col.a = 0 then result := bmNone;
+    if col.a = 255 then result := bmBlit;
+  end;
+end;
+
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
 begin
   pos := transform(pos);
   if not clip.isInside(pos.x, pos.y) then exit;
 
-  case blendMode of
+  case smartBM(col) of
+    bmNone: ;
     bmBlit: page.setPixel(pos.x, pos.y, col);
     bmBlend: page.putPixel(pos.x, pos.y, col);
   end;
@@ -598,6 +619,7 @@ procedure tDrawContext.hLine(pos: tPoint;len: int32;col: RGBA);
 var
   endPos: tPoint;
   i: integer;
+  pixels: pointer;
 begin
   pos := transform(pos);
   endPos := Point(pos.x+len, pos.y);
@@ -605,7 +627,14 @@ begin
   endPos := clip.clipPoint(endPos);
   len := endPos.x - pos.x;
   if len <= 0 then exit;
-  hLine_REF(page, pos, len, col, blendMode);
+
+  pixels := page.getAddress(pos.x, pos.y);
+
+  case smartBM(col) of
+    bmNone: ;
+    bmBlit: filldword(pixels^, len, dword(col));
+    bmBlend: blend_MMX(pixels, len, col);
+  end;
 end;
 
 procedure tDrawContext.vLine(pos: tPoint;len: int32;col: RGBA);
@@ -619,7 +648,12 @@ begin
   endPos := clip.clipPoint(endPos);
   len := endPos.y - pos.y;
   if len <= 0 then exit;
-  vLine_REF(page, pos, len, col, blendMode);
+
+  case smartBM(col) of
+    bmNone: ;
+    bmBlit: for i := 0 to len-1 do page.setPixel(pos.x, pos.y+i, col);
+    bmBlend: for i := 0 to len-1 do page.putPixel(pos.x, pos.y+i, col);
+  end;
 end;
 
 procedure tDrawContext.fillRect(rect: tRect; col: RGBA);
@@ -630,16 +664,17 @@ begin
   rect.pos := transform(rect.pos);
   rect.clipTo(clip);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
+  rect.pos := transformInv(rect.pos);
   for y := rect.top to rect.bottom-1 do
-    hLine_REF(page, Point(rect.left, y), rect.width, col, blendMode);
+    hLine(Point(rect.left, y), rect.width, col);
 end;
 
 procedure tDrawContext.drawRect(rect: tRect; col: RGBA);
 begin
   hLine(rect.topLeft, rect.width, col);
-  hLine(rect.bottomLeft, rect.width, col);
+  hLine(Point(rect.left, rect.bottom-1), rect.width, col);
   vLine(Point(rect.left, rect.top+1), rect.height-2, col);
-  vLine(Point(rect.right, rect.top+1), rect.height-2, col);
+  vLine(Point(rect.right-1, rect.top+1), rect.height-2, col);
 end;
 
 {-------------------------------------------------}
@@ -652,7 +687,6 @@ begin
     for x := 0 to page.width-1 do
       page.putPixel(x,y,RGBA.random);
 end;
-
 
 procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 begin

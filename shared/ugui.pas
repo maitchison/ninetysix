@@ -235,7 +235,7 @@ var
   backCol, frameCol: RGBA;
 begin
   backCol := col;
-  frameCol := RGB(0,0,0,backCol.a div 4);
+  frameCol := RGB(0,0,0,backCol.a div 2);
   if autoStyle then begin
     case state of
       gsNormal: ;
@@ -347,7 +347,7 @@ begin
   fTextStyle.col := RGB(250, 250, 250);
   fText := aText;
   width := 100;
-  height := 18;
+  height := 19;
   autoStyle := true;
 end;
 
