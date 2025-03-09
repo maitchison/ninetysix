@@ -1,4 +1,4 @@
-procedure blend_MMX(pixels: pointer;count: int32;col: RGBA);
+procedure blendCol_MMX(pixels: pointer;count: int32;col: RGBA);
 asm
   // if mixer interrupt runs during the timer then we'll have
   // fpu in invalid state, so block them during the hline

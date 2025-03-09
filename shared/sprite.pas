@@ -240,9 +240,7 @@ end;
 {Copy sprite to screen at given location, no alpha blending}
 procedure tSprite.blit(dstPage: tPage; atX, atY: Integer);
 begin
-  {note: this is wrong, need to use pivot}
-  //stub: add back in
-  //blit_ASM(dstPage, self.page, self.srcRect, atX, atY);
+  dstPage.dc.drawSubImage(Point(atX, atY), page, srcRect);
 end;
 
 {Draws sprite stetched to cover destination rect}

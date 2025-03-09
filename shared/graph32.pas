@@ -648,7 +648,7 @@ begin
   case smartBM(col) of
     bmNone: ;
     bmBlit: filldword(pixels^, len, dword(col));
-    bmBlend: blend_MMX(pixels, len, col);
+    bmBlend: blendCol_MMX(pixels, len, col);
   end;
 end;
 
@@ -674,9 +674,21 @@ begin
 end;
 
 procedure tDrawContext.drawSubImage(pos: tPoint;src: tPage; srcRect: tRect);
+var
+  dstRect: tRect;
+  srcOffset: tPoint;
 begin
-  // pass:
-  //(dstPage, srcPage: tPage; srcRect: tRect; atX,atY: int32);
+
+  applyTransform(pos);
+
+  dstRect := Rect(pos.x, pos.y, src.width, src.height);
+  dstRect.clipTo(clip);
+  if dstRect.isEmpty then exit;
+  srcRect.width := dstRect.width;
+  srcRect.height := dstRect.height;
+  srcRect.pos += (pos - dstRect.pos); // might be the wrong way around..?
+
+  blitImage_REF(page, src, srcRect, dstRect.x, dstRect.y);
 end;
 
 procedure tDrawContext.fillRect(rect: tRect; col: RGBA);
@@ -687,7 +699,7 @@ begin
   {transform, then clip, then restore... only for performance reasons}
   applyTransform(rect.pos);
   rect.clipTo(clip);
-  if (rect.width <= 0) or (rect.height <= 0) then exit;
+  if rect.isEmpty then exit;
   applyTransformInv(rect.pos);
   for y := rect.top to rect.bottom-1 do
     hLine(Point(rect.left, y), rect.width, col);

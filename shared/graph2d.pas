@@ -31,6 +31,7 @@ type
   tPoint = record
     x, y: int32;
     class operator add(a,b: tPoint): tPoint;
+    class operator subtract(a,b: tPoint): tPoint;
     function toString(): string;
   end;
 
@@ -41,6 +42,7 @@ type
     procedure init(left, top, width, height: int32);
     procedure pad(padding: int32);
     function  padded(padding: int32): tRect;
+    function  isEmpty: boolean; inline;
 
     procedure expandToInclude(p: tPoint);
     function  isInside(x,y: int32): boolean;
@@ -140,6 +142,12 @@ begin
   result.y := a.y + b.y;
 end;
 
+class operator tPoint.subtract(a,b: tPoint): tPoint;
+begin
+  result.x := a.x - b.x;
+  result.y := a.y - b.y;
+end;
+
 function tPoint.toString(): string;
 begin
   result := format('(%d,%d)',[x, y]);
@@ -169,6 +177,11 @@ function tRect.padded(padding: int32): tRect;
 begin
   result := self;
   result.pad(padding);
+end;
+
+function tRect.isEmpty: boolean; inline;
+begin
+  result := (width <= 0) or (height <= 0);
 end;
 
 function tRect.clipPoint(p: tPoint): tPoint;
