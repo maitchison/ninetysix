@@ -70,3 +70,17 @@ asm
   sti
 
 end;
+
+{this is just a movq version... might not be that much faster that movsd}
+procedure blitImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32);
+begin
+end;
+
+procedure tintImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+begin
+end;
+
+procedure blendImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+begin
+end;
+

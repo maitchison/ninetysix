@@ -18,18 +18,18 @@ begin
 end;
 
 {draw an image segment to screen, no blending}
-procedure blitImage_REF(dstPage, srcPage: tPage; srcRect: tRect; atX,atY: int32);
+procedure blitImage_REF(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
 var
   srcPtr: pRGBA;
   dstPtr: pRGBA;
   i: integer;
 begin
 
-  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
-  dstPtr := dstPage.getAddress(atX, atY);
+  srcPtr := srcPage.getAddress(srcX, srcY);
+  dstPtr := dstPage.getAddress(dstX, dstY);
 
-  for i := 0 to srcRect.height-1 do begin
-    move(srcPtr^, dstPtr^, srcRect.width*4);
+  for i := 0 to height-1 do begin
+    move(srcPtr^, dstPtr^, width*4);
     inc(srcPtr, srcPage.width);
     inc(dstPtr, dstPage.width);
   end;

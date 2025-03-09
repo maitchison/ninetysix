@@ -41,13 +41,15 @@ type
     procedure applyTransformInv(var p: tPoint); inline;
     procedure applyTint(var col: RGBA); inline;
     function  smartBM(col: RGBA): tBlendMode;
+    function  hasTint: boolean; inline;
 
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
     procedure hLine(pos: tPoint;len: int32;col: RGBA);
     procedure vLine(pos: tPoint;len: int32;col: RGBA);
-    procedure drawSubImage(pos: tPoint;src: tPage; srcRect: tRect);
-    {composite}
+    procedure drawSubImage(src: tPage; pos: tPoint; srcRect: tRect);
+    {constructed}
+    procedure drawImage(src: tPage; pos: tPoint);
     procedure fillRect(rect: tRect; col: RGBA);
     procedure drawRect(rect: tRect; col: RGBA);
   end;
@@ -616,6 +618,11 @@ begin
   end;
 end;
 
+function tDrawContext.hasTint: boolean; inline;
+begin
+  result := int32(tint) <> -1;
+end;
+
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
 begin
   applyTransform(pos);
@@ -673,7 +680,7 @@ begin
   end;
 end;
 
-procedure tDrawContext.drawSubImage(pos: tPoint;src: tPage; srcRect: tRect);
+procedure tDrawContext.drawSubImage(src: tPage; pos: tPoint; srcRect: tRect);
 var
   dstRect: tRect;
   srcOffset: tPoint;
@@ -688,7 +695,26 @@ begin
   srcRect.height := dstRect.height;
   srcRect.pos += (pos - dstRect.pos); // might be the wrong way around..?
 
-  blitImage_REF(page, src, srcRect, dstRect.x, dstRect.y);
+  case blendMode of
+    bmNone: ;
+    bmBlit: begin
+      if hasTint then
+        tintImage_MMX(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint)
+      else
+        blitImage_REF(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height);
+      end;
+    bmBlend:
+      blendImage_MMX(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint);
+  end;
+end;
+
+{----------------------}
+{ Constructed: draw commands built from base commands }
+{----------------------}
+
+procedure tDrawContext.drawImage(src: tPage; pos: tPoint);
+begin
+  drawSubImage(src, pos, src.bounds);
 end;
 
 procedure tDrawContext.fillRect(rect: tRect; col: RGBA);

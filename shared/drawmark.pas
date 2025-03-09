@@ -1,0 +1,4 @@
+program drawMap;
+
+begin
+end;
