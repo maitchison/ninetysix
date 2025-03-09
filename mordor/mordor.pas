@@ -1,4 +1,4 @@
-program romdor;
+program mordor;
 
 uses
   {engine stuff}
