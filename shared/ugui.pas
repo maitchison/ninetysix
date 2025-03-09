@@ -234,7 +234,7 @@ var
   backCol, frameCol: RGBA;
 begin
   backCol := col;
-  frameCol := RGB(0,0,0,96);
+  frameCol := RGB(0,0,0,backCol.a div 4);
   if autoStyle then begin
     case state of
       gsNormal: ;

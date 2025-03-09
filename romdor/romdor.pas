@@ -28,18 +28,20 @@ uses
   uMap
   ;
 
-var
-  screen: tScreen;
-
 type
   tMapEditScene = class(tScene)
   protected
     map: tMap;
+    mapGUI: tMapGUI;
   public
     constructor Create();
     destructor Destroy(); override;
     procedure run(); override;
   end;
+
+var
+  screen: tScreen;
+  scene: tMapEditScene;
 
 procedure setup();
 begin
@@ -165,13 +167,20 @@ end;
 
 procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
+  note('Saving map');
+  scene.map.save('map.dat');
+end;
 
+procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
+begin
+  note('Loading map');
+  scene.map.load('map.dat');
+  scene.mapGUI.refresh();
 end;
 
 procedure tMapEditScene.run();
 var
   elapsed: single;
-  mapGUI: tMapGUI;
   editGUI: tTileEditorGUI;
   saveButton, loadButton: tGuiButton;
   fpsLabel: tGuiLabel;
@@ -197,11 +206,11 @@ begin
   gui.append(mapGUI);
 
   saveButton := tGuiButton.create(Point(650,400), 'Save');
+  savebutton.addHook(ON_MOUSE_CLICK, onSaveClick);
   gui.append(saveButton);
   loadButton := tGuiButton.create(Point(650,450), 'Load');
+  loadbutton.addHook(ON_MOUSE_CLICK, onLoadClick);
   gui.append(loadButton);
-
-  savebutton.addHook(ON_MOUSE_CLICK, onSaveClick);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
@@ -235,9 +244,6 @@ begin
 end;
 
 {-------------------------------------------------------}
-
-var
-  scene: tScene;
 
 begin
 

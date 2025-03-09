@@ -6,6 +6,7 @@ interface
 uses
   test,
   debug,
+  filesystem,
   stream,
   utils;
 
@@ -72,6 +73,7 @@ type
     procedure setTile(x,y: integer; aTile: tTile);
     function  getWall(x,y: integer; d: tMapDirection): tWall;
     procedure setWall(x,y: integer; d: tMapDirection;aWall: tWall);
+    procedure init(aWidth, aHeight: integer);
   public
     constructor Create(aWidth, aHeight: word);
     destructor destroy(); override;
@@ -119,6 +121,21 @@ end;
 {-------------------------------------------------}
 
 constructor tMap.Create(aWidth, aHeight: word);
+begin
+  inherited Create();
+  init(aWidth, aHeight);
+end;
+
+destructor tMap.destroy();
+begin
+  setLength(fTile, 0);
+  setLength(fNorthWall, 0);
+  setLength(fWestWall, 0);
+  inherited destroy();
+end;
+
+{initialize a map to given size}
+procedure tMap.init(aWidth, aHeight: integer);
 var
   i: integer;
 begin
@@ -130,14 +147,6 @@ begin
   for i := 0 to length(fTile)-1 do fTile[i].clear();
   for i := 0 to length(fNorthWall)-1 do fNorthWall[i].clear();
   for i := 0 to length(fWestWall)-1 do fWestWall[i].clear();
-end;
-
-destructor tMap.destroy();
-begin
-  setLength(fTile, 0);
-  setLength(fNorthWall, 0);
-  setLength(fWestWall, 0);
-  inherited destroy();
 end;
 
 function tMap.getTile(x,y: integer): tTile;
@@ -179,22 +188,39 @@ var
   f: tFileStream;
   header: tMapHeader;
 begin
-
   fillchar(header, sizeof(header), 0);
   header.tag := 'MDRM';
   header.width := width;
   header.height := height;
-
-  f := tFileStream.create(filename);
+  f := tFileStream.Create(filename, FM_WRITE);
   f.writeBlock(header, sizeof(header));
-  f.writeBlock(fTile, sizeof(fTile));
-  f.writeBlock(fNorthWall, sizeof(fNorthWall));
-  f.writeBlock(fWestWall, sizeof(fWestWall));
+  f.writeBlock(fTile[0], sizeof(fTile[0])*length(fTile));
+  f.writeBlock(fNorthWall[0], sizeof(fNorthWall[0])*length(fNorthWall));
+  f.writeBlock(fWestWall[0], sizeof(fWestWall[0])*length(fWestWall));
+  f.flush();
   f.free();
 end;
 
 procedure tMap.load(filename: string);
+var
+  f: tFileStream;
+  header: tMapHeader;
 begin
+
+  header.tag := 'MDRM';
+  header.width := width;
+  header.height := height;
+
+  f := tFileStream.Create(filename);
+
+  f.readBlock(header, sizeof(header));
+  if (header.tag <> 'MDRM') then raise ValueError('Invalid map');
+  init(header.width, header.height);
+
+  f.readBlock(fTile[0], sizeof(fTile[0])*length(fTile));
+  f.readBlock(fNorthWall[0], sizeof(fNorthWall[0])*length(fNorthWall));
+  f.readBlock(fWestWall[0], sizeof(fWestWall[0])*length(fWestWall));
+  f.free();
 end;
 
 procedure tMap.clear();
