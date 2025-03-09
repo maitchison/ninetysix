@@ -12,7 +12,7 @@ uses
 type
   tScene = class
   public
-    gui: tGuiComponents;
+    gui: tGui;
     screen: tScreen;
     constructor Create();
     destructor destroy(); override;
@@ -24,7 +24,7 @@ implementation
 constructor tScene.Create();
 begin
   inherited Create();
-  gui := tGuiComponents.create();
+  gui := tGui.create();
   screen := tScreen.create();
 end;
 

@@ -72,7 +72,7 @@ function log10(x: double): double;
 function log2(x: double): double;
 function isPowerOfTwo(x: dword): boolean;
 function roundUpToPowerOfTwo(x: dword): dword;
-function shiftRight(x: int32; shift: byte): int32; inline; register;
+function shiftRight(x: int32; shift: byte): int32;
 
 {------------------------------------------------}
 { SysUtils replacements}
@@ -262,14 +262,25 @@ begin
 end;
 
 {returns x / (1 shl shift)}
-function shiftRight(x: int32; shift: byte): int32; inline; register;
+function shiftRight(x: int32; shift: byte): int32;
+var
+  i: integer;
+begin
+  for i := 0 to shift-1 do
+    x := x div 2;
+  result := x;
+end;
+{not working due to generics for some reason..?}
+{
 asm
   push cx
   mov cl, shift
   mov eax, x
   sar eax, cl
+  mov result,eax
   pop cx
 end;
+}
 
 {----------------------------------------------------------}
 

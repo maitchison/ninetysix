@@ -9,10 +9,19 @@ uses
   font,
   utils,
   uMouse,
+  uInput,
+  sound,
+  mixLib,
+  sysTypes,
   graph2d,
   graph32,
   keyboard,
   uScreen;
+
+const
+  ON_MOUSE_CLICK = 'mouseclick';
+  ON_MOUSE_DOWN = 'mousedown';
+  ON_KEYPRESS = 'keypress';
 
 type
 
@@ -26,8 +35,14 @@ type
 
   tGuiState = (gsNormal, gsDisabled, gsHover, gsPressed, gsSelected);
 
+  tGuiComponent = class;
+  tGui = class;
+
+  tHookProc = procedure(sender: tGuiComponent; msg: string; args: array of const);
+
   tGuiComponent = class
   protected
+    gui: tGui;
     bounds: tRect;
     visible: boolean;
     enabled: boolean;
@@ -37,16 +52,21 @@ type
     fText: string;
     fTextStyle: tTextStyle;
     fCol: RGBA;
+    fHookKey: tStrings;
+    fHookProc: array of tHookProc;
     mouseOverThisFrame, mouseOverLastFrame: boolean;
   protected
     procedure doDraw(screen: tScreen); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
+    procedure fireMessage(aMsg: string; args: array of const); overload;
+    procedure fireMessage(aMsg: string); overload;
   public
     constructor Create();
     procedure draw(screen: tScreen);
     procedure update(elapsed: single);
     function  state: tGuiState;
+    procedure addHook(aMsg: string; aProc: tHookProc);
   public
     procedure onKeyPress(code: word); virtual;
   public
@@ -62,9 +82,14 @@ type
 
   tGuiComponents = class
     elements: array of tGuiComponent;
-    procedure append(x: tGuiComponent);
-    procedure draw(screen: tScreen);
-    procedure update(elapsed: single);
+    procedure append(x: tGuiComponent); virtual;
+    procedure draw(screen: tScreen); virtual;
+    procedure update(elapsed: single); virtual;
+  end;
+
+  tGui = class(tGuiComponents)
+    procedure append(x: tGuiComponent); override;
+    procedure update(elapsed: single); override;
   end;
 
   tGuiLabel = class(tGuiComponent)
@@ -83,7 +108,16 @@ type
     constructor Create(aPos: tPoint; aText: string='');
   end;
 
+const
+  DEFAULT_MOUSEDOWN_SFX: tSoundEffect = nil;
+  DEFAULT_MOUSECLICK_SFX: tSoundEffect = nil;
+
 implementation
+
+procedure playSFX(sfx: tSoundEffect);
+begin
+  if assigned(sfx) then mixer.play(sfx);
+end;
 
 {--------------------------------------------------------}
 
@@ -96,7 +130,6 @@ begin
 end;
 
 {--------------------------------------------------------}
-{ tGuiComponents }
 
 procedure tGuiComponents.append(x: tGuiComponent);
 begin
@@ -121,15 +154,56 @@ begin
   while true do begin
     code := dosGetKey.code;
     if code = 0 then break;
-    for gc in elements do gc.onKeyPress(code);
+    for gc in elements do begin
+      gc.fireMessage(ON_KEYPRESS, [code]);
+      gc.onKeyPress(code);
+    end;
   end;
 
   for gc in elements do gc.update(elapsed);
 end;
 
+{--------------------------------------------------------}
+
+procedure tGui.append(x: tGuiComponent);
+begin
+  inherited append(x);
+  x.gui := self;
+end;
+
+procedure tGui.update(elapsed: single);
+begin
+  inherited update(elapsed);
+end;
+
+{--------------------------------------------------------}
+
+procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
+var
+  i: integer;
+begin
+  aMsg := aMsg.toLower();
+  for i := 0 to length(fHookKey)-1 do begin
+    if fHookKey[i] = aMsg then fHookProc[i](self, aMsg, args);
+  end;
+end;
+
+procedure tGuiComponent.fireMessage(aMsg: string);
+begin
+  fireMessage(aMsg, []);
+end;
+
+procedure tGuiComponent.addHook(aMsg: string; aProc: tHookProc);
+begin
+  fHookKey.append(aMsg);
+  setLength(fHookProc, length(fHookProc)+1);
+  fHookProc[length(fHookProc)-1] := aProc;
+end;
+
 function tGuiComponent.state: tGuiState;
 begin
   if not enabled then exit(gsDisabled);
+  if pressed then exit(gsPressed);
   if mouseOverThisFrame then exit(gsHover);
   exit(gsNormal);
 end;
@@ -166,26 +240,31 @@ begin
       gsNormal: ;
       gsDisabled: backCol := RGBA.Lerp(backCol, RGBA.Black, 0.5);
       gsHover: backCol := RGBA.Lerp(backCol, RGB(255,255,0), 0.33);
-      gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,0), 0.33);
+      gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,255), 0.33);
     end;
   end;
 
   screen.canvas.fillRect(bounds, backCol);
   screen.canvas.drawRect(bounds, frameCol);
 
-  if textStyle.col.a > 0 then begin
-    if textStyle.centered then begin
-      textRect := font.textExtents(text);
-      drawX := x+((width - textRect.width) div 2);
-      drawY := y+((height - textRect.height) div 2)-1;
-    end else begin
-      drawX := x+2;
-      drawY := y;
-    end;
-    if textStyle.shadow then
-      font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,textStyle.col.a*3 div 4));
-    font.textOut(screen.canvas, drawX, drawY, text, textStyle.col);
+  if textStyle.centered then begin
+    textRect := font.textExtents(text);
+    drawX := x+((width - textRect.width) div 2);
+    drawY := y+((height - textRect.height) div 2)-1;
+  end else begin
+    drawX := x+2;
+    drawY := y;
   end;
+
+  if pressed then begin
+    inc(drawX);
+    inc(drawY);
+  end;
+
+
+  if textStyle.shadow then
+    font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,textStyle.col.a*3 div 4));
+  font.textOut(screen.canvas, drawX, drawY, text, textStyle.col);
 
   screen.markRegion(bounds);
 end;
@@ -201,14 +280,30 @@ begin
   mouseOverLastFrame := mouseOverThisFrame;
   mouseOverThisFrame := false;
   if not enabled then exit;
-  mouseOverThisFrame := bounds.isInside(mouse_x, mouse_y);
-  pressed := (mouse_b and 1) = 1;
+  mouseOverThisFrame := bounds.isInside(input.mouseX, input.mouseY);
+
+  {handle pressed logic}
+  if mouseOverThisFrame then begin
+    if input.mousePressed then begin
+      fireMessage(ON_MOUSE_DOWN);
+      playSFX(DEFAULT_MOUSEDOWN_SFX);
+      pressed := true;
+    end;
+  end else
+    pressed := false;
+
+  if pressed and not input.mouseLB then begin
+    playSFX(DEFAULT_MOUSECLICK_SFX);
+    fireMessage(ON_MOUSE_CLICK);
+    pressed := false;
+  end;
+
   doUpdate(elapsed);
 end;
 
 procedure tGuiComponent.onKeyPress(code: word);
 begin
-  // do nothing;
+  // nothing
 end;
 
 procedure tGuiComponent.setText(aText: string);
@@ -219,7 +314,7 @@ end;
 
 {-----------------------}
 
-constructor tGuiLabel.create(aPos: tPoint; aText: string='');
+constructor tGuiLabel.Create(aPos: tPoint; aText: string='');
 begin
   inherited create();
   bounds.x := aPos.x;

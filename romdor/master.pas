@@ -92,7 +92,7 @@ var
   sfx: tSoundEffect;
 begin
   srcPath := joinPath(SRC_ROOT, filename+'.wav');
-  dstPath := DST_ROOT+filename+'.a96';
+  dstPath := joinPath(DST_ROOT, filename+'.a96');
 
   if not preProcess(srcPath, dstPath) then exit;
 

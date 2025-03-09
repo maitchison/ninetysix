@@ -11,6 +11,7 @@ uses
   timer,
   vga,
   crt,
+  uInput,
   uMouse,
   uScreen,
   graph32,
@@ -56,6 +57,10 @@ begin
   screen.scrollMode := SSM_COPY;
 
   loadResources();
+
+  {init sounds}
+  DEFAULT_MOUSEDOWN_SFX := sfx['clickdown'];
+  DEFAULT_MOUSECLICK_SFX := sfx['clickup'];
 
 end;
 
@@ -158,6 +163,11 @@ begin
   inherited destroy();
 end;
 
+procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
+begin
+
+end;
+
 procedure tMapEditScene.run();
 var
   elapsed: single;
@@ -191,6 +201,8 @@ begin
   loadButton := tGuiButton.create(Point(650,450), 'Load');
   gui.append(loadButton);
 
+  savebutton.addHook(ON_MOUSE_CLICK, onSaveClick);
+
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
 
@@ -208,6 +220,8 @@ begin
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
     musicUpdate();
+
+    input.update();
 
     gui.update(elapsed);
     screen.clearAll();

@@ -112,11 +112,15 @@ var
   i, id: integer;
 begin
   id := -1;
-  for i := 0 to length(resources)-1 do
+  for i := 0 to length(resources)-1 do begin
+    {stub:}
+    note(resources[i].tag);
     if resources[i].tag = aTag then begin
       id := i;
       break;
     end;
+  end;
+
   if id < 0 then raise ValueError('No resource named "%s"', [aTag]);
   if (resources[id] is tLazyResource) then begin
     result := loadResource(tLazyResource(resources[id]).path);

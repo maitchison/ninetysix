@@ -154,7 +154,7 @@ var
   res: tResource;
 begin
   res := inherited addResource(filename);
-  assert(res is tSoundEffect);
+  assert((res is tSoundEffect) or (res is tLazyResource));
   result := res;
 end;
 

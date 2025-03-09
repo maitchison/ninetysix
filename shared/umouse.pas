@@ -1,9 +1,6 @@
 unit uMouse;
 
-{todo: come back and clean this one up}
-
-{$MODE fpc}
-
+{$mode objfpc}
 
 interface
 
@@ -14,15 +11,22 @@ uses
   utils,
   vga;
 
-var
-  { current mouse x and y coordinates, updated automatically. }
-  mouse_x, mouse_y : Word;
-  { button state }
-  mouse_b : Word;
+type
+  tMouse = class
+    {these are updated live}
+    function x: integer;
+    function y: integer;
+    function leftButton: boolean;
+    function rightButton: boolean;
+  end;
 
-procedure overrideBaseAddress(newAddress: word);
+var
+  mouse: tMouse;
+
 procedure initMouse();
 procedure closeMouse();
+
+procedure overrideBaseMouseCursorAddress(newAddress: word);
 
 implementation
 
@@ -38,12 +42,39 @@ var
   { supplied register structure to the callback }
   mouse_regs    : trealregs; external name '___v2prt0_rmcb_regs';
   userProcLength: int32;
+  { current mouse x and y coordinates, updated automatically. }
+  mouse_x, mouse_y : Word;
+  { button state }
+  mouse_b : Word;
 
 const
   {This is around 2 MEGs into the video ram, which is safe for <= 800x600x32}
   DEFAULT_BASE_ADDRESS = 1920;
   BASE_ADDRESS: word = DEFAULT_BASE_ADDRESS;
 
+{-----------------------------------------------------------}
+
+function tMouse.x: integer;
+begin
+  result := mouse_x;
+end;
+
+function tMouse.y: integer;
+begin
+  result := mouse_y;
+end;
+
+function tMouse.leftButton: boolean;
+begin
+  result := mouse_b and $1 = $1;
+end;
+
+function tMouse.rightButton: boolean;
+begin
+  result := mouse_b and $2 = $2;
+end;
+
+{-----------------------------------------------------------}
 function DetectMouse(): boolean; assembler;
 asm
   mov ax, 0
@@ -54,7 +85,7 @@ asm
   {If al is still zero then mouse is not present.}
 end;
 
-procedure SetBoundary(x1, y1, x2, y2: integer);
+procedure SetBoundary(x1, y1, x2, y2: int16);
 begin
   asm
     mov ax, $07
@@ -98,11 +129,11 @@ begin
 
 end;
 
-procedure updateHardwareCursor(mouse_x, mouse_y: word);
+procedure updateHardwareCursor(x, y: word);
 var
   counter: dword;
 begin
-  s3.S3SetHardwareCursorLocation(mouse_x, mouse_y);
+  s3.S3SetHardwareCursorLocation(x, y);
 end;
 
 procedure writeBit(x,y: integer; value: boolean; plane: byte);
@@ -220,7 +251,7 @@ begin
 end;
 
 {set start address for mouse cursor (real address is newAddress*1024)}
-procedure overrideBaseAddress(newAddress: word);
+procedure overrideBaseMouseCursorAddress(newAddress: word);
 begin
   BASE_ADDRESS := newAddress;
 end;
@@ -260,9 +291,6 @@ const
 var
         { number of mouse buttons }
         mouse_numbuttons : longint;
-
-        { bit mask for the action which triggered the callback }
-        mouse_action : word;
 
         { is an additional user procedure installed }
         userproc_installed : Longbool;
@@ -351,7 +379,6 @@ begin
   lock_data(mouse_x, sizeof(mouse_x));
   lock_data(mouse_y, sizeof(mouse_y));
   lock_data(mouse_b, sizeof(mouse_b));
-  lock_data(mouse_action, sizeof(mouse_action));
 
   lock_data(userproc_installed, sizeof(userproc_installed));
   lock_data(userproc_proc, sizeof(userproc_proc));
@@ -395,7 +422,6 @@ begin
   unlock_data(mouse_x, sizeof(mouse_x));
   unlock_data(mouse_y, sizeof(mouse_y));
   unlock_data(mouse_b, sizeof(mouse_b));
-  unlock_data(mouse_action, sizeof(mouse_action));
 
   unlock_data(userproc_proc, sizeof(userproc_proc));
   unlock_data(userproc_installed, sizeof(userproc_installed));
@@ -413,9 +439,11 @@ initialization
   userProc_Installed := False;
   userProcLength := dword(@mouse_dummy2)-dword(@userProc);
 
-  Mouse_X := 0;
-  Mouse_Y := 0;
-  Mouse_B := 0;
+  mouse_x := 0;
+  mouse_y := 0;
+  mouse_b := 0;
+
+  mouse := tMouse.Create();
 
 finalization
   closeMouse();

@@ -11,6 +11,10 @@ type
   tInt32Array = array of int32;
   tStrings = array of string;
 
+type tStringsHelper = record helper for tStrings
+  procedure append(s: string);
+  end;
+
 type tDwordsHelper = record helper for tDwords
   procedure append(x: dword);
   function  toString(maxEntries: int32=16): string;
@@ -34,6 +38,15 @@ implementation
 uses
   test, debug,
   utils;
+
+{-------------------------------------------------------------}
+
+procedure tStringsHelper.append(s: string);
+begin
+  setLength(self, length(self)+1);
+  self[length(self)-1] := s;
+end;
+
 
 {-------------------------------------------------------------}
 
