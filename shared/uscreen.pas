@@ -8,6 +8,7 @@ uses
   test,
   debug,
   utils,
+  uColor,
   graph2d,
   graph32,
   sprite,

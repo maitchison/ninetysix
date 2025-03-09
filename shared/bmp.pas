@@ -7,6 +7,7 @@ uses
   test,
   utils,
   resource,
+  uColor,
   graph32;
 
 function loadBMP(fileName: string): tPage;

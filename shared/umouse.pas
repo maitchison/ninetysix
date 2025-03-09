@@ -32,6 +32,7 @@ implementation
 
 uses
   s3,
+  uColor,
   graph32;
 
 procedure installMouseProc(userproc : pointer; userproclen : longint); forward;

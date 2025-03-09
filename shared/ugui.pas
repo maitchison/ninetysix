@@ -13,6 +13,7 @@ uses
   sound,
   mixLib,
   sysTypes,
+  uColor,
   graph2d,
   graph32,
   keyboard,

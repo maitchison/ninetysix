@@ -5,6 +5,7 @@ interface
 
 uses
   debug,
+  uColor,
   graph2d,
   graph32,
   utils,

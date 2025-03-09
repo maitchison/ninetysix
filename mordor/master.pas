@@ -29,7 +29,7 @@ var
 const
   {TODO: from CWD}
   SRC_ROOT = 'c:\masters\romdor';
-  DST_ROOT = 'c:\dev\romdor\res';
+  DST_ROOT = 'c:\dev\mordor\res';
 
 procedure updateEncodeProgress(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
 begin

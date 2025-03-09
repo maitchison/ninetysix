@@ -7,6 +7,7 @@ uses
   debug,
   test,
   utils,
+  uColor,
   graph2d,
   graph32,
   uScreen;

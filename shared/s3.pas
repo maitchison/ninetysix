@@ -10,6 +10,7 @@ uses
   debug,
   utils,
   crt,
+  uColor,
   graph32,
   vga;
 

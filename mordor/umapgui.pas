@@ -11,6 +11,7 @@ uses
   graph32,
   sprite,
   uScreen,
+  uColor,
   keyboard,
   font,
   {game stuff}

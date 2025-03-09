@@ -10,6 +10,7 @@ uses
   debug,
   utils,
   sysTypes,
+  uColor,
   vga,
   iniFile,
   graph2d,

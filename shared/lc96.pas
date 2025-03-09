@@ -27,6 +27,7 @@ uses
   sysTypes,
   stream,
   resource,
+  uColor,
   graph2d,
   graph32;
 
