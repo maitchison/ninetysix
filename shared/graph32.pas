@@ -22,7 +22,11 @@ const
 
 type
 
-  tBlendMode = (bmNone, bmBlit, bmBlend);
+  tBlendMode = (
+    bmNone,   // skip
+    bmBlit,   // src
+    bmBlend   // alpha*src + (1-alpha)*dst
+  );
   tFeatureLevel = (flREF, flASM, flMMX);
 
   tPage = class;
@@ -32,15 +36,18 @@ type
     offset: tPoint;
     clip: tRect;
     blendMode: tBlendMode;
-
-    function transform(p: tPoint): tPoint;
-    function transformInv(p: tPoint): tPoint;
-    function smartBM(col: RGBA): tBlendMode;
+    tint: RGBA;  {used to modulate src color before write}
+    procedure applyTransform(var p: tPoint); inline;
+    procedure applyTransformInv(var p: tPoint); inline;
+    procedure applyTint(var col: RGBA); inline;
+    function  smartBM(col: RGBA): tBlendMode;
 
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
     procedure hLine(pos: tPoint;len: int32;col: RGBA);
     procedure vLine(pos: tPoint;len: int32;col: RGBA);
+    procedure drawSubImage(pos: tPoint;src: tPage; srcRect: tRect);
+    {composite}
     procedure fillRect(rect: tRect; col: RGBA);
     procedure drawRect(rect: tRect; col: RGBA);
   end;
@@ -188,6 +195,7 @@ begin
   result.blendMode := blendMode;
   result.clip := bounds;
   result.offset := Point(0,0);
+  result.tint := RGB(255,255,255,255);
 end;
 
 {returns address in memory of given pixel. If out of bounds, returns nil}
@@ -581,16 +589,21 @@ end;
 
 {-------------------------------------------------}
 
-function tDrawContext.transform(p: tPoint): tPoint;
+procedure tDrawContext.applyTransform(var p: tPoint); inline;
 begin
-  result.x := p.x + offset.x;
-  result.y := p.y + offset.y;
+  p.x += offset.x;
+  p.y += offset.y;
 end;
 
-function tDrawContext.transformInv(p: tPoint): tPoint;
+procedure tDrawContext.applyTransformInv(var p: tPoint); inline;
 begin
-  result.x := p.x - offset.x;
-  result.y := p.y - offset.y;
+  p.x -= offset.x;
+  p.y -= offset.y;
+end;
+
+procedure tDrawContext.applyTint(var col: RGBA); inline;
+begin
+  if int32(tint) <> -1 then col := col * tint;
 end;
 
 {figure out the blend mode based on alpha etc.}
@@ -605,8 +618,9 @@ end;
 
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
 begin
-  pos := transform(pos);
+  applyTransform(pos);
   if not clip.isInside(pos.x, pos.y) then exit;
+  applyTint(col);
 
   case smartBM(col) of
     bmNone: ;
@@ -621,13 +635,14 @@ var
   i: integer;
   pixels: pointer;
 begin
-  pos := transform(pos);
+  applyTransform(pos);
   endPos := Point(pos.x+len, pos.y);
   pos := clip.clipPoint(pos);
   endPos := clip.clipPoint(endPos);
   len := endPos.x - pos.x;
   if len <= 0 then exit;
 
+  applyTint(col);
   pixels := page.getAddress(pos.x, pos.y);
 
   case smartBM(col) of
@@ -642,12 +657,14 @@ var
   endPos: tPoint;
   i: integer;
 begin
-  pos := transform(pos);
+  applyTransform(pos);
   endPos := Point(pos.x, pos.y+len);
   pos := clip.clipPoint(pos);
   endPos := clip.clipPoint(endPos);
   len := endPos.y - pos.y;
   if len <= 0 then exit;
+
+  applyTint(col);
 
   case smartBM(col) of
     bmNone: ;
@@ -656,15 +673,22 @@ begin
   end;
 end;
 
+procedure tDrawContext.drawSubImage(pos: tPoint;src: tPage; srcRect: tRect);
+begin
+  // pass:
+  //(dstPage, srcPage: tPage; srcRect: tRect; atX,atY: int32);
+end;
+
 procedure tDrawContext.fillRect(rect: tRect; col: RGBA);
 var
   pos: tPoint;
   y: integer;
 begin
-  rect.pos := transform(rect.pos);
+  {transform, then clip, then restore... only for performance reasons}
+  applyTransform(rect.pos);
   rect.clipTo(clip);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
-  rect.pos := transformInv(rect.pos);
+  applyTransformInv(rect.pos);
   for y := rect.top to rect.bottom-1 do
     hLine(Point(rect.left, y), rect.width, col);
 end;

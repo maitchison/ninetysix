@@ -15,6 +15,7 @@ type
 
     class operator add(a,b: RGBA): RGBA;
     class operator multiply(a: RGBA; b: single): RGBA;
+    class operator multiply(a,b: RGBA): RGBA;
     class operator equal(a,b: RGBA): boolean;
 
     function toString: shortString;
@@ -183,6 +184,19 @@ class operator RGBA.multiply(a: RGBA; b: single): RGBA;
 begin
   {ignore alpha for the moment}
   result.init(round(a.r*b), round(a.g*b), round(a.b*b));
+end;
+
+class operator RGBA.multiply(a,b: RGBA): RGBA;
+begin
+  {
+   we divide by 256 instead of 255, so add bias such that
+   0*x=0
+   255*255=255
+  }
+  result.r := (255+word(a.r)*b.r) shr 8;
+  result.g := (255+word(a.g)*b.g) shr 8;
+  result.b := (255+word(a.b)*b.b) shr 8;
+  result.a := (255+word(a.a)*b.a) shr 8;
 end;
 
 function RGBA.toString: shortString;

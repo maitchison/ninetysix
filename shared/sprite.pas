@@ -241,7 +241,8 @@ end;
 procedure tSprite.blit(dstPage: tPage; atX, atY: Integer);
 begin
   {note: this is wrong, need to use pivot}
-  blit_ASM(dstPage, self.page, self.srcRect, atX, atY);
+  //stub: add back in
+  //blit_ASM(dstPage, self.page, self.srcRect, atX, atY);
 end;
 
 {Draws sprite stetched to cover destination rect}
