@@ -198,8 +198,8 @@ begin
   pivot2x.x -= xMin*2;
   pivot2x.y -= yMin*2;
 
-  srcRect.x += xMin;
-  srcRect.y += yMin;
+  srcRect.pos.x += xMin;
+  srcRect.pos.y += yMin;
   srcRect.width := (xMax-xMin)+1;
   srcRect.height := (yMax-yMin)+1;
 

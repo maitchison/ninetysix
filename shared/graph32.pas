@@ -36,11 +36,11 @@ type
     function transform(p: tPoint): tPoint;
 
     {basic drawing API}
-    procedure putPixel(pos: tPoint;col: RGBA);
-    procedure hLine(x1, y, x2: int32;c: RGBA);
-    procedure vLine(x, y1, y2: int32;c: RGBA);
-    procedure fillRect(aRect: tRect; c: RGBA);
-    procedure drawRect(aRect: tRect; c: RGBA);
+    procedure putPixel(pos: tPoint; col: RGBA);
+    procedure hLine(pos: tPoint;len: int32;col: RGBA);
+    procedure vLine(pos: tPoint;len: int32;col: RGBA);
+    procedure fillRect(rect: tRect; col: RGBA);
+    procedure drawRect(rect: tRect; col: RGBA);
   end;
 
   {page using 32bit RGBA color}
@@ -585,27 +585,61 @@ end;
 
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
 begin
-  putPixel_REF(self, pos, col);
+  pos := transform(pos);
+  if not clip.isInside(pos.x, pos.y) then exit;
+
+  case blendMode of
+    bmBlit: page.setPixel(pos.x, pos.y, col);
+    bmBlend: page.putPixel(pos.x, pos.y, col);
+  end;
 end;
 
-procedure tDrawContext.hLine(x1, y, x2: int32;c: RGBA);
+procedure tDrawContext.hLine(pos: tPoint;len: int32;col: RGBA);
+var
+  endPos: tPoint;
+  i: integer;
 begin
-  //NIY
+  pos := transform(pos);
+  endPos := Point(pos.x+len, pos.y);
+  pos := clip.clipPoint(pos);
+  endPos := clip.clipPoint(endPos);
+  len := endPos.x - pos.x;
+  if len <= 0 then exit;
+  hLine_REF(page, pos, len, col, blendMode);
 end;
 
-procedure tDrawContext.vLine(x, y1, y2: int32;c: RGBA);
+procedure tDrawContext.vLine(pos: tPoint;len: int32;col: RGBA);
+var
+  endPos: tPoint;
+  i: integer;
 begin
-  //NIY
+  pos := transform(pos);
+  endPos := Point(pos.x, pos.y+len);
+  pos := clip.clipPoint(pos);
+  endPos := clip.clipPoint(endPos);
+  len := endPos.y - pos.y;
+  if len <= 0 then exit;
+  vLine_REF(page, pos, len, col, blendMode);
 end;
 
-procedure tDrawContext.fillRect(aRect: tRect; c: RGBA);
+procedure tDrawContext.fillRect(rect: tRect; col: RGBA);
+var
+  pos: tPoint;
+  y: integer;
 begin
-  //NIY
+  rect.pos := transform(rect.pos);
+  rect.clipTo(clip);
+  if (rect.width <= 0) or (rect.height <= 0) then exit;
+  for y := rect.top to rect.bottom-1 do
+    hLine_REF(page, Point(rect.left, y), rect.width, col, blendMode);
 end;
 
-procedure tDrawContext.drawRect(aRect: tRect; c: RGBA);
+procedure tDrawContext.drawRect(rect: tRect; col: RGBA);
 begin
-  //NIY
+  hLine(rect.topLeft, rect.width, col);
+  hLine(rect.bottomLeft, rect.width, col);
+  vLine(Point(rect.left, rect.top+1), rect.height-2, col);
+  vLine(Point(rect.right, rect.top+1), rect.height-2, col);
 end;
 
 {-------------------------------------------------}

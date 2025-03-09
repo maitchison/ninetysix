@@ -1,27 +1,34 @@
 {reference routines for graph32, with full DrawContext support}
 
-procedure putPixel_REF(const dc: tDrawContext; pos: tPoint;col: RGBA);
-var
-  pixels: pRGBA;
+procedure putPixel_REF(page: tPage; pos: tPoint; col: RGBA; blendMode: tBlendMode);
 begin
-  pos := dc.transform(pos);
-  if not dc.clip.isInside(pos.x, pos.y) then exit;
-  pixels := dc.page.getAddress(pos.x, pos.y);
-  case dc.blendMode of
-    bmBlit: pixels^ := col;
-    bmBlend: begin
-      if col.a = 0 then exit;
-      if col.a = 255 then
-        pixels^ := col
-      else
-        pixels^ := RGBA.Lerp(pixels^, col, col.a/255);
-    end;
+  case blendMode of
+    bmBlit: page.setPixel(pos.x, pos.y, col);
+    bmBlend: page.putPixel(pos.x, pos.y, col);
   end;
 end;
 
-                (*
-{Draw line from (x1,y) to (x2,y) inclusive at start and exclusive at end.}
-procedure hLine_REF(const dc: tDrawContext; x1,y,x2: int16; c: RGBA); pascal;
+procedure hLine_REF(page: tPage; pos: tPoint; len: int32; col: RGBA; blendMode: tBlendMode);
+var
+  i: integer;
+begin
+  if len <= 0 then exit;
+  for i := 0 to len-1 do
+    putPixel_REF(page, Point(pos.x+i, pos.y), col, blendMode);
+end;
+
+procedure vLine_REF(page: tPage; pos: tPoint; len: int32; col: RGBA; blendMode: tBlendMode);
+var
+  i: integer;
+begin
+  if len <= 0 then exit;
+  for i := 0 to len-1 do
+    putPixel_REF(page, Point(pos.x, pos.y+i), col, blendMode);
+end;
+
+(*
+{Draw line from (pos.x, pos.y) to (pos.x+len,pos.y) inclusive.}
+procedure hLine_REF(pos: tPoint; len: int32; col: RGBA);
 var
   x: int32;
   count: int32;
@@ -129,6 +136,33 @@ begin
 
 end;
 
+  *)
+
+
+(*
+procedure hLine_REF(const dc: tDrawContext; pos: tPoint;len: word; col: RGBA);
+var
+  i: integer;
+begin
+  if len <= 0 then exit;
+  for i := 0 to len-1 do begin
+    putPixel_REF(pos, col);
+    inc(pos.x)
+  end;
+end;
+
+procedure vLine_REF(const dc: tDrawContext; pos: tPoint;len: word; col: RGBA);
+var
+  i: integer;
+begin
+  if len <= 0 then exit;
+  for i := 0 to len-1 do begin
+    putPixel_REF(pos, col);
+    inc(pos.y)
+  end;
+end;
+  *)
+(*
 {draw line from (x,y1) to (x,y2) inclusive at start and exclusive at end.}
 procedure vLine_REF(const dc: tDrawContext; x,y1,y2: int16; c: RGBA);
 var

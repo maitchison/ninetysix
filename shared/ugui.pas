@@ -71,8 +71,8 @@ type
   public
     procedure onKeyPress(code: word); virtual;
   public
-    property x: integer read bounds.x write bounds.x;
-    property y: integer read bounds.y write bounds.y;
+    property x: integer read bounds.pos.x write bounds.pos.x;
+    property y: integer read bounds.pos.y write bounds.pos.y;
     property width: integer read bounds.width write bounds.width;
     property height: integer read bounds.height write bounds.height;
     property font: tFont read fTextStyle.font write fTextStyle.font;

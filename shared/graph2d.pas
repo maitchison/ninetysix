@@ -35,7 +35,7 @@ type
   end;
 
   tRect = record
-    x,y: int32;
+    pos: tPoint;
     width, height: int32;
 
     procedure init(left, top, width, height: int32);
@@ -72,6 +72,7 @@ type
 
     procedure clear();
     procedure clipTo(const other: tRect);
+    function  clipPoint(p: tPoint): tPoint;
 
     property topLeft: tPoint read getTopLeft write moveTopLeft;
     property topRight: tPoint read getTopRight write moveTopRight;
@@ -82,6 +83,8 @@ type
     property right: int32 read getRight write moveRight;
     property top: int32 read getTop write moveTop;
     property bottom: int32 read getBottom write moveBottom;
+    property x: int32 read pos.x write pos.x;
+    property y: int32 read pos.y write pos.y;
 
     function toString(): string;
 
@@ -155,8 +158,8 @@ end;
 {adds padding units to each side}
 procedure tRect.pad(padding: int32);
 begin
-  x -= padding;
-  y -= padding;
+  pos.x -= padding;
+  pos.y -= padding;
   width += padding * 2;
   height += padding * 2;
 end;
@@ -166,6 +169,15 @@ function tRect.padded(padding: int32): tRect;
 begin
   result := self;
   result.pad(padding);
+end;
+
+function tRect.clipPoint(p: tPoint): tPoint;
+begin
+  if p.x < x then p.x := x;
+  if p.y < y then p.y := y;
+  if p.x > right-1 then p.x := right-1;
+  if p.y > bottom-1 then p.y := bottom-1;
+  result := p;
 end;
 
 {
