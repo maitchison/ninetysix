@@ -642,9 +642,12 @@ end;
 
 procedure tDrawContext.blendImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
 begin
-  blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+  case backend of
+    dbREF: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbASM: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbMMX: blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+  end;
 end;
-
 
 {-------------------------------------------------}
 

@@ -12,10 +12,11 @@ type
 
     class function Random(): RGBA; static;
     class function Lerp(a,b: RGBA; factor: single): RGBA; static;
+    class function Blend(a,b: RGBA; alpha: byte): RGBA; inline; static;
 
     class operator add(a,b: RGBA): RGBA;
-    class operator multiply(a: RGBA; b: single): RGBA;
-    class operator multiply(a,b: RGBA): RGBA;
+    class operator multiply(a: RGBA; b: single): RGBA; inline;
+    class operator multiply(a,b: RGBA): RGBA; inline;
     class operator equal(a,b: RGBA): boolean;
 
     function toString: shortString;
@@ -23,7 +24,7 @@ type
     procedure init(r,g,b: int32;a: int32=255);
     procedure gammaAdjust(v: single);
     procedure linearAdjust(v: single);
-    procedure blend(other: RGBA; factor: single);
+    procedure lerp(other: RGBA; factor: single);
     procedure toLinear();
     procedure toSRGB();
     procedure from16(value: uint16);
@@ -208,7 +209,7 @@ begin
 
 end;
 
-procedure RGBA.blend(other: RGBA; factor: single);
+procedure RGBA.lerp(other: RGBA; factor: single);
 begin
   other.gammaAdjust(factor);
   self.gammaAdjust(1-factor);
@@ -225,6 +226,18 @@ begin
     round(a.b * (1-factor)) + round(b.b * factor),
     round(a.a * (1-factor)) + round(b.a * factor)
   );
+end;
+
+{alpha 0->b, ahlpa 255->a}
+class function RGBA.Blend(a,b: RGBA; alpha: byte): RGBA; inline;
+var
+  invAlpha: byte;
+begin
+  invAlpha := 255-alpha;
+  result.r := (255 + word(a.r)*alpha + word(b.r)*invAlpha) shr 8;
+  result.g := (255 + word(a.g)*alpha + word(b.g)*invAlpha) shr 8;
+  result.b := (255 + word(a.b)*alpha + word(b.b)*invAlpha) shr 8;
+  result.a := (255 + word(a.a)*alpha + word(b.a)*invAlpha) shr 8;
 end;
 
 procedure RGBA.gammaAdjust(v: single);

@@ -15,9 +15,8 @@ var
   i: int32;
   f: single;
 begin
-  f := (col.a/255);
   for i := 0 to count-1 do begin
-    pixels^ := RGBA.Lerp(pixels^, col, f);
+    pixels^ := RGBA.Blend(pixels^, col, col.a);
     inc(pixels);
   end;
 end;
@@ -52,6 +51,33 @@ begin
     dstPtr := dstPage.getAddress(dstX, dstY+j);
     for i := 0 to width-1 do begin
       dstPtr^ := srcPtr^ * tint;
+      inc(srcPtr);
+      inc(dstPtr);
+    end;
+  end;
+end;
+
+procedure blendImage_REF(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+var
+  i,j: integer;
+  srcPtr: pRGBA;
+  dstPtr: pRGBA;
+  needsTint: boolean;
+  src: RGBA;
+begin
+  needsTint := int32(tint) <> -1;
+  for j := 0 to height-1 do begin
+    srcPtr := srcPage.getAddress(srcX, srcY+j);
+    dstPtr := dstPage.getAddress(dstX, dstY+j);
+    for i := 0 to width-1 do begin
+      src := srcPtr^;
+      if src.a <> 0 then begin
+        if needsTint then src := src * tint;
+        if src.a = 255 then
+          dstPtr^ := src
+        else
+          dstPtr^ := RGBA.Blend(src, dstPtr^, src.a);
+      end;
       inc(srcPtr);
       inc(dstPtr);
     end;

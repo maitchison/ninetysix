@@ -90,12 +90,18 @@ begin
   runFillTest(dc, 'fill_blend');
   }
 
+  {
   dc := screen.canvas.dc(bmBlit);
   runDrawTest(dc, 'draw_blit');
 
   dc := screen.canvas.dc(bmBlit);
   dc.tint := RGB(255,128,64);
   runDrawTest(dc, 'draw_tint');
+  }
+
+  dc := screen.canvas.dc(bmBlend);
+  dc.tint := RGB(255,128,64,128);
+  runDrawTest(dc, 'blend');
 
   videoDriver.setText();
   logTimers();
