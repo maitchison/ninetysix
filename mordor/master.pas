@@ -158,9 +158,9 @@ begin
     resLib := tResourceLibrary.CreateOrLoad('resources.ini');
 
   processFolder(GUI_ROOT, joinPath(DST_ROOT, 'gui'), ftPNG);
-  processFolder(GUI_ROOT, joinPath(DST_ROOT, 'gui'), ftWAVE);
   processFolder(joinPath(SRC_ROOT, 'gfx'), joinPath(DST_ROOT, 'res'), ftPNG);
   processFolder(joinPath(SRC_ROOT, 'music'), joinPath(DST_ROOT, 'music'), ftWAVE);
+  processFolder(GUI_ROOT, joinPath(DST_ROOT, 'sfx'), ftWAVE);
 
   resLib.free();
 end.

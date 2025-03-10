@@ -33,6 +33,8 @@ var
   scene: tGuiScene;
   gfx: tGFXLibrary;
   sfx: tSFXLibrary;
+  guiSkin: tGuiSkin;
+
 
 {-------------------------------------------------------}
 
@@ -90,17 +92,18 @@ begin
   gfx := tGFXLibrary.Create(true);
   gfx.loadFromFolder('res', '*.p96');
   sfx := tSFXLibrary.Create(true);
-  sfx.loadFromFolder('res', '*.a96');
+  sfx.loadFromFolder('sfx', '*.a96');
 
+  guiSkin := tGuiSkin.Create();
+  guiSkin.gfx.loadFromFolder('gui', '*.p96');
+  guiSkin.sfx.loadFromFolder('sfx', '*.a96');
+
+  DEFAULT_GUI_SKIN := guiSkin;
 
   initMouse();
   initKeyboard();
 
   musicPlay('res\prologue.a96');
-
-  {init sounds}
-  DEFAULT_MOUSEDOWN_SFX := sfx['clickdown'];
-  DEFAULT_MOUSECLICK_SFX := sfx['clickup'];
 
   scene := tGuiScene.create();
   scene.run();

@@ -26,6 +26,13 @@ const
 
 type
 
+  tGuiSkin = class
+    gfx: tGFXLibrary;
+    sfx: tSFXLibrary;
+    constructor Create();
+    destructor destroy; override;
+  end;
+
   tTextStyle = record
     font: tFont;
     col: RGBA;
@@ -37,13 +44,12 @@ type
   tGuiState = (gsNormal, gsDisabled, gsHover, gsPressed, gsSelected);
 
   tGuiComponent = class;
-  tGui = class;
 
   tHookProc = procedure(sender: tGuiComponent; msg: string; args: array of const);
 
   tGuiComponent = class
   protected
-    gui: tGui;
+    skin: tGuiSkin;
     bounds: tRect;
     visible: boolean;
     enabled: boolean;
@@ -57,6 +63,7 @@ type
     fHookProc: array of tHookProc;
     mouseOverThisFrame, mouseOverLastFrame: boolean;
   protected
+    procedure playSFX(sfxName: string);
     procedure doDraw(screen: tScreen); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
@@ -88,11 +95,6 @@ type
     procedure update(elapsed: single); virtual;
   end;
 
-  tGui = class(tGuiComponents)
-    procedure append(x: tGuiComponent); override;
-    procedure update(elapsed: single); override;
-  end;
-
   tGuiLabel = class(tGuiComponent)
   protected
     procedure setText(aText: string); override;
@@ -110,14 +112,24 @@ type
   end;
 
 const
-  DEFAULT_MOUSEDOWN_SFX: tSoundEffect = nil;
-  DEFAULT_MOUSECLICK_SFX: tSoundEffect = nil;
+  DEFAULT_GUI_SKIN: tGuiSkin = nil;
 
 implementation
 
-procedure playSFX(sfx: tSoundEffect);
+{--------------------------------------------------------}
+
+constructor tGuiSkin.Create();
 begin
-  if assigned(sfx) then mixer.play(sfx);
+  inherited Create();
+  gfx := tGFXLibrary.create(True);
+  sfx := tSFXLibrary.create(True);
+end;
+
+destructor tGuiSkin.destroy();
+begin
+  inherited destroy();
+  gfx.free();
+  sfx.free();
 end;
 
 {--------------------------------------------------------}
@@ -166,18 +178,14 @@ end;
 
 {--------------------------------------------------------}
 
-procedure tGui.append(x: tGuiComponent);
+procedure tGuiComponent.playSFX(sfxName: string);
+var
+  sfx: tSoundEffect;
 begin
-  inherited append(x);
-  x.gui := self;
+  if not assigned(skin) then exit;
+  sfx := skin.sfx[sfxName];
+  if assigned(sfx) then mixer.play(sfx);
 end;
-
-procedure tGui.update(elapsed: single);
-begin
-  inherited update(elapsed);
-end;
-
-{--------------------------------------------------------}
 
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
 var
@@ -214,13 +222,14 @@ end;
 
 constructor tGuiComponent.create();
 begin
-  inherited create();
-  self.visible := true;
-  self.enabled := true;
-  self.bounds.init(0,0,0,0);
+  inherited Create();
+  visible := true;
+  enabled := true;
+  bounds.init(0,0,0,0);
   text := '';
   textStyle.setDefault();
   col := RGB(128,128,128);
+  skin := DEFAULT_GUI_SKIN;
 end;
 
 procedure tGuiComponent.doUpdate(elapsed: single);
@@ -286,14 +295,14 @@ begin
   if mouseOverThisFrame then begin
     if input.mousePressed then begin
       fireMessage(ON_MOUSE_DOWN);
-      playSFX(DEFAULT_MOUSEDOWN_SFX);
+      playSFX('clickdown');
       pressed := true;
     end;
   end else
     pressed := false;
 
   if pressed and not input.mouseLB then begin
-    playSFX(DEFAULT_MOUSECLICK_SFX);
+    playSFX('clipup');
     fireMessage(ON_MOUSE_CLICK);
     pressed := false;
   end;
@@ -339,7 +348,7 @@ end;
 
 constructor tGuiButton.create(aPos: tPoint; aText: string='');
 begin
-  inherited create();
+  inherited Create();
   bounds.x := aPos.x;
   bounds.y := aPos.y;
   fTextStyle.centered := true;
