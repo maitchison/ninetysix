@@ -81,6 +81,8 @@ type
     property items[tag: Variant]: tSprite read getByVar; default;
   end;
 
+function Border(aLeft, aTop, aRight, aBottom: Integer): tBorder;
+
 implementation
 
 uses
@@ -91,6 +93,11 @@ uses
 
 {$i sprite_ref.inc}
 {$i sprite_asm.inc}
+
+function Border(aLeft, aTop, aRight, aBottom: Integer): tBorder;
+begin
+  result.init(aLeft, aTop, aRight, aBottom);
+end;
 
 {---------------------------------------------------------------------}
 

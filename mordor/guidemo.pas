@@ -24,7 +24,6 @@ uses
   uScene,
   uGui;
 
-
 type
   tGuiScene = class(tScene)
     procedure run(); override;
@@ -80,17 +79,26 @@ end;
 procedure initGui();
 var
   style: tGuiStyle;
+  state: tGuiStyleState;
+
+  function makeGuiState(tag: string; aBorder: tBorder): tGuiStyleState;
+  begin
+    state := tGuiStyleState.Create();
+    state.background := tSprite.Create(guiSkin.gfx[tag]);
+    state.background.border := aBorder;
+  end;
+
 begin
   guiSkin := tGuiSkin.Create();
   guiSkin.gfx.loadFromFolder('gui', '*.p96');
   guiSkin.sfx.loadFromFolder('sfx', '*.a96');
 
   style := tGuiStyle.Create();
-  style.normal := tSprite.Create(guiSkin.gfx['ec_button_normal']);
-  style.normal.border.init(6,6,6,6);
-  guiSkin.styles['normal'] := style;
+  guiSkin.styles['default'] := style;
 
-  DEFAULT_GUI_SKIN := guiSkin;
+  style := tGuiStyle.Create();
+  style.state['normal'] := makeGuiState('ec_button_normal', Border(8,8,6,11));
+  guiSkin.styles['button'] := style;
 
 end;
 

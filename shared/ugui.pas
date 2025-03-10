@@ -29,25 +29,36 @@ const
 
 type
 
+  tFontStyle = class
+    font: tFont;
+    col: RGBA;
+    shadow: boolean;
+    centered: boolean;
+    constructor Create();
+    destructor destroy; override;
+  end;
+
+  tGuiStyleState = class
+    background: tSprite;
+    textColor: RGBA;
+    constructor Create();
+    destructor destroy; override;
+  end;
+
   tGuiStyle = class
-    normal: tSprite;
+    fontStyle: tFontStyle;
+    state: tStringMap<tGuiStyleState>;
+    //sounds: tStringMap<tGuiSound>;
+    constructor Create();
+    destructor destroy; override;
   end;
 
   tGuiSkin = class
-    {these should be protected...}
     gfx: tGFXLibrary;
     sfx: tSFXLibrary;
     styles: tStringMap<tGuiStyle>;
     constructor Create();
     destructor destroy; override;
-  end;
-
-  tTextStyle = record
-    font: tFont;
-    col: RGBA;
-    shadow: boolean;
-    centered: boolean;
-    procedure setDefault();
   end;
 
   tGuiState = (gsNormal, gsDisabled, gsHover, gsPressed, gsSelected);
@@ -58,7 +69,7 @@ type
 
   tGuiComponent = class
   protected
-    skin: tGuiSkin;
+    style: tGuiStyle;
     bounds: tRect;
     visible: boolean;
     enabled: boolean;
@@ -66,7 +77,6 @@ type
     autoStyle: boolean; {if true will autostyle the component based on state}
     {standard label like draw}
     fText: string;
-    fTextStyle: tTextStyle;
     fCol: RGBA;
     fHookKey: tStrings;
     fHookProc: array of tHookProc;
@@ -78,6 +88,13 @@ type
     procedure setText(aText: string); virtual;
     procedure fireMessage(aMsg: string; args: array of const); overload;
     procedure fireMessage(aMsg: string); overload;
+    {style}
+    function  getStateStyle(aState: string): tGuiStyleState;
+    function  getCurrentStateStyle(): tGuiStyleState;
+    function  getBackground(): tSprite;
+    function  getTextColor(): RGBA;
+    function  getFontStyle(): tFontStyle;
+    function  getFont(): tFont;
   public
     constructor Create();
     procedure draw(screen: tScreen);
@@ -91,10 +108,12 @@ type
     property y: integer read bounds.pos.y write bounds.pos.y;
     property width: integer read bounds.width write bounds.width;
     property height: integer read bounds.height write bounds.height;
-    property font: tFont read fTextStyle.font write fTextStyle.font;
+    property font: tFont read getFont;
     property text: string read fText write setText;
-    property textStyle: tTextStyle read fTextStyle write fTextStyle;
+    property fontStyle: tFontStyle read getFontStyle;
     property col: RGBA read fCol write fCol;
+    property textColor: RGBA read getTextColor;
+    property background: tSprite read getBackground;
   end;
 
   tGuiComponents = class
@@ -145,12 +164,47 @@ end;
 
 {--------------------------------------------------------}
 
-procedure tTextStyle.setDefault();
+constructor tGuiStyle.Create();
 begin
+  inherited Create();
+  fontStyle := tFontStyle.Create();
+  state := tStringMap<tGuiStyleState>.Create();
+  state['default'] := tGuiStyleState.Create();
+end;
+
+destructor tGuiStyle.destroy();
+begin
+  state.free;
+  inherited destroy();
+end;
+
+{--------------------------------------------------------}
+
+constructor tGuiStyleState.Create();
+begin
+  inherited Create();
+  textColor := RGBA.White;
+end;
+
+destructor tGuiStyleState.destroy();
+begin
+  inherited destroy();
+end;
+
+{--------------------------------------------------------}
+
+constructor tFontStyle.Create();
+begin
+  inherited Create();
   col := RGB(255,255,255);
   font := DEFAULT_FONT;
   shadow := false;
   centered := false;
+end;
+
+destructor tFontStyle.destroy();
+begin
+  inherited destroy();
 end;
 
 {--------------------------------------------------------}
@@ -193,10 +247,53 @@ procedure tGuiComponent.playSFX(sfxName: string);
 var
   sfx: tSoundEffect;
 begin
+  {todo: add sounds back in}
+  {
   if not assigned(skin) then exit;
   if not skin.sfx.hasResource(sfxName) then exit;
   sfx := skin.sfx[sfxName];
   mixer.play(sfx);
+  }
+end;
+
+function tGuiComponent.getStateStyle(aState: string): tGuiStyleState;
+begin
+  if not style.state.contains(aState) then
+    result := style.state['default']
+  else
+    result := style.state[aState]
+end;
+
+function tGuiComponent.getCurrentStateStyle(): tGuiStyleState;
+begin
+  case state of
+    gsNormal: result := getStateStyle('normal');
+    gsDisabled: result := getStateStyle('disabled');
+    gsHover: result := getStateStyle('hover');
+    gsPressed: result := getStateStyle('pressed');
+    gsSelected: result := getStateStyle('selected');
+    else result := getStateStyle('default');
+  end;
+end;
+
+function tGuiComponent.getBackground(): tSprite;
+begin
+  result := getCurrentStateStyle().background;
+end;
+
+function tGuiComponent.getTextColor(): RGBA;
+begin
+  result := getCurrentStateStyle().textColor;
+end;
+
+function tGuiComponent.getFontStyle(): tFontStyle;
+begin
+  result := style.fontStyle;
+end;
+
+function tGuiComponent.getFont(): tFont;
+begin
+  result := getFontStyle.font;
 end;
 
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
@@ -239,9 +336,8 @@ begin
   enabled := true;
   bounds.init(0,0,0,0);
   text := '';
-  textStyle.setDefault();
   col := RGB(128,128,128);
-  skin := DEFAULT_GUI_SKIN;
+  style := DEFAULT_GUI_SKIN.styles['default'];
 end;
 
 procedure tGuiComponent.doUpdate(elapsed: single);
@@ -254,6 +350,7 @@ var
   drawX, drawY: integer;
   textRect: tRect;
   backCol, frameCol: RGBA;
+  style: tGuiStyle;
 begin
   backCol := col;
   frameCol := RGB(0,0,0,backCol.a div 2);
@@ -266,10 +363,11 @@ begin
     end;
   end;
 
+  {draw background}
   screen.canvas.dc.fillRect(bounds, backCol);
   screen.canvas.dc.drawRect(bounds, frameCol);
 
-  if textStyle.centered then begin
+  if fontStyle.centered then begin
     textRect := font.textExtents(text);
     drawX := x+((width - textRect.width) div 2);
     drawY := y+((height - textRect.height) div 2)-1;
@@ -283,9 +381,9 @@ begin
     inc(drawY);
   end;
 
-  if textStyle.shadow then
-    font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,textStyle.col.a*3 div 4));
-  font.textOut(screen.canvas, drawX, drawY, text, textStyle.col);
+  if fontStyle.shadow then
+    font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
+  font.textOut(screen.canvas, drawX, drawY, text, fontStyle.col);
 
   screen.markRegion(bounds);
 end;
@@ -337,12 +435,13 @@ end;
 
 constructor tGuiLabel.Create(aPos: tPoint; aText: string='');
 begin
-  inherited create();
+  inherited Create();
   bounds.x := aPos.x;
   bounds.y := aPos.y;
-  fTextStyle.centered := false;
-  fTextStyle.shadow := false;
-  fTextStyle.col := RGB(250, 250, 250);
+  {todo: remove}
+  fontStyle.centered := false;
+  fontStyle.shadow := false;
+  fontStyle.col := RGB(250, 250, 250);
   col := RGBA.Clear;
   text := aText;
   autoSize := true;
@@ -363,9 +462,11 @@ begin
   inherited Create();
   bounds.x := aPos.x;
   bounds.y := aPos.y;
+  {
   fTextStyle.centered := true;
   fTextStyle.shadow := true;
   fTextStyle.col := RGB(250, 250, 250);
+  }
   fText := aText;
   width := 100;
   height := 19;
@@ -374,9 +475,11 @@ end;
 
 procedure tGuiButton.doDraw(screen: tScreen);
 begin
-  {todo: use a proper nine-slice background with clicking graphics}
   inherited doDraw(screen);
 end;
 
 begin
+  {create a default, empty style}
+  DEFAULT_GUI_SKIN := tGuiSkin.Create();
+  DEFAULT_GUI_SKIN.styles['default'] := tGuiStyle.Create();
 end.
