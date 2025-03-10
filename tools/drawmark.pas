@@ -63,6 +63,25 @@ begin
   end;
 end;
 
+procedure runStretchTest(dc: tDrawContext; tag: string);
+var
+  i: integer;
+  backend: tDrawBackend;
+begin
+  for backend in [dbREF] do begin
+    dc.backend := backend;
+    for i := 0 to (ITERATIONS div 2)-1 do begin
+      timer.startTimer(tag+'_'+BACKEND_NAME[backend]);
+      dc.stretchSubImage(testPage, Rect(rnd, rnd, 256, 256), Rect(0,0,32,32));
+      timer.stopTimer(tag+'_'+BACKEND_NAME[backend]);
+      if (i mod 4 = 0) then begin
+        screen.markRegion(screen.bounds);
+        screen.flipAll();
+      end;
+    end;
+  end;
+end;
+
 begin
 
   {set video}
@@ -73,7 +92,7 @@ begin
     fatal('Requires 1MB video card.');
 
   videoDriver.setText();
-  //runTestSuites();
+  runTestSuites();
 
   videoDriver.setTrueColor(800, 600);
   screen := tScreen.create();
@@ -84,22 +103,18 @@ begin
 
   startTimer('flip'); stopTimer('flip');
 
-  {
   dc := screen.canvas.dc(bmBlit);
   runFillTest(dc, 'fill_blit');
 
   dc := screen.canvas.dc(bmBlend);
   runFillTest(dc, 'fill_blend');
-  }
 
-  {
   dc := screen.canvas.dc(bmBlit);
   runDrawTest(dc, 'draw_blit');
 
   dc := screen.canvas.dc(bmBlit);
   dc.tint := RGB(255,128,64);
   runDrawTest(dc, 'draw_tint');
-  }
 
   dc := screen.canvas.dc(bmBlend);
   dc.tint := RGB(255,128,64,128);
@@ -108,6 +123,15 @@ begin
   {this tests the fast path for a=255 pixels, as well as no tint}
   dc := screen.canvas.dc(bmBlend);
   runDrawTest(dc, 'blend_fast');
+
+  {this tests the fast path for a=255 pixels, as well as no tint}
+  dc := screen.canvas.dc(bmBlit);
+  dc.textureFilter := tfNearest;
+  runStretchTest(dc, 'stretch_nearest');
+
+  dc := screen.canvas.dc(bmBlit);
+  dc.textureFilter := tfLinear;
+  runStretchTest(dc, 'stretch_linear');
 
   videoDriver.setText();
   logTimers();

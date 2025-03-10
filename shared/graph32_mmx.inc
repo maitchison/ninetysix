@@ -399,3 +399,74 @@ begin
     sti
   end;
 end;
+
+{bilinear sampling with MMX
+ seems to not be much faster though?
+}
+(*
+  asm
+    cli
+
+    {MM0 <- 0}
+    pxor      MM0, MM0
+    {MM6 <- acc (set to bias)}
+    mov       eax, 255
+    movd      MM6, eax
+    punpcklwd MM6, MM6
+    punpckldq MM6, MM6
+  @Pixel1:
+    movd      MM1, C1
+    punpcklbw MM1, MM0
+    mov       eax, P1
+    add       eax, 255
+    shr       eax, 8
+    movd      MM5, eax
+    punpcklwd MM5, MM5
+    punpckldq MM5, MM5
+    pmullw    MM1, MM5
+    paddusw   MM6, MM1
+  @Pixel2:
+    movd      MM1, C2
+    punpcklbw MM1, MM0
+    mov       eax, P2
+    add       eax, 255
+    shr       eax, 8
+    movd      MM5, eax
+    punpcklwd MM5, MM5
+    punpckldq MM5, MM5
+    pmullw    MM1, MM5
+    paddusw   MM6, MM1
+  @Pixel3:
+    movd      MM1, C3
+    punpcklbw MM1, MM0
+    mov       eax, P3
+    add       eax, 255
+    shr       eax, 8
+    movd      MM5, eax
+    punpcklwd MM5, MM5
+    punpckldq MM5, MM5
+    pmullw    MM1, MM5
+    paddusw   MM6, MM1
+  @Pixel4:
+    movd      MM1, C4
+    punpcklbw MM1, MM0
+    mov       eax, P4
+    add       eax, 255
+    shr       eax, 8
+    movd      MM5, eax
+    punpcklwd MM5, MM5
+    punpckldq MM5, MM5
+    pmullw    MM1, MM5
+    paddusw   MM6, MM1
+
+    {write out value}
+    psrlw     MM6, 8
+    packuswb  MM6, MM6
+
+    movd      eax, MM6
+    mov       SLN, eax
+
+    emms
+    sti
+  end;
+  *)

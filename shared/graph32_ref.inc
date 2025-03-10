@@ -83,3 +83,35 @@ begin
     end;
   end;
 end;
+
+{draw image stretched}
+procedure stretchImage_REF(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcWidth, srcHeight: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
+var
+  i,j: integer;
+  dstPtr: pRGBA;
+  needsTint: boolean;
+  src: RGBA;
+  tx,ty: single;
+begin
+  needsTint := int32(tint) <> -1;
+  for j := 0 to dstRect.height-1 do begin
+    dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
+    ty := srcY + (j/dstRect.height) * srcHeight;
+    for i := 0 to dstRect.width-1 do begin
+      tx := srcX + (i/dstRect.width) * srcWidth;
+      case filter of
+        tfNearest: src := srcPage.getPixel(round(tx), round(ty));
+        tfLinear: src := srcPage.getPixelF(tx, ty);
+        else src.init(255,0,255);
+      end;
+      if src.a <> 0 then begin
+        if needsTint then src := src * tint;
+        if (src.a = 255) or (blendMode = bmBlit) then
+          dstPtr^ := src
+        else
+          dstPtr^ := RGBA.Blend(src, dstPtr^, src.a);
+      end;
+      inc(dstPtr);
+    end;
+  end;
+end;
