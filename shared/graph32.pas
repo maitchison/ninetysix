@@ -17,9 +17,6 @@ uses
   utils,
   graph2d;
 
-const
-  ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
-
 type
 
   tBlendMode = (
@@ -80,7 +77,8 @@ type
     function  getPixelF(fx,fy: single): RGBA;
     procedure putPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure setPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
-    procedure clear(c: RGBA);
+    procedure clear(c: RGBA); overload;
+    procedure clear(); overload;
 
     function  clone(): tPage;
     function  asBytes: tBytes;
@@ -96,19 +94,6 @@ type
     class function Load(filename: string): tPage;
   end;
 
-  {page stored as 8bit lumance}
-  tPage8 = class(tResource)
-    width, height: word;
-    pixels: pointer;
-    constructor Create(); overload;
-    destructor  destroy(); override;
-    constructor create(aWidth, aHeight: word); overload;
-    function    getAddress(x, y: integer): pointer; inline;
-    procedure   putValue(x, y: integer;v: byte);
-    function    getValue(x, y: integer): byte;
-    class function Load(filename: string): tPage8;
-  end;
-
   tImageLoaderProc = function(filename: string): tPage;
 
   tGFXLibrary = class(tResourceLibrary)
@@ -118,6 +103,10 @@ type
     function addResource(filename: string): tResource; override;
     property items[tag: string]: tPage read getGFXByTag; default;
   end;
+
+const
+  ERR_COL: RGBA = (b:255;g:0;r:255;a:255);
+  BACKEND_NAME: array[tDrawBackend] of string = ('ref','asm','mmx');
 
 procedure makePageRandom(page: tPage);
 
@@ -174,7 +163,7 @@ begin
   self.width := AWidth;
   self.height := AHeight;
   self.pixels := getMem(dword(aWidth) * aHeight * 4);
-  self.clear(RGBA.Create(0,0,0));
+  self.clear();
 end;
 
 constructor tPage.CreateAsReference(aWidth, aHeight: word;pixelData: Pointer);
@@ -274,6 +263,11 @@ end;
 procedure tPage.clear(c: RGBA);
 begin
   filldword(pixels^, width*height, c.to32);
+end;
+
+procedure tPage.clear();
+begin
+  clear(RGBA.Black);
 end;
 
 procedure tPage.putPixel(atX,atY: int16;c: RGBA); inline; assembler; register;
@@ -540,68 +534,6 @@ begin
 end;
 
 {-------------------------------------------------}
-
-constructor tPage8.create();
-begin
-  inherited create();
-  self.width := 0;
-  self.height := 0;
-  self.pixels := nil;
-end;
-
-destructor tPage8.destroy();
-begin
-  if assigned(self.pixels) then begin
-    freeMem(self.pixels);
-    self.pixels := nil;
-  end;
-  inherited destroy();
-end;
-
-constructor tPage8.create(aWidth, aHeight: word);
-begin
-  create();
-  self.width := aWidth;
-  self.height := aHeight;
-  self.pixels := getMem(aWidth * aHeight);
-  fillchar(self.pixels^, aWidth * aHeight, 0);
-end;
-
-procedure tPage8.putValue(x, y: integer;v: byte);
-begin
-  if dword(x) >= width then exit;
-  if dword(y) >= height then exit;
-  pByte(pixels + (x+y*width))^ := v;
-end;
-
-function tPage8.getValue(x, y: integer): byte;
-begin
-  if dword(x) >= width then exit(0);
-  if dword(y) >= height then exit(0);
-  result := pByte(pixels + (x+y*width))^;
-end;
-
-{returns address in memory of given pixel. If out of bounds, returns nil}
-function tPage8.getAddress(x, y: integer): pointer; inline;
-begin
-  if (dword(x) >= self.width) or (dword(y) >= self.height) then exit(nil);
-  result := pixels + (y * width + x);
-end;
-
-class function tPage8.Load(filename: string): tPage8;
-var
-  page: tPage;
-  x,y: integer;
-begin
-  page := tPage.load(filename);
-  result := tPage8.create(page.width, page.height);
-  for y := 0 to page.height-1 do
-    for x := 0 to page.width-1 do
-      result.putValue(x, y, page.getPixel(x,y).lumance);
-  page.free();
-end;
-
-{-------------------------------------------------}
 { dispatch}
 
 procedure tDrawContext.blitCol(pixels: pRGBA;len: int32;col: RGBA);
@@ -645,7 +577,12 @@ begin
   case backend of
     dbREF: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
     dbASM: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
-    dbMMX: blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbMMX: begin
+      if hasTint then
+        blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint)
+      else
+        blendImage_MMX_fast(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
+      end;
   end;
 end;
 
@@ -835,17 +772,79 @@ type
 
 procedure tGraph32Test.run();
 var
-  a,b: RGBA;
-  page8: tPage8;
+  page, img: tPage;
+  dc: tDrawContext;
+  backend: tDrawBackend;
+
+  {make sure page is pink (255,0,255,255) except for single pixel at location,
+   of given color}
+  procedure assertSinglePixel(dc: tDrawContext; x,y: integer; c: RGBA);
+  var
+    i,j: integer;
+    status: string;
+  begin
+    for j := 0 to page.height-1 do begin
+      for i := 0 to page.width-1 do begin
+        status := format('-> at [%d,%d] backend:%s', [i,j, BACKEND_NAME[dc.backend]]);
+        if (i=x) and (j=y) then
+          assertEqual(c, dc.page.getPixel(i,j), status)
+        else
+          assertEqual(RGB(255,0,255,255), dc.page.getPixel(i,j), status);
+      end;
+    end;
+  end;
+
 begin
-  {test RGBA}
-  a.init(0, 64, 128);
-  b.from16(a.to16);
-  assertEqual(a,b);
-  {test page 8}
-  {just make sure we can allocate and deallocate}
-  page8 := tPage8.create(16,16);
-  page8.destroy();
+  {test our core drawing routines}
+  page := tPage.create(4,4);
+  img := tPage.create(1,1);
+  img.clear(RGB(255,128,64,32));
+  for backend in [dbREF, dbASM, dbMMX] do begin
+
+    dc := page.dc(bmBlit);
+    dc.backend := backend;
+
+    {putPixel}
+    page.clear(RGB(255,0,255));
+    dc.putPixel(Point(1,1),RGB(1,2,3,4));
+    dc.putPixel(Point(-1,-1),RGB(1,2,3,4));
+    dc.putPixel(Point(5,5),RGB(1,2,3,4));
+    assertSinglePixel(dc, 1, 1, RGB(1,2,3,4));
+
+    {blit}
+    page.clear(RGB(255,0,255));
+    dc.drawImage(img, Point(1,1));
+    {clipping is currently broken}
+    //page.dc(bmBlit).drawImage(img, Point(-1,-1));
+    //page.dc(bmBlit).drawImage(img, Point(5,5));
+    assertSinglePixel(dc, 1, 1, RGB(255,128,64,32));
+
+    {tint}
+    page.clear(RGB(255,0,255));
+    dc.tint := RGB(128,255,255);
+    dc.drawImage(img, Point(1,1));
+    {clipping is currently broken}
+    //page.dc(bmBlit).drawImage(img, Point(-1,-1));
+    //page.dc(bmBlit).drawImage(img, Point(5,5));
+    assertSinglePixel(dc, 1, 1, RGB(128,128,64,32));
+
+    {blend}
+    page.clear(RGB(255,0,255));
+    dc.blendMode := bmBlend;
+    dc.tint := RGB(128,255,255);
+    dc.drawImage(img, Point(1,1));
+    {clipping is currently broken}
+    //page.dc(bmBlend).drawImage(img, Point(-1,-1));
+    //page.dc(bmBlend).drawImage(img, Point(5,5));
+    assertSinglePixel(dc, 1, 1,
+      RGB(
+        round(128*(32/255)+255*(223/255)),
+        round(128*(32/255)+0*(223/255)),
+        round(64*(32/255)+255*(223/255)),
+        round(32*(32/255)+255*(223/255))
+      )
+    );
+  end;
 end;
 
 {--------------------------------------------------------}

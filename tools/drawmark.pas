@@ -21,9 +21,6 @@ var
   dc: tDrawContext;
 
 const
-  BACKEND_NAME: array[tDrawBackend] of string = ('ref','asm','mmx');
-
-const
   ITERATIONS = 16;
 
 procedure runFillTest(dc: tDrawContext; tag: string);
@@ -67,12 +64,17 @@ begin
 end;
 
 begin
+
   {set video}
   enableVideoDriver(tVesaDriver.create());
   if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
     fatal('Requires VESA 2.0 or greater.');
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     fatal('Requires 1MB video card.');
+
+  videoDriver.setText();
+  //runTestSuites();
+
   videoDriver.setTrueColor(800, 600);
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
@@ -102,6 +104,10 @@ begin
   dc := screen.canvas.dc(bmBlend);
   dc.tint := RGB(255,128,64,128);
   runDrawTest(dc, 'blend');
+
+  {this tests the fast path for a=255 pixels, as well as no tint}
+  dc := screen.canvas.dc(bmBlend);
+  runDrawTest(dc, 'blend_fast');
 
   videoDriver.setText();
   logTimers();

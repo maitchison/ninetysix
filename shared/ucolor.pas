@@ -233,6 +233,8 @@ class function RGBA.Blend(a,b: RGBA; alpha: byte): RGBA; inline;
 var
   invAlpha: byte;
 begin
+  if alpha = 0 then exit(b);
+  if alpha = 255 then exit(a);
   invAlpha := 255-alpha;
   result.r := (255 + word(a.r)*alpha + word(b.r)*invAlpha) shr 8;
   result.g := (255 + word(a.g)*alpha + word(b.g)*invAlpha) shr 8;

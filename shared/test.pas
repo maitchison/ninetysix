@@ -16,7 +16,6 @@ type
     procedure run(); virtual;
   end;
 
-
 procedure assertError(msg: string); overload;
 
 {todo: move these to testSuite}

@@ -12,6 +12,8 @@ asm
   mov edi, PIXELS
   mov ecx, COUNT
   shr ecx, 2
+  test ecx, ecx
+  jz @FINAL
 
   mov   eax, COL
   movd  MM0, eax
@@ -24,6 +26,7 @@ asm
   dec ecx
   jnz @XLOOP
 
+@FINAL:
   mov ecx, COUNT
   and ecx, $3
   rep stosd
@@ -128,6 +131,8 @@ begin
   @YLOOP:
     mov ecx, WIDTH
     shr ecx, 2
+    test ecx, ecx
+    jz @FINAL
 
   @XLOOP:
     movq MM0, [esi]
@@ -139,6 +144,7 @@ begin
     dec ecx
     jnz @XLOOP
 
+  @FINAL:
     mov ecx, WIDTH
     and ecx, $3
     rep movsd
@@ -159,6 +165,7 @@ var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
+
   srcPtr := srcPage.getAddress(srcX, srcY);
   dstPtr := dstPage.getAddress(dstX, dstY);
   srcStride := (srcPage.width - width) * 4;
@@ -238,15 +245,12 @@ begin
   @YLOOP:
     mov       ecx, WIDTH
 
-    {todo: faster path for no tint}
-    {todo: alpha skip}
-    {todo: alpha blit}
-
   @XLOOP:
     {MM2 <- sARGB}
     movd      MM2, [esi]
     punpcklbw MM2, MM0    // convert to 16bit.
 
+    {tint}
     {MM2 <- sARGB * tint}
     pmullw    MM2, MM1    // modulate with tint
     paddw     MM2, MM3    // add bias
@@ -254,9 +258,11 @@ begin
 
     {eax <- sA * tint}
     {alpha test}
-    movd      eax, MM2
-    shr       eax, 24
-    test      al, al
+    movq      MM7, MM2
+    psrlq     MM7, 48
+    movd      eax, MM7
+
+    cmp       al, 0
     je @SKIP
     cmp       al, 255
     je @BLIT
@@ -267,23 +273,113 @@ begin
     movd      MM6, [edi]
     punpcklbw MM6, MM0    // convert to 16bit.
 
+    {expand alpha}
+    {maybe a lookup for this is better?}
     {MM4 <- 0a0a0a0a}
-    movd      MM4, ebx
+    movd      MM4, eax
     punpcklwd MM4, MM4
     punpckldq MM4, MM4
     {MM5 <- 0(1-a)0(1-a)0(1-a)0(1-a)}
-    movq      MM5, MM4      // 255
-    psubw     MM5, MM3      // 255-a
+    movq      MM5, MM3      // 255
+    psubw     MM5, MM4      // 255-a
 
+    {blend}
     {MM2 <- a * (sARGB * tint) * (1-a) * dARGB) + bias}
     pmullw    MM2, MM4
     pmullw    MM6, MM5
-    paddusw   MM2, MM6
-    paddusw   MM2, MM3
-    psllw     MM2, 8
+    paddw     MM2, MM6
+    paddw     MM2, MM3
+    psrlw     MM2, 8
 
   @BLIT:
 
+    {blit}
+    packuswb  MM2, MM2
+    movd      [edi], MM2
+
+  @SKIP:
+
+    add edi, 4
+    add esi, 4
+    dec ecx
+    jnz @XLOOP
+
+    add esi, SRCSTRIDE
+    add edi, DSTSTRIDE
+    dec ebx
+    jnz @YLOOP
+    popad
+    emms
+    sti
+  end;
+end;
+
+procedure blendImage_MMX_fast(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
+var
+  srcPtr, dstPtr: pointer;
+  srcStride, dstStride: dword;
+begin
+  srcPtr := srcPage.getAddress(srcX, srcY);
+  dstPtr := dstPage.getAddress(dstX, dstY);
+  srcStride := (srcPage.width - width) * 4;
+  dstStride := (dstPage.width - width) * 4;
+  asm
+    cli
+    pushad
+    mov esi, SRCPTR
+    mov edi, DSTPTR
+    mov ebx, HEIGHT
+
+    {MM0 <- 0}
+    pxor      MM0, MM0
+    {MM3 <- bias}
+    mov       eax, $00ff00ff
+    movd      MM3, eax
+    punpckldq MM3, MM3
+
+  @YLOOP:
+    mov       ecx, WIDTH
+
+  @XLOOP:
+    {MM2 <- sARGB}
+    mov       eax, [esi]
+    movd      MM2, eax
+    shr       eax, 24
+    punpcklbw MM2, MM0    // convert to 16bit.
+
+    {alpha test}
+    cmp       al, 0
+    je @SKIP
+    cmp       al, 255
+    je @BLIT
+
+  @BLEND:
+
+    {MM6 <- dARGB}
+    movd      MM6, [edi]
+    punpcklbw MM6, MM0    // convert to 16bit.
+
+    {expand alpha}
+    {maybe a lookup for this is better?}
+    {MM4 <- 0a0a0a0a}
+    movd      MM4, eax
+    punpcklwd MM4, MM4
+    punpckldq MM4, MM4
+    {MM5 <- 0(1-a)0(1-a)0(1-a)0(1-a)}
+    movq      MM5, MM3      // 255
+    psubw     MM5, MM4      // 255-a
+
+    {blend}
+    {MM2 <- a * (sARGB * tint) * (1-a) * dARGB) + bias}
+    pmullw    MM2, MM4
+    pmullw    MM6, MM5
+    paddw     MM2, MM6
+    paddw     MM2, MM3
+    psrlw     MM2, 8
+
+  @BLIT:
+
+    {blit}
     packuswb  MM2, MM2
     movd      [edi], MM2
 

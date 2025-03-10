@@ -617,5 +617,6 @@ begin
 end;
 
 initialization
-  tSpriteTest.create('Sprite');
+  //stub: turn these off.. we'll enable them once we've finished redoing the drawing code
+  //tSpriteTest.create('Sprite');
 end.
