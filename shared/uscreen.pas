@@ -13,7 +13,7 @@ uses
   graph32,
   sprite,
   vga,
-  timer,
+  uTimer,
   s3;
 
 const

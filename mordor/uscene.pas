@@ -7,13 +7,15 @@ uses
   test,
   utils,
   uGui,
-  uScreen;
+  uScreen,
+  graph2d;
 
 type
   tScene = class
   public
     gui: tGui;
     screen: tScreen;
+    fpsLabel: tGuiLabel;
     constructor Create();
     destructor destroy(); override;
     procedure run(); virtual;
@@ -26,6 +28,10 @@ begin
   inherited Create();
   gui := tGui.create();
   screen := tScreen.create();
+
+  {default gui}
+  fpsLabel := tGuiLabel.Create(Point(10,10));
+  gui.append(fpsLabel);
 end;
 
 destructor tScene.destroy();

@@ -10,7 +10,7 @@ uses
   debug,
   utils,
   sound,
-  timer,
+  uTimer,
   sysInfo,
   la96,
   go32;

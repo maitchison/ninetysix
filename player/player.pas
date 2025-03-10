@@ -8,7 +8,7 @@ uses
   mixLib,
   la96,
   keyboard,
-  timer,
+  uTimer,
   stream,
   {graphics stuff}
   screen,

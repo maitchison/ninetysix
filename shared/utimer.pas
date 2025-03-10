@@ -1,5 +1,5 @@
 {handles timers}
-unit timer;
+unit uTimer;
 
 interface
 

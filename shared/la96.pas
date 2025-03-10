@@ -82,7 +82,7 @@ uses
   dos,
   go32,
   sysInfo,
-  timer,
+  uTimer,
   stats,
   list,
   sound,

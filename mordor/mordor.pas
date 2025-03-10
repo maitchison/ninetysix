@@ -8,7 +8,7 @@ uses
   mixlib,
   vesa,
   keyboard,
-  timer,
+  uTimer,
   vga,
   crt,
   uInput,
