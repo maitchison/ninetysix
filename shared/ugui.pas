@@ -10,6 +10,7 @@ uses
   utils,
   uMouse,
   uInput,
+  uMap,
   sound,
   mixLib,
   sysTypes,
@@ -17,6 +18,8 @@ uses
   graph2d,
   graph32,
   keyboard,
+  uStringMap,
+  sprite,
   uScreen;
 
 const
@@ -26,9 +29,15 @@ const
 
 type
 
+  tGuiStyle = class
+    normal: tSprite;
+  end;
+
   tGuiSkin = class
+    {these should be protected...}
     gfx: tGFXLibrary;
     sfx: tSFXLibrary;
+    styles: tStringMap<tGuiStyle>;
     constructor Create();
     destructor destroy; override;
   end;
@@ -121,13 +130,15 @@ implementation
 constructor tGuiSkin.Create();
 begin
   inherited Create();
-  gfx := tGFXLibrary.create(True);
-  sfx := tSFXLibrary.create(True);
+  styles := tStringMap<tGuiStyle>.Create();
+  gfx := tGFXLibrary.Create(True);
+  sfx := tSFXLibrary.Create(True);
 end;
 
 destructor tGuiSkin.destroy();
 begin
   inherited destroy();
+  styles.free();
   gfx.free();
   sfx.free();
 end;

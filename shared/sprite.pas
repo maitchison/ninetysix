@@ -21,10 +21,10 @@ type
 
   tBorder = record
     top, left, bottom, right: Integer;
-    constructor init(aLeft, aTop, aRight, aBottom: Integer);
+    procedure init(aLeft, aTop, aRight, aBottom: Integer);
     procedure setDefault();
     function  isDefault: boolean;
-    function toString(): string;
+    function  toString(): string;
     procedure writeToIni(ini: tIniWriter; tag: string='Border');
     procedure readFromIni(ini: tIniReader; tag: string='Border');
   end;
@@ -94,7 +94,7 @@ uses
 
 {---------------------------------------------------------------------}
 
-constructor tBorder.init(aLeft, aTop, aRight, aBottom: Integer);
+procedure tBorder.init(aLeft, aTop, aRight, aBottom: Integer);
 begin
   self.left := aLeft;
   self.top := aTop;

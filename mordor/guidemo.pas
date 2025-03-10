@@ -16,6 +16,7 @@ uses
   vga,
   vesa,
   sound,
+  sprite,
   uMouse,
   uScreen,
   uInput,
@@ -34,7 +35,6 @@ var
   gfx: tGFXLibrary;
   sfx: tSFXLibrary;
   guiSkin: tGuiSkin;
-
 
 {-------------------------------------------------------}
 
@@ -76,6 +76,24 @@ end;
 
 {-------------------------------------------------------}
 
+{todo: make this an ini file}
+procedure initGui();
+var
+  style: tGuiStyle;
+begin
+  guiSkin := tGuiSkin.Create();
+  guiSkin.gfx.loadFromFolder('gui', '*.p96');
+  guiSkin.sfx.loadFromFolder('sfx', '*.a96');
+
+  style := tGuiStyle.Create();
+  style.normal := tSprite.Create(guiSkin.gfx['ec_button_normal']);
+  style.normal.border.init(6,6,6,6);
+  guiSkin.styles['normal'] := style;
+
+  DEFAULT_GUI_SKIN := guiSkin;
+
+end;
+
 begin
 
   autoHeapSize();
@@ -99,11 +117,7 @@ begin
   sfx := tSFXLibrary.Create(true);
   sfx.loadFromFolder('sfx', '*.a96');
 
-  guiSkin := tGuiSkin.Create();
-  guiSkin.gfx.loadFromFolder('gui', '*.p96');
-  guiSkin.sfx.loadFromFolder('sfx', '*.a96');
-
-  DEFAULT_GUI_SKIN := guiSkin;
+  initGui();
 
   initMouse();
   initKeyboard();
