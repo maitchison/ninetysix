@@ -23,6 +23,7 @@ implementation
 uses
   utils,
   debug,
+  uColor,
   FPImage,
   FPReadPNG;
 

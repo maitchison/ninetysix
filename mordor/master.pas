@@ -16,6 +16,8 @@ uses
   stream,
   la96,
   lc96,
+  sysUtils
+  ,
   sysPNG,
   iniFile,
   uResLib,
@@ -28,8 +30,13 @@ var
 
 const
   {TODO: from CWD}
-  SRC_ROOT = 'c:\masters\romdor';
-  DST_ROOT = 'c:\dev\mordor\res';
+  GUI_ROOT = 'c:\masters\gui';
+  SRC_ROOT = 'c:\masters\mordor';
+  DST_ROOT = 'c:\dev\mordor\';
+
+type
+  tConvertProc = procedure(srcPath, dstPath: string);
+  tFileType = (ftPNG, ftWAVE);
 
 procedure updateEncodeProgress(frameOn: int32; samplePtr: pAudioSample16S; frameLength: int32);
 begin
@@ -65,13 +72,10 @@ begin
   resLib.serialize('resources.ini');
 end;
 
-procedure convertPNG(filename: string);
+procedure convertPNG(srcPath, dstPath: string);
 var
-  srcPath, dstPath: string;
   img: tPage;
 begin
-  srcPath := joinPath(SRC_ROOT, filename+'.png');
-  dstPath := joinPath(DST_ROOT, filename+'.p96');
 
   if not preProcess(srcPath, dstPath) then exit;
 
@@ -85,14 +89,11 @@ begin
   postProcess(srcPath, dstPath);
 end;
 
-procedure convertWave(filename: string);
+procedure convertWave(srcPath, dstPath: string);
 var
-  srcPath, dstPath: string;
   writer: tLA96Writer;
   sfx: tSoundEffect;
 begin
-  srcPath := joinPath(SRC_ROOT, filename+'.wav');
-  dstPath := joinPath(DST_ROOT, filename+'.a96');
 
   if not preProcess(srcPath, dstPath) then exit;
 
@@ -111,28 +112,42 @@ begin
   postProcess(srcPath, dstPath);
 end;
 
-procedure masterGFX();
+procedure processFolder(srcPath, dstPath: string; fileType: tFileType);
 var
-  filename,tag: string;
+  filename, tag: string;
+  srcExtension, dstExtension: string;
+  convert: tConvertProc;
 begin
-  writeln('Processing GFX');
-  for filename in fs.listFiles(joinPath(SRC_ROOT, '\*.png')) do begin
-    tag := removeExtension(extractFilename(filename));
-    convertPNG(tag);
-  end;
-end;
 
-{create compressed copies of master music tracks}
-procedure masterSFX();
-var
-  filename: string;
-  tag: string;
-  root: string;
-begin
-  writeln('Processing SFX');
-  for filename in fs.listFiles(joinPath(SRC_ROOT, '\*.wav')) do begin
+  case fileType of
+    ftPNG: begin
+      srcExtension := 'png';
+      dstExtension := 'p96';
+      convert := convertPNG;
+    end;
+    ftWAVE: begin
+      srcExtension := 'wav';
+      dstExtension := 'a96';
+      convert := convertWave;
+    end;
+    else raise ValueError('Invalid filetype');
+  end;
+
+  writeln(format('Processing %s -> %s [%s]', [srcPath, dstPath, srcExtension]));
+
+  for filename in fs.listFiles(joinPath(srcPath, '\*.'+srcExtension)) do begin
     tag := removeExtension(extractFilename(filename));
-    convertWave(tag);
+    try
+      convert(joinPath(srcPath, filename), joinPath(dstPath, tag+'.'+dstExtension));
+    except
+      on e: sysUtils.Exception do begin
+        textAttr := Red;
+        writeln('[Error]');
+        textAttr := White;
+        warning(format('Error processing %s: %s', [tag, e.message]));
+      end;
+    end;
+
   end;
 end;
 
@@ -142,8 +157,10 @@ begin
   else
     resLib := tResourceLibrary.CreateOrLoad('resources.ini');
 
-  masterGFX();
-  masterSFX();
+  processFolder(GUI_ROOT, joinPath(DST_ROOT, 'gui'), ftPNG);
+  processFolder(GUI_ROOT, joinPath(DST_ROOT, 'gui'), ftWAVE);
+  processFolder(joinPath(SRC_ROOT, 'gfx'), joinPath(DST_ROOT, 'res'), ftPNG);
+  processFolder(joinPath(SRC_ROOT, 'music'), joinPath(DST_ROOT, 'music'), ftWAVE);
 
   resLib.free();
 end.
