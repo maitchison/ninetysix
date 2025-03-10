@@ -42,9 +42,14 @@ procedure tGuiScene.run();
 var
   timer: tTimer;
   elapsed: single;
+  button: tGuiButton;
 begin
 
   timer := tTimer.create('main');
+
+  button := tGuiButton.Create(Point(10, 10));
+  button.text :='Test Button';
+  gui.append(button);
 
   repeat
 
@@ -103,7 +108,7 @@ begin
   initMouse();
   initKeyboard();
 
-  musicPlay('res\prologue.a96');
+  //musicPlay('res\prologue.a96');
 
   scene := tGuiScene.create();
   scene.run();

@@ -22,7 +22,9 @@ type
     lazy: boolean;
     resources: array of tResource;
     function getByTag(aTag: string): tResource;
+    function findByTag(aTag: string): integer;
   public
+    function hasResource(aTag: string): boolean;
     function addResource(filename: string): tResource; virtual;
     procedure loadFromFolder(root: string; pattern: string; filter: tResourceLoaderFilter = nil);
     constructor Create(aLazy: boolean=false);
@@ -109,23 +111,31 @@ end;
 
 function tResourceLibrary.getByTag(aTag: string): tResource;
 var
-  i, id: integer;
+  id: integer;
+  srcPath: string;
 begin
-  id := -1;
-  for i := 0 to length(resources)-1 do begin
-    if resources[i].tag = aTag then begin
-      id := i;
-      break;
-    end;
-  end;
-
+  id := findByTag(aTag);
   if id < 0 then raise ValueError('No resource named "%s"', [aTag]);
   if (resources[id] is tLazyResource) then begin
-    result := loadResource(tLazyResource(resources[id]).path);
+    srcPath := tLazyResource(resources[id]).path;
     resources[id].free;
-    resources[id] := result;
-  end else
-    result := resources[id];
+    resources[id] := loadResource(srcPath);
+  end;
+  result := resources[id];
+end;
+
+function tResourceLibrary.findByTag(aTag: string): integer;
+var
+  i: integer;
+begin
+  result := -1;
+  for i := 0 to length(resources)-1 do
+    if resources[i].tag = aTag then exit(i);
+end;
+
+function tResourceLibrary.hasResource(aTag: string): boolean;
+begin
+  result := findByTag(aTag) >= 0;
 end;
 
 {--------------------------------------------------------}

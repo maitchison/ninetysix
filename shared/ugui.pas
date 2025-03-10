@@ -183,8 +183,9 @@ var
   sfx: tSoundEffect;
 begin
   if not assigned(skin) then exit;
+  if not skin.sfx.hasResource(sfxName) then exit;
   sfx := skin.sfx[sfxName];
-  if assigned(sfx) then mixer.play(sfx);
+  mixer.play(sfx);
 end;
 
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
@@ -302,7 +303,7 @@ begin
     pressed := false;
 
   if pressed and not input.mouseLB then begin
-    playSFX('clipup');
+    playSFX('clickup');
     fireMessage(ON_MOUSE_CLICK);
     pressed := false;
   end;
