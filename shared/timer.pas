@@ -134,9 +134,9 @@ end;
 function tTimer.toString(): string;
 begin
   if avElapsed < 0.1 then
-    result := format('%s %fms (%fms) [total:%.2fs]', [pad(tag, 20), 1000*avElapsed, 1000*maxElapsed, 1.0*totalElapsed])
+    result := format('%s %.2fms (%fms) [total:%.2fs]', [pad(tag, 20), 1000*avElapsed, 1000*maxElapsed, 1.0*totalElapsed])
   else
-    result := format('%s %fs (%fs) [total:%.2fs]', [pad(tag, 20), avElapsed, maxElapsed, totalElapsed]);
+    result := format('%s %.3fs (%fs) [total:%.2fs]', [pad(tag, 20), avElapsed, maxElapsed, totalElapsed]);
 end;
 
 var timer: tTimer;

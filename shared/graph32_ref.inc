@@ -4,10 +4,15 @@
  at this point we assume all clipping and transform is done
 }
 
+procedure blitCol_REF(pixels: pRGBA;count: int32;col: RGBA);
+begin
+  filldword(pixels^, count, dword(col));
+end;
+
 {very slow blending}
 procedure blendCol_REF(pixels: pRGBA;count: int32;col: RGBA);
 var
-  i: integer;
+  i: int32;
   f: single;
 begin
   f := (col.a/255);
@@ -34,4 +39,3 @@ begin
     inc(dstPtr, dstPage.width);
   end;
 end;
-

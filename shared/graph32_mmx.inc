@@ -1,3 +1,39 @@
+procedure blitCol_MMX(pixels: pRGBA;count: int32;col: RGBA);
+asm
+
+  cli
+
+  push edi
+  push ecx
+  push eax
+
+  mov edi, PIXELS
+  mov ecx, COUNT
+  shr ecx, 2
+
+  mov   eax, COL
+  movd  MM0, eax
+  punpckldq MM0, MM0
+
+@XLOOP:
+  movq [edi], MM0
+  movq [edi+8], MM0
+  add edi, 16
+  dec ecx
+  jnz @XLOOP
+
+  mov ecx, COUNT
+  and ecx, $3
+  rep stosd
+
+  pop eax
+  pop ecx
+  pop edi
+
+  emms
+  sti
+end;
+
 procedure blendCol_MMX(pixels: pointer;count: int32;col: RGBA);
 asm
   // if mixer interrupt runs during the timer then we'll have
@@ -72,8 +108,32 @@ asm
 end;
 
 {this is just a movq version... might not be that much faster that movsd}
-procedure blitImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32);
+procedure blitImage_MMX(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
+var
+  srcPtr, dstPtr: pointer;
+  srcStride, dstStride: dword;
 begin
+  srcPtr := srcPage.getAddress(srcX, srcY);
+  dstPtr := dstPage.getAddress(dstX, dstY);
+  srcStride := (srcPage.width - width) * 4;
+  dstStride := (dstPage.width - width) * 4;
+  asm
+    pushad
+    mov esi, SRCPTR
+    mov edi, DSTPTR
+    mov ebx, HEIGHT
+  @YLOOP:
+    mov ecx, WIDTH
+  @XLOOP:
+    dec ecx
+
+    rep movsd
+    add esi, SRCSTRIDE
+    add edi, DSTSTRIDE
+    dec ebx
+    jnz @YLOOP
+    popad
+  end;
 end;
 
 procedure tintImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);

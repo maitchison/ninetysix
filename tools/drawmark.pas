@@ -20,21 +20,51 @@ var
   i: integer;
   dc: tDrawContext;
 
-procedure runTest(dc: tDrawContext; tag: string);
+const
+  BACKEND_NAME: array[tDrawBackend] of string = ('ref','asm','mmx');
+
+const
+  ITERATIONS = 16;
+
+procedure runFillTest(dc: tDrawContext; tag: string);
 var
   i: integer;
+  col: RGBA;
+  backend: tDrawBackend;
 begin
-  for i := 0 to 64-1 do begin
-    timer.startTimer(tag);
-    dc.drawImage(testPage, Point(rnd, rnd));
-    timer.stopTimer(tag);
-    if (i mod 4 = 0) then begin
-      screen.markRegion(screen.bounds);
-      screen.flipAll();
+  for backend in [dbREF, dbASM, dbMMX] do begin
+    dc.backend := backend;
+    for i := 0 to ITERATIONS-1 do begin
+      col.init(rnd, rnd, rnd, rnd);
+      timer.startTimer(tag+'_'+BACKEND_NAME[backend]);
+      dc.fillRect(Rect(rnd, rnd, 256, 256), col);
+      timer.stopTimer(tag+'_'+BACKEND_NAME[backend]);
+      if (i mod 4 = 0) then begin
+        screen.markRegion(screen.bounds);
+        screen.flipAll();
+      end;
     end;
   end;
 end;
 
+procedure runDrawTest(dc: tDrawContext; tag: string);
+var
+  i: integer;
+  backend: tDrawBackend;
+begin
+  for backend in [dbREF, dbASM, dbMMX] do begin
+    dc.backend := backend;
+    for i := 0 to ITERATIONS-1 do begin
+      timer.startTimer(tag+'_'+BACKEND_NAME[backend]);
+      dc.drawImage(testPage, Point(rnd, rnd));
+      timer.stopTimer(tag+'_'+BACKEND_NAME[backend]);
+      if (i mod 4 = 0) then begin
+        screen.markRegion(screen.bounds);
+        screen.flipAll();
+      end;
+    end;
+  end;
+end;
 
 begin
   {set video}
@@ -50,14 +80,23 @@ begin
   testPage := tPage.Create(256, 256);
   makePageRandom(testPage);
 
-  dc := screen.canvas.dc(bmBlit);
-  runTest(dc, 'blit');
+  startTimer('flip'); stopTimer('flip');
 
   dc := screen.canvas.dc(bmBlit);
-  dc.tint := RGB(255, 128, 64);
-  runTest(dc, 'tint');
-
+  runFillTest(dc, 'fill_blit');
   readkey;
+
+
+  dc := screen.canvas.dc(bmBlend);
+  runFillTest(dc, 'fill_blend');
+  readkey;
+
+    {
+    dc := screen.canvas.dc(bmBlit);
+    dc.backend := backend;
+    runDrawTest(dc, 'draw_blit_'+BACKEND_NAME[backend]);
+    }
+
 
   videoDriver.setText();
   logTimers();

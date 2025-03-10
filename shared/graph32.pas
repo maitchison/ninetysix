@@ -27,7 +27,7 @@ type
     bmBlit,   // src
     bmBlend   // alpha*src + (1-alpha)*dst
   );
-  tFeatureLevel = (flREF, flASM, flMMX);
+  tDrawBackend = (dbREF, dbASM, dbMMX);
 
   tPage = class;
 
@@ -37,11 +37,19 @@ type
     clip: tRect;
     blendMode: tBlendMode;
     tint: RGBA;  {used to modulate src color before write}
+    backend: tDrawBackend;
     procedure applyTransform(var p: tPoint); inline;
     procedure applyTransformInv(var p: tPoint); inline;
     procedure applyTint(var col: RGBA); inline;
     function  smartBM(col: RGBA): tBlendMode;
     function  hasTint: boolean; inline;
+
+    {dispatch}
+    procedure blitCol(pixels: pRGBA;len: int32;col: RGBA);
+    procedure blendCol(pixels: pRGBA;len: int32;col: RGBA);
+    procedure blitImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32);
+    procedure tintImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+    procedure blendImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
 
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
@@ -198,6 +206,10 @@ begin
   result.clip := bounds;
   result.offset := Point(0,0);
   result.tint := RGB(255,255,255,255);
+  if cpuInfo.hasMMX then
+    result.backend := dbMMX
+  else
+    result.backend := dbASM;
 end;
 
 {returns address in memory of given pixel. If out of bounds, returns nil}
@@ -590,6 +602,47 @@ begin
 end;
 
 {-------------------------------------------------}
+{ dispatch}
+
+procedure tDrawContext.blitCol(pixels: pRGBA;len: int32;col: RGBA);
+begin
+  case backend of
+    dbREF: blitCol_REF(pixels, len, col);
+    dbASM: blitCol_ASM(pixels, len, col);
+    dbMMX: blitCol_MMX(pixels, len, col);
+  end;
+end;
+
+procedure tDrawContext.blendCol(pixels: pRGBA;len: int32;col: RGBA);
+begin
+  case backend of
+    dbREF: blendCol_REF(pixels, len, col);
+    dbASM: blendCol_REF(pixels, len, col); // no ASM version yet
+    dbMMX: blendCol_MMX(pixels, len, col);
+  end;
+end;
+
+procedure tDrawContext.blitImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32);
+begin
+  case backend of
+    dbREF: blitImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
+    dbASM: blitImage_ASM(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
+    dbMMX: blitImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
+  end;
+end;
+
+procedure tDrawContext.tintImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+begin
+  tintImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+end;
+
+procedure tDrawContext.blendImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+begin
+  blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+end;
+
+
+{-------------------------------------------------}
 
 procedure tDrawContext.applyTransform(var p: tPoint); inline;
 begin
@@ -630,7 +683,6 @@ begin
   applyTint(col);
 
   case smartBM(col) of
-    bmNone: ;
     bmBlit: page.setPixel(pos.x, pos.y, col);
     bmBlend: page.putPixel(pos.x, pos.y, col);
   end;
@@ -653,9 +705,8 @@ begin
   pixels := page.getAddress(pos.x, pos.y);
 
   case smartBM(col) of
-    bmNone: ;
-    bmBlit: filldword(pixels^, len, dword(col));
-    bmBlend: blendCol_MMX(pixels, len, col);
+    bmBlit: blitCol(pixels, len, col);
+    bmBlend: blendCol(pixels, len, col);
   end;
 end;
 
@@ -699,12 +750,12 @@ begin
     bmNone: ;
     bmBlit: begin
       if hasTint then
-        tintImage_MMX(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint)
+        tintImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint)
       else
-        blitImage_REF(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height);
+        blitImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height);
       end;
     bmBlend:
-      blendImage_MMX(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint);
+      blendImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint);
   end;
 end;
 
