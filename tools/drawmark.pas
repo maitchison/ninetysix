@@ -82,21 +82,20 @@ begin
 
   startTimer('flip'); stopTimer('flip');
 
+  {
   dc := screen.canvas.dc(bmBlit);
   runFillTest(dc, 'fill_blit');
-  readkey;
-
 
   dc := screen.canvas.dc(bmBlend);
   runFillTest(dc, 'fill_blend');
-  readkey;
+  }
 
-    {
-    dc := screen.canvas.dc(bmBlit);
-    dc.backend := backend;
-    runDrawTest(dc, 'draw_blit_'+BACKEND_NAME[backend]);
-    }
+  dc := screen.canvas.dc(bmBlit);
+  runDrawTest(dc, 'draw_blit');
 
+  dc := screen.canvas.dc(bmBlit);
+  dc.tint := RGB(255,128,64);
+  runDrawTest(dc, 'draw_tint');
 
   videoDriver.setText();
   logTimers();

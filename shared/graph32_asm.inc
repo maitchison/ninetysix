@@ -40,5 +40,4 @@ begin
     jnz @YLOOP
     popad
   end;
-
 end;

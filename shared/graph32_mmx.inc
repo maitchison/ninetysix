@@ -1,6 +1,8 @@
 procedure blitCol_MMX(pixels: pRGBA;count: int32;col: RGBA);
 asm
 
+  {this is almost 2x faster on real hardware}
+
   cli
 
   push edi
@@ -118,29 +120,95 @@ begin
   srcStride := (srcPage.width - width) * 4;
   dstStride := (dstPage.width - width) * 4;
   asm
+    cli
     pushad
     mov esi, SRCPTR
     mov edi, DSTPTR
     mov ebx, HEIGHT
   @YLOOP:
     mov ecx, WIDTH
-  @XLOOP:
-    dec ecx
+    shr ecx, 2
 
+  @XLOOP:
+    movq MM0, [esi]
+    movq MM1, [esi+8]
+    movq [edi], MM0
+    movq [edi+8], MM1
+    add edi, 16
+    add esi, 16
+    dec ecx
+    jnz @XLOOP
+
+    mov ecx, WIDTH
+    and ecx, $3
     rep movsd
+
     add esi, SRCSTRIDE
     add edi, DSTSTRIDE
     dec ebx
     jnz @YLOOP
     popad
+    emms
+    sti
   end;
 end;
 
-procedure tintImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+{modulate color, but no blending}
+procedure tintImage_MMX(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+var
+  srcPtr, dstPtr: pointer;
+  srcStride, dstStride: dword;
 begin
+  srcPtr := srcPage.getAddress(srcX, srcY);
+  dstPtr := dstPage.getAddress(dstX, dstY);
+  srcStride := (srcPage.width - width) * 4;
+  dstStride := (dstPage.width - width) * 4;
+  asm
+    cli
+    pushad
+    mov esi, SRCPTR
+    mov edi, DSTPTR
+    mov ebx, HEIGHT
+
+    {MM0 <- 0}
+    pxor      MM0, MM0
+    {MM1 <- tintColor as int16}
+    movd      MM1, TINT
+    punpcklbw MM1, MM0
+    {MM3 <- bias}
+    mov       eax, $00ff00ff
+    movd      MM3, eax
+    punpckldq MM3, MM3
+
+  @YLOOP:
+    mov       ecx, WIDTH
+
+  @XLOOP:
+    movd      MM2, [esi]
+    punpcklbw MM2, MM0    // convert to 16bit.
+
+    pmullw    MM2, MM1    // modulate
+    paddw     MM2, MM3    // add bias
+    psrlw     MM2, 8      // divide
+    packuswb  MM2, MM2
+    movd      [edi], MM2
+
+    add edi, 4
+    add esi, 4
+    dec ecx
+    jnz @XLOOP
+
+    add esi, SRCSTRIDE
+    add edi, DSTSTRIDE
+    dec ebx
+    jnz @YLOOP
+    popad
+    emms
+    sti
+  end;
 end;
+
 
 procedure blendImage_MMX(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
 begin
 end;
-

@@ -39,3 +39,21 @@ begin
     inc(dstPtr, dstPage.width);
   end;
 end;
+
+procedure tintImage_REF(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+var
+  i,j: integer;
+  srcPtr: pRGBA;
+  dstPtr: pRGBA;
+
+begin
+  for j := 0 to height-1 do begin
+    srcPtr := srcPage.getAddress(srcX, srcY+j);
+    dstPtr := dstPage.getAddress(dstX, dstY+j);
+    for i := 0 to width-1 do begin
+      dstPtr^ := srcPtr^ * tint;
+      inc(srcPtr);
+      inc(dstPtr);
+    end;
+  end;
+end;

@@ -633,7 +633,11 @@ end;
 
 procedure tDrawContext.tintImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
 begin
-  tintImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+  case backend of
+    dbREF: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbASM: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbMMX: tintImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+  end;
 end;
 
 procedure tDrawContext.blendImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
