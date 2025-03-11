@@ -5,6 +5,7 @@ uses
   {engine stuff}
   debug,
   test,
+  {$i gui.inc}
   utils,
   crt,
   sbDriver,
@@ -22,8 +23,7 @@ uses
   uColor,
   uInput,
   uTimer,
-  uScene,
-  uGui;
+  uScene;
 
 type
   tGuiScene = class(tScene)

@@ -115,20 +115,6 @@ type
     procedure update(elapsed: single); virtual;
   end;
 
-  tGuiLabel = class(tGuiComponent)
-  protected
-    procedure setText(aText: string); override;
-  public
-    autoSize: boolean;
-  public
-    constructor Create(aPos: tPoint; aText: string='');
-  end;
-
-  tGuiButton = class(tGuiComponent)
-  public
-    constructor Create(aPos: tPoint; aText: string='');
-  end;
-
 const
   DEFAULT_GUI_SKIN: tGuiSkin = nil;
   GUI_STATE_NAME: array[tGuiState] of string = (
@@ -401,59 +387,6 @@ begin
 end;
 
 {-----------------------}
-
-constructor tGuiLabel.Create(aPos: tPoint; aText: string='');
-begin
-  inherited Create();
-  bounds.x := aPos.x;
-  bounds.y := aPos.y;
-
-  style := DEFAULT_GUI_SKIN.styles['panel'].clone();
-
-  fontStyle.centered := true;
-  fontStyle.shadow := true;
-  fontStyle.col := RGB(250, 250, 250, 230);
-
-  col := RGBA.Clear;
-  text := aText;
-  autoSize := true;
-end;
-
-procedure tGuiLabel.setText(aText: string);
-begin
-  {todo: set dirty}
-  inherited setText(aText);
-  if autoSize then
-    bounds := font.textExtents(text, bounds.topLeft);
-end;
-
-{-----------------------}
-
-constructor tGuiButton.create(aPos: tPoint; aText: string='');
-var
-  s: tSprite;
-begin
-  inherited Create();
-
-  style := DEFAULT_GUI_SKIN.styles['button'].clone();
-
-  fontStyle.centered := true;
-  fontStyle.shadow := true;
-  fontStyle.col := RGB(250, 250, 250, 230);
-
-  bounds.x := aPos.x;
-  bounds.y := aPos.y;
-
-  fText := aText;
-  width := 120;
-
-  s := getSprite();
-  if assigned(s) then
-    height := 12+s.border.top + s.border.bottom
-  else
-    height := 19;
-
-end;
 
 begin
   {create a default, empty style}

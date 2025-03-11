@@ -5,8 +5,8 @@ interface
 uses
   debug,
   test,
+  {$i gui.inc}
   utils,
-  uGui,
   uScreen,
   graph2d;
 
