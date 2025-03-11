@@ -24,7 +24,7 @@ height = 3
 }
 
 uses
-  test;
+  uTest;
 
 type
 
@@ -100,7 +100,7 @@ procedure assertEqual(a, b: tPoint;msg: string=''); overload;
 
 implementation
 
-uses debug, utils;
+uses uDebug, uUtils;
 
 {--------------------------------------------------------}
 

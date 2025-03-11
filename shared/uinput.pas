@@ -11,7 +11,7 @@ pressed to be detected
 
 uses
   uMouse,
-  graph2d;
+  uRect;
 
 type
   tInput = class

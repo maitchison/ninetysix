@@ -9,9 +9,9 @@ interface
 
 uses
   dos,
-  test,
-  debug,
-  utils,
+  uTest,
+  uDebug,
+  uUtils,
   go32;
 
 type
@@ -72,8 +72,8 @@ var
 implementation
 
 uses
-  mixLib,
-  sound;
+  uMixer,
+  uSound;
 
 procedure speakerOff(); forward;
 procedure speakerOn(); forward;
@@ -329,14 +329,26 @@ begin
 
       mov fs, go32.dosMemSelector
       mov ecx, BUFFER_SIZE
-      mov edi, dosSegment
-      shl edi, 4
-      add edi, dosOffset
+
+      xor eax, eax
+      xor ebx, ebx
+      mov ax, dosSegment
+      shl eax, 4
+      xor ebx, ebx
+      mov bx, dosOffset
+      add eax, ebx
+      mov edx, eax
+
+      mov dl, 7
 
     @LOOP:
 
       {this will be loud!}
-      call rnd
+      rdtsc
+      mul ah
+      add al, dl
+      mov dl, ah
+
       mov fs:[edi], al
       inc edi
 

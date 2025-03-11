@@ -3,12 +3,12 @@ unit uBmp;
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  resource,
+  uDebug,
+  uTest,
+  uUtils,
+  uResource,
   uColor,
-  graph32;
+  uGraph32;
 
 function loadBMP(fileName: string): tPage;
 

@@ -4,11 +4,10 @@ unit uGui;
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  graph32,
-
+  uDebug,
+  uTest,
+  uUtils,
+  uGraph32,
   uFont,
   uMouse,
   uInput,
@@ -42,7 +41,7 @@ type
     padding: tBorder;       // how far to inset objects
     {maps from state to value}
     sprites: tStringMap<tSprite>;
-    sounds: tStringMap<tSoundEffect>;
+    sounds: tStringMap<tSound>;
     constructor Create();
     destructor destroy; override;
     function clone(): tGuiStyle;
@@ -157,7 +156,7 @@ begin
   inherited Create();
   padding := Border(2,2,2,2);
   sprites := tStringMap<tSprite>.Create();
-  sounds := tStringMap<tSoundEffect>.Create();
+  sounds := tStringMap<tSound>.Create();
 end;
 
 destructor tGuiStyle.destroy();
@@ -244,7 +243,7 @@ end;
 
 procedure tGuiComponent.playSFX(sfxName: string);
 var
-  sfx: tSoundEffect;
+  sfx: tSound;
 begin
   if not style.sounds.contains(sfxName) then exit;
   mixer.play(style.sounds[sfxName]);

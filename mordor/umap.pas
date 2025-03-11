@@ -4,11 +4,11 @@ unit uMap;
 interface
 
 uses
-  test,
-  debug,
-  filesystem,
-  stream,
-  utils;
+  uTest,
+  uDebug,
+  uFileSystem,
+  uStream,
+  uUtils;
 
 type
 

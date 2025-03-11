@@ -11,12 +11,12 @@ unit uLZ4;
 interface
 
 uses
-  test,
-  sysTypes,
-  debug,
-  hashmap,
-  stream,
-  utils;
+  uTest,
+  uTypes,
+  uDebug,
+  uHashMap,
+  uStream,
+  uUtils;
 
 type
   tCompressionProfile = record

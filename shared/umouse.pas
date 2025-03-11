@@ -5,11 +5,11 @@ unit uMouse;
 interface
 
 uses
-  debug,
+  uDebug,
   crt,
   go32,
-  utils,
-  vga;
+  uUtils,
+  uVgaDriver;
 
 type
   tMouse = class
@@ -31,9 +31,9 @@ procedure overrideBaseMouseCursorAddress(newAddress: word);
 implementation
 
 uses
-  s3,
+  uS3Driver,
   uColor,
-  graph32;
+  uGraph32;
 
 procedure installMouseProc(userproc : pointer; userproclen : longint); forward;
 procedure removeMouseProc; forward;
@@ -134,7 +134,7 @@ procedure updateHardwareCursor(x, y: word);
 var
   counter: dword;
 begin
-  s3.S3SetHardwareCursorLocation(x, y);
+  uS3Driver.S3SetHardwareCursorLocation(x, y);
 end;
 
 procedure writeBit(x,y: integer; value: boolean; plane: byte);

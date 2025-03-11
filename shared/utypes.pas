@@ -36,8 +36,8 @@ function Int32Array(s: string): tInt32Array;
 implementation
 
 uses
-  test, debug,
-  utils;
+  uTest, uDebug,
+  uUtils;
 
 {-------------------------------------------------------------}
 

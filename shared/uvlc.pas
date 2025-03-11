@@ -4,13 +4,13 @@ unit uVlc;
 interface
 
 uses
-  test,
-  debug,
-  utils,
-  sysTypes,
-  myMath,
-  bits,
-  stream;
+  uTest,
+  uDebug,
+  uUtils,
+  uTypes,
+  uMath,
+  uBits,
+  uStream;
 
 {
   Supports the following encodings
@@ -919,7 +919,7 @@ begin
     {16bit}
     s.seek(0);
     setLength(outData16, length(testData1));
-    vlc.readSegment16(s, length(testData1), @outData16[0]);
+    uVlc.readSegment16(s, length(testData1), @outData16[0]);
     assertEqual(toBytes(outData16).toString, toBytes(testData1).toString);
 
     {make sure size is ok}
@@ -938,7 +938,7 @@ begin
   {16bit}
   s.seek(0);
   setLength(outData16, length(testData2));
-  vlc.readSegment16(s, length(testData2), @outData16[0]);
+  uVlc.readSegment16(s, length(testData2), @outData16[0]);
   assertEqual(toDWords(outData16).toString, toDWords(testData2).toString);
   {make sure size is ok}
   {+2 is for header}

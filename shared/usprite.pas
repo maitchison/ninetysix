@@ -6,16 +6,16 @@ unit uSprite;
 interface
 
 uses
-  test,
-  debug,
-  vga,
-  utils,
-  iniFile,
-  graph32,
+  uTest,
+  uDebug,
+  uVgaDriver,
+  uUtils,
+  uIniFile,
+  uGraph32,
   uTypes,
   uColor,
   uRect,
-  vertex;
+  uVertex;
 
 type
 
@@ -89,10 +89,10 @@ function Border(aLeft, aTop, aRight, aBottom: Integer): tBorder;
 implementation
 
 uses
-  poly,
-  keyboard, //stub
-  myMath,
-  filesystem;
+  uPoly,
+  uKeyboard, //stub
+  uMath,
+  uFileSystem;
 
 function Border(aLeft, aTop, aRight, aBottom: Integer): tBorder;
 begin
@@ -620,7 +620,7 @@ begin
   assertEqual(sprite2.srcRect.toString, sprite1.srcRect.toString);
   assertEqual(sprite2.border.toString, sprite1.border.toString);
 
-  fs.delFile('test.ini');
+  fileSystem.delFile('test.ini');
 
   sprite1.free;
   sprite2.free;

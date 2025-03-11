@@ -4,8 +4,8 @@ unit uTimer;
 interface
 
 uses
-  debug,
-  utils;
+  uDebug,
+  uUtils;
 
 type
   tTimer = class

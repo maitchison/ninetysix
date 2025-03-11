@@ -6,12 +6,12 @@ unit uVesaDriver;
 interface
 
 uses
-  test,
-  debug,
-  utils,
-  graph2d,
+  uTest,
+  uDebug,
+  uUtils,
+  uRect,
   go32,
-  vga;
+  uVGADriver;
 
 type tVesaInfo = packed record
   {----------- VBE 1.0 -----------------}

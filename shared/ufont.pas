@@ -4,12 +4,12 @@ unit uFont;
 interface
 
 uses
-  debug,
+  uDebug,
   uColor,
-  graph2d,
-  graph32,
-  utils,
-  lc96;
+  uRect,
+  uGraph32,
+  uUtils,
+  uLP96;
 
 type
 
@@ -47,7 +47,8 @@ var
 implementation
 
 uses
-  filesystem, bmp;
+  uFileSystem,
+  uBmp;
 
 {---------------------------------------------------------}
 
@@ -116,9 +117,9 @@ begin
 
   result := tFont.Create();
 
-  if fs.exists(filename+'.p96') then
+  if fileSystem.exists(filename+'.p96') then
     bitmap := LoadLC96(filename+'.p96')
-  else if fs.exists(filename+'.bmp') then
+  else if fileSystem.exists(filename+'.bmp') then
     bitmap := LoadBMP(filename+'.bmp')
   else
     fatal('File not found "'+filename+'.[p96|bmp]"');

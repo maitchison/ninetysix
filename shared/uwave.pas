@@ -3,13 +3,14 @@ unit uWave;
 interface
 
 uses
-  debug, test,
-  utils,
-  resource,
-  sound;
+  uDebug,
+  uTest,
+  uUtils,
+  uResource,
+  uSound;
 
-function  loadWave(filename: string): tSoundEffect;
-procedure saveWave(filename: string;sfx: tSoundEffect);
+function  loadWave(filename: string): tSound;
+procedure saveWave(filename: string;sfx: tSound);
 
 implementation
 
@@ -33,7 +34,7 @@ type
     chunkSize: dword;
   end;
 
-function loadWave(filename: string): tSoundEffect;
+function loadWave(filename: string): tSound;
 const
   BLOCK_SIZE = 16*1024;
 var
@@ -80,14 +81,14 @@ begin
         fatal('Invalid formatBlockID '+formatBlockID);
 
       if frequency <> 44100 then
-        fatal(utils.format('frequency must be 44100 but was %d', [frequency]));
+        fatal(uUtils.format('frequency must be 44100 but was %d', [frequency]));
 
       if audioFormat <> 1 then
         fatal(format('format must be 1 (PCM) but was %d', [audioFormat]));
 
       af := getAudioFormat(bitsPerSample, numChannels);
       if af = AF_INVALID then
-        fatal(utils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));
+        fatal(uUtils.format('Invalid audio format %d-bit %d channels.', [bitsPerSample, numChannels]));
     end;
 
     {process the chunks}
@@ -101,7 +102,7 @@ begin
 
         samplesToRead := chunkSize div AF_SIZE[af];
 
-        result := tSoundEffect.create(af, samplesToRead, filename);
+        result := tSound.create(af, samplesToRead, filename);
 
         bytesRemaining := samplesToRead * AF_SIZE[af];
         dataPtr := result.data;
@@ -126,7 +127,7 @@ begin
 end;
 
 {saves sound file to a wave file}
-procedure saveWave(filename: string;sfx: tSoundEffect);
+procedure saveWave(filename: string;sfx: tSound);
 var
   f: file;
   fileHeader: tWaveFileHeader;

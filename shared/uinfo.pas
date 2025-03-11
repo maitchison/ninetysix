@@ -4,7 +4,7 @@ unit uInfo;
 interface
 
 uses
-  debug;
+  uDebug;
 
 type
   {I think make this a class?}
@@ -38,7 +38,7 @@ implementation
 
 uses
   go32,
-  utils;
+  uUtils;
 
 {-------------------------------------------------------------}
 { CPU Stuff }
@@ -217,7 +217,7 @@ end;
 
 procedure logHeapStatus(msg: string='Heap status');
 begin
-  debug.debug(pad(format('--- %s used:%skb free:%skb ',
+  debug(pad(format('--- %s used:%skb free:%skb ',
     [
       msg,
       // total_physical_pages

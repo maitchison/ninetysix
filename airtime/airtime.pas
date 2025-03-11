@@ -565,7 +565,7 @@ begin
 
   {setup heap logging before units start.}
   {$if declared(Heaptrc)}
-  if fs.exists('heaptrc.txt') then fs.delFile('heaptrc.txt');
+  if fileSystem.exists('heaptrc.txt') then fs.delFile('heaptrc.txt');
   heaptrc.setHeapTraceOutput('heaptrc.txt');
   heaptrc.printfaultyblock := true;
   heaptrc.printleakedblock := true;

@@ -4,11 +4,11 @@ unit uFileSystem;
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  list,
-  sysTypes,
+  uDebug,
+  uTest,
+  uUtils,
+  uList,
+  uTypes,
   dos;
 
 type
@@ -42,7 +42,7 @@ type
   end;
 
 var
-  fs: tFilesystem;
+  fileSystem: tFilesystem;
 
 implementation
 

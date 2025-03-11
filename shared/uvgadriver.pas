@@ -6,11 +6,11 @@ unit uVgaDriver;
 interface
 
 uses
-  debug,
-  utils,
+  uDebug,
+  uUtils,
+  crt,
   go32,
-  graph2d,
-  crt;
+  uRect;
 
 type
   tVideoDriver = class

@@ -1,12 +1,12 @@
 {very simple unit for handling CSV writing}
-unit uCsv;
+unit uCSV;
 
 interface
 
 uses
-  debug,
-  test,
-  utils;
+  uDebug,
+  uTest,
+  uUtils;
 
 type
   tCSVWriter = class

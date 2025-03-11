@@ -9,7 +9,7 @@ unit uMath;
 interface
 
 uses
-  test;
+  uTest;
 
 type
   tFloat = extended;  // floating point type to use
@@ -28,7 +28,7 @@ const
 implementation
 
 uses
-  utils;
+  uUtils;
 
 function degToRad(x: tFloat): tFloat;
 begin

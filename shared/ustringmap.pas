@@ -8,9 +8,9 @@ For the moment this is a linear scan... which is fine for small maps
 interface
 
 uses
-  test,
-  debug,
-  sysTypes;
+  uTest,
+  uDebug,
+  uTypes;
 
 type
   tStringMap<T> = class

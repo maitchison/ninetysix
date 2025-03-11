@@ -15,12 +15,12 @@ unit uSound;
 interface
 
 uses
-  test,
-  debug,
-  utils,
+  uTest,
+  uDebug,
   dos,
-  sbDriver,
-  uResource,
+  uUtils,
+  uSBDriver,
+  uResource;
 
 type
 
@@ -134,9 +134,9 @@ function getAudioFormat(bitsPerChannel: integer; numChannels: integer): tAudioFo
 implementation
 
 uses
-  mixLib,
-  wave,
-  la96;
+  uMixer,
+  uWave,
+  uLA96;
 
 {--------------------------------------------------------}
 
@@ -383,7 +383,7 @@ begin
     result := tSound(proc(filename));
     note(' - loaded %s (%fs) in %.2fs', [filename, result.length/44100, getSec-startTime]);
   end else
-    debug.fatal('No sound loader for file "'+filename+'"');
+    fatal('No sound loader for file "'+filename+'"');
 end;
 
 

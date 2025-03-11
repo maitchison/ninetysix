@@ -6,9 +6,9 @@ unit uVertex;
 interface
 
 uses
-  test,
-  debug,
-  utils,
+  uTest,
+  uDebug,
+  uUtils,
   uMath,
   uRect;
 

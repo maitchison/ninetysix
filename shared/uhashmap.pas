@@ -6,11 +6,11 @@ unit uHashMap;
 interface
 
 uses
-  test,
-  debug,
-  utils,
-  sysTypes,
-  list;
+  uTest,
+  uDebug,
+  uUtils,
+  uTypes,
+  uList;
 
 type
 
@@ -99,7 +99,7 @@ function hashD2W(key: dword): word; register; inline; assembler;
 implementation
 
 uses
-  sysInfo;
+  uInfo;
 
 {----------------------------------------}
 

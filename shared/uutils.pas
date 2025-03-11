@@ -8,10 +8,10 @@ unit uUtils;
 interface
 
 uses
-  sysInfo,
   dos,
-  sysTypes,
-  go32;
+  go32,
+  uInfo,
+  uTypes;
 
 {todo:
   my format
@@ -170,8 +170,8 @@ var
 implementation
 
 uses
-  debug,
-  test;
+  uDebug,
+  uTest;
 
 var
   SEED: byte;
@@ -315,7 +315,7 @@ begin
         '.': begin
             // very basic for the moment
             if (i = length(fmt)) or (not (fmt[i+1] in ['0'..'9']))  then
-              debug.fatal('invalid formatting, decimal expected after "."');
+              fatal('invalid formatting, decimal expected after "."');
             inPlaceholder := true;
           end;
         '0'..'9': begin
@@ -656,7 +656,7 @@ var
 begin
   {todo: better way to handle errors}
   val(s, value, code);
-  if code <> 0 then debug.fatal(Format('Invalid integer "%s"', [s]));
+  if code <> 0 then fatal(Format('Invalid integer "%s"', [s]));
   result := value;
 end;
 
@@ -667,7 +667,7 @@ var
 begin
   {todo: better way to handle errors}
   val(s, value, code);
-  if code <> 0 then debug.fatal(Format('Invalid float "%s"', [s]));
+  if code <> 0 then fatal(Format('Invalid float "%s"', [s]));
   result := value;
 end;
 
@@ -1266,7 +1266,7 @@ end;
 
 function tStringHelper.toLower(): string;
 begin
-  result := utils.toLowerCase(self);
+  result := uUtils.toLowerCase(self);
 end;
 
 function tStringHelper.contains(substring: string; ignoreCase: boolean=false): boolean;
@@ -1281,7 +1281,7 @@ end;
 
 function tStringHelper.trim(): string;
 begin
-  result := utils.trim(self);
+  result := uUtils.trim(self);
 end;
 
 {--------------------------------------------------------}

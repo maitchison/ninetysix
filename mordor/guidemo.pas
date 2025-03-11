@@ -2,22 +2,21 @@
 program guiDemo;
 
 uses
-  {engine stuff}
-  debug,
-  test,
-  {$i gui.inc}
-  utils,
+  uDebug,
+  uTest,
   crt,
-  sbDriver,
-  mixLib,
-  graph2d,
-  graph32,
-  resource,
-  keyboard,
-  vga,
-  vesa,
-  sound,
-  sprite,
+  {$i gui.inc}
+  uUtils,
+  uSBDriver,
+  uVgaDriver,
+  uVesaDriver,
+  uMixer,
+  uRect,
+  uGraph32,
+  uResource,
+  uKeyboard,
+  uSound,
+  uSprite,
   uMouse,
   uScreen,
   uColor,
@@ -152,7 +151,7 @@ begin
   textAttr := White + Blue*16;
   clrscr;
 
-  debug.VERBOSE_SCREEN := llNote;
+  uDebug.VERBOSE_SCREEN := llNote;
 
   runTestSuites();
 

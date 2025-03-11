@@ -4,11 +4,11 @@ unit uBits;
 interface
 
 uses
-  test,
-  debug,
-  stream,
-  sysTypes,
-  utils;
+  uTest,
+  uDebug,
+  uStream,
+  uTypes,
+  uUtils;
 
 {object so that we can create without mem alloc}
 type tBitStream = object

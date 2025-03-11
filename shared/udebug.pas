@@ -97,9 +97,9 @@ function GeneralError(fmt: string;args: array of const): tGeneralError; overload
 implementation
 
 uses
-  utils,
-  sysInfo,
-  vga;
+  uUtils,
+  uInfo,
+  uVgaDriver;
 
 {------------------------------------------------}
 
@@ -168,7 +168,7 @@ begin
     flush(logFile);
   end;
 
-  if (level >= VERBOSE_SCREEN) and assigned(vga.videoDriver()) and vga.videoDriver().isText then begin
+  if (level >= VERBOSE_SCREEN) and assigned(uVgaDriver.videoDriver()) and uVgaDriver.videoDriver().isText then begin
     oldTextAttr := textAttr;
     textAttr := (textAttr and $f0) + getLogLevelColor(entry.level);
     writeln(entry.toString);

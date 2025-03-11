@@ -1,5 +1,5 @@
 {Audio compression library}
-unit uA96;
+unit uLA96;
 
 {$MODE delphi}
 
@@ -72,24 +72,24 @@ unit uA96;
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  sysTypes,
-  filesystem,
-  resource,
-  lz4,
+  uDebug,
+  uTest,
+  uUtils,
+  uTypes,
+  uFileSystem,
+  uResource,
+  uLZ4,
   dos,
   go32,
-  sysInfo,
+  uInfo,
   uTimer,
-  stats,
-  list,
-  sound,
-  csv,
-  vlc,
-  audioFilter,
-  stream;
+  uStats,
+  uList,
+  uSound,
+  uCSV,
+  uVLC,
+  uAudioFilter,
+  uStream;
 
 type
 
@@ -164,7 +164,7 @@ type
     procedure open(aFilename: string); overload;
     procedure open(aStream: tStream); overload;
     procedure close();
-    function  readSFX(): tSoundEffect;
+    function  readSFX(): tSound;
     procedure readNextFrame(samplePtr: pAudioSample16S);
   end;
 
@@ -192,13 +192,13 @@ type
 
     procedure writeNextFrame(samplePtr: pAudioSample16S);
     procedure close();
-    procedure writeA96(sfx: tSoundEffect; aProfile: tAudioCompressionProfile); overload;
-    procedure writeA96(sfx: tSoundEffect); overload;
+    procedure writeA96(sfx: tSound; aProfile: tAudioCompressionProfile); overload;
+    procedure writeA96(sfx: tSound); overload;
   end;
 
-function loadA96(filename: string): tSoundEffect; register;
-function decodeLA96(s: tStream): tSoundEffect;
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
+function loadA96(filename: string): tSound; register;
+function decodeLA96(s: tStream): tSound;
+function encodeLA96(sfx: tSound; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 
 const
   {note: low sounds very noisy, but I think we can fix this with some post filtering}
@@ -269,7 +269,7 @@ end;
 
 function tLA96FileHeader.verStr(): string;
 begin
-  result := utils.format('%d.%d', [versionBig, versionSmall]);
+  result := uUtils.format('%d.%d', [versionBig, versionSmall]);
 end;
 
 {----------------------}
@@ -401,11 +401,11 @@ begin
 end;
 
 {read entire SFX out and return it uncompressed}
-function tLA96Reader.readSFX(): tSoundEffect;
+function tLA96Reader.readSFX(): tSound;
 var
   i: integer;
 begin
-  result := tSoundEffect.create(AF_16_STEREO, header.numSamples);
+  result := tSound.create(AF_16_STEREO, header.numSamples);
   for i := 0 to header.numFrames-1 do
     readNextFrame(result.data + (i*header.frameSize*4));
 end;
@@ -460,8 +460,8 @@ begin
   difValue := zagZig(fs.readWord());
 
   startTimer('LA96_FRAME_ReadSegments');
-  vlc.readSegment16(fs, header.frameSize-1, midCodes);
-  vlc.readSegment16(fs, header.frameSize-1, difCodes);
+  uVlc.readSegment16(fs, header.frameSize-1, midCodes);
+  uVlc.readSegment16(fs, header.frameSize-1, difCodes);
   stopTimer('LA96_FRAME_ReadSegments');
 
   frameSpec.length := header.frameSize;
@@ -575,7 +575,7 @@ begin
   if frameOn mod 16 = 15 then write('.');
 end;
 
-function decodeLA96(s: tStream): tSoundEffect;
+function decodeLA96(s: tStream): tSound;
 var
   reader: tLA96Reader;
 begin
@@ -585,7 +585,7 @@ begin
   reader.free;
 end;
 
-function encodeLA96(sfx: tSoundEffect; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
+function encodeLA96(sfx: tSound; profile: tAudioCompressionProfile;verbose: boolean=false): tMemoryStream;
 var
   writer: tLA96Writer;
   ms: tMemoryStream;
@@ -786,13 +786,13 @@ begin
   inc(frameOn);
 end;
 
-procedure tLA96Writer.writeA96(sfx: tSoundEffect;aProfile: tAudioCompressionProfile);
+procedure tLA96Writer.writeA96(sfx: tSound;aProfile: tAudioCompressionProfile);
 begin
   self.profile := aProfile;
   writeA96(sfx);
 end;
 
-procedure tLA96Writer.writeA96(sfx: tSoundEffect);
+procedure tLA96Writer.writeA96(sfx: tSound);
 var
   i: integer;
   startPos, endPos: int32;
@@ -861,7 +861,7 @@ var
   lutDecode: tULawLookup;
   i: int32;
   s: tStream;
-  sfxIn, sfxOut: tSoundEffect;
+  sfxIn, sfxOut: tSound;
   sample: tAudioSample16S;
   value: int16;
 const
@@ -882,7 +882,7 @@ begin
   end;
 
   {make sure that encoding a very short works correctly}
-  sfxIn := tSoundEffect.create(AF_16_STEREO, 3);
+  sfxIn := tSound.create(AF_16_STEREO, 3);
   fillchar(sfxIn.data^, 3*4, 0);
   sample.left := 1000;
   sample.right := -300;
@@ -907,7 +907,7 @@ end;
 
 {--------------------------------------------------------}
 
-function loadA96(filename: string): tSoundEffect;
+function loadA96(filename: string): tSound;
 var
   fs: tFileStream;
 begin

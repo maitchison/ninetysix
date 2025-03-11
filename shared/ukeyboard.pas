@@ -22,7 +22,7 @@ end;
 interface
 
 uses
-  debug,
+  uDebug,
   {todo: remove crt?}
   crt,
   dos,

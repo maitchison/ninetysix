@@ -73,7 +73,7 @@ function RGBF(r,g,b: single;a: single=1.0): RGBA;
 implementation
 
 uses
-  utils;
+  uUtils;
 
 {-------------------------------------------------------------}
 

@@ -21,15 +21,15 @@ unit uLP96;
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  sysTypes,
-  stream,
-  resource,
+  uDebug,
+  uTest,
+  uUtils,
+  uTypes,
+  uStream,
+  uResource,
   uColor,
-  graph2d,
-  graph32;
+  uRect,
+  uGraph32;
 
 procedure saveLC96(filename: string; page: tPage;forceAlpha: boolean=False);
 function loadLC96(filename: string): tPage;
@@ -40,7 +40,7 @@ function encodeLC96(page: tPage;s: tStream=nil;withAlpha: boolean=False): tStrea
 implementation
 
 uses
-  lz4;
+  uLZ4;
 
 const
   VER_BIG = 0;

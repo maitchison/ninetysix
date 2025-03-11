@@ -4,7 +4,7 @@ unit uTest;
 interface
 
 uses
-  sysTypes;
+  uTypes;
 
 type
 
@@ -32,9 +32,9 @@ procedure runTestSuites();
 implementation
 
 uses
-  utils,
+  uUtils,
   uTimer,
-  debug;
+  uDebug;
 
 var
   testSuites: array of tTestSuite = nil;

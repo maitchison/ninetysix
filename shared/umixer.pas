@@ -6,10 +6,10 @@ unit uMixer;
 interface
 
 uses
-  test,
-  debug,
-  utils,
-  la96,
+  uTest,
+  uDebug,
+  uUtils,
+  uLA96,
   go32,
   uSound,
   uTimer,
@@ -39,7 +39,7 @@ type
 
   tSoundChannel = class
     id: word;
-    sfx: tSoundEffect;   {the currently playing sound effect}
+    sfx: tSound;   {the currently playing sound effect}
     lastUpdateVolume, lastUpdatePitch: single;
     volume: single;
     pitch: single;
@@ -61,9 +61,9 @@ type
 
     constructor create();
     destructor destroy(); override;
-    function getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
-    function playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
-    function play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_OLDEST; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel; overload;
+    function getFreeChannel(sfx: tSound; strategy: tSoundChannelSelection): tSoundChannel;
+    function playRepeat(sfx: tSound; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+    function play(sfx: tSound; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_OLDEST; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel; overload;
   end;
 
 type
@@ -103,9 +103,9 @@ function scratchBufferPtr: pAudioSample16S;
 implementation
 
 uses
-  keyboard, {stub}
+  uKeyboard, {stub}
   crt, {also stub}
-  sbdriver;
+  uSBDriver;
 
 const
   MAX_MIXER_SAMPLES = 8*1024;
@@ -119,7 +119,7 @@ var
 
   {todo: maybe put this in mixer? or just keep them global... yeah global is the way}
   {also, this need not be a sound effect, just a buffer as above?}
-  musicBuffer: tSoundEffect;
+  musicBuffer: tSound;
   mbReadPos, mbWritePos: dword;
   {handles reading music.}
   musicReader: tLA96Reader; {the current one}
@@ -220,7 +220,7 @@ end;
 }
 function mixDown(startTC: tTimeCode;bufBytes:dword): pointer;
 var
-  sfx: tSoundEffect;
+  sfx: tSound;
   i,j: int32;
   noise: int32;
   sample, finalSample: pointer;
@@ -532,7 +532,7 @@ var
   sbSamples: int32;
   frameSize: int32;
 begin
-  sbSamples := sbDriver.HALF_BUFFER_SIZE div 4;
+  sbSamples := uSBDriver.HALF_BUFFER_SIZE div 4;
   frameSize := 1024; // hard code this for the moment.
   result.bufferFramesMax := (MB_SAMPLES - sbSamples) div frameSize;
   result.bufferFramesFilled := (int64(mbWritePos) - mbReadPos) div frameSize;
@@ -704,7 +704,7 @@ begin
 end;
 
 {returns a channel to use for given sound}
-function tSoundMixer.getFreeChannel(sfx: tSoundEffect; strategy: tSoundChannelSelection): tSoundChannel;
+function tSoundMixer.getFreeChannel(sfx: tSound; strategy: tSoundChannelSelection): tSoundChannel;
 var
   i: integer;
   bestIndex: integer;
@@ -751,7 +751,7 @@ begin
   end;
 end;
 
-function tSoundMixer.playRepeat(sfx: tSoundEffect; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+function tSoundMixer.playRepeat(sfx: tSound; channelSelection: tSoundChannelSelection; volume: single=1.0; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   channel: tSoundChannel;
 begin
@@ -761,7 +761,7 @@ begin
   result := channel;
 end;
 
-function tSoundMixer.play(sfx: tSoundEffect; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_OLDEST; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
+function tSoundMixer.play(sfx: tSound; volume: single=1.0; channelSelection: tSoundChannelSelection = SCS_OLDEST; pitch: single=1.0;timeOffset: single=0.0): tSoundChannel;
 var
   ticksOffset: int32;
   offsetString: string;
@@ -848,7 +848,7 @@ initialization
   assert(MB_SAMPLES >= (BUFFER_SIZE div 4));
 
   mixer := tSoundMixer.create();
-  musicBuffer := tSoundEffect.create(AF_16_STEREO, MB_SAMPLES);
+  musicBuffer := tSound.create(AF_16_STEREO, MB_SAMPLES);
   masterMusicReader := tLA96Reader.create();
   masterMusicReader.looping := true;
   musicReader := masterMusicReader;

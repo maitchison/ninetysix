@@ -6,11 +6,11 @@ unit uIniFile;
 interface
 
 uses
-  debug,
-  list,
-  utils,
-  sysTypes,
-  graph2d;
+  uDebug,
+  uList,
+  uUtils,
+  uTypes,
+  uRect;
 
 type
 

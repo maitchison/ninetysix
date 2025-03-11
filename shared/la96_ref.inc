@@ -40,7 +40,7 @@ begin
   end;
 end;
 
-procedure postProcessEMA(samplePtr: pAudioSample16S; out left: single; out right: single; count: int32; alpha: single);
+procedure postProcessEMA(samplePtr: pAudioSample16S; var left: single; var right: single; count: int32; alpha: single);
 var
   i: integer;
   sample: tAudioSample16S;

@@ -60,7 +60,7 @@ begin
   output(pad(extractFilename(dstPath),14, ' '), LightGray);
 
   {make sure it exists}
-  if not fs.exists(srcPath) then begin
+  if not fileSystem.exists(srcPath) then begin
     outputLn('[missing]', LightRed);
     exit(false);
   end;

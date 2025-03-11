@@ -404,8 +404,8 @@ begin
     no writeln: 12.4
     sln from backtrace: 1.6
   }
-  new := fs.readText('sample_new.txt');
-  old := fs.readText('sample_old.txt');
+  new := fileSystem.readText('sample_new.txt');
+  old := fileSystem.readText('sample_old.txt');
 
   diff := tDiffSolver.create();
 
@@ -539,8 +539,8 @@ begin
   key := '';
   value := '';
 
-  if fs.exists('stats.csv') then begin
-    csvLines := fs.readText('stats.csv');
+  if fileSystem.exists('stats.csv') then begin
+    csvLines := fileSystem.readText('stats.csv');
     for line in csvLines do begin
       split(line, ',', key, value);
       if length(key) < 2 then continue;
@@ -671,10 +671,10 @@ var
   code: word;
 begin
 
-  testFiles := fs.listFiles('.\*_test.pas');
+  testFiles := fileSystem.listFiles('.\*_test.pas');
 
-  fs.delFile('_runtest.pas');
-  fs.delFile('_runtest.exe');
+  fileSystem.delFile('_runtest.pas');
+  fileSystem.delFile('_runtest.exe');
 
   outputLn(format('Found %d unit tests.', [testFiles.len]));
 
@@ -720,8 +720,8 @@ begin
   code := dosExecute('_runtest.exe', true);
   if code <> 0 then fatal('Failed to run unit tests.');
 
-  fs.delFile('_runtest.pas');
-  fs.delFile('_runtest.exe');
+  fileSystem.delFile('_runtest.pas');
+  fileSystem.delFile('_runtest.exe');
 
 end;
 
@@ -815,8 +815,8 @@ begin
     end;
     outputDiv();
 
-    old := fs.readText(fileDiff.old.fqn);
-    new := fs.readText(fileDiff.new.fqn);
+    old := fileSystem.readText(fileDiff.old.fqn);
+    new := fileSystem.readText(fileDiff.new.fqn);
     matches := fileDiff.getMatch();
     stats := fileDiff.getStats();
 

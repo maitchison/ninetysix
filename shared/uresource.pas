@@ -3,7 +3,7 @@ unit uResource;
 interface
 
 uses
-  debug;
+  uDebug;
 
 type
   tResource = class
@@ -41,8 +41,8 @@ procedure registerResourceLoader(aExtension: string; aProc: tResourceLoaderProc)
 implementation
 
 uses
-  fileSystem,
-  utils;
+  uFileSystem,
+  uUtils;
 
 type
   tRegistryEntry = record
@@ -102,7 +102,7 @@ var
   tag: string;
   path: string;
 begin
-  for filename in fs.listFiles(joinPath(root, '\'+pattern)) do begin
+  for filename in fileSystem.listFiles(joinPath(root, '\'+pattern)) do begin
     path := joinPath(root, filename);
     if assigned(filter) and (not filter(path)) then continue;
     addResource(path);

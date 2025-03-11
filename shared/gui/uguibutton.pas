@@ -3,12 +3,12 @@ unit uGuiButton;
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  sprite,
-  graph32,
-  graph2d,
+  uDebug,
+  uTest,
+  uUtils,
+  uSprite,
+  uRect,
+  uGraph32,
   uColor,
   uGui;
 

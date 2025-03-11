@@ -3,12 +3,12 @@ unit uScene;
 interface
 
 uses
-  debug,
-  test,
+  uDebug,
+  uTest,
   {$i gui.inc}
-  utils,
-  uScreen,
-  graph2d;
+  uUtils,
+  uRect,
+  uScreen;
 
 type
   tScene = class

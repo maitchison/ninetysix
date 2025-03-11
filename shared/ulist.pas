@@ -3,9 +3,9 @@ unit uList;
 interface
 
 uses
-  test,
-  sysTypes,
-  debug;
+  uTest,
+  uTypes,
+  uDebug;
 
 type
 
@@ -92,8 +92,8 @@ type
 implementation
 
 uses
-  filesystem,
-  utils;
+  uFilesystem,
+  uUtils;
 
 {----------------------------------------------------}
 { tIntList }
@@ -554,7 +554,7 @@ begin
   s1.save('test.txt');
   s2.load('test.txt');
   assertEqual(s2.toString, '["202","103","101"]');
-  fs.delFile('test.txt');
+  fileSystem.delFile('test.txt');
 
 end;
 

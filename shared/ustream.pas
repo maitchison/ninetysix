@@ -6,12 +6,12 @@ unit uStream;
 interface
 
 uses
-  utils,
-  debug,
-  myMath,
-  sysTypes,
-  filesystem,
-  test;
+  uUtils,
+  uDebug,
+  uMath,
+  uTypes,
+  uFileSystem,
+  uTest;
 
 const
   FS_READBUFFER_SIZE = 16*1024;
@@ -145,7 +145,7 @@ type
 implementation
 
 uses
-  vlc;
+  uVlc;
 
 {------------------------------------------------------}
 { tStream }
@@ -303,12 +303,12 @@ end;
 
 function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
 begin
-  result := vlc.readSegment(self, n, outBuffer);
+  result := uVlc.readSegment(self, n, outBuffer);
 end;
 
 function tStream.writeSegment(values: array of dword;segmentType:byte=255): int32;
 begin
-  result := vlc.writeSegment(self, values, segmentType);
+  result := uVlc.writeSegment(self, values, segmentType);
 end;
 
 
@@ -518,7 +518,7 @@ var
   ioError: word;
 begin
 
-  fs.openFile(filename, f, FM_READ);
+  fileSystem.openFile(filename, f, FM_READ);
 
   try
     {work out how much to read}
@@ -579,7 +579,7 @@ begin
   case fileMode of
     FM_READ: begin
       {open file for read only}
-      if not fs.exists(aFilename) then fatal('Could not open "'+aFilename+'" for reading');
+      if not filesystem.exists(aFilename) then fatal('Could not open "'+aFilename+'" for reading');
       system.assign(f, aFilename);
       system.reset(f,1);
       fLen := filesize(f);
@@ -593,7 +593,7 @@ begin
     FM_READWRITE: begin
       {if file exists it is opened, with pos at the start of the file,
        and the ability to both read and write to it}
-      if fs.exists(aFilename) then begin
+      if fileSystem.exists(aFilename) then begin
         system.assign(f, aFilename);
         system.rewrite(f,1);
         system.reset(f,1);
@@ -719,14 +719,14 @@ begin
     fs.writeByte(i);
   fs.free;
 
-  assertEqual(filesystem.fs.getFilesize('tmp.dat'), 100);
+  assertEqual(fileSystem.getFilesize('tmp.dat'), 100);
 
   fs := tFileStream.create('tmp.dat');
   for i := 1 to 100 do
     assertEqual(fs.readByte, i);
   fs.free;
 
-  filesystem.fs.delFile('tmp.dat');
+  fileSystem.delFile('tmp.dat');
 end;
 
 procedure tStreamTest.testMemoryStream();
@@ -792,7 +792,7 @@ begin
     assertEqual(s.readVLC8, testData1[i]);
   s.free;
 
-  filesystem.fs.delFile('tmp.dat');
+  fileSystem.delFile('tmp.dat');
 
 end;
 

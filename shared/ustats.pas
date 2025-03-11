@@ -4,7 +4,7 @@ unit uStats;
 interface
 
 uses
-  test;
+  uTest;
 
 type
   tStats = record

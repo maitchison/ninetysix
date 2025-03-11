@@ -5,16 +5,16 @@ unit uScreen;
 interface
 
 uses
-  test,
-  debug,
-  utils,
+  uTest,
+  uDebug,
+  uUtils,
   uColor,
-  graph2d,
-  graph32,
-  sprite,
-  vga,
-  uTimer,
-  s3;
+  uRect,
+  uGraph32,
+  uSprite,
+  uVgaDriver,
+  uS3Driver,
+  uTimer;
 
 const
   FG_FLIP  = 1;
@@ -104,7 +104,7 @@ type
 implementation
 
 uses
-  keyboard; {stub}
+  uKeyboard; {stub}
 
 {-------------------------------------------------}
 
@@ -496,7 +496,7 @@ begin
     16: videoDepth := VD_16;
     24: videoDepth := VD_24;
     32: videoDepth := VD_32;
-    else debug.fatal(format('Bit depth %d not supported',[videoDriver.bitsPerPixel]));
+    else fatal(format('Bit depth %d not supported',[videoDriver.bitsPerPixel]));
   end;
 
   fillchar(flagGrid, sizeof(flagGrid), 0);

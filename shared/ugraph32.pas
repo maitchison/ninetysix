@@ -7,16 +7,15 @@ unit uGraph32;
 interface
 
 uses
-  test,
-  debug,
-  vga,
-  utils,
-  graph2d,
+  uTest,
+  uDebug,
+  uVgaDriver,
+  uUtils,
+  uRect,
   uResource,
   uTypes,
   uInfo,
-  uColor,
-
+  uColor;
 
 type
 
@@ -536,7 +535,7 @@ begin
     result := tPage(res);
     note(' - loaded %s (%dx%d) in %.2fs', [filename, result.width, result.height, getSec-startTime]);
   end else
-    debug.fatal('No image loader for file "'+filename+'"');
+    fatal('No image loader for file "'+filename+'"');
 end;
 
 {-------------------------------------------------}

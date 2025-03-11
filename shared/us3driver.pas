@@ -7,12 +7,12 @@ interface
 
 uses
   go32,
-  debug,
-  utils,
+  uDebug,
+  uUtils,
   crt,
   uColor,
-  graph32,
-  vga;
+  uGraph32,
+  uVgaDriver;
 
 type
   tS3Driver = class

@@ -4,12 +4,12 @@ unit uPoly;
 interface
 
 uses
-  debug,
-  test,
-  utils,
+  uDebug,
+  uTest,
+  uUtils,
   uColor,
-  graph2d,
-  graph32,
+  uRect,
+  uGraph32,
   uScreen;
 
 type
