@@ -107,7 +107,7 @@ var
   value: integer;
   numberLength: integer;
 begin
-  setLength(result, 0);
+  result := nil;
   numberLength := 0;
   for i := 1 to length(s) do begin
     case s[i] of

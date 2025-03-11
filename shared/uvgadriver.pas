@@ -46,13 +46,13 @@ type
     property bitsPerPixel:word read fBPP;
     property LFB_SEG:word read getLFB_SEG;
 
-    procedure waitVSYNC(); virtual; abstract;
-    function  tryMode(width, height, bpp: word): boolean; virtual; abstract;
+    procedure waitVSYNC(); virtual;
+    function  tryMode(width, height, bpp: word): boolean; virtual;
     procedure setMode(width, height, bpp: word);
     procedure setTrueColor(width, height: word; maxBPP: byte=32);
-    procedure setLogicalSize(width, height: word); virtual; abstract;
-    procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); virtual; abstract;
-    procedure setText(); virtual; abstract;
+    procedure setLogicalSize(width, height: word); virtual;
+    procedure setDisplayStart(x, y: word;waitRetrace:boolean=false); virtual;
+    procedure setText(); virtual;
     function  isText(): boolean;
   end;
 
@@ -143,6 +143,30 @@ begin
   if (maxBPP >= 16) and tryMode(width, height, 16) then exit;
   if (maxBPP >= 15) and tryMode(width, height, 15) then exit;
   fatal(format('Could not set true color video mode (%dx%d) [maxBPP=%d]', [width, height, maxBPP]));
+end;
+
+{-----------------------------}
+{ abstract stub methods }
+
+procedure tVideoDriver.waitVSYNC();
+begin
+end;
+
+procedure tVideoDriver.setDisplayStart(x, y: word;waitRetrace:boolean=false);
+begin
+end;
+
+function tVideoDriver.tryMode(width, height, bpp: word): boolean;
+begin
+  exit(false);
+end;
+
+procedure tVideoDriver.setLogicalSize(width, height: word);
+begin
+end;
+
+procedure tVideoDriver.setText();
+begin
 end;
 
 {--------------------------------------------------------------}
