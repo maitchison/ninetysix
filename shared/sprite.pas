@@ -20,13 +20,16 @@ uses
 type
 
   tBorder = record
-    top, left, bottom, right: Integer;
+    top, left, bottom, right: int32;
     procedure init(aLeft, aTop, aRight, aBottom: Integer);
     procedure setDefault();
     function  isDefault: boolean;
     function  toString(): string;
+    function  inset(rect: tRect): tRect;
     procedure writeToIni(ini: tIniWriter; tag: string='Border');
     procedure readFromIni(ini: tIniReader; tag: string='Border');
+    function  horizontal: integer;
+    function  vertical: integer;
   end;
 
   tSprite = class(tObject, iIniSerializable)
@@ -124,9 +127,28 @@ begin
   result := format('(%d %d %d %d)', [left, top, right, bottom]);
 end;
 
+function tBorder.inset(rect: tRect): tRect;
+begin
+  result := rect;
+  result.width -= horizontal;
+  result.height -= vertical;
+  result.pos.x += left;
+  result.pos.y += top;
+end;
+
 procedure tBorder.writeToIni(ini: tIniWriter; tag: string='Border');
 begin
   ini.writeArray(tag, [left, top, right, bottom]);
+end;
+
+function tBorder.horizontal: integer;
+begin
+  result := left + right;
+end;
+
+function tBorder.vertical: integer;
+begin
+  result := top + bottom;
 end;
 
 procedure tBorder.readFromIni(ini: tIniReader; tag: string='Border');

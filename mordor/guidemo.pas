@@ -97,7 +97,7 @@ var
       if guiSkin.gfx.hasResource(gfxName) then
         style.sprites[state] := makeSprite(gfxName, aBorder)
       else
-        warning('Missing '+gfxName);
+        warning('Missing gui gfx: "'+gfxName+'"');
     end;
   end;
 
@@ -112,7 +112,8 @@ begin
   style := tGuiStyle.Create();
   style.fontStyle.centered := true;
   style.fontStyle.shadow := true;
-  style.fontStyle.col := RGB(250, 250, 250);
+  style.fontStyle.col := RGB(250, 250, 250, 230);
+  style.padding.init(8,8,6,11);
   makeStateSprites(style, 'ec_button', Border(8,8,6,11));
   guiSkin.styles['button'] := style;
 

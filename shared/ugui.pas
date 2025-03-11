@@ -39,6 +39,7 @@ type
   end;
 
   tGuiStyle = class
+    padding: tBorder;       // how far to inset objects
     fontStyle: tFontStyle;
     {maps from state to value}
     sprites: tStringMap<tSprite>;
@@ -57,7 +58,7 @@ type
     destructor destroy; override;
   end;
 
-  tGuiState = (gsNormal, gsDisabled, gsHilighted, gsPressed, gsSelected);
+  tGuiState = (gsNormal, gsDisabled, gsHighlighted, gsPressed, gsSelected);
 
   tGuiComponent = class;
 
@@ -70,7 +71,6 @@ type
     visible: boolean;
     enabled: boolean;
     pressed: boolean;
-    autoStyle: boolean; {if true will autostyle the component based on state}
     {standard label like draw}
     fText: string;
     fCol: RGBA;
@@ -85,6 +85,7 @@ type
     procedure fireMessage(aMsg: string; args: array of const); overload;
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(screen: tScreen);
+    function  innerBounds: tRect;
     {style}
     function  getSprite(): tSprite;
     function  getTextColor(): RGBA;
@@ -128,8 +129,6 @@ type
   end;
 
   tGuiButton = class(tGuiComponent)
-  protected
-    procedure doDraw(screen: tScreen); override;
   public
     constructor Create(aPos: tPoint; aText: string='');
   end;
@@ -139,7 +138,7 @@ const
   GUI_STATE_NAME: array[tGuiState] of string = (
     'normal',
     'disabled',
-    'hilighted',
+    'highlighted',
     'pressed',
     'selected'
   );
@@ -169,6 +168,7 @@ end;
 constructor tGuiStyle.Create();
 begin
   inherited Create();
+  padding := Border(2,2,2,2);
   fontStyle := tFontStyle.Create();
   sprites := tStringMap<tSprite>.Create();
 end;
@@ -183,6 +183,7 @@ end;
 function tGuiStyle.clone(): tGuiStyle;
 begin
   result := tGuiStyle.Create();
+  result.padding := padding;
   result.fontStyle := fontStyle.clone.clone();
   result.sprites := sprites.clone();
 end;
@@ -302,7 +303,7 @@ function tGuiComponent.state: tGuiState;
 begin
   if not enabled then exit(gsDisabled);
   if pressed then exit(gsPressed);
-  if mouseOverThisFrame then exit(gsHilighted);
+  if mouseOverThisFrame then exit(gsHighlighted);
   exit(gsNormal);
 end;
 
@@ -334,17 +335,20 @@ begin
   backCol := col;
   frameCol := RGB(0,0,0,backCol.a div 2);
 
-  if autoStyle then begin
-    case state of
-      gsNormal: ;
-      gsDisabled: backCol := RGBA.Lerp(backCol, RGBA.Black, 0.5);
-      gsHilighted: backCol := RGBA.Lerp(backCol, RGB(255,255,0), 0.33);
-      gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,255), 0.33);
-    end;
+  case state of
+    gsNormal: ;
+    gsDisabled: backCol := RGBA.Lerp(backCol, RGBA.Black, 0.5);
+    gsHighlighted: backCol := RGBA.Lerp(backCol, RGB(255,255,0), 0.33);
+    gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,255), 0.33);
   end;
 
   screen.canvas.dc.fillRect(bounds, backCol);
   screen.canvas.dc.drawRect(bounds, frameCol);
+end;
+
+function tGuiComponent.innerBounds: tRect;
+begin
+  result := style.padding.inset(bounds);
 end;
 
 procedure tGuiComponent.doDraw(screen: tScreen);
@@ -365,11 +369,11 @@ begin
 
   if fontStyle.centered then begin
     textRect := font.textExtents(text);
-    drawX := x+((width - textRect.width) div 2);
-    drawY := y+((height - textRect.height) div 2)-1;
+    drawX := innerBounds.x+((innerBounds.width - textRect.width) div 2);
+    drawY := innerBounds.y+((innerBounds.height - textRect.height) div 2)-1;
   end else begin
-    drawX := x+2;
-    drawY := y;
+    drawX := innerBounds.x;
+    drawY := innerBounds.y-1;
   end;
 
   if pressed then begin
@@ -456,6 +460,8 @@ end;
 {-----------------------}
 
 constructor tGuiButton.create(aPos: tPoint; aText: string='');
+var
+  s: tSprite;
 begin
   inherited Create();
 
@@ -465,14 +471,14 @@ begin
   bounds.y := aPos.y;
 
   fText := aText;
-  width := 100;
-  height := 19;
-  autoStyle := true;
-end;
+  width := 120;
 
-procedure tGuiButton.doDraw(screen: tScreen);
-begin
-  inherited doDraw(screen);
+  s := getSprite();
+  if assigned(s) then
+    height := 12+s.border.top + s.border.bottom
+  else
+    height := 19;
+
 end;
 
 begin
