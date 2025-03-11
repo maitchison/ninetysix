@@ -19,6 +19,7 @@ uses
   sprite,
   uMouse,
   uScreen,
+  uColor,
   uInput,
   uTimer,
   uScene,
@@ -79,13 +80,11 @@ end;
 procedure initGui();
 var
   style: tGuiStyle;
-  state: tGuiStyleState;
 
-  function makeGuiState(tag: string; aBorder: tBorder): tGuiStyleState;
+  function makeSprite(tag: string; aBorder: tBorder): tSprite;
   begin
-    state := tGuiStyleState.Create();
-    state.background := tSprite.Create(guiSkin.gfx[tag]);
-    state.background.border := aBorder;
+    result := tSprite.Create(guiSkin.gfx[tag]);
+    result.border := aBorder;
   end;
 
 begin
@@ -97,9 +96,14 @@ begin
   guiSkin.styles['default'] := style;
 
   style := tGuiStyle.Create();
-  style.state['normal'] := makeGuiState('ec_button_normal', Border(8,8,6,11));
+  style.fontStyle.centered := true;
+  style.fontStyle.shadow := true;
+  style.sprites['normal'] := makeSprite('ec_button_normal', Border(8,8,6,11));
   guiSkin.styles['button'] := style;
 
+  style.fontStyle.col := RGB(250, 250, 250);
+
+  DEFAULT_GUI_SKIN := guiSkin;
 end;
 
 begin

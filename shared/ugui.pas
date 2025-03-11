@@ -35,22 +35,18 @@ type
     shadow: boolean;
     centered: boolean;
     constructor Create();
-    destructor destroy; override;
-  end;
-
-  tGuiStyleState = class
-    background: tSprite;
-    textColor: RGBA;
-    constructor Create();
-    destructor destroy; override;
+    function clone(): tFontStyle;
   end;
 
   tGuiStyle = class
     fontStyle: tFontStyle;
-    state: tStringMap<tGuiStyleState>;
-    //sounds: tStringMap<tGuiSound>;
+    {maps from state to value}
+    sprites: tStringMap<tSprite>;
+    {these are not implemented yet}
+    //sounds: tStringMap<tSoundEffect>;
     constructor Create();
     destructor destroy; override;
+    function clone(): tGuiStyle;
   end;
 
   tGuiSkin = class
@@ -89,9 +85,7 @@ type
     procedure fireMessage(aMsg: string; args: array of const); overload;
     procedure fireMessage(aMsg: string); overload;
     {style}
-    function  getStateStyle(aState: string): tGuiStyleState;
-    function  getCurrentStateStyle(): tGuiStyleState;
-    function  getBackground(): tSprite;
+    function  getSprite(): tSprite;
     function  getTextColor(): RGBA;
     function  getFontStyle(): tFontStyle;
     function  getFont(): tFont;
@@ -108,12 +102,13 @@ type
     property y: integer read bounds.pos.y write bounds.pos.y;
     property width: integer read bounds.width write bounds.width;
     property height: integer read bounds.height write bounds.height;
-    property font: tFont read getFont;
     property text: string read fText write setText;
-    property fontStyle: tFontStyle read getFontStyle;
     property col: RGBA read fCol write fCol;
+    {style helpers}
+    property fontStyle: tFontStyle read getFontStyle;
+    property font: tFont read getFont;
     property textColor: RGBA read getTextColor;
-    property background: tSprite read getBackground;
+    property sprite: tSprite read getSprite;
   end;
 
   tGuiComponents = class
@@ -141,6 +136,13 @@ type
 
 const
   DEFAULT_GUI_SKIN: tGuiSkin = nil;
+  GUI_STATE_NAME: array[tGuiState] of string = (
+    'normal',
+    'disabled',
+    'hover',
+    'pressed',
+    'selected'
+  );
 
 implementation
 
@@ -168,27 +170,21 @@ constructor tGuiStyle.Create();
 begin
   inherited Create();
   fontStyle := tFontStyle.Create();
-  state := tStringMap<tGuiStyleState>.Create();
-  state['default'] := tGuiStyleState.Create();
+  sprites := tStringMap<tSprite>.Create();
 end;
 
 destructor tGuiStyle.destroy();
 begin
-  state.free;
+  fontStyle.free;
+  sprites.free;
   inherited destroy();
 end;
 
-{--------------------------------------------------------}
-
-constructor tGuiStyleState.Create();
+function tGuiStyle.clone(): tGuiStyle;
 begin
-  inherited Create();
-  textColor := RGBA.White;
-end;
-
-destructor tGuiStyleState.destroy();
-begin
-  inherited destroy();
+  result := tGuiStyle.Create();
+  result.fontStyle := fontStyle.clone.clone();
+  result.sprites := sprites.clone();
 end;
 
 {--------------------------------------------------------}
@@ -202,9 +198,12 @@ begin
   centered := false;
 end;
 
-destructor tFontStyle.destroy();
+function tFontStyle.clone(): tFontStyle;
 begin
-  inherited destroy();
+  result.col := col;
+  result.font := font;
+  result.shadow := shadow;
+  result.centered := centered;
 end;
 
 {--------------------------------------------------------}
@@ -256,34 +255,15 @@ begin
   }
 end;
 
-function tGuiComponent.getStateStyle(aState: string): tGuiStyleState;
+function tGuiComponent.getSprite(): tSprite;
 begin
-  if not style.state.contains(aState) then
-    result := style.state['default']
-  else
-    result := style.state[aState]
-end;
-
-function tGuiComponent.getCurrentStateStyle(): tGuiStyleState;
-begin
-  case state of
-    gsNormal: result := getStateStyle('normal');
-    gsDisabled: result := getStateStyle('disabled');
-    gsHover: result := getStateStyle('hover');
-    gsPressed: result := getStateStyle('pressed');
-    gsSelected: result := getStateStyle('selected');
-    else result := getStateStyle('default');
-  end;
-end;
-
-function tGuiComponent.getBackground(): tSprite;
-begin
-  result := getCurrentStateStyle().background;
+  result := style.sprites.getWithDefault(GUI_STATE_NAME[state], nil);
 end;
 
 function tGuiComponent.getTextColor(): RGBA;
 begin
-  result := getCurrentStateStyle().textColor;
+  {todo: make this state dependant}
+  result := fontStyle.col;
 end;
 
 function tGuiComponent.getFontStyle(): tFontStyle;
@@ -293,7 +273,7 @@ end;
 
 function tGuiComponent.getFont(): tFont;
 begin
-  result := getFontStyle.font;
+  result := fontStyle.font;
 end;
 
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
@@ -438,10 +418,12 @@ begin
   inherited Create();
   bounds.x := aPos.x;
   bounds.y := aPos.y;
-  {todo: remove}
+  {todo: remove (well clone the 'label' style and update.}
+  {
   fontStyle.centered := false;
   fontStyle.shadow := false;
   fontStyle.col := RGB(250, 250, 250);
+  }
   col := RGBA.Clear;
   text := aText;
   autoSize := true;
@@ -460,13 +442,12 @@ end;
 constructor tGuiButton.create(aPos: tPoint; aText: string='');
 begin
   inherited Create();
+
+  style := DEFAULT_GUI_SKIN.styles['button'];
+
   bounds.x := aPos.x;
   bounds.y := aPos.y;
-  {
-  fTextStyle.centered := true;
-  fTextStyle.shadow := true;
-  fTextStyle.col := RGB(250, 250, 250);
-  }
+
   fText := aText;
   width := 100;
   height := 19;

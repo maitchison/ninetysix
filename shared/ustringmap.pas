@@ -20,11 +20,22 @@ type
     function getByKey(aKey: string): T;
     procedure setByKey(aKey: string; aValue: T);
   public
+    function clone(): tStringMap<T>;
+    function getWithDefault(aKey: string; defaultValue: T): T;
     property items[key: string]: T read getByKey write setByKey; default;
     function contains(aKey: string): boolean;
   end;
 
 implementation
+
+function tStringMap<T>.clone(): tStringMap<T>;
+var
+  i: integer;
+begin
+  result := tStringMap<T>.Create();
+  for i := 0 to length(keys)-1 do
+    result[keys[i]] := values[i];
+end;
 
 function tStringMap<T>.getByKey(aKey: string): T;
 var
@@ -57,6 +68,14 @@ begin
   for i := 0 to length(keys)-1 do
     if (keys[i] = aKey) then exit(true);
   exit(false);
+end;
+
+function tStringMap<T>.getWithDefault(aKey: string; defaultValue: T): T;
+begin
+  if contains(aKey) then
+    result := getByKey(aKey)
+  else
+    result := defaultValue;
 end;
 
 begin
