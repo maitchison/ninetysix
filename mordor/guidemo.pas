@@ -87,6 +87,20 @@ var
     result.border := aBorder;
   end;
 
+  procedure makeStateSprites(style: tGuiStyle; tag: string; aBorder: tBorder);
+  var
+    state: string;
+    gfxName: string;
+  begin
+    for state in GUI_STATE_NAME do begin
+      gfxName := tag+'_'+state;
+      if guiSkin.gfx.hasResource(gfxName) then
+        style.sprites[state] := makeSprite(gfxName, aBorder)
+      else
+        warning('Missing '+gfxName);
+    end;
+  end;
+
 begin
   guiSkin := tGuiSkin.Create();
   guiSkin.gfx.loadFromFolder('gui', '*.p96');
@@ -98,10 +112,9 @@ begin
   style := tGuiStyle.Create();
   style.fontStyle.centered := true;
   style.fontStyle.shadow := true;
-  style.sprites['normal'] := makeSprite('ec_button_normal', Border(8,8,6,11));
-  guiSkin.styles['button'] := style;
-
   style.fontStyle.col := RGB(250, 250, 250);
+  makeStateSprites(style, 'ec_button', Border(8,8,6,11));
+  guiSkin.styles['button'] := style;
 
   DEFAULT_GUI_SKIN := guiSkin;
 end;

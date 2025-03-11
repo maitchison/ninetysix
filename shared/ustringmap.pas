@@ -43,7 +43,7 @@ var
 begin
   for i := 0 to length(keys)-1 do
     if keys[i] = aKey then exit(values[i]);
-  raise ValueError('Key not found '+aKey);
+  raise ValueError('Key not found "'+aKey+'"');
 end;
 
 procedure tStringMap<T>.setByKey(aKey: string; aValue: T);

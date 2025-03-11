@@ -57,7 +57,7 @@ type
     destructor destroy; override;
   end;
 
-  tGuiState = (gsNormal, gsDisabled, gsHover, gsPressed, gsSelected);
+  tGuiState = (gsNormal, gsDisabled, gsHilighted, gsPressed, gsSelected);
 
   tGuiComponent = class;
 
@@ -84,6 +84,7 @@ type
     procedure setText(aText: string); virtual;
     procedure fireMessage(aMsg: string; args: array of const); overload;
     procedure fireMessage(aMsg: string); overload;
+    procedure defaultBackgroundDraw(screen: tScreen);
     {style}
     function  getSprite(): tSprite;
     function  getTextColor(): RGBA;
@@ -108,7 +109,6 @@ type
     property fontStyle: tFontStyle read getFontStyle;
     property font: tFont read getFont;
     property textColor: RGBA read getTextColor;
-    property sprite: tSprite read getSprite;
   end;
 
   tGuiComponents = class
@@ -139,7 +139,7 @@ const
   GUI_STATE_NAME: array[tGuiState] of string = (
     'normal',
     'disabled',
-    'hover',
+    'hilighted',
     'pressed',
     'selected'
   );
@@ -302,7 +302,7 @@ function tGuiComponent.state: tGuiState;
 begin
   if not enabled then exit(gsDisabled);
   if pressed then exit(gsPressed);
-  if mouseOverThisFrame then exit(gsHover);
+  if mouseOverThisFrame then exit(gsHilighted);
   exit(gsNormal);
 end;
 
@@ -325,27 +325,43 @@ begin
   // pass
 end;
 
-procedure tGuiComponent.doDraw(screen: tScreen);
+{the fallback default background draw}
+procedure tGuiComponent.defaultBackgroundDraw(screen: tScreen);
 var
-  drawX, drawY: integer;
-  textRect: tRect;
   backCol, frameCol: RGBA;
-  style: tGuiStyle;
 begin
+
   backCol := col;
   frameCol := RGB(0,0,0,backCol.a div 2);
+
   if autoStyle then begin
     case state of
       gsNormal: ;
       gsDisabled: backCol := RGBA.Lerp(backCol, RGBA.Black, 0.5);
-      gsHover: backCol := RGBA.Lerp(backCol, RGB(255,255,0), 0.33);
+      gsHilighted: backCol := RGBA.Lerp(backCol, RGB(255,255,0), 0.33);
       gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,255), 0.33);
     end;
   end;
 
-  {draw background}
   screen.canvas.dc.fillRect(bounds, backCol);
   screen.canvas.dc.drawRect(bounds, frameCol);
+end;
+
+procedure tGuiComponent.doDraw(screen: tScreen);
+var
+  drawX, drawY: integer;
+  textRect: tRect;
+  style: tGuiStyle;
+  s: tSprite;
+begin
+
+  {draw background}
+  s := getSprite();
+  if assigned(s) then begin
+    s.nineSlice(screen.canvas, bounds);
+  end else begin
+    defaultBackgroundDraw(screen);
+  end;
 
   if fontStyle.centered then begin
     textRect := font.textExtents(text);
