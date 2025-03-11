@@ -3,7 +3,6 @@ unit uList;
 
 {
 Note: generics seems to make FPC crash... :(
-
 }
 
 interface

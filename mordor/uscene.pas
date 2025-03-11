@@ -13,7 +13,7 @@ uses
 type
   tScene = class
   public
-    gui: tGuiComponents;
+    gui: tGuiContainer;
     screen: tScreen;
     fpsLabel: tGuiLabel;
     constructor Create();
@@ -26,7 +26,7 @@ implementation
 constructor tScene.Create();
 begin
   inherited Create();
-  gui := tGuiComponents.Create();
+  gui := tGuiContainer.Create();
   screen := tScreen.Create();
 
   {default gui}

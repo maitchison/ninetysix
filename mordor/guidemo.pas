@@ -44,6 +44,7 @@ var
   elapsed: single;
   myButton: tGuiButton;
   myLabel: tGuiLabel;
+  myPanel: tGuiPanel;
 begin
 
   timer := tTimer.create('main');

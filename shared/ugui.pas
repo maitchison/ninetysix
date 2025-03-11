@@ -69,7 +69,6 @@ type
     isVisible: boolean;
     isEnabled: boolean;
     isPressed: boolean;
-    {standard label like draw}
     fText: string;
     fCol: RGBA;
     fHookKey: tStrings;
@@ -109,11 +108,15 @@ type
     property textColor: RGBA read fontStyle.col write fontStyle.col;
   end;
 
-  tGuiComponents = class
+  tGuiContainer = class(tGuiComponent)
+  protected
     elements: array of tGuiComponent;
+  public
+    constructor Create();
+    destructor destroy; override;
     procedure append(x: tGuiComponent); virtual;
-    procedure draw(screen: tScreen); virtual;
-    procedure update(elapsed: single); virtual;
+    procedure doDraw(screen: tScreen); override;
+    procedure doUpdate(elapsed: single); override;
   end;
 
 const
@@ -183,20 +186,37 @@ end;
 
 {--------------------------------------------------------}
 
-procedure tGuiComponents.append(x: tGuiComponent);
+constructor tGuiContainer.Create();
+begin
+  inherited Create();
+  {todo: think of some reasonable bounds}
+  bounds := Rect(0,0,1024,1024);
+  setLength(elements, 0);
+end;
+
+destructor tGuiContainer.destroy;
+var
+  gc: tGuiComponent;
+begin
+  for gc in elements do gc.free;
+  setLength(elements, 0);
+  inherited destroy;
+end;
+
+procedure tGuiContainer.append(x: tGuiComponent);
 begin
   setLength(elements, length(elements)+1);
   elements[length(elements)-1] := x;
 end;
 
-procedure tGuiComponents.draw(screen: tScreen);
+procedure tGuiContainer.doDraw(screen: tScreen);
 var
   gc: tGuiComponent;
 begin
   for gc in elements do gc.draw(screen);
 end;
 
-procedure tGuiComponents.update(elapsed: single);
+procedure tGuiContainer.doUpdate(elapsed: single);
 var
   gc: tGuiComponent;
   code: word;
