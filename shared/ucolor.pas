@@ -68,6 +68,7 @@ type
 
 function RGB(d: dword): RGBA; inline; overload;
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline; overload;
+function RGBF(r,g,b: single;a: single=1.0): RGBA;
 
 implementation
 
@@ -79,6 +80,11 @@ uses
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
 begin
   result := RGBA.create(r,g,b,a);
+end;
+
+function RGBF(r,g,b: single;a: single=1.0): RGBA;
+begin
+  result := RGBA.create(round(r*255),round(g*255),round(b*255),round(a*255));
 end;
 
 function RGB(d: dword): RGBA; inline;

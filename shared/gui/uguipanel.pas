@@ -26,7 +26,8 @@ var
 begin
   inherited Create();
 
-  style := DEFAULT_GUI_SKIN.styles['button'].clone();
+  col := RGB(128,128,128);
+  style := DEFAULT_GUI_SKIN.styles['panel'].clone();
   bounds := rect;
 end;
 

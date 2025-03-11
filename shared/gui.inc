@@ -2,3 +2,4 @@
   uGuiButton,
   uGuiLabel,
   uGuiPanel,
+  uGuiWindow,

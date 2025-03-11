@@ -356,13 +356,13 @@ begin
   {middle part}
 
   srcRect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
-  drawStretched(DstPage, TRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
+  drawStretched(dstPage, tRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
 
   srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
   drawStretched(dstPage, tRect.Inset(drawRect, border.left, border.top, -border.right, -border.bottom));
 
   srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
-  drawStretched(DstPage, TRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
+  drawStretched(dstPage, tRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 
 
   {bottom part}

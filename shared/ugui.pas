@@ -90,8 +90,8 @@ type
     fontStyle: tFontStyle;
   public
     constructor Create();
-    procedure draw(screen: tScreen);
-    procedure update(elapsed: single);
+    procedure draw(screen: tScreen); virtual;
+    procedure update(elapsed: single); virtual;
     function  state: tGuiState;
     procedure addHook(aMsg: string; aProc: tHookProc);
   public
@@ -115,8 +115,8 @@ type
     constructor Create();
     destructor destroy; override;
     procedure append(x: tGuiComponent); virtual;
-    procedure doDraw(screen: tScreen); override;
-    procedure doUpdate(elapsed: single); override;
+    procedure draw(screen: tScreen); override;
+    procedure update(elapsed: single); override;
   end;
 
 const
@@ -192,6 +192,8 @@ begin
   {todo: think of some reasonable bounds}
   bounds := Rect(0,0,1024,1024);
   setLength(elements, 0);
+  {make sure we don't draw background}
+  fCol.a := 0;
 end;
 
 destructor tGuiContainer.destroy;
@@ -209,19 +211,19 @@ begin
   elements[length(elements)-1] := x;
 end;
 
-procedure tGuiContainer.doDraw(screen: tScreen);
+procedure tGuiContainer.draw(screen: tScreen);
 var
   gc: tGuiComponent;
 begin
-  for gc in elements do gc.draw(screen);
+  doDraw(screen);
+  for gc in elements do if gc.isVisible then gc.draw(screen);
 end;
 
-procedure tGuiContainer.doUpdate(elapsed: single);
+procedure tGuiContainer.update(elapsed: single);
 var
   gc: tGuiComponent;
   code: word;
 begin
-
   {process keys, if any}
   while true do begin
     code := dosGetKey.code;
@@ -232,7 +234,9 @@ begin
     end;
   end;
 
-  for gc in elements do gc.update(elapsed);
+  for gc in elements do if gc.isEnabled then gc.update(elapsed);
+
+  doUpdate(elapsed)
 end;
 
 {--------------------------------------------------------}
@@ -246,8 +250,11 @@ begin
 end;
 
 function tGuiComponent.getSprite(): tSprite;
+var
+  defaultSprite: tSprite;
 begin
-  result := style.sprites.getWithDefault(GUI_STATE_NAME[state], nil);
+  defaultSprite := style.sprites.getWithDefault('default', nil);
+  result := style.sprites.getWithDefault(GUI_STATE_NAME[state], defaultSprite);
 end;
 
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
@@ -308,6 +315,8 @@ var
   backCol, frameCol: RGBA;
   dc: tDrawContext;
 begin
+
+  if col.a = 0 then exit;
 
   backCol := col;
   frameCol := RGB(0,0,0,backCol.a div 2);
