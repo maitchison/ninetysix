@@ -66,8 +66,8 @@ type
     procedure stretchSubImage(src: tPage; dstRect: tRect; srcRect: tRect); overload;
     {constructed}
     procedure drawImage(src: tPage; pos: tPoint);
-    procedure fillRect(rect: tRect; col: RGBA);
-    procedure drawRect(rect: tRect; col: RGBA);
+    procedure fillRect(dstRect: tRect; col: RGBA);
+    procedure drawRect(dstRect: tRect; col: RGBA);
     procedure stretchImage(src: tPage; dstRect: tRect);
   end;
 
@@ -126,10 +126,6 @@ procedure assertEqual(a, b: RGBA;msg: string=''); overload;
 procedure assertEqual(a, b: tPage); overload;
 
 implementation
-
-uses
-  sprite,
-  bmp;
 
 {$include graph32_REF.inc}
 {$include graph32_ASM.inc}
@@ -645,11 +641,12 @@ begin
   applyTransform(pos);
   if not clip.isInside(pos.x, pos.y) then exit;
   applyTint(col);
-
   case smartBM(col) of
+    bmNone: exit;
     bmBlit: page.setPixel(pos.x, pos.y, col);
     bmBlend: page.putPixel(pos.x, pos.y, col);
   end;
+  markRegion(Rect(pos.x, pos.y, 1, 1));
 end;
 
 procedure tDrawContext.hLine(pos: tPoint;len: int32;col: RGBA);
@@ -669,9 +666,42 @@ begin
   pixels := page.getAddress(pos.x, pos.y);
 
   case smartBM(col) of
+    bmNone:   exit;
     bmBlit:   doBlitCol(pixels, len, col);
     bmBlend:  doBlendCol(pixels, len, col);
   end;
+  markRegion(Rect(pos.x, pos.y, len, 1));
+end;
+
+procedure tDrawContext.fillRect(dstRect: tRect; col: RGBA);
+var
+  y: integer;
+  pixels: pointer;
+  stride: dword;
+  len: dword;
+begin
+
+  applyTransform(dstRect.pos);
+  dstRect.clipTo(clip);
+  if dstRect.isEmpty then exit;
+
+  applyTint(col);
+  pixels := page.getAddress(dstRect.pos.x, dstRect.pos.y);
+  stride := page.width * 4;
+
+  case smartBM(col) of
+    bmNone:   exit;
+    bmBlit:   for y := dstRect.top to dstRect.bottom-1 do begin
+      doBlitCol(pixels, dstRect.width, col);
+      pixels += stride;
+    end;
+    bmBlend:  for y := dstRect.top to dstRect.bottom-1 do begin
+      doBlendCol(pixels, dstRect.width, col);
+      pixels += stride;
+    end;
+  end;
+
+  markRegion(dstRect);
 end;
 
 procedure tDrawContext.vLine(pos: tPoint;len: int32;col: RGBA);
@@ -689,10 +719,12 @@ begin
   applyTint(col);
 
   case smartBM(col) of
-    bmNone: ;
+    bmNone: exit;
     bmBlit: for i := 0 to len-1 do page.setPixel(pos.x, pos.y+i, col);
     bmBlend: for i := 0 to len-1 do page.putPixel(pos.x, pos.y+i, col);
   end;
+
+  markRegion(Rect(pos.x, pos.y, 1, len));
 end;
 
 procedure tDrawContext.drawSubImage(src: tPage; pos: tPoint; srcRect: tRect);
@@ -711,7 +743,7 @@ begin
   srcRect.pos += (pos - dstRect.pos); // might be the wrong way around..?
 
   case blendMode of
-    bmNone: ;
+    bmNone: exit;
     bmBlit: begin
       if hasTint then
         doTintImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint)
@@ -721,7 +753,12 @@ begin
     bmBlend:
       doBlendImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint);
   end;
+  markRegion(dstRect);
 end;
+
+{-------------------------------------}
+{ constructed }
+{-------------------------------------}
 
 procedure tDrawContext.stretchSubImage(src: tPage; pos: tPoint; scaleX, scaleY: single; srcRect: tRect);
 var
@@ -773,31 +810,17 @@ begin
   drawSubImage(src, pos, src.bounds);
 end;
 
-procedure tDrawContext.fillRect(rect: tRect; col: RGBA);
-var
-  pos: tPoint;
-  y: integer;
-begin
-  {transform, then clip, then restore... only for performance reasons}
-  applyTransform(rect.pos);
-  rect.clipTo(clip);
-  if rect.isEmpty then exit;
-  applyTransformInv(rect.pos);
-  for y := rect.top to rect.bottom-1 do
-    hLine(Point(rect.left, y), rect.width, col);
-end;
-
-procedure tDrawContext.drawRect(rect: tRect; col: RGBA);
-begin
-  hLine(rect.topLeft, rect.width, col);
-  hLine(Point(rect.left, rect.bottom-1), rect.width, col);
-  vLine(Point(rect.left, rect.top+1), rect.height-2, col);
-  vLine(Point(rect.right-1, rect.top+1), rect.height-2, col);
-end;
-
 procedure tDrawContext.stretchImage(src: tPage; dstRect: tRect);
 begin
   stretchSubImage(src, dstRect, src.bounds);
+end;
+
+procedure tDrawContext.drawRect(dstRect: tRect; col: RGBA);
+begin
+  hLine(dstRect.topLeft, dstRect.width, col);
+  hLine(Point(dstRect.left, dstRect.bottom-1), dstRect.width, col);
+  vLine(Point(dstRect.left, dstRect.top+1), dstRect.height-2, col);
+  vLine(Point(dstRect.right-1, dstRect.top+1), dstRect.height-2, col);
 end;
 
 {-------------------------------------------------}
