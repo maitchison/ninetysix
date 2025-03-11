@@ -6,20 +6,21 @@ interface
 uses
   debug,
   test,
-  font,
   utils,
+  graph32,
+
+  uFont,
   uMouse,
   uInput,
   uMap,
-  sound,
-  mixLib,
-  sysTypes,
+  uSound,
+  uMixer,
+  uTypes,
   uColor,
-  graph2d,
-  graph32,
-  keyboard,
+  uRect,
+  uKeyboard,
   uStringMap,
-  sprite,
+  uSprite,
   uScreen;
 
 const
