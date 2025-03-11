@@ -53,14 +53,14 @@ type
     function  clone(): tSprite;
 
     function  getPixel(atX, atY: integer): RGBA;
-    procedure blit(dstPage: tPage; atX, atY: int32);
     procedure trim();
-    function  draw(dstPage: tPage; atX, atY: int32): tRect;
-    function  drawFlipped(dstPage: tPage; atX, atY: int32): tRect;
-    function  drawStretched(DstPage: TPage; dest: tRect): tRect;
-    function  drawRotated(dstPage: tPage; atPos: tPoint;zAngle: single; scale: single=1.0): tRect;
-    function  drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4): tRect;
-    procedure nineSlice(dstPage: TPage; drawRect: tRect);
+
+    procedure draw(const dc: tDrawContext; atX, atY: int32);
+    procedure drawFlipped(const dc: tDrawContext; atX, atY: int32);
+    procedure drawStretched(const dc: tDrawContext; dstRect: tRect);
+    procedure drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
+    procedure drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
+    procedure drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddleSlice: boolean=False);
 
     {iIniSerializable}
     procedure writeToIni(ini: tIniWriter);
@@ -93,9 +93,6 @@ uses
   keyboard, //stub
   myMath,
   filesystem;
-
-{$i sprite_ref.inc}
-{$i sprite_asm.inc}
 
 function Border(aLeft, aTop, aRight, aBottom: Integer): tBorder;
 begin
@@ -235,19 +232,26 @@ begin
   //note('Sprite trim: old:%s new:%s', [oldRect.toString, srcRect.toString]);
 end;
 
+function tSprite.getPixel(atX, atY: integer): RGBA;
+begin
+  fillchar(result, sizeof(result), 0);
+  if (atX < 0) or (atY < 0) or (atX >= srcRect.width) or (atY >= srcRect.height) then exit;
+  result := page.getPixel(atX+srcRect.x, atY+srcRect.y);
+end;
+
 {Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
-function tSprite.draw(dstPage: tPage; atX, atY: integer): tRect;
+procedure tSprite.draw(const dc: tDrawContext; atX, atY: integer);
 begin
   atX -= pivot2x.x div 2;
   atY -= pivot2x.y div 2;
-  {todo: make this ASM/MMX!}
-  draw_REF(dstPage, self.page, srcRect, atX, atY);
-  result.init(atX, atY, width, height);
+  dc.drawSubImage(page, Point(atX, atY), srcRect);
 end;
 
 {Draws sprite flipped on x-axis}
-function tSprite.drawFlipped(dstPage: tPage; atX, atY: integer): tRect;
+procedure tSprite.drawFlipped(const dc: tDrawContext; atX, atY: integer);
 begin
+  //NIY
+  {
   atX -= pivot2x.x div 2;
   atY -= pivot2x.y div 2;
   polyDraw_ASM(dstPage, page, srcRect,
@@ -256,45 +260,36 @@ begin
     Point(atX, atY + srcRect.height - 1),
     Point(atX + srcRect.width - 1, atY + srcRect.height - 1)
   );
-  result.init(atX, atY, width, height);
-end;
-
-function tSprite.getPixel(atX, atY: integer): RGBA;
-begin
-  fillchar(result, sizeof(result), 0);
-  if (atX < 0) or (atY < 0) or (atX >= srcRect.width) or (atY >= srcRect.height) then exit;
-  result := page.getPixel(atX+srcRect.x, atY+srcRect.y);
-end;
-
-{Copy sprite to screen at given location, no alpha blending}
-procedure tSprite.blit(dstPage: tPage; atX, atY: Integer);
-begin
-  dstPage.dc(bmBlit).drawSubImage(page, Point(atX, atY), srcRect);
+  }
 end;
 
 {Draws sprite stetched to cover destination rect}
-function tSprite.drawStretched(dstPage: tPage; dest: tRect): tRect;
+procedure tSprite.drawStretched(const dc: tDrawContext; dstRect: tRect);
 begin
-  {todo: switch to drawTransformed}
-  stretchDraw_ASM(dstPage, Self.page, Self.srcRect, dest);
-  result := dest;
+  dc.stretchSubImage(page, dstRect, srcRect);
 end;
 
-function tSprite.drawRotated(dstPage: tPage; atPos: tPoint;zAngle: single; scale: single=1.0): tRect;
+procedure tSprite.drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
 var
   transform: tMatrix4x4;
 begin
+  // NIY
+  (*
   {todo: switch to a 3x2 matrix for this stuff}
   transform.setIdentity();
   transform.translate(V3(-pivot2x.x/2, -pivot2x.y/2, 0));
   transform.rotateXYZ(0, 0, zAngle * DEG2RAD);
   transform.scale(scale);
   result := drawTransformed(dstPage, V3(atPos.x, atPos.y, 0), transform);
+  *)
 end;
 
 {identity transform will the centered on sprite center...
  todo: implement a default anchor}
-function tSprite.drawTransformed(dstPage: tPage; pos: V3D;transform: tMatrix4x4): tRect;
+procedure tSprite.drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
+begin
+  // NIY
+(*
 var
   p1,p2,p3,p4: tPoint;
   minX, minY, maxX, maxY: integer;
@@ -331,53 +326,42 @@ begin
   );
   result := Rect(minX, minY, maxX-minX+1, maxY-minY+1);
 end;
+*)
+end;
 
 {Draw sprite using nine-slice method}
-procedure tSprite.NineSlice(dstPage: TPage; drawRect: tRect);
+procedure tSprite.drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddleSlice: boolean=False);
 var
   oldRect: tRect;
 begin
-
-  if not assigned(self) then
-    fatal('Tried drawing unassigned sprite');
 
   oldRect := srcRect;
 
   {top part}
   srcRect := tRect.inset(oldRect, 0, 0, border.left, border.top);
-  draw(dstPage, drawRect.x, drawRect.y);
-
+  draw(dc, dstRect.x, dstRect.y);
   srcRect := tRect.Inset(oldRect,Border.Left, 0, -Border.Right, Border.Top);
-  drawStretched(DstPage, tRect.Inset(drawRect, border.left, 0, -border.right, border.top));
-
+  drawStretched(dc, tRect.Inset(dstRect, border.left, 0, -border.right, border.top));
   srcRect := tRect.Inset(oldRect,-Border.Right, 0, 0, Border.Top);
-  draw(DstPage, drawRect.x+drawRect.width-Border.right, drawRect.y);
+  draw(dc, dstRect.x+dstRect.width-Border.right, dstRect.y);
 
   {middle part}
-
   srcRect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
-  drawStretched(dstPage, tRect.Inset(DrawRect, 0, Border.Top, Border.Left, -Border.Bottom));
-
+  drawStretched(dc, tRect.Inset(dstRect, 0, Border.Top, Border.Left, -Border.Bottom));
   srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
-  drawStretched(dstPage, tRect.Inset(drawRect, border.left, border.top, -border.right, -border.bottom));
-
+  drawStretched(dc, tRect.Inset(dstRect, border.left, border.top, -border.right, -border.bottom));
   srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
-  drawStretched(dstPage, tRect.Inset(DrawRect,-Border.Right, Border.Top, 0, -Border.Bottom));
-
+  drawStretched(dc, tRect.Inset(dstRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 
   {bottom part}
-
   srcRect := tRect.Inset(oldRect,0, -Border.Bottom, Border.Left, 0);
-  draw(DstPage, drawRect.x, drawRect.y+drawRect.height-Border.Bottom);
-
+  draw(dc, dstRect.x, dstRect.y+dstRect.height-Border.Bottom);
   srcRect := tRect.Inset(oldRect,Border.Left, -Border.Bottom, -Border.Right, 0);
-  drawStretched(DstPage, TRect.Inset(DrawRect,Border.Left, -Border.Bottom, -Border.Right, 0));
-
+  drawStretched(dc, TRect.Inset(dstRect,Border.Left, -Border.Bottom, -Border.Right, 0));
   srcRect := tRect.Inset(oldRect,-Border.Right, -Border.Bottom, 0, 0);
-  draw(DstPage, drawRect.x+drawRect.width-Border.Right, drawRect.y+drawRect.height-Border.Bottom);
+  draw(dc, dstRect.x+dstRect.width-Border.Right, dstRect.y+dstRect.height-Border.Bottom);
 
   srcRect := oldRect;
-
 end;
 
 {create a shallow copy of the sprite}
@@ -569,6 +553,7 @@ var
   end;
 
 begin
+(*
   page := tPage.create(4,4);
   spritePage := tPage.create(2,2);
   c[0] := RGB(0,0,0); c[1] := RGB(255,0,0); c[2] := RGB(0,255,0); c[3] := RGB(0,0,255); c[4] := RGB(255,0,255);
@@ -606,8 +591,7 @@ begin
   page.free;
   spritePage.free;
   sprite.free;
-
-
+*)
 end;
 
 procedure tSpriteTest.run();
@@ -646,6 +630,5 @@ begin
 end;
 
 initialization
-  //stub: turn these off.. we'll enable them once we've finished redoing the drawing code
-  //tSpriteTest.create('Sprite');
+  tSpriteTest.create('Sprite');
 end.

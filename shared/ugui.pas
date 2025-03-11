@@ -356,7 +356,7 @@ begin
   {draw background}
   s := getSprite();
   if assigned(s) then begin
-    s.nineSlice(screen.canvas, bounds);
+    s.drawNineSlice(screen.canvas.dc, bounds);
   end else begin
     defaultBackgroundDraw(screen);
   end;

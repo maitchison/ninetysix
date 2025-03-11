@@ -63,6 +63,9 @@ function UVCoord(p: tPoint): tUVCoord; overload;
 
 implementation
 
+{$i poly_ref.inc}
+{$i poly_asm.inc}
+
 {----------------------------------------------------}
 
 function min4(a,b,c,d: int32): int32; inline;

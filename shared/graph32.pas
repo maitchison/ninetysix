@@ -47,6 +47,7 @@ type
     procedure applyTint(var col: RGBA); inline;
     function  smartBM(col: RGBA): tBlendMode;
     function  hasTint: boolean; inline;
+    procedure markRegion(const rect: tRect); inline;
 
     {dispatch}
     procedure doBlitCol(pixels: pRGBA;len: int32;col: RGBA);
@@ -67,6 +68,7 @@ type
     procedure drawImage(src: tPage; pos: tPoint);
     procedure fillRect(rect: tRect; col: RGBA);
     procedure drawRect(rect: tRect; col: RGBA);
+    procedure stretchImage(src: tPage; dstRect: tRect);
   end;
 
   {page using 32bit RGBA color}
@@ -483,50 +485,33 @@ begin
 end;
 
 function tPage.resized(aWidth, aHeight: integer): tPage;
-var
-  new: tPage;
-  s: tSprite;
 begin
-  new := tPage.create(aWidth, aHeight);
-  s := tSprite.create(self);
-  s.blit(new, 0, 0);
-  s.free();
-  result := new;
+  result := tPage.create(aWidth, aHeight);
+  result.dc(bmBlit).drawImage(self, Point(0, 0));
 end;
 
 procedure tPage.resize(aWidth, aHeight: integer);
 var
   tmp: tPage;
-  s: tSprite;
 begin
   tmp := self.clone();
   self.width := aWidth;
   self.height := aHeight;
-  freemem(self.pixels);
+  freeMem(self.pixels);
   getMem(self.pixels, aWidth*aHeight*4);
-  fillchar(self.pixels^, aWidth*aHeight*4, 0);
-  s := tSprite.create(tmp);
-  s.blit(self, 0, 0);
-  s.free();
-  note(hexStr(tmp));
-  tmp.free();
+  dc(bmBlit).drawImage(tmp, Point(0, 0));
+  tmp.free;
 end;
 
 function tPage.bounds(): tRect; inline;
 begin
-  result := Rect(0,0,width,height);
+  result := Rect(0, 0, width, height);
 end;
 
 function tPage.scaled(aWidth, aHeight: integer): tPage;
-var
-  new: tPage;
-  s: tSprite;
 begin
-  new := tPage.create(aWidth, aHeight);
-  s := tSprite.create(self);
-  s.drawStretched(new, rect(aWidth, aHeight));
-  s.free();
-  result := new;
+  result := tPage.create(aWidth, aHeight);
+  result.dc.stretchImage(self, result.bounds);
 end;
 
 {Sets all instances of this color to transparent}
@@ -648,6 +633,11 @@ end;
 function tDrawContext.hasTint: boolean; inline;
 begin
   result := int32(tint) <> -1;
+end;
+
+procedure tDrawContext.markRegion(const rect: tRect); inline;
+begin
+  // pass
 end;
 
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
@@ -803,6 +793,11 @@ begin
   hLine(Point(rect.left, rect.bottom-1), rect.width, col);
   vLine(Point(rect.left, rect.top+1), rect.height-2, col);
   vLine(Point(rect.right-1, rect.top+1), rect.height-2, col);
+end;
+
+procedure tDrawContext.stretchImage(src: tPage; dstRect: tRect);
+begin
+  stretchSubImage(src, dstRect, src.bounds);
 end;
 
 {-------------------------------------------------}
