@@ -20,11 +20,13 @@ type
 
 implementation
 
-constructor tGuiButton.create(aPos: tPoint; aText: string='');
+constructor tGuiButton.Create(aPos: tPoint; aText: string='');
 var
   s: tSprite;
 begin
   inherited Create();
+
+  isInteractive := true;
 
   style := DEFAULT_GUI_SKIN.styles['button'].clone();
 
@@ -35,14 +37,10 @@ begin
   bounds.x := aPos.x;
   bounds.y := aPos.y;
 
-  fText := aText;
-  width := 120;
+  text := aText;
 
-  s := getSprite();
-  if assigned(s) then
-    height := 12+s.border.top + s.border.bottom
-  else
-    height := 19;
+  sizeToContent();
+
 end;
 
 begin

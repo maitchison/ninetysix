@@ -42,14 +42,17 @@ procedure tGuiScene.run();
 var
   timer: tTimer;
   elapsed: single;
-  button: tGuiButton;
+  myButton: tGuiButton;
+  myLabel: tGuiLabel;
 begin
 
   timer := tTimer.create('main');
 
-  button := tGuiButton.Create(Point(10, 10));
-  button.text :='Test Button';
-  gui.append(button);
+  myButton := tGuiButton.Create(Point(10, 100), 'Test button');
+  gui.append(myButton);
+
+  myLabel := tGuiLabel.MakeLabel(Point(10, 150), 'This is some text that is a bit longer.');
+  gui.append(myLabel);
 
   repeat
 
@@ -115,8 +118,10 @@ begin
   guiSkin.styles['box'] := style;
 
   style := tGuiStyle.Create();
-  style.padding.init(8,8,6,11);
+  style.padding.init(8,5,8,9);
   makeStateSprites(style, 'ec_button', Border(8,8,6,11));
+  style.sounds['clickup'] := sfx['clickup'];
+  style.sounds['clickdown'] := sfx['clickdown'];
   guiSkin.styles['button'] := style;
 
   style := tGuiStyle.Create();

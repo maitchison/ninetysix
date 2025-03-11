@@ -41,8 +41,7 @@ type
     padding: tBorder;       // how far to inset objects
     {maps from state to value}
     sprites: tStringMap<tSprite>;
-    {these are not implemented yet}
-    //sounds: tStringMap<tSoundEffect>;
+    sounds: tStringMap<tSoundEffect>;
     constructor Create();
     destructor destroy; override;
     function clone(): tGuiStyle;
@@ -66,9 +65,10 @@ type
   protected
     style: tGuiStyle;
     bounds: tRect;
-    visible: boolean;
-    enabled: boolean;
-    pressed: boolean;
+    isInteractive: boolean;
+    isVisible: boolean;
+    isEnabled: boolean;
+    isPressed: boolean;
     {standard label like draw}
     fText: string;
     fCol: RGBA;
@@ -84,6 +84,7 @@ type
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(screen: tScreen);
     function  innerBounds: tRect;
+    procedure sizeToContent(); virtual;
     {style}
     function  getSprite(): tSprite;
   public
@@ -152,11 +153,13 @@ begin
   inherited Create();
   padding := Border(2,2,2,2);
   sprites := tStringMap<tSprite>.Create();
+  sounds := tStringMap<tSoundEffect>.Create();
 end;
 
 destructor tGuiStyle.destroy();
 begin
   sprites.free;
+  sounds.free;
   inherited destroy();
 end;
 
@@ -165,6 +168,7 @@ begin
   result := tGuiStyle.Create();
   result.padding := padding;
   result.sprites := sprites.clone();
+  result.sounds := sounds.clone();
 end;
 
 {--------------------------------------------------------}
@@ -217,13 +221,8 @@ procedure tGuiComponent.playSFX(sfxName: string);
 var
   sfx: tSoundEffect;
 begin
-  {todo: add sounds back in}
-  {
-  if not assigned(skin) then exit;
-  if not skin.sfx.hasResource(sfxName) then exit;
-  sfx := skin.sfx[sfxName];
-  mixer.play(sfx);
-  }
+  if not style.sounds.contains(sfxName) then exit;
+  mixer.play(style.sounds[sfxName]);
 end;
 
 function tGuiComponent.getSprite(): tSprite;
@@ -255,8 +254,9 @@ end;
 
 function tGuiComponent.state: tGuiState;
 begin
-  if not enabled then exit(gsDisabled);
-  if pressed then exit(gsPressed);
+  if not isEnabled then exit(gsDisabled);
+  if not isInteractive then exit(gsNormal);
+  if isPressed then exit(gsPressed);
   if mouseOverThisFrame then exit(gsHighlighted);
   exit(gsNormal);
 end;
@@ -267,8 +267,9 @@ end;
 constructor tGuiComponent.create();
 begin
   inherited Create();
-  visible := true;
-  enabled := true;
+  isVisible := true;
+  isEnabled := true;
+  isInteractive := false;
   bounds.init(0,0,0,0);
   text := '';
   col := RGB(128,128,128);
@@ -285,6 +286,7 @@ end;
 procedure tGuiComponent.defaultBackgroundDraw(screen: tScreen);
 var
   backCol, frameCol: RGBA;
+  dc: tDrawContext;
 begin
 
   backCol := col;
@@ -297,13 +299,21 @@ begin
     gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,255), 0.33);
   end;
 
-  screen.canvas.dc.fillRect(bounds, backCol);
-  screen.canvas.dc.drawRect(bounds, frameCol);
+  dc := screen.canvas.dc();
+  dc.fillRect(bounds, backCol);
+  dc.drawRect(bounds, frameCol);
 end;
 
 function tGuiComponent.innerBounds: tRect;
 begin
   result := style.padding.inset(bounds);
+end;
+
+procedure tGuiComponent.sizeToContent();
+begin
+  bounds := font.textExtents(text, bounds.topLeft);
+  bounds.width += style.padding.horizontal;
+  bounds.height += style.padding.vertical;
 end;
 
 procedure tGuiComponent.doDraw(screen: tScreen);
@@ -327,11 +337,12 @@ begin
     drawX := innerBounds.x+((innerBounds.width - textRect.width) div 2);
     drawY := innerBounds.y+((innerBounds.height - textRect.height) div 2)-1;
   end else begin
+    {-2 due to font height being a bit weird}
     drawX := innerBounds.x;
-    drawY := innerBounds.y-1;
+    drawY := innerBounds.y-2;
   end;
 
-  if pressed then begin
+  if isPressed then begin
     inc(drawX);
     inc(drawY);
   end;
@@ -345,7 +356,7 @@ end;
 
 procedure tGuiComponent.draw(screen: tScreen);
 begin
-  if not visible then exit;
+  if not isVisible then exit;
   doDraw(screen);
 end;
 
@@ -353,23 +364,25 @@ procedure tGuiComponent.update(elapsed: single);
 begin
   mouseOverLastFrame := mouseOverThisFrame;
   mouseOverThisFrame := false;
-  if not enabled then exit;
+  if not isEnabled then exit;
   mouseOverThisFrame := bounds.isInside(input.mouseX, input.mouseY);
 
-  {handle pressed logic}
-  if mouseOverThisFrame then begin
-    if input.mousePressed then begin
-      fireMessage(ON_MOUSE_DOWN);
-      playSFX('clickdown');
-      pressed := true;
-    end;
-  end else
-    pressed := false;
+  if isInteractive then begin
+    {handle pressed logic}
+    if mouseOverThisFrame then begin
+      if input.mousePressed then begin
+        fireMessage(ON_MOUSE_DOWN);
+        playSFX('clickdown');
+        isPressed := true;
+      end;
+    end else
+      isPressed := false;
 
-  if pressed and not input.mouseLB then begin
-    playSFX('clickup');
-    fireMessage(ON_MOUSE_CLICK);
-    pressed := false;
+    if isPressed and not input.mouseLB then begin
+      playSFX('clickup');
+      fireMessage(ON_MOUSE_CLICK);
+      isPressed := false;
+    end;
   end;
 
   doUpdate(elapsed);

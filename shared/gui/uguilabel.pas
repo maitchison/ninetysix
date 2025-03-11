@@ -19,34 +19,54 @@ type
   public
     autoSize: boolean;
   public
+    class function MakeText(aPos: tPoint; aText: string=''): tGuiLabel;
+    class function MakeLabel(aPos: tPoint; aText: string=''): tGuiLabel;
     constructor Create(aPos: tPoint; aText: string='');
   end;
 
 implementation
 
+{simple fixed size no-background text label}
+class function tGuiLabel.MakeText(aPos: tPoint; aText: string=''): tGuiLabel;
+begin
+  result := tGuiLabel.Create(aPos, aText);
+end;
+
+{text with label, auto size}
+class function tGuiLabel.MakeLabel(aPos: tPoint; aText: string=''): tGuiLabel;
+begin
+  result := tGuiLabel.Create(aPos, aText);
+  result.col := RGBA.White;
+  result.autoSize := true;
+  result.sizeToContent();
+end;
+
 constructor tGuiLabel.Create(aPos: tPoint; aText: string='');
 begin
   inherited Create();
+
   bounds.x := aPos.x;
   bounds.y := aPos.y;
 
   style := DEFAULT_GUI_SKIN.styles['panel'].clone();
 
-  fontStyle.centered := true;
+  fontStyle.centered := false;
   fontStyle.shadow := true;
   fontStyle.col := RGB(250, 250, 250, 230);
 
-  col := RGBA.Clear;
+  autoSize := false;
+  width := 100;
+  height := 20;
+
+  col := RGB(128, 128, 138);
   text := aText;
-  autoSize := true;
 end;
 
 procedure tGuiLabel.setText(aText: string);
 begin
-  {todo: set dirty}
   inherited setText(aText);
   if autoSize then
-    bounds := font.textExtents(text, bounds.topLeft);
+    sizeToContent();
 end;
 
 begin
