@@ -110,12 +110,24 @@ begin
   guiSkin.styles['default'] := style;
 
   style := tGuiStyle.Create();
-  style.fontStyle.centered := true;
-  style.fontStyle.shadow := true;
-  style.fontStyle.col := RGB(250, 250, 250, 230);
+  style.padding.init(8,8,11,11);
+  style.sprites['default'] := makeSprite('ec_box', Border(40,40,40,40));
+  guiSkin.styles['box'] := style;
+
+  style := tGuiStyle.Create();
   style.padding.init(8,8,6,11);
   makeStateSprites(style, 'ec_button', Border(8,8,6,11));
   guiSkin.styles['button'] := style;
+
+  style := tGuiStyle.Create();
+  style.sprites['default'] := makeSprite('ec_toggle_off', Border(4,4,6,6));
+  style.sprites['selected'] := makeSprite('ec_toggle_on', Border(4,4,6,6));
+  guiSkin.styles['toggle'] := style;
+
+  style := tGuiStyle.Create();
+  style.padding.init(4,4,4,4);
+  style.sprites['default'] := makeSprite('ec_panel', Border(4,4,4,4));
+  guiSkin.styles['panel'] := style;
 
   DEFAULT_GUI_SKIN := guiSkin;
 end;

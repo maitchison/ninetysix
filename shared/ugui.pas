@@ -29,18 +29,16 @@ const
 
 type
 
-  tFontStyle = class
+  tFontStyle = record
     font: tFont;
     col: RGBA;
     shadow: boolean;
     centered: boolean;
-    constructor Create();
-    function clone(): tFontStyle;
+    procedure setDefault();
   end;
 
   tGuiStyle = class
     padding: tBorder;       // how far to inset objects
-    fontStyle: tFontStyle;
     {maps from state to value}
     sprites: tStringMap<tSprite>;
     {these are not implemented yet}
@@ -88,9 +86,8 @@ type
     function  innerBounds: tRect;
     {style}
     function  getSprite(): tSprite;
-    function  getTextColor(): RGBA;
-    function  getFontStyle(): tFontStyle;
-    function  getFont(): tFont;
+  public
+    fontStyle: tFontStyle;
   public
     constructor Create();
     procedure draw(screen: tScreen);
@@ -107,9 +104,8 @@ type
     property text: string read fText write setText;
     property col: RGBA read fCol write fCol;
     {style helpers}
-    property fontStyle: tFontStyle read getFontStyle;
-    property font: tFont read getFont;
-    property textColor: RGBA read getTextColor;
+    property font: tFont read fontStyle.font write fontStyle.font;
+    property textColor: RGBA read fontStyle.col write fontStyle.col;
   end;
 
   tGuiComponents = class
@@ -169,13 +165,11 @@ constructor tGuiStyle.Create();
 begin
   inherited Create();
   padding := Border(2,2,2,2);
-  fontStyle := tFontStyle.Create();
   sprites := tStringMap<tSprite>.Create();
 end;
 
 destructor tGuiStyle.destroy();
 begin
-  fontStyle.free;
   sprites.free;
   inherited destroy();
 end;
@@ -184,27 +178,17 @@ function tGuiStyle.clone(): tGuiStyle;
 begin
   result := tGuiStyle.Create();
   result.padding := padding;
-  result.fontStyle := fontStyle.clone.clone();
   result.sprites := sprites.clone();
 end;
 
 {--------------------------------------------------------}
 
-constructor tFontStyle.Create();
+procedure tFontStyle.setDefault();
 begin
-  inherited Create();
   col := RGB(255,255,255);
   font := DEFAULT_FONT;
   shadow := false;
   centered := false;
-end;
-
-function tFontStyle.clone(): tFontStyle;
-begin
-  result.col := col;
-  result.font := font;
-  result.shadow := shadow;
-  result.centered := centered;
 end;
 
 {--------------------------------------------------------}
@@ -261,22 +245,6 @@ begin
   result := style.sprites.getWithDefault(GUI_STATE_NAME[state], nil);
 end;
 
-function tGuiComponent.getTextColor(): RGBA;
-begin
-  {todo: make this state dependant}
-  result := fontStyle.col;
-end;
-
-function tGuiComponent.getFontStyle(): tFontStyle;
-begin
-  result := style.fontStyle;
-end;
-
-function tGuiComponent.getFont(): tFont;
-begin
-  result := fontStyle.font;
-end;
-
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
 var
   i: integer;
@@ -318,6 +286,7 @@ begin
   bounds.init(0,0,0,0);
   text := '';
   col := RGB(128,128,128);
+  fontStyle.setDefault();
   style := DEFAULT_GUI_SKIN.styles['default'];
 end;
 
@@ -438,12 +407,13 @@ begin
   inherited Create();
   bounds.x := aPos.x;
   bounds.y := aPos.y;
-  {todo: remove (well clone the 'label' style and update.}
-  {
-  fontStyle.centered := false;
-  fontStyle.shadow := false;
-  fontStyle.col := RGB(250, 250, 250);
-  }
+
+  style := DEFAULT_GUI_SKIN.styles['panel'].clone();
+
+  fontStyle.centered := true;
+  fontStyle.shadow := true;
+  fontStyle.col := RGB(250, 250, 250, 230);
+
   col := RGBA.Clear;
   text := aText;
   autoSize := true;
@@ -465,7 +435,11 @@ var
 begin
   inherited Create();
 
-  style := DEFAULT_GUI_SKIN.styles['button'];
+  style := DEFAULT_GUI_SKIN.styles['button'].clone();
+
+  fontStyle.centered := true;
+  fontStyle.shadow := true;
+  fontStyle.col := RGB(250, 250, 250, 230);
 
   bounds.x := aPos.x;
   bounds.y := aPos.y;
