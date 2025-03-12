@@ -139,6 +139,7 @@ type
   end;
 
 const
+  {global GUI stuff}
   DEFAULT_GUI_SKIN: tGuiSkin = nil;
   GUI_STATE_NAME: array[tGuiState] of string = (
     'normal',
@@ -147,6 +148,9 @@ const
     'pressed',
     'selected'
   );
+
+  GUI_HQ: boolean = true;
+  GUI_DOUBLEBUFFER: boolean = true;
 
 implementation
 
@@ -235,6 +239,7 @@ begin
   setLength(elements, length(elements)+1);
   elements[length(elements)-1] := x;
   x.parent := self;
+  if GUI_DOUBLEBUFFER then x.enableDoubleBuffered();
 end;
 
 procedure tGuiContainer.draw(dc: tDrawContext);
@@ -478,19 +483,19 @@ begin
     if isDirty then begin
       canvas.clear(RGB(0,0,0,0));
       canvasDC := canvas.getDC(bmBlend);
-      {todo: make drawing default to 0,0 origin}
-      canvasDC.offset -= bounds.pos;
-      canvasDC.tint := RGBA.White;
+      if GUI_HQ then canvasDC.textureFilter := tfLinear;
+      canvasDC.tint := col;
       doDraw(canvasDC);
       isDirty := false;
     end;
     dc.blendMode := bmBlend;
-    dc.tint := col;
+    dc.tint := RGBA.White;
     dc.offset += fPos;
     //dc.drawImage(canvas, bounds.pos);
     dc.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
   end else begin
     {draw component directly to dc}
+    if GUI_HQ then dc.textureFilter := tfLinear;
     dc.tint := col;
     dc.offset += fPos;
     doDraw(dc);
@@ -537,18 +542,21 @@ end;
 
 procedure tGuiComponent.setText(aText: string);
 begin
+  if fText = aText then exit;
   fText := aText;
   isDirty := true;
 end;
 
 procedure tGuiComponent.setCol(col: RGBA);
 begin
+  if fCol = col then exit;
   fCol := col;
   isDirty := true;
 end;
 
 procedure tGuiComponent.setSize(aWidth, aHeight: integer);
 begin
+  if (fWidth = aWidth) and (fHeight = aHeight) then exit;
   fWidth := aWidth;
   fHeight := aHeight;
   if isDoubleBuffered then

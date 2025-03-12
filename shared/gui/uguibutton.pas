@@ -38,9 +38,6 @@ begin
 
   fPos := aPos;
   sizeToContent();
-
-  enableDoubleBuffered();
-
 end;
 
 begin

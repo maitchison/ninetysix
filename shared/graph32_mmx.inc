@@ -561,6 +561,13 @@ var
   linePtr: pointer;
 begin
 
+  if filter = tfLinear then begin
+    {we don't currently support linear filtering...
+     it wouldn't be too hard to put in though}
+    stretchImage_REF(dstPage, srcPage, dstRect, srcX, srcY, srcDx, srcDy, tint, filter, blendMode);
+    exit;
+  end;
+
   needsTint := int32(tint) <> -1;
   tdx := round(srcDx*65536);
   tdy := round(srcDy*65536);

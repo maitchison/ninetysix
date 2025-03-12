@@ -31,8 +31,6 @@ begin
 
   fPos := rect.pos;
   setSize(rect.width, rect.height);
-
-  enableDoubleBuffered();
 end;
 
 begin

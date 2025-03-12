@@ -33,7 +33,6 @@ begin
   style := DEFAULT_GUI_SKIN.styles['box'].clone();
   background := DEFAULT_GUI_SKIN.gfx['innerwindow'];
   setBounds(aRect);
-  enableDoubleBuffered();
 end;
 
 procedure tGuiWindow.doDraw(dc: tDrawContext);

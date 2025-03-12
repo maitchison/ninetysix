@@ -259,8 +259,13 @@ begin
 
   {scaled integer version: 161}
 
-  if (fx < 0) or (fy < 0) or (fx >= width-1) or (fy >= height-1) then
-    exit(RGB(255, 0, 255));
+  {shouldn't be needed...}
+  if fx < 0 then fx := 0;
+  if fy < 0 then fy := 0;
+  if fx > width-1 then fx := width-1;
+  if fy > height-1 then fy := height-1;
+  {if (fx < 0) or (fy < 0) or (fx >= width-1) or (fy >= height-1) then
+    exit(RGB(255, 0, 255));}
 
   x := trunc(fx);
   y := trunc(fy);
