@@ -542,14 +542,14 @@ end;
 
 procedure tGuiComponent.setText(aText: string);
 begin
-  if fText = aText then exit;
+  if (fText = aText) then exit;
   fText := aText;
   isDirty := true;
 end;
 
 procedure tGuiComponent.setCol(col: RGBA);
 begin
-  if fCol = col then exit;
+  if (fCol = col) then exit;
   fCol := col;
   isDirty := true;
 end;
@@ -560,6 +560,7 @@ begin
   fWidth := aWidth;
   fHeight := aHeight;
   if isDoubleBuffered then
+    {this just renables it with correct size}
     enableDoubleBuffered();
   isDirty := true;
 end;
