@@ -29,6 +29,8 @@ begin
   col := RGB(128,128,128);
   style := DEFAULT_GUI_SKIN.styles['panel'].clone();
   bounds := rect;
+
+  enableDoubleBuffered();
 end;
 
 begin

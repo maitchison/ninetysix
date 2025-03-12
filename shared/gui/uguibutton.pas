@@ -41,6 +41,8 @@ begin
 
   sizeToContent();
 
+  enableDoubleBuffered();
+
 end;
 
 begin

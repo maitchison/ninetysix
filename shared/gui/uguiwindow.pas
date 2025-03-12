@@ -29,10 +29,11 @@ var
   s: tSprite;
 begin
   inherited Create();
-  col := RGB(128,128,128);
+  col := RGBA.White;
   style := DEFAULT_GUI_SKIN.styles['box'].clone();
   background := DEFAULT_GUI_SKIN.gfx['innerwindow'];
   bounds := rect;
+  enableDoubleBuffered();
 end;
 
 procedure tGuiWindow.doDraw(dc: tDrawContext);

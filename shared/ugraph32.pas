@@ -366,7 +366,13 @@ asm
     {perform mixing}
     mov ch,  255
     sub ch,  cl
-
+  @BLEND_A:
+    {super complicated... it's a shame we have to do this}
+    {ok, for the moment just or them together...}
+    mov dl,  byte ptr c[3]
+    or dl,  byte ptr [edi+3]
+    shl edx, 8
+  @BLEND_B:
     mov al,  byte ptr c[2]
     mul cl
     mov dl,  ah
@@ -374,7 +380,7 @@ asm
     mul ch
     add dl,  ah
     shl edx, 8
-
+  @BLEND_G:
     mov al,  byte ptr c[1]
     mul cl
     mov dl,  ah
@@ -382,7 +388,7 @@ asm
     mul ch
     add dl,  ah
     shl edx, 8
-
+  @BLEND_R:
     mov al,  byte ptr c[0]
     mul cl
     mov dl,  ah

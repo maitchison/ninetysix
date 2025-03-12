@@ -62,6 +62,8 @@ type
   tHookProc = procedure(sender: tGuiComponent; msg: string; args: array of const);
 
   tGuiComponent = class
+  private
+    prevState: tGuiState;
   protected
     parent: tGuiContainer;
     style: tGuiStyle;
@@ -75,6 +77,9 @@ type
     fHookKey: tStrings;
     fHookProc: array of tHookProc;
     mouseOverThisFrame, mouseOverLastFrame: boolean;
+    {buffering}
+    canvas: tPage;
+    isDirty: boolean;
   protected
     procedure playSFX(sfxName: string);
     procedure doDraw(dc: tDrawContext); virtual;
@@ -87,6 +92,10 @@ type
     procedure sizeToContent(); virtual;
     {style}
     function  getSprite(): tSprite;
+    {canvas}
+    procedure enableDoubleBuffered();
+    procedure disableDoubleBuffered();
+    function  isDoubleBuffered: boolean;
   public
     fontStyle: tFontStyle;
   public
@@ -219,7 +228,8 @@ procedure tGuiContainer.draw(dc: tDrawContext);
 var
   gc: tGuiComponent;
 begin
-  doDraw(dc);
+  {draw ourselves}
+  inherited draw(dc);
 
   {todo: update clip rect aswell I guess}
   dc.offset += innerBounds.pos;
@@ -264,6 +274,24 @@ begin
   result := style.sprites.getWithDefault(GUI_STATE_NAME[state], defaultSprite);
 end;
 
+procedure tGuiComponent.enableDoubleBuffered;
+begin
+  if assigned(canvas) then canvas.free();
+  canvas := tPage.create(bounds.width, bounds.height);
+  isDirty := true;
+end;
+
+procedure tGuiComponent.disableDoubleBuffered;
+begin
+  if assigned(canvas) then canvas.free;
+  canvas := nil;
+end;
+
+function tGuiComponent.isDoubleBuffered: boolean;
+begin
+  result := assigned(canvas);
+end;
+
 procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
 var
   i: integer;
@@ -295,7 +323,7 @@ begin
   exit(gsNormal);
 end;
 
-constructor tGuiComponent.create();
+constructor tGuiComponent.Create();
 begin
   inherited Create();
   isVisible := true;
@@ -303,9 +331,10 @@ begin
   isInteractive := false;
   bounds.init(0,0,0,0);
   text := '';
-  col := RGB(128,128,128);
+  col := RGB(255,255,255);
   fontStyle.setDefault();
   style := DEFAULT_GUI_SKIN.styles['default'];
+  isDirty := true;
 end;
 
 {get absolute bounds by parent query}
@@ -406,11 +435,31 @@ end;
 procedure tGuiComponent.draw(dc: tDrawContext);
 var
   oldTint: RGBA;
+  canvasDC: tDrawContext;
 begin
   if not isVisible then exit;
-  {note: not sure this is the best place to handle this?}
-  dc.tint := col;
-  doDraw(dc);
+
+  {todo: check clipping bounds}
+
+  if isDoubleBuffered then begin
+    {draw component to canvas, then write this to dc}
+    if isDirty then begin
+      canvas.clear(RGB(0,0,0,0));
+      canvasDC := canvas.getDC(bmBlend);
+      {todo: make drawing default to 0,0 origin}
+      canvasDC.offset -= bounds.pos;
+      canvasDC.tint := RGBA.White;
+      doDraw(canvasDC);
+      isDirty := false;
+    end;
+    dc.blendMode := bmBlend;
+    dc.tint := col;
+    dc.drawImage(canvas, bounds.pos);
+  end else begin
+    {draw component directly to dc}
+    dc.tint := col;
+    doDraw(dc);
+  end;
 end;
 
 procedure tGuiComponent.update(elapsed: single);
@@ -439,6 +488,11 @@ begin
   end;
 
   doUpdate(elapsed);
+
+  {check if our state changed}
+  if prevState <> state then
+    isDirty := true;
+  prevState := state;
 end;
 
 procedure tGuiComponent.onKeyPress(code: word);
