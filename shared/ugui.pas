@@ -454,7 +454,8 @@ begin
     end;
     dc.blendMode := bmBlend;
     dc.tint := col;
-    dc.drawImage(canvas, bounds.pos);
+    //dc.drawImage(canvas, bounds.pos);
+    dc.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
   end else begin
     {draw component directly to dc}
     dc.tint := col;

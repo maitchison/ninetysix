@@ -67,6 +67,7 @@ type
     procedure stretchSubImage(src: tPage; dstRect: tRect; srcRect: tRect); overload;
     {constructed}
     procedure drawImage(src: tPage; pos: tPoint);
+    procedure inOutDraw(src: tPage; pos: tPoint; border: integer; innerBlendMode, outerBlendMode: tBlendMode);
     procedure fillRect(dstRect: tRect; col: RGBA);
     procedure drawRect(dstRect: tRect; col: RGBA);
     procedure stretchImage(src: tPage; dstRect: tRect);
@@ -820,6 +821,51 @@ end;
 procedure tDrawContext.drawImage(src: tPage; pos: tPoint);
 begin
   drawSubImage(src, pos, src.bounds);
+end;
+
+{draw inside and outside region with different blending modes.
+ this can dramatically improve performance when blitting an image that
+ has transpariency only on the edges, e.g. a window frame
+
+ It can also be used to efficently draw an image with a large
+ transparent center
+ }
+procedure tDrawContext.inOutDraw(src: tPage; pos: tPoint; border: integer; innerBlendMode, outerBlendMode: tBlendMode);
+var
+  srcRect: tRect;
+  oldBlendMode: tBlendMode;
+begin
+  srcRect := src.bounds;
+  oldBlendMode := blendMode;
+
+  {todo: this would be faster if we called eveything directly, and did
+   clipping and regionMarking here instead}
+
+  blendMode := innerBlendMode;
+  drawSubImage(src,
+    pos + Point(border, border),
+    Rect(border, border, srcRect.width-border*2, srcRect.height-border*2)
+  );
+
+  blendMode := outerBlendMode;
+  drawSubImage(src,
+    pos,
+    Rect(0, 0, srcRect.width, border)
+  );
+  drawSubImage(src,
+    pos + Point(0, srcRect.height-border),
+    Rect(0, srcRect.height-border, srcRect.width, border)
+  );
+  drawSubImage(src,
+    pos + Point(0, border),
+    Rect(0, border, border, srcRect.height-border*2)
+  );
+  drawSubImage(src,
+    pos + Point(srcRect.width-border, border),
+    Rect(srcRect.width-border, border, border, srcRect.height-border*2)
+  );
+
+  blendMode := oldBlendMode;
 end;
 
 procedure tDrawContext.stretchImage(src: tPage; dstRect: tRect);
