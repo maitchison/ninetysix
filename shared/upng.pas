@@ -1,5 +1,5 @@
 {PNG loading support}
-unit sysPng;
+unit uPng;
 
 // --------------------------------------------------------------------
 //
@@ -13,16 +13,16 @@ unit sysPng;
 interface
 
 uses
-  resource,
-  graph32;
+  uResource,
+  uGraph32;
 
 function loadPNG(const FileName: string): tPage;
 
 implementation
 
 uses
-  utils,
-  debug,
+  uUtils,
+  uDebug,
   uColor,
   FPImage,
   FPReadPNG;

@@ -8,20 +8,19 @@ todo: full auto mode
 }
 
 uses
-  debug,
-  utils,
-  graph32,
+  uDebug,
+  uUtils,
   crt,
-  sound,
-  stream,
-  la96,
-  lc96,
-  sysUtils
-  ,
-  sysPNG,
-  iniFile,
+  sysUtils,
+  uGraph32,
+  uSound,
+  uStream,
+  uLA96,
+  uLP96,
+  uPNG,
+  uIniFile,
   uResLib,
-  filesystem;
+  uFilesystem;
 
 var
   {force processing of all files}
@@ -67,7 +66,7 @@ var
 begin
   res.srcFile := srcFile;
   res.dstFile := dstFile;
-  res.modifiedTime := fs.getModified(srcFile);
+  res.modifiedTime := fileSystem.getModified(srcFile);
   resLib.updateResource(res);
   resLib.serialize('resources.ini');
 end;
@@ -92,12 +91,12 @@ end;
 procedure convertWave(srcPath, dstPath: string);
 var
   writer: tLA96Writer;
-  sfx: tSoundEffect;
+  sfx: tSound;
 begin
 
   if not preProcess(srcPath, dstPath) then exit;
 
-  sfx := tSoundEffect.Load(srcPath);
+  sfx := tSound.Load(srcPath);
 
   writer := tLA96Writer.create();
   writer.open(dstPath);
@@ -135,7 +134,7 @@ begin
 
   writeln(format('Processing %s -> %s [%s]', [srcPath, dstPath, srcExtension]));
 
-  for filename in fs.listFiles(joinPath(srcPath, '\*.'+srcExtension)) do begin
+  for filename in fileSystem.listFiles(joinPath(srcPath, '\*.'+srcExtension)) do begin
     tag := removeExtension(extractFilename(filename));
     try
       convert(joinPath(srcPath, filename), joinPath(dstPath, tag+'.'+dstExtension));

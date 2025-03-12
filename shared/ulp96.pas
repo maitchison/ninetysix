@@ -392,7 +392,7 @@ end;
 
 function decodeLC96(s: tStream): tPage;
 var
-  width, height, BPP: word;
+  originalWidth, originalHeight, width, height, BPP: word;
   i,j: int32;
   px,py: int32;
   bytes: tBytes;
@@ -415,8 +415,10 @@ begin
       fatal('Not an LC96 file.');
 
   {todo: make this a record}
-  width := s.readWord;
-  height := s.readWord;
+  originalWidth := s.readWord;
+  originalHeight := s.readWord;
+  width := (originalWidth + 3) div 4 * 4;
+  height := (originalHeight + 3) div 4 * 4;
   bpp := s.readWord;
   verSmall := s.readByte;
   verBig := s.readByte;
@@ -468,6 +470,10 @@ begin
       decodePatch_ASM(data, result, px*4, py*4, hasAlpha);
 
   data.free;
+
+  {crop if needed}
+  if (originalWidth <> width) or (originalHeight <> height) then
+    result.resize(originalWidth, originalHeight);
 end;
 
 {convert an image into 'lossless compression' format.}
@@ -490,11 +496,22 @@ var
   compressedSize: dword;
   startPos: int32;
   compressedData: tBytes;
-
+  ownsPage: boolean;
+  originalWidth, originalHeight: word;
 begin
 
   if (page.width <= 0) or (page.height <= 0) then
     fatal('Invalid page dims');
+
+  originalWidth := page.width;
+  originalHeight := page.height;
+
+  {pad if needed}
+  ownsPage := false;
+  if (page.width and $3 <> 0) or (page.height and $3 <> 0) then begin
+    page := page.resized((page.width+3) div 4 * 4, (page.height+3) div 4 * 4);
+    ownsPage := true;
+  end;
 
   if not assigned(s) then
     s := tMemoryStream.Create();
@@ -502,13 +519,6 @@ begin
   startPos := s.pos;
 
   if withAlpha then bpp := 32 else bpp := 24;
-
-  {check everything is ok}
-  if ((page.width and $3) <> 0) or ((page.height and $3) <> 0) then
-    warning(format(
-        'Page (%d, %d) has invalid dims, cropping to multiple of 4.',
-        [page.width, page.height]
-    ));
 
   numPatches := (page.width div 4) * (page.height div 4);
 
@@ -527,8 +537,8 @@ begin
 
   {write header}
   s.writeChars('LC96');
-  s.writeWord(page.Width);
-  s.writeWord(page.Height);
+  s.writeWord(originalWidth);
+  s.writeWord(originalHeight);
   s.writeWord(bpp);
   s.writebyte(VER_SMALL);
   s.writebyte(VER_BIG);
@@ -543,6 +553,8 @@ begin
   s.writeBytes(compressedData);
 
   result := s;
+
+  if ownsPage then page.free;
 end;
 
 

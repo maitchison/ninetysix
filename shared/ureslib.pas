@@ -5,13 +5,13 @@ unit uResLib;
 interface
 
 uses
-  debug,
-  test,
-  fileSystem,
-  sound,
-  utils,
-  la96,
-  lc96;
+  uDebug,
+  uTest,
+  uFileSystem,
+  uSound,
+  uUtils,
+  uLA96,
+  uLP96;
 
 type
   tResourceInfo = record
@@ -81,7 +81,7 @@ end;
 
 constructor tResourceLibrary.createOrLoad(fileName: string);
 begin
-  if fs.exists(fileName) then
+  if fileSystem.exists(fileName) then
     create(fileName)
   else
     create();
@@ -126,13 +126,13 @@ var
   id: int32;
 begin
   result := false;
-  {does it exit}
+  {we have no record of it -> update}
   id := findResourceIndex(dstFile);
-  if id < 0 then
-    exit(true);
-  {has it changed}
-  if resources[id].modifiedTime <> fs.getModified(resources[id].srcFile) then
-    exit(true);
+  if id < 0 then exit(true);
+  {it is missing -> update}
+  if not fileSystem.exists(dstFile) then exit(true);
+  {it has changed -> update}
+  if resources[id].modifiedTime <> fileSystem.getModified(resources[id].srcFile) then exit(true);
 end;
 
 procedure tResourceLibrary.serialize(fileName: string);
