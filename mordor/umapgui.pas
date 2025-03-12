@@ -3,17 +3,17 @@ unit uMapGUI;
 interface
 
 uses
-  test,
-  debug,
-  utils,
+  uTest,
+  uDebug,
+  uUtils,
   uGui,
-  graph2d,
-  graph32,
-  sprite,
+  uRect,
+  uGraph32,
+  uSprite,
   uScreen,
   uColor,
-  keyboard,
-  font,
+  uKeyboard,
+  uFont,
   {game stuff}
   res,
   uMap;
@@ -33,7 +33,7 @@ type
     procedure changeSelection(delta: integer);
     procedure applyToMapTile(map: tMap; atX, atY: integer);
     procedure onKeyPress(code: word); override;
-    procedure doDraw(screen: tScreen); override;
+    procedure doDraw(dc: tDrawContext); override;
     property floorType: tFloorType read fFloorType;
     property editMode: tEditMode read fEditMode;
   end;
@@ -59,7 +59,7 @@ type
     procedure renderTile(x,y: integer);
     procedure moveCursor(dx,dy: integer);
     procedure doUpdate(elapsed: single); override;
-    procedure doDraw(screen: tScreen); override;
+    procedure doDraw(dc: tDrawContext); override;
     procedure refresh();
   end;
 
@@ -101,26 +101,25 @@ begin
   end;
 end;
 
-procedure tTileEditorGUI.doDraw(screen: tScreen);
+procedure tTileEditorGUI.doDraw(dc: tDrawContext);
 var
   ft: tFloorType;
   fs: tFloorSpec;
   i: integer;
 begin
 
-  screen.canvas.dc.fillRect(bounds, RGB(0,0,0));
-  screen.canvas.dc.drawRect(bounds, RGB(255,255,255));
+  dc.fillRect(bounds, RGB(0,0,0));
+  dc.drawRect(bounds, RGB(255,255,255));
   for ft in tFloorType do begin
     i := ord(ft);
     fs := FLOOR_SPEC[ft];
     if fs.spriteIdx >= 0 then
-      mapSprites.sprites[fs.spriteIdx].draw(screen.canvas, bounds.x+i*16, bounds.y);
+      mapSprites.sprites[fs.spriteIdx].draw(dc, bounds.x+i*16, bounds.y);
     if ft = floorType then begin
-      mapSprites.sprites[CURSOR_SPRITE].draw(screen.canvas, bounds.x+i*16, bounds.y);
-      DEFAULT_FONT.textOut(screen.canvas, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
+      mapSprites.sprites[CURSOR_SPRITE].draw(dc, bounds.x+i*16, bounds.y);
+      DEFAULT_FONT.textOut(dc.page, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
     end;
   end;
-  screen.markRegion(bounds);
 end;
 
 {-------------------------------------------------------}
@@ -133,8 +132,7 @@ begin
   cursor.x := 0;
   cursor.y := 0;
   //background := tSprite.create(gfx['darkmap']);
-  bounds.width := 512;
-  bounds.height := 512;
+  setSize(512, 512);
   canvas := tPage.create(bounds.width, bounds.height);
   cSprite := tSprite.create(canvas);
   tileEditor := nil;
@@ -188,15 +186,15 @@ begin
   pos := tilePos(x,y);
 
   {todo: support background}
-  canvas.dc.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+  canvas.getDC().fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
 
   {floor}
   id := tile.floorSpec.spriteIdx;
-  if id >= 0 then mapSprites.sprites[id].draw(canvas, pos.x, pos.y);
+  if id >= 0 then mapSprites.sprites[id].draw(canvas.getDC(), pos.x, pos.y);
 
   {medium}
   id := MEDIUM_SPRITE[tile.mediumType];
-  if id >= 0 then mapSprites.sprites[id].draw(canvas, pos.x, pos.y);
+  if id >= 0 then mapSprites.sprites[id].draw(canvas.getDC(), pos.x, pos.y);
 
   {walls}
   {
@@ -219,16 +217,16 @@ begin
   if keyDown(key_space) then onKeyPress(key_space);
 end;
 
-procedure tMapGUI.doDraw(screen: tScreen);
+procedure tMapGUI.doDraw(dc: tDrawContext);
 begin
-  cSprite.blit(screen.canvas, bounds.x, bounds.y);
-  screen.markRegion(bounds);
+  {todo: change this to a canvas with double buffering...}
+  //cSprite.blit(dc, bounds.x, bounds.y);
 end;
 
 procedure tMapGui.drawCursor();
 begin
   mapSprites.sprites[CURSOR_SPRITE].draw(
-    canvas,
+    canvas.getDC(),
     tilePos(cursor.x,cursor.y).x,
     tilePos(cursor.x,cursor.y).y
   );
@@ -250,7 +248,7 @@ var
   x,y: integer;
 begin
   if assigned(background) then
-    background.draw(canvas, 0, 0);
+    background.draw(canvas.getDC(), 0, 0);
   if not assigned(map) then exit();
   for y := 0 to map.height-1 do
     for x := 0 to map.width-1 do

@@ -9,6 +9,7 @@ uses
   uUtils,
   uGraph32,
   uFont,
+  uFileSystem,
   uMouse,
   uInput,
   uMap,
@@ -117,6 +118,7 @@ type
   public
     property text: string read fText write setText;
     property col: RGBA read fCol write setCol;
+    property pos: tPoint read fPos write fPos;
     {style helpers}
     property font: tFont read fontStyle.font write fontStyle.font;
     property textColor: RGBA read fontStyle.col write fontStyle.col;
@@ -151,6 +153,9 @@ const
 
   GUI_HQ: boolean = true;
   GUI_DOUBLEBUFFER: boolean = true;
+
+procedure initGuiSkinSimple();
+procedure initGuiSkinEpic();
 
 implementation
 
@@ -567,8 +572,84 @@ end;
 
 {-----------------------}
 
+{todo: make this an ini file}
+procedure initGuiSkinEpic();
+var
+  style: tGuiStyle;
+  guiSkin: tGuiSkin;
+
+  function makeSprite(tag: string; aBorder: tBorder): tSprite;
+  begin
+    result := tSprite.Create(guiSkin.gfx[tag]);
+    result.border := aBorder;
+    result.innerBlendMode := ord(bmBlit); // faster
+  end;
+
+  procedure makeStateSprites(style: tGuiStyle; tag: string; aBorder: tBorder);
+  var
+    state: string;
+    gfxName: string;
+  begin
+    for state in GUI_STATE_NAME do begin
+      gfxName := tag+'_'+state;
+      if guiSkin.gfx.hasResource(gfxName) then
+        style.sprites[state] := makeSprite(gfxName, aBorder)
+      else
+        warning('Missing gui gfx: "'+gfxName+'"');
+    end;
+  end;
+
 begin
-  {create a default, empty style}
-  DEFAULT_GUI_SKIN := tGuiSkin.Create();
-  DEFAULT_GUI_SKIN.styles['default'] := tGuiStyle.Create();
+  guiSkin := tGuiSkin.Create();
+  guiSkin.gfx.loadFromFolder('gui', '*.p96');
+  guiSkin.sfx.loadFromFolder('sfx', '*.a96');
+
+  style := tGuiStyle.Create();
+  guiSkin.styles['default'] := style;
+
+  style := tGuiStyle.Create();
+  style.padding.init(8,11,8,11);
+  style.sprites['default'] := makeSprite('ec_box', Border(40,40,40,40));
+  style.sprites['default'].innerBlendMode := ord(bmNone); // nothing to draw here
+  guiSkin.styles['box'] := style;
+
+  style := tGuiStyle.Create();
+  style.padding.init(8,5,8,9);
+  makeStateSprites(style, 'ec_button', Border(8,8,6,11));
+  style.sounds['clickup'] := guiSkin.sfx['clickup'];
+  style.sounds['clickdown'] := guiSkin.sfx['clickdown'];
+  guiSkin.styles['button'] := style;
+
+  style := tGuiStyle.Create();
+  style.sprites['default'] := makeSprite('ec_toggle_off', Border(4,4,6,6));
+  style.sprites['selected'] := makeSprite('ec_toggle_on', Border(4,4,6,6));
+  guiSkin.styles['toggle'] := style;
+
+  style := tGuiStyle.Create();
+  style.padding.init(4,4,4,4);
+  style.sprites['default'] := makeSprite('ec_panel', Border(4,4,4,4));
+  guiSkin.styles['panel'] := style;
+
+  DEFAULT_GUI_SKIN := guiSkin;
+end;
+
+{very simple default gui. No sprites required}
+procedure initGuiSkinSimple();
+var
+  guiSkin: tGuiSkin;
+  style: tGuiStyle;
+begin
+  guiSkin := tGuiSkin.Create();
+  style := tGuiStyle.Create();
+  guiSkin.styles['default'] := style.clone();
+  guiSkin.styles['box'] := style.clone();
+  guiSkin.styles['button'] := style.clone();
+  guiSkin.styles['toggle'] := style.clone();
+  guiSkin.styles['panel'] := style.clone();
+
+  DEFAULT_GUI_SKIN := guiSkin;
+end;
+
+begin
+  initGuiSkinSimple();
 end.

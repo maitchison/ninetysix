@@ -14,8 +14,8 @@ type
 
   tWallType = (wtNone, wtWall, wtDoor, wtSecret, wtLockedDoor);
   tFloorType = (ftNone, ftStone, ftWater, ftDirt, ftGrass);
-  tMediumType = (mtNone, mtMist, mtRock);
-  tMapDirection = (mdNorth, mdEast, mdSouth, mdWest);
+  tMediumType = (mtNone, mtFog, mtRock);
+  tDirection = (dNorth, dEast, dSouth, dWest);
 
   tFloorSpec = record
     tag: string;
@@ -41,8 +41,8 @@ const
 
   CURSOR_SPRITE = 19+32;
 
-  MD_X: array[tMapDirection] of integer = (0,+8,0,-7);
-  MD_Y: array[tMapDirection] of integer = (-7,0,+8,0);
+  MD_X: array[tDirection] of integer = (0,+8,0,-7);
+  MD_Y: array[tDirection] of integer = (-7,0,+8,0);
 
 type
 
@@ -71,8 +71,8 @@ type
     fNorthWall, fWestWall: array of tWall;
     function  getTile(x,y: integer): tTile;
     procedure setTile(x,y: integer; aTile: tTile);
-    function  getWall(x,y: integer; d: tMapDirection): tWall;
-    procedure setWall(x,y: integer; d: tMapDirection;aWall: tWall);
+    function  getWall(x,y: integer; d: tDirection): tWall;
+    procedure setWall(x,y: integer; d: tDirection;aWall: tWall);
     procedure init(aWidth, aHeight: integer);
   public
     constructor Create(aWidth, aHeight: word);
@@ -84,7 +84,7 @@ type
     property width: integer read fWidth;
     property height: integer read fHeight;
     property tile[x,y: integer]: tTile read getTile write setTile;
-    property wall[x,y: integer;d: tMapDirection]: tWall read getWall;
+    property wall[x,y: integer;d: tDirection]: tWall read getWall;
   end;
 
 implementation
@@ -161,25 +161,25 @@ begin
   fTile[x+y*fWidth] := aTile;
 end;
 
-function tMap.getWall(x,y: integer;d: tMapDirection): tWall;
+function tMap.getWall(x,y: integer;d: tDirection): tWall;
 begin
   if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
   case d of
-    mdNorth: result := fNorthWall[x+y*(fWidth+1)];
-    mdWest: result := fWestWall[x+y*(fWidth+1)];
-    mdSouth: result := fNorthWall[x+(y+1)*(fWidth+1)];
-    mdEast: result := fWestWall[(x+1)+y*(fWidth+1)];
+    dNorth: result := fNorthWall[x+y*(fWidth+1)];
+    dWest: result := fWestWall[x+y*(fWidth+1)];
+    dSouth: result := fNorthWall[x+(y+1)*(fWidth+1)];
+    dEast: result := fWestWall[(x+1)+y*(fWidth+1)];
   end;
 end;
 
-procedure tMap.setWall(x,y: integer;d: tMapDirection; aWall: tWall);
+procedure tMap.setWall(x,y: integer;d: tDirection; aWall: tWall);
 begin
   if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
   case d of
-    mdNorth: fNorthWall[x+y*(fWidth+1)] := aWall;
-    mdWest: fWestWall[x+y*(fWidth+1)] := aWall;
-    mdSouth: fNorthWall[x+(y+1)*(fWidth+1)] := aWall;
-    mdEast: fWestWall[(x+1)+y*(fWidth+1)] := aWall;
+    dNorth: fNorthWall[x+y*(fWidth+1)] := aWall;
+    dWest: fWestWall[x+y*(fWidth+1)] := aWall;
+    dSouth: fNorthWall[x+(y+1)*(fWidth+1)] := aWall;
+    dEast: fWestWall[(x+1)+y*(fWidth+1)] := aWall;
   end;
 end;
 

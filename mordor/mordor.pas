@@ -2,25 +2,25 @@ program mordor;
 
 uses
   {engine stuff}
-  debug,
-  test,
-  sbDriver,
-  mixlib,
-  vesa,
-  keyboard,
+  uDebug,
+  uTest,
+  uVesaDriver,
+  uSBDriver,
+  uVGADriver,
+  uMixer,
+  uKeyboard,
   uTimer,
-  vga,
   crt,
   uInput,
   uMouse,
   uScreen,
-  graph32,
-  sprite,
-  lc96,
-  utils,
-  uGui,
-  graph2d,
-  resource,
+  uGraph32,
+  uSprite,
+  uLA96,
+  uUtils,
+  uRect,
+  uResource,
+  {$i gui.inc}
   {game stuff}
   res,
   uMapGUI,
@@ -55,15 +55,11 @@ begin
   //musicPlay('res\mordor.a96');
   initMouse();
   initKeyboard();
+  //initGuiSkinEpic();
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 
   loadResources();
-
-  {init sounds}
-  DEFAULT_MOUSEDOWN_SFX := sfx['clickdown'];
-  DEFAULT_MOUSECLICK_SFX := sfx['clickup'];
-
 end;
 
 procedure titleScreen();
@@ -79,6 +75,7 @@ begin
   freeAndNil(screen.background);
 end;
 
+(*
 procedure encounterScreen();
 
 var
@@ -111,6 +108,7 @@ begin
 
   freeAndNil(screen.background);
 end;
+*)
 
 {-------------------------------------------------------}
 
@@ -200,8 +198,7 @@ begin
   mapGUI := tMapGui.Create();
   mapGUI.map := map;
   mapGUI.mode := mmEdit;
-  mapGUI.x := 20;
-  mapGUI.y := 50;
+  mapGUI.pos := Point(20, 50);
   mapGUI.tileEditor := editGui;
   gui.append(mapGUI);
 
@@ -234,7 +231,7 @@ begin
 
     gui.update(elapsed);
     screen.clearAll();
-    gui.draw(screen);
+    gui.draw(screen.canvas.getDC());
     screen.flipAll();
 
     timer.stop();
@@ -252,7 +249,7 @@ begin
   textAttr := White + Blue*16;
   clrscr;
 
-  debug.VERBOSE_SCREEN := llNote;
+  uDebug.VERBOSE_SCREEN := llNote;
 
   runTestSuites();
 

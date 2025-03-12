@@ -83,7 +83,7 @@ type
     procedure setCapacity(newSize: dword);
     procedure setLen(n: int32); override;
   public
-    constructor create(aInitialCapacity: dword=0);
+    constructor Create(aInitialCapacity: dword=0);
     destructor destroy(); override;
 
     {our core overrides}
@@ -127,7 +127,7 @@ type
     procedure requestBufferBytes(aPos, numBytes: int32);
   public
 
-    constructor create(aFilename: string; fileMode: tFileMode=FM_READ);
+    constructor Create(aFilename: string; fileMode: tFileMode=FM_READ);
     destructor destroy(); override;
 
     {our core overrides}

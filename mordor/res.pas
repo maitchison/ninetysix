@@ -3,11 +3,11 @@ unit res;
 interface
 
 uses
-  debug,
-  test,
-  sprite,
-  sound,
-  graph32;
+  uDebug,
+  uTest,
+  uSprite,
+  uSound,
+  uGraph32;
 
 var
   gfx: tGFXLibrary;
