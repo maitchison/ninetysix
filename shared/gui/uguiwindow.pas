@@ -40,7 +40,7 @@ var
   dc: tDrawContext;
 begin
   inherited doDraw(screen);
-  dc := screen.canvas.dc;
+  dc := screen.canvas.dc(bmBlit);
   //dc.tint := RGBF(0.40,0.42,0.62);
   dc.tint := RGBF(1.00,0.22,0.12);
   dc.stretchImage(background, innerBounds);
