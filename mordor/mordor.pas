@@ -23,7 +23,8 @@ uses
   {$i gui.inc}
   {game stuff}
   res,
-  uMapGUI,
+  uMapGui,
+  uTileEditorGui,
   uScene,
   uMap
   ;
