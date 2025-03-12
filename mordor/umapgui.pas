@@ -32,6 +32,7 @@ type
   protected
     function  tilePos(x,y: integer): tPoint;
     procedure drawCursor(dc: tDrawContext);
+    procedure invalidateTile(x,y: integer);
   const
     TILE_SIZE = 15;
   public
@@ -45,6 +46,7 @@ type
     procedure moveCursor(dx,dy: integer);
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(dc: tDrawContext); override;
+    procedure invalidate(); override;
   end;
 
 implementation
@@ -61,11 +63,27 @@ begin
   //background := tSprite.create(gfx['darkmap']);
   setSize(512, 512);
   tileEditor := nil;
+  doubleBufferMode := dbmBlit;
+  invalidate();
 end;
 
 destructor tMapGUI.destroy();
 begin
   inherited destroy;
+end;
+
+procedure tMapGUI.invalidate();
+begin
+  inherited invalidate();
+  fillChar(isTileDirty, sizeof(isTileDirty), true);
+  isDirty := true;
+end;
+
+{mark tile as needing to be redrawn}
+procedure tMapGUI.invalidateTile(x,y: integer);
+begin
+  isTileDirty[x,y] := true;
+  isDirty := true;
 end;
 
 function tMapGUI.tilePos(x,y: integer): tPoint;
@@ -87,10 +105,7 @@ begin
     key_space:
       if assigned(map) and assigned(tileEditor) then begin
         tileEditor.applyToMapTile(map, cursor.x, cursor.y);
-        //renderTile(cursor.x, cursor.y);
-        // todo: mark just this tile as dirty
-        isDirty := true;
-        //drawCursor();
+        invalidateTile(cursor.x, cursor.y);
       end;
   end;
 end;
@@ -133,6 +148,11 @@ begin
   end;
   }
 
+  {cursor}
+  if (mode = mmEdit) and (x = cursor.x) and (y = cursor.y) then
+    drawCursor(dc);
+
+  isTileDirty[x,y] := false;
 end;
 
 procedure tMapGUI.doUpdate(elapsed: single);
@@ -146,15 +166,12 @@ procedure tMapGUI.doDraw(dc: tDrawContext);
   var
   x,y: integer;
 begin
-  inherited doDraw(dc); // do we need this?
-  if assigned(background) then
-    background.draw(dc, 0, 0);
   if not assigned(map) then exit();
+
   for y := 0 to map.height-1 do
     for x := 0 to map.width-1 do
-      renderTile(dc, x, y);
-  if mode = mmEdit then
-    drawCursor(dc);
+      if isTileDirty[x,y] then
+        renderTile(dc, x, y);
 end;
 
 procedure tMapGui.drawCursor(dc: tDrawContext);
@@ -173,8 +190,8 @@ begin
   oldCursor := cursor;
   cursor.x := clamp(cursor.x + dx, 0, map.width-1);
   cursor.y := clamp(cursor.y + dy, 0, map.height-1);
-  // todo: mark only these two tiles as dirty
-  isDirty := true;
+  invalidateTile(oldCursor.x, oldCursor.y);
+  invalidateTile(cursor.x, cursor.y);
 end;
 
 end.

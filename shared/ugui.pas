@@ -55,6 +55,14 @@ type
   end;
 
   tGuiState = (gsNormal, gsDisabled, gsHighlighted, gsPressed, gsSelected);
+  tDoubleBufferMode = (
+    // canvas is filled with RGBA.Clear, component should redraw everything, and result is blended into screen, blending only performed on outer 8 pixels
+    dbmPartialBlend,
+    // canvas is filled with RGBA.Clear, component should redraw everything, and result is blended into screen.
+    dbmFullBlend,
+    // canvas is not cleared and canvas is blitted to screen
+    dbmBlit
+  );
 
   tGuiComponent = class;
   tGuiContainer = class;
@@ -82,6 +90,7 @@ type
     {buffering}
     canvas: tPage;
     isDirty: boolean;
+    doubleBufferMode: tDoubleBufferMode;
   protected
     procedure playSFX(sfxName: string);
     procedure doDraw(dc: tDrawContext); virtual;
@@ -112,7 +121,7 @@ type
     function  screenPos(): tPoint;
     function  screenBounds(): tRect;
     procedure addHook(aMsg: string; aProc: tHookProc);
-    procedure invalidate();
+    procedure invalidate(); virtual;
   public
     procedure onKeyPress(code: word); virtual;
   public
@@ -369,6 +378,7 @@ begin
   fontStyle.setDefault();
   style := DEFAULT_GUI_SKIN.styles['default'];
   isDirty := true;
+  doubleBufferMode := dbmPartialBlend;
 end;
 
 {get absolute bounds by parent query}
@@ -492,18 +502,30 @@ begin
   if isDoubleBuffered then begin
     {draw component to canvas, then write this to dc}
     if isDirty then begin
-      canvas.clear(RGB(0,0,0,0));
+      if doubleBufferMode in [dbmPartialBlend, dbmFullBlend] then
+        canvas.clear(RGB(0,0,0,0));
       canvasDC := canvas.getDC(bmBlend);
       if GUI_HQ then canvasDC.textureFilter := tfLinear;
       canvasDC.tint := col;
       doDraw(canvasDC);
       isDirty := false;
     end;
-    dc.blendMode := bmBlend;
     dc.tint := RGBA.White;
     dc.offset += fPos;
-    //dc.drawImage(canvas, bounds.pos);
-    dc.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
+    case doubleBufferMode of
+      dbmPartialBlend: begin
+        dc.blendMode := bmBlend;
+        dc.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
+      end;
+      dbmFullBlend: begin
+        dc.blendMode := bmBlend;
+        dc.drawImage(canvas, bounds.pos);
+      end;
+      dbmBlit: begin
+        dc.blendMode := bmBlit;
+        dc.drawImage(canvas, bounds.pos);
+      end;
+    end;
   end else begin
     {draw component directly to dc}
     if GUI_HQ then dc.textureFilter := tfLinear;
