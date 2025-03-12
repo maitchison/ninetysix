@@ -113,23 +113,23 @@ asm
 end;
 
 {this is just a movq version... might not be that much faster that movsd}
-procedure blitImage_MMX(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
+procedure blitImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
-  srcPtr := srcPage.getAddress(srcX, srcY);
+  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - width) * 4;
-  dstStride := (dstPage.width - width) * 4;
+  srcStride := (srcPage.width - srcRect.width) * 4;
+  dstStride := (dstPage.width - srcRect.width) * 4;
   asm
     cli
     pushad
     mov esi, SRCPTR
     mov edi, DSTPTR
-    mov ebx, HEIGHT
+    mov ebx, SRCRECT.HEIGHT
   @YLOOP:
-    mov ecx, WIDTH
+    mov ecx, SRCRECT.WIDTH
     shr ecx, 2
     test ecx, ecx
     jz @FINAL
@@ -145,7 +145,7 @@ begin
     jnz @XLOOP
 
   @FINAL:
-    mov ecx, WIDTH
+    mov ecx, SRCRECT.WIDTH
     and ecx, $3
     rep movsd
 
@@ -160,22 +160,22 @@ begin
 end;
 
 {modulate color, but no blending}
-procedure tintImage_MMX(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+procedure tintImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
 
-  srcPtr := srcPage.getAddress(srcX, srcY);
+  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - width) * 4;
-  dstStride := (dstPage.width - width) * 4;
+  srcStride := (srcPage.width - srcRect.width) * 4;
+  dstStride := (dstPage.width - srcRect.width) * 4;
   asm
     cli
     pushad
     mov esi, SRCPTR
     mov edi, DSTPTR
-    mov ebx, HEIGHT
+    mov ebx, SRCRECT.HEIGHT
 
     {MM0 <- 0}
     pxor      MM0, MM0
@@ -188,7 +188,7 @@ begin
     punpckldq MM3, MM3
 
   @YLOOP:
-    mov       ecx, WIDTH
+    mov       ecx, SRCRECT.WIDTH
 
   @XLOOP:
     movd      MM2, [esi]
@@ -216,21 +216,21 @@ begin
 end;
 
 
-procedure blendImage_MMX(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+procedure blendImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
-  srcPtr := srcPage.getAddress(srcX, srcY);
+  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - width) * 4;
-  dstStride := (dstPage.width - width) * 4;
+  srcStride := (srcPage.width - srcRect.width) * 4;
+  dstStride := (dstPage.width - srcRect.width) * 4;
   asm
     cli
     pushad
     mov esi, SRCPTR
     mov edi, DSTPTR
-    mov ebx, HEIGHT
+    mov ebx, SRCRECT.HEIGHT
 
     {MM0 <- 0}
     pxor      MM0, MM0
@@ -243,7 +243,7 @@ begin
     punpckldq MM3, MM3
 
   @YLOOP:
-    mov       ecx, WIDTH
+    mov       ecx, SRCRECT.WIDTH
 
   @XLOOP:
     {MM2 <- sARGB}
@@ -314,21 +314,21 @@ begin
   end;
 end;
 
-procedure blendImage_MMX_fast(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
+procedure blendImage_MMX_fast(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
-  srcPtr := srcPage.getAddress(srcX, srcY);
+  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - width) * 4;
-  dstStride := (dstPage.width - width) * 4;
+  srcStride := (srcPage.width - srcRect.width) * 4;
+  dstStride := (dstPage.width - srcRect.width) * 4;
   asm
     cli
     pushad
     mov esi, SRCPTR
     mov edi, DSTPTR
-    mov ebx, HEIGHT
+    mov ebx, SRCRECT.HEIGHT
 
     {MM0 <- 0}
     pxor      MM0, MM0
@@ -338,7 +338,7 @@ begin
     punpckldq MM3, MM3
 
   @YLOOP:
-    mov       ecx, WIDTH
+    mov       ecx, SRCRECT.WIDTH
 
   @XLOOP:
     {MM2 <- sARGB}

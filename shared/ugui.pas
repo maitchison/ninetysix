@@ -351,12 +351,16 @@ var
   textRect: tRect;
   style: tGuiStyle;
   s: tSprite;
+  dc: tDrawContext;
 begin
 
   {draw background}
   s := getSprite();
   if assigned(s) then begin
-    s.drawNineSlice(screen.canvas.dc, bounds);
+    dc := screen.canvas.dc(bmBlend);
+    dc.tint := col;
+    dc.textureFilter := tfLinear;
+    s.drawNineSlice(dc, bounds);
   end else begin
     defaultBackgroundDraw(screen);
   end;

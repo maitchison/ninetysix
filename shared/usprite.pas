@@ -60,7 +60,7 @@ type
     procedure drawStretched(const dc: tDrawContext; dstRect: tRect);
     procedure drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
     procedure drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
-    procedure drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddleSlice: boolean=False);
+    procedure drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddle: boolean=False);
 
     {iIniSerializable}
     procedure writeToIni(ini: tIniWriter);
@@ -330,7 +330,7 @@ end;
 end;
 
 {Draw sprite using nine-slice method}
-procedure tSprite.drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddleSlice: boolean=False);
+procedure tSprite.drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddle: boolean=False);
 var
   oldRect: tRect;
 begin
@@ -340,7 +340,7 @@ begin
   {top part}
   srcRect := tRect.inset(oldRect, 0, 0, border.left, border.top);
   draw(dc, dstRect.x, dstRect.y);
-  srcRect := tRect.Inset(oldRect,Border.Left, 0, -Border.Right, Border.Top);
+  srcRect := tRect.inset(oldRect, Border.Left, 0, -Border.Right, Border.Top);
   drawStretched(dc, tRect.Inset(dstRect, border.left, 0, -border.right, border.top));
   srcRect := tRect.Inset(oldRect,-Border.Right, 0, 0, Border.Top);
   draw(dc, dstRect.x+dstRect.width-Border.right, dstRect.y);
@@ -348,8 +348,10 @@ begin
   {middle part}
   srcRect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
   drawStretched(dc, tRect.Inset(dstRect, 0, Border.Top, Border.Left, -Border.Bottom));
-  srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
-  drawStretched(dc, tRect.Inset(dstRect, border.left, border.top, -border.right, -border.bottom));
+  if not excludeMiddle then begin
+    srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
+    drawStretched(dc, tRect.Inset(dstRect, border.left, border.top, -border.right, -border.bottom));
+  end;
   srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
   drawStretched(dc, tRect.Inset(dstRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 
@@ -492,6 +494,7 @@ var
   sprite: tSprite;
   c: array[0..4] of RGBA;
   x,y: integer;
+  dc: tDrawContext;
 
 type tSln = array[0..3,0..3] of byte;
 
@@ -516,10 +519,10 @@ var
     (0, 4, 2, 0),
     (0, 0, 0, 0)),
     {scaling}
-   ((3, 3, 1, 1),
-    (3, 3, 1, 1),
-    (4, 4, 2, 2),
-    (4, 4, 2, 2))
+   ((1, 1, 2, 2),
+    (1, 1, 2, 2),
+    (3, 3, 4, 4),
+    (3, 3, 4, 4))
   ];
 
   function whichColor(aC: RGBA): string;
@@ -553,7 +556,7 @@ var
   end;
 
 begin
-(*
+
   page := tPage.create(4,4);
   spritePage := tPage.create(2,2);
   c[0] := RGB(0,0,0); c[1] := RGB(255,0,0); c[2] := RGB(0,255,0); c[3] := RGB(0,0,255); c[4] := RGB(255,0,255);
@@ -563,17 +566,26 @@ begin
   spritePage.putPixel(1,1,c[4]);
   sprite := tSprite.create(spritePage);
 
+  dc := page.dc(bmBlit);
+
   {standard draw with clipping}
   page.clear(c[0]);
-  sprite.draw(page, 1, 1);
+  sprite.draw(dc, 1, 1);
   testSln(page, sln[0]);
   page.clear(c[0]);
-  sprite.draw(page, -1, -1);
+  sprite.draw(dc, -1, -1);
   testSln(page, sln[1]);
   page.clear(c[0]);
-  sprite.draw(page, 3, 3);
+  sprite.draw(dc, 3, 3);
   testSln(page, sln[2]);
 
+
+  {scaling}
+  page.clear(c[0]);
+  sprite.drawStretched(dc, Rect(0,0,4,4));
+  testSln(page, sln[4]);
+  (*
+  {these are not implemented yet}
   {rotation}
   sprite.setPivot(1,1);
   page.clear(c[0]);
@@ -583,15 +595,13 @@ begin
   sprite.drawRotated(page, Point(2, 2), 90);
   testSln(page, sln[3]);
 
-  {scaling (via rotation)}
-  page.clear(c[0]);
-  sprite.drawRotated(page, Point(2, 2), 90, 2.0);
-  testSln(page, sln[4]);
+
+  *)
 
   page.free;
   spritePage.free;
   sprite.free;
-*)
+
 end;
 
 procedure tSpriteTest.run();

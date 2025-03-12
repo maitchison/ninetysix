@@ -52,10 +52,10 @@ type
     {dispatch}
     procedure doBlitCol(pixels: pRGBA;len: int32;col: RGBA);
     procedure doBlendCol(pixels: pRGBA;len: int32;col: RGBA);
-    procedure doBlitImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32);
-    procedure doTintImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
-    procedure doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
-    procedure doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcWidth, srcHeight: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
+    procedure doBlitImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect);
+    procedure doTintImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
+    procedure doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
+    procedure doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
 
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
@@ -253,7 +253,7 @@ begin
 
   {scaled integer version: 161}
 
-  if (fx < 0) or (fy < 0) or (fx > width-1) or (fy > height-1) then
+  if (fx < 0) or (fy < 0) or (fx >= width-1) or (fy >= height-1) then
     exit(RGB(255, 0, 255));
 
   x := trunc(fx);
@@ -559,42 +559,42 @@ begin
   end;
 end;
 
-procedure tDrawContext.doBlitImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32);
+procedure tDrawContext.doBlitImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect);
 begin
   case backend of
-    dbREF: blitImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
-    dbASM: blitImage_ASM(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
-    dbMMX: blitImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
+    dbREF: blitImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect);
+    dbASM: blitImage_ASM(dstPixels, srcPixels, dstX, dstY, srcRect);
+    dbMMX: blitImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect);
   end;
 end;
 
-procedure tDrawContext.doTintImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+procedure tDrawContext.doTintImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 begin
   case backend of
-    dbREF: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
-    dbASM: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
-    dbMMX: tintImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbREF: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
+    dbASM: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
+    dbMMX: tintImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
   end;
 end;
 
-procedure tDrawContext.doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+procedure tDrawContext.doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 begin
   case backend of
-    dbREF: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
-    dbASM: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint);
+    dbREF: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
+    dbASM: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
     dbMMX: begin
       if hasTint then
-        blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height, tint)
+        blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect, tint)
       else
-        blendImage_MMX_fast(dstPixels, srcPixels, dstX, dstY, srcX, srcY, width, height);
+        blendImage_MMX_fast(dstPixels, srcPixels, dstX, dstY, srcRect);
       end;
   end;
 end;
 
-procedure tDrawContext.doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcWidth, srcHeight: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
+procedure tDrawContext.doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
 begin
   {only ref for the moment..}
-  stretchImage_REF(dstPage, srcPage, dstRect, srcX, srcY, srcWidth, srcHeight, tint, filter, blendMode);
+  stretchImage_REF(dstPage, srcPage, dstRect, srcX, srcY, srcDx, srcDy, tint, filter, blendMode);
 end;
 
 {-------------------------------------------------}
@@ -735,24 +735,25 @@ begin
 
   applyTransform(pos);
 
-  dstRect := Rect(pos.x, pos.y, src.width, src.height);
+  dstRect := Rect(pos.x, pos.y, srcRect.width, srcRect.height);
   dstRect.clipTo(clip);
   if dstRect.isEmpty then exit;
   srcRect.width := dstRect.width;
   srcRect.height := dstRect.height;
-  srcRect.pos += (pos - dstRect.pos); // might be the wrong way around..?
+  srcRect.pos -= (pos - dstRect.pos);
 
   case blendMode of
     bmNone: exit;
     bmBlit: begin
       if hasTint then
-        doTintImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint)
+        doTintImage(page, src, dstRect.x, dstRect.y, srcRect, tint)
       else
-        doBlitImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height);
+        doBlitImage(page, src, dstRect.x, dstRect.y, srcRect);
       end;
     bmBlend:
-      doBlendImage(page, src, dstRect.x, dstRect.y, srcRect.x, srcRect.y, srcRect.width, srcRect.height, tint);
+      doBlendImage(page, src, dstRect.x, dstRect.y, srcRect, tint);
   end;
+
   markRegion(dstRect);
 end;
 
@@ -774,7 +775,7 @@ end;
 procedure tDrawContext.stretchSubImage(src: tPage; dstRect: tRect; srcRect: tRect);
 var
   srcX1, srcY1, srcX2, srcY2: single;
-  invScaleX, invScaleY: single;
+  scaleX, scaleY: single;
   delta: integer;
   bottomRight: tPoint;
 begin
@@ -783,19 +784,18 @@ begin
   bottomRight := dstRect.bottomRight;
   dstRect.clipTo(clip);
 
-  invScaleX := dstRect.width / srcRect.width;
-  invScaleY := dstRect.height / srcRect.height;
+  {todo: support negative width and height}
+  scaleX := srcRect.width / (dstRect.width+1);
+  scaleY := srcRect.height / (dstRect.height+1);
 
   {transform src rect based on clipping}
-  srcX1 := srcRect.left + ((dstRect.x - dstRect.pos.x) * invScaleX);
-  srcY1 := srcRect.top + ((dstRect.y - dstRect.pos.y) * invScaleY);
-  srcX2 := srcRect.right + ((dstRect.right - bottomRight.x) * invScaleX);
-  srcY2 := srcRect.bottom + ((dstRect.bottom - bottomRight.y) * invScaleY);
+  srcX1 := (scaleX/2) + srcRect.left + ((dstRect.x - dstRect.pos.x) * scaleX);
+  srcY1 := (scaleY/2) + srcRect.top + ((dstRect.y - dstRect.pos.y) * scaleY);
 
   doStretchImage(
     page, src,
     dstRect,
-    srcX1, srcY1, srcX2-srcX1, srcY2-srcY1,
+    srcX1, srcY1, scaleX, scaleY,
     tint, textureFilter, blendMode
   );
 
@@ -931,6 +931,7 @@ begin
       )
     );
   end;
+
 end;
 
 {--------------------------------------------------------}

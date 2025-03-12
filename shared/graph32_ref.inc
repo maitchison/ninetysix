@@ -22,34 +22,34 @@ begin
 end;
 
 {draw an image segment to screen, no blending}
-procedure blitImage_REF(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
+procedure blitImage_REF(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);
 var
   srcPtr: pRGBA;
   dstPtr: pRGBA;
   i: integer;
 begin
 
-  srcPtr := srcPage.getAddress(srcX, srcY);
+  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
 
-  for i := 0 to height-1 do begin
-    move(srcPtr^, dstPtr^, width*4);
+  for i := 0 to srcRect.height-1 do begin
+    move(srcPtr^, dstPtr^, srcRect.width*4);
     inc(srcPtr, srcPage.width);
     inc(dstPtr, dstPage.width);
   end;
 end;
 
-procedure tintImage_REF(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+procedure tintImage_REF(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 var
   i,j: integer;
   srcPtr: pRGBA;
   dstPtr: pRGBA;
 
 begin
-  for j := 0 to height-1 do begin
-    srcPtr := srcPage.getAddress(srcX, srcY+j);
+  for j := 0 to srcRect.height-1 do begin
+    srcPtr := srcPage.getAddress(srcRect.x, srcRect.y+j);
     dstPtr := dstPage.getAddress(dstX, dstY+j);
-    for i := 0 to width-1 do begin
+    for i := 0 to srcRect.width-1 do begin
       dstPtr^ := srcPtr^ * tint;
       inc(srcPtr);
       inc(dstPtr);
@@ -57,7 +57,7 @@ begin
   end;
 end;
 
-procedure blendImage_REF(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32; tint: RGBA);
+procedure blendImage_REF(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 var
   i,j: integer;
   srcPtr: pRGBA;
@@ -66,10 +66,10 @@ var
   src: RGBA;
 begin
   needsTint := int32(tint) <> -1;
-  for j := 0 to height-1 do begin
-    srcPtr := srcPage.getAddress(srcX, srcY+j);
+  for j := 0 to srcRect.height-1 do begin
+    srcPtr := srcPage.getAddress(srcRect.x, srcRect.y+j);
     dstPtr := dstPage.getAddress(dstX, dstY+j);
-    for i := 0 to width-1 do begin
+    for i := 0 to srcRect.width-1 do begin
       src := srcPtr^;
       if src.a <> 0 then begin
         if needsTint then src := src * tint;
@@ -85,7 +85,7 @@ begin
 end;
 
 {draw image stretched}
-procedure stretchImage_REF(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcWidth, srcHeight: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
+procedure stretchImage_REF(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
 var
   i,j: integer;
   dstPtr: pRGBA;
@@ -93,14 +93,15 @@ var
   src: RGBA;
   tx,ty: single;
 begin
+
   needsTint := int32(tint) <> -1;
+  ty := srcY;
   for j := 0 to dstRect.height-1 do begin
     dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
-    ty := srcY + (j/dstRect.height) * srcHeight;
+    tx := srcX;
     for i := 0 to dstRect.width-1 do begin
-      tx := srcX + (i/dstRect.width) * srcWidth;
       case filter of
-        tfNearest: src := srcPage.getPixel(round(tx), round(ty));
+        tfNearest: src := srcPage.getPixel(trunc(tx), trunc(ty));
         tfLinear: src := srcPage.getPixelF(tx, ty);
         else src.init(255,0,255);
       end;
@@ -112,6 +113,8 @@ begin
           dstPtr^ := RGBA.Blend(src, dstPtr^, src.a);
       end;
       inc(dstPtr);
+      tx += srcDx;
     end;
+    ty += srcDy;
   end;
 end;

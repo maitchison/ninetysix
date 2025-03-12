@@ -14,15 +14,15 @@ asm
   pop edi
 end;
 
-procedure blitImage_ASM(dstPage, srcPage: tPage; dstX, dstY, srcX, srcY, width, height: int32);
+procedure blitImage_ASM(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
-  srcPtr := srcPage.getAddress(srcX, srcY);
+  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - width) * 4;
-  dstStride := (dstPage.width - width) * 4;
+  srcStride := (srcPage.width - srcRect.width) * 4;
+  dstStride := (dstPage.width - srcRect.width) * 4;
 
   asm
     pushad
@@ -30,9 +30,9 @@ begin
     mov esi, SRCPTR
     mov edi, DSTPTR
 
-    mov ebx, HEIGHT
+    mov ebx, SRCRECT.HEIGHT
   @YLOOP:
-    mov ecx, WIDTH
+    mov ecx, SRCRECT.WIDTH
     rep movsd
     add esi, SRCSTRIDE
     add edi, DSTSTRIDE
