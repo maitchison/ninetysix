@@ -127,6 +127,9 @@ procedure assertEqual(a, b: tPage); overload;
 
 implementation
 
+uses
+  uKeyboard; {stub}
+
 {$include graph32_REF.inc}
 {$include graph32_ASM.inc}
 {$include graph32_MMX.inc}
@@ -788,8 +791,8 @@ begin
   dstRect.clipTo(clip);
 
   {todo: support negative width and height}
-  scaleX := srcRect.width / (dstRect.width+1);
-  scaleY := srcRect.height / (dstRect.height+1);
+  scaleX := srcRect.width / dstRect.width;
+  scaleY := srcRect.height / dstRect.height;
 
   {transform src rect based on clipping}
   srcX1 := (scaleX/2) + srcRect.left + ((dstRect.x - dstRect.pos.x) * scaleX);

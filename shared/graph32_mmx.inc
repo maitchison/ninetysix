@@ -420,7 +420,7 @@ begin
   for j := 0 to dstRect.height-1 do begin
     dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
     linePtr := srcPage.getAddress(0, trunc(srcY+(j*srcDy)));
-    tx := round((srcX+0.25)*65536);
+    tx := round((srcX)*65536);
 
     asm
       cli

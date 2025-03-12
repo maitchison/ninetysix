@@ -359,7 +359,6 @@ begin
   if assigned(s) then begin
     dc := screen.canvas.dc(bmBlend);
     dc.tint := col;
-    dc.textureFilter := tfLinear;
     s.drawNineSlice(dc, bounds);
   end else begin
     defaultBackgroundDraw(screen);

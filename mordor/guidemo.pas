@@ -120,7 +120,7 @@ begin
   guiSkin.styles['default'] := style;
 
   style := tGuiStyle.Create();
-  style.padding.init(8,8,11,11);
+  style.padding.init(8,11,8,11);
   style.sprites['default'] := makeSprite('ec_box', Border(40,40,40,40));
   guiSkin.styles['box'] := style;
 
