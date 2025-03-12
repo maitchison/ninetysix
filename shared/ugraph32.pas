@@ -114,6 +114,7 @@ type
   protected
     function getGFXByTag(aTag: string): tPage;
   public
+    function getWithDefault(aTag: string;aDefault: tPage): tPage;
     function addResource(filename: string): tResource; override;
     property items[tag: string]: tPage read getGFXByTag; default;
   end;
@@ -145,6 +146,14 @@ begin
   res := getByTag(aTag);
   assert(res is tPage);
   result := tPage(res);
+end;
+
+function tGFXLibrary.getWithDefault(aTag: string;aDefault: tPage): tPage;
+begin
+  if hasResource(aTag) then
+    exit(self[aTag])
+  else
+    exit(aDefault);
 end;
 
 function tGFXLibrary.addResource(filename: string): tResource;

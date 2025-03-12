@@ -31,7 +31,7 @@ begin
   inherited Create();
   col := RGBA.White;
   style := DEFAULT_GUI_SKIN.styles['box'].clone();
-  background := DEFAULT_GUI_SKIN.gfx['innerwindow'];
+  background := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
   setBounds(aRect);
 end;
 
@@ -42,7 +42,8 @@ begin
   inherited doDraw(dc);
   //dc.tint := RGBF(0.40,0.42,0.62);
   dc.tint *= RGBF(1.00,0.22,0.12);
-  dc.stretchImage(background, innerBounds);
+  if assigned(background) then
+    dc.stretchImage(background, innerBounds);
 end;
 
 begin

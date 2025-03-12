@@ -111,10 +111,9 @@ begin
   sfx := tSFXLibrary.Create(true);
   sfx.loadFromFolder('sfx', '*.a96');
 
-  initGui();
-
   initMouse();
   initKeyboard();
+  initGuiSkinEpic();
 
   //musicPlay('res\prologue.a96');
 

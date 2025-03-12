@@ -55,7 +55,7 @@ begin
   //musicPlay('res\mordor.a96');
   initMouse();
   initKeyboard();
-  //initGuiSkinEpic();
+  initGuiSkinEpic();
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 
@@ -183,7 +183,7 @@ var
   saveButton, loadButton: tGuiButton;
   fpsLabel: tGuiLabel;
   timer: tTimer;
-
+  dc: tDrawContext;
 begin
 
   map := tMap.create(32,32);
@@ -216,6 +216,7 @@ begin
   mapGUI.refresh();
 
   timer := tTimer.create('main');
+  dc := screen.getDC();
 
   repeat
 
@@ -231,7 +232,7 @@ begin
 
     gui.update(elapsed);
     screen.clearAll();
-    gui.draw(screen.canvas.getDC());
+    gui.draw(dc);
     screen.flipAll();
 
     timer.stop();

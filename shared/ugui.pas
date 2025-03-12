@@ -12,7 +12,6 @@ uses
   uFileSystem,
   uMouse,
   uInput,
-  uMap,
   uSound,
   uMixer,
   uTypes,
