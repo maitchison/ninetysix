@@ -65,9 +65,11 @@ type
   private
     prevState: tGuiState;
   protected
+    {position relative to parent}
+    fPos: tPoint;
+    fWidth, fHeight: integer;
     parent: tGuiContainer;
     style: tGuiStyle;
-    bounds: tRect;
     isInteractive: boolean;
     isVisible: boolean;
     isEnabled: boolean;
@@ -85,11 +87,15 @@ type
     procedure doDraw(dc: tDrawContext); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
+    procedure setCol(col: RGBA); virtual;
+    procedure setSize(aWidth, aHeight: integer);
     procedure fireMessage(aMsg: string; args: array of const); overload;
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(dc: tDrawContext);
+    function  bounds: tRect;
     function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
+    procedure setBounds(aRect: tRect);
     {style}
     function  getSprite(): tSprite;
     {canvas}
@@ -103,18 +109,14 @@ type
     procedure draw(dc: tDrawContext); virtual;
     procedure update(elapsed: single); virtual;
     function  state: tGuiState;
-    function  absBounds(): tRect;
-    function  absInnerBounds(): tRect;
+    function  screenPos(): tPoint;
+    function  screenBounds(): tRect;
     procedure addHook(aMsg: string; aProc: tHookProc);
   public
     procedure onKeyPress(code: word); virtual;
   public
-    property x: integer read bounds.pos.x write bounds.pos.x;
-    property y: integer read bounds.pos.y write bounds.pos.y;
-    property width: integer read bounds.width write bounds.width;
-    property height: integer read bounds.height write bounds.height;
     property text: string read fText write setText;
-    property col: RGBA read fCol write fCol;
+    property col: RGBA read fCol write setCol;
     {style helpers}
     property font: tFont read fontStyle.font write fontStyle.font;
     property textColor: RGBA read fontStyle.col write fontStyle.col;
@@ -129,6 +131,11 @@ type
     procedure append(x: tGuiComponent); virtual;
     procedure draw(dc: tDrawContext); override;
     procedure update(elapsed: single); override;
+  end;
+
+  tGui = class(tGuiContainer)
+  public
+    constructor Create();
   end;
 
 const
@@ -198,14 +205,20 @@ end;
 
 {--------------------------------------------------------}
 
+constructor tGui.Create();
+begin
+  inherited Create();
+  fCol.a := 0;
+end;
+
+{--------------------------------------------------------}
+
 constructor tGuiContainer.Create();
 begin
   inherited Create();
-  {todo: think of some reasonable bounds}
-  bounds := Rect(0,0,1024,1024);
+  fWidth := 100;
+  fHeight := 100;
   setLength(elements, 0);
-  {make sure we don't draw background}
-  fCol.a := 0;
 end;
 
 destructor tGuiContainer.destroy;
@@ -232,7 +245,7 @@ begin
   inherited draw(dc);
 
   {todo: update clip rect aswell I guess}
-  dc.offset += innerBounds.pos;
+  dc.offset += innerBounds.pos + fPos;
   for gc in elements do if gc.isVisible then gc.draw(dc);
 end;
 
@@ -274,10 +287,13 @@ begin
   result := style.sprites.getWithDefault(GUI_STATE_NAME[state], defaultSprite);
 end;
 
-procedure tGuiComponent.enableDoubleBuffered;
+procedure tGuiComponent.enableDoubleBuffered();
 begin
+  if assigned(canvas) and (canvas.width = fWidth) and (canvas.height = fHeight) then
+    {already done}
+    exit;
   if assigned(canvas) then canvas.free();
-  canvas := tPage.create(bounds.width, bounds.height);
+  canvas := tPage.create(fWidth, fHeight);
   isDirty := true;
 end;
 
@@ -329,7 +345,9 @@ begin
   isVisible := true;
   isEnabled := true;
   isInteractive := false;
-  bounds.init(0,0,0,0);
+  fPos := Point(0, 0);
+  fWidth := 16;
+  fHeight := 16;
   text := '';
   col := RGB(255,255,255);
   fontStyle.setDefault();
@@ -338,18 +356,18 @@ begin
 end;
 
 {get absolute bounds by parent query}
-function tGuiComponent.absBounds(): tRect;
+function tGuiComponent.screenPos(): tPoint;
 begin
-  result := bounds;
+  result := fPos;
   if not assigned(parent) then exit;
-  result.pos += parent.absInnerBounds().pos;
+  result += parent.fPos + Point(parent.style.padding.left, parent.style.padding.top);
 end;
 
-function tGuiComponent.absInnerBounds(): tRect;
+function tGuiComponent.screenBounds(): tRect;
 begin
-  result := innerBounds;
-  if not assigned(parent) then exit;
-  result.pos += parent.absInnerBounds().pos;
+  result.pos := screenPos;
+  result.width := fWidth;
+  result.height := fHeight;
 end;
 
 procedure tGuiComponent.doUpdate(elapsed: single);
@@ -384,11 +402,27 @@ begin
   result := style.padding.inset(bounds);
 end;
 
-procedure tGuiComponent.sizeToContent();
+function tGuiComponent.bounds: tRect;
 begin
-  bounds := font.textExtents(text, bounds.topLeft);
-  bounds.width += style.padding.horizontal;
-  bounds.height += style.padding.vertical;
+  result := Rect(0,0,fWidth,fHeight);
+end;
+
+{set both position and size}
+procedure tGuiComponent.setBounds(aRect: tRect);
+begin
+  fPos := aRect.pos;
+  setSize(aRect.width, aRect.height);
+  isDirty := true;
+end;
+
+procedure tGuiComponent.sizeToContent();
+var
+  newBounds: tRect;
+begin
+  newBounds := font.textExtents(text);
+  newBounds.width += style.padding.horizontal;
+  newBounds.height += style.padding.vertical;
+  setSize(newBounds.width, newBounds.height);
 end;
 
 procedure tGuiComponent.doDraw(dc: tDrawContext);
@@ -437,8 +471,6 @@ var
   oldTint: RGBA;
   canvasDC: tDrawContext;
 begin
-  if not isVisible then exit;
-
   {todo: check clipping bounds}
 
   if isDoubleBuffered then begin
@@ -454,11 +486,13 @@ begin
     end;
     dc.blendMode := bmBlend;
     dc.tint := col;
+    dc.offset += fPos;
     //dc.drawImage(canvas, bounds.pos);
     dc.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
   end else begin
     {draw component directly to dc}
     dc.tint := col;
+    dc.offset += fPos;
     doDraw(dc);
   end;
 end;
@@ -468,7 +502,7 @@ begin
   mouseOverLastFrame := mouseOverThisFrame;
   mouseOverThisFrame := false;
   if not isEnabled then exit;
-  mouseOverThisFrame := absBounds.isInside(input.mouseX, input.mouseY);
+  mouseOverThisFrame := screenBounds.isInside(input.mouseX, input.mouseY);
 
   if isInteractive then begin
     {handle pressed logic}
@@ -503,8 +537,23 @@ end;
 
 procedure tGuiComponent.setText(aText: string);
 begin
-  // todo: set dirty
   fText := aText;
+  isDirty := true;
+end;
+
+procedure tGuiComponent.setCol(col: RGBA);
+begin
+  fCol := col;
+  isDirty := true;
+end;
+
+procedure tGuiComponent.setSize(aWidth, aHeight: integer);
+begin
+  fWidth := aWidth;
+  fHeight := aHeight;
+  if isDoubleBuffered then
+    enableDoubleBuffered();
+  isDirty := true;
 end;
 
 {-----------------------}

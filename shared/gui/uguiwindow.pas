@@ -18,13 +18,13 @@ type
   protected
     background: tPage;
   public
-    constructor Create(rect: tRect; aText: string='');
+    constructor Create(aRect: tRect; aText: string='');
     procedure doDraw(dc: tDrawContext); override;
   end;
 
 implementation
 
-constructor tGuiWindow.Create(rect: tRect; aText: string='');
+constructor tGuiWindow.Create(aRect: tRect; aText: string='');
 var
   s: tSprite;
 begin
@@ -32,7 +32,7 @@ begin
   col := RGBA.White;
   style := DEFAULT_GUI_SKIN.styles['box'].clone();
   background := DEFAULT_GUI_SKIN.gfx['innerwindow'];
-  bounds := rect;
+  setBounds(aRect);
   enableDoubleBuffered();
 end;
 

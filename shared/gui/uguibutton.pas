@@ -34,11 +34,9 @@ begin
   fontStyle.shadow := true;
   fontStyle.col := RGB(250, 250, 250, 230);
 
-  bounds.x := aPos.x;
-  bounds.y := aPos.y;
+  ftext := aText;
 
-  text := aText;
-
+  fPos := aPos;
   sizeToContent();
 
   enableDoubleBuffered();

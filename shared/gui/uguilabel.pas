@@ -55,8 +55,7 @@ begin
   fontStyle.col := RGB(250, 250, 250, 230);
 
   autoSize := false;
-  width := 100;
-  height := 20;
+  setBounds(Rect(aPos.x, aPos.y, 120, 20));
 
   col := RGB(128, 128, 138);
   text := aText;

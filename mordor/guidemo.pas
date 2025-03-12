@@ -56,7 +56,7 @@ begin
   myPanel := tGuiPanel.Create(Rect(300, 10, 200, 100));
   gui.append(myPanel);
 
-  myWindow := tGuiWindow.Create(Rect(350, 10, 200, 400));
+  myWindow := tGuiWindow.Create(Rect(350, 20, 200, 400));
   gui.append(myWindow);
 
   myButton := tGuiButton.Create(Point(5, 5), 'Test button');
