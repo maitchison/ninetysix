@@ -39,7 +39,7 @@ type
     pivot2x: tPoint;  // the origin
     srcRect: tRect;   // location of sprite on page
     border: tBorder;  // border inset (not really used yet)
-
+    innerBlendMode: int8; // blend used for center during nine-slice (or -1 for none)
   protected
     procedure setPivot(x,y: single);
   public
@@ -60,7 +60,7 @@ type
     procedure drawStretched(const dc: tDrawContext; dstRect: tRect);
     procedure drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
     procedure drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
-    procedure drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddle: boolean=False);
+    procedure drawNineSlice(var dc: tDrawContext; dstRect: tRect);
 
     {iIniSerializable}
     procedure writeToIni(ini: tIniWriter);
@@ -169,6 +169,7 @@ begin
   self.srcRect := Rect(aPage.width, aPage.height);
   self.pivot2x := Point(0,0);
   self.border.init(0, 0, 0, 0);
+  self.innerBlendMode := -1;
 end;
 
 constructor tSprite.Create(aPage: tPage; aRect: tRect);
@@ -330,9 +331,11 @@ end;
 end;
 
 {Draw sprite using nine-slice method}
-procedure tSprite.drawNineSlice(const dc: tDrawContext; dstRect: tRect; excludeMiddle: boolean=False);
+procedure tSprite.drawNineSlice(var dc: tDrawContext; dstRect: tRect);
 var
   oldRect: tRect;
+  oldMode: tBlendMode;
+  insetRect: tRect;
 begin
 
   oldRect := srcRect;
@@ -348,10 +351,18 @@ begin
   {middle part}
   srcRect := tRect.Inset(oldRect, 0, Border.Top, Border.Left, -Border.Bottom);
   drawStretched(dc, tRect.Inset(dstRect, 0, Border.Top, Border.Left, -Border.Bottom));
-  if not excludeMiddle then begin
-    srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
-    drawStretched(dc, tRect.Inset(dstRect, border.left, border.top, -border.right, -border.bottom));
-  end;
+
+  {special case for center piece}
+  srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
+  insetRect := tRect.Inset(dstRect, border.left, border.top, -border.right, -border.bottom);
+  if innerBlendMode >= 0 then begin
+    oldMode := dc.blendMode;
+    dc.blendMode := tBlendMode(innerBlendMode);
+    drawStretched(dc, insetRect);
+    dc.blendMode := oldMode;
+  end else
+    drawStretched(dc, insetRect);
+
   srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);
   drawStretched(dc, tRect.Inset(dstRect,-Border.Right, Border.Top, 0, -Border.Bottom));
 

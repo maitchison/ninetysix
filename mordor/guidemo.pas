@@ -95,6 +95,7 @@ var
   begin
     result := tSprite.Create(guiSkin.gfx[tag]);
     result.border := aBorder;
+    result.innerBlendMode := ord(bmBlit); // faster
   end;
 
   procedure makeStateSprites(style: tGuiStyle; tag: string; aBorder: tBorder);
@@ -122,6 +123,7 @@ begin
   style := tGuiStyle.Create();
   style.padding.init(8,11,8,11);
   style.sprites['default'] := makeSprite('ec_box', Border(40,40,40,40));
+  style.sprites['default'].innerBlendMode := ord(bmNone); // nothing to draw here
   guiSkin.styles['box'] := style;
 
   style := tGuiStyle.Create();

@@ -18,7 +18,7 @@ uses
 
 type
 
-  tBlendMode = (bmBlit, bmBlend);
+  tBlendMode = (bmNone, bmBlit, bmBlend);
 
   tDrawContext = record
     dstPointer: pointer;
