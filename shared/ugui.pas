@@ -19,8 +19,7 @@ uses
   uRect,
   uKeyboard,
   uStringMap,
-  uSprite,
-  uScreen;
+  uSprite;
 
 const
   ON_MOUSE_CLICK = 'mouseclick';
@@ -76,12 +75,12 @@ type
     mouseOverThisFrame, mouseOverLastFrame: boolean;
   protected
     procedure playSFX(sfxName: string);
-    procedure doDraw(screen: tScreen); virtual;
+    procedure doDraw(dc: tDrawContext); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
     procedure fireMessage(aMsg: string; args: array of const); overload;
     procedure fireMessage(aMsg: string); overload;
-    procedure defaultBackgroundDraw(screen: tScreen);
+    procedure defaultBackgroundDraw(dc: tDrawContext);
     function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
     {style}
@@ -90,7 +89,7 @@ type
     fontStyle: tFontStyle;
   public
     constructor Create();
-    procedure draw(screen: tScreen); virtual;
+    procedure draw(dc: tDrawContext); virtual;
     procedure update(elapsed: single); virtual;
     function  state: tGuiState;
     procedure addHook(aMsg: string; aProc: tHookProc);
@@ -115,7 +114,7 @@ type
     constructor Create();
     destructor destroy; override;
     procedure append(x: tGuiComponent); virtual;
-    procedure draw(screen: tScreen); override;
+    procedure draw(dc: tDrawContext); override;
     procedure update(elapsed: single); override;
   end;
 
@@ -211,12 +210,12 @@ begin
   elements[length(elements)-1] := x;
 end;
 
-procedure tGuiContainer.draw(screen: tScreen);
+procedure tGuiContainer.draw(dc: tDrawContext);
 var
   gc: tGuiComponent;
 begin
-  doDraw(screen);
-  for gc in elements do if gc.isVisible then gc.draw(screen);
+  doDraw(dc);
+  for gc in elements do if gc.isVisible then gc.draw(dc);
 end;
 
 procedure tGuiContainer.update(elapsed: single);
@@ -310,10 +309,9 @@ begin
 end;
 
 {the fallback default background draw}
-procedure tGuiComponent.defaultBackgroundDraw(screen: tScreen);
+procedure tGuiComponent.defaultBackgroundDraw(dc: tDrawContext);
 var
   backCol, frameCol: RGBA;
-  dc: tDrawContext;
 begin
 
   if col.a = 0 then exit;
@@ -328,7 +326,6 @@ begin
     gsPressed: backCol := RGBA.Lerp(backCol, RGB(128,128,255), 0.33);
   end;
 
-  dc := screen.canvas.dc();
   dc.fillRect(bounds, backCol);
   dc.drawRect(bounds, frameCol);
 end;
@@ -345,23 +342,20 @@ begin
   bounds.height += style.padding.vertical;
 end;
 
-procedure tGuiComponent.doDraw(screen: tScreen);
+procedure tGuiComponent.doDraw(dc: tDrawContext);
 var
   drawX, drawY: integer;
   textRect: tRect;
   style: tGuiStyle;
   s: tSprite;
-  dc: tDrawContext;
 begin
 
   {draw background}
   s := getSprite();
   if assigned(s) then begin
-    dc := screen.canvas.dc(bmBlend);
-    dc.tint := col;
     s.drawNineSlice(dc, bounds);
   end else begin
-    defaultBackgroundDraw(screen);
+    defaultBackgroundDraw(dc);
   end;
 
   if fontStyle.centered then begin
@@ -380,16 +374,19 @@ begin
   end;
 
   if fontStyle.shadow then
-    font.textOut(screen.canvas, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
-  font.textOut(screen.canvas, drawX, drawY, text, fontStyle.col);
+    font.textOut(dc.page, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
+  font.textOut(dc.page, drawX, drawY, text, fontStyle.col);
 
-  screen.markRegion(bounds);
 end;
 
-procedure tGuiComponent.draw(screen: tScreen);
+procedure tGuiComponent.draw(dc: tDrawContext);
+var
+  oldTint: RGBA;
 begin
   if not isVisible then exit;
-  doDraw(screen);
+  {note: not sure this is the best place to handle this?}
+  dc.tint := col;
+  doDraw(dc);
 end;
 
 procedure tGuiComponent.update(elapsed: single);

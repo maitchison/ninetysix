@@ -19,7 +19,7 @@ type
     background: tPage;
   public
     constructor Create(rect: tRect; aText: string='');
-    procedure doDraw(screen: tScreen); override;
+    procedure doDraw(dc: tDrawContext); override;
   end;
 
 implementation
@@ -35,14 +35,13 @@ begin
   bounds := rect;
 end;
 
-procedure tGuiWindow.doDraw(screen: tScreen);
+procedure tGuiWindow.doDraw(dc: tDrawContext);
 var
-  dc: tDrawContext;
+  oldDc: tDrawContext;
 begin
-  inherited doDraw(screen);
-  dc := screen.canvas.dc(bmBlit);
+  inherited doDraw(dc);
   //dc.tint := RGBF(0.40,0.42,0.62);
-  dc.tint := RGBF(1.00,0.22,0.12);
+  dc.tint *= RGBF(1.00,0.22,0.12);
   dc.stretchImage(background, innerBounds);
 end;
 

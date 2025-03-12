@@ -384,6 +384,7 @@ begin
   result.tag := self.tag;
   result.srcRect := self.srcRect;
   result.border := self.border;
+  result.innerBlendMode := self.innerBlendMode;
 end;
 
 destructor tSprite.destroy();
@@ -577,7 +578,7 @@ begin
   spritePage.putPixel(1,1,c[4]);
   sprite := tSprite.create(spritePage);
 
-  dc := page.dc(bmBlit);
+  dc := page.getDC(bmBlit);
 
   {standard draw with clipping}
   page.clear(c[0]);

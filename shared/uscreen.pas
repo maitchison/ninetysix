@@ -46,8 +46,11 @@ type
     FX_GREEN        // a bit like a simulation
     );
 
+  {note: this needs a big tidy up,
+    why do we have clip and bounds nd viewport?
+    scrollmode doesn't work properly anymore
+  }
   tScreen = class
-
   private
     viewport: tRect;
     // dirty grid
@@ -55,7 +58,6 @@ type
     // pixel -> grid is divide by 8
     flagGrid: array[0..128-1, 0..256-1] of byte;
     videoDepth: tVideoDepth;
-
   public
     canvas: tPage;
     background: tPage;
@@ -66,39 +68,31 @@ type
     clip: tRect;      // clipping rect
     scrollMode: tScreenScrollMode;
     fx: tFlipEffect;
-
   protected
     procedure copyLine(x1, x2, y: int32);
     procedure flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
+    procedure doMarkRegion(const rect: tRect);
   public
-
     constructor create();
     destructor destroy(); override;
-
     function width: word;
     function height: word;
-
+    function getDC: tDrawContext;
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
-
     function  getViewPort(): tRect;
     procedure setViewPort(x,y: int32);
-
     procedure resize(aWidth: word; aHeight: word);
     {copy commands}
     procedure copyRegion(rect: tRect);
     procedure clearRegion(rect: tRect);
-
     procedure pageFlip();
     procedure pageClear();
-
     {dirty handling}
     procedure flipAll();
     procedure clearAll();
-    procedure markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR); inline;
+    procedure markRegion(const rect: tRect; flags:word=FG_FLIP+FG_CLEAR); inline;
     procedure markPixel(x,y: integer; flags:word=FG_FLIP+FG_CLEAR); inline;
-
-
   end;
 
 implementation
@@ -550,6 +544,12 @@ begin
     flipLineToScreen(srcX, srcY+i, dstX, dstY+i, cnt);
 end;
 
+function tScreen.getDC: tDrawContext;
+begin
+  result := canvas.getDC();
+  result.markRegionHook := self.doMarkRegion;
+end;
+
 {draw line from x1,y -> x2,y, including final point}
 procedure tScreen.hLine(x1, x2, y: int32;col: RGBA);
 var
@@ -634,8 +634,14 @@ begin
     end;
 end;
 
+{used for hooks, so not inline}
+procedure tScreen.doMarkRegion(const rect: tRect);
+begin
+  markRegion(rect);
+end;
+
 {indicates that region should fliped this frame, and cleared next frame}
-procedure tScreen.markRegion(rect: tRect; flags:word=FG_FLIP+FG_CLEAR); inline;
+procedure tScreen.markRegion(const rect: tRect; flags:word=FG_FLIP+FG_CLEAR); inline;
 var
   x,y, x1,x2,y1,y2: integer;
 begin
@@ -752,7 +758,7 @@ begin
 
   {debugging}
   if keyDown(key_f7) then begin
-    canvas.dc.fillRect(rect, rgba.create(rnd, 0, 0));
+    canvas.getDC().fillRect(rect, rgba.create(rnd, 0, 0));
     exit;
   end;
 

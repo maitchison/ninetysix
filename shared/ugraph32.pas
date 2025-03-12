@@ -34,6 +34,8 @@ type
 
   tPage = class;
 
+  tMarkRegionProc = procedure(const rect: tRect) of object;
+
   tDrawContext = record
     page: tPage;
     offset: tPoint;
@@ -42,13 +44,13 @@ type
     tint: RGBA;  {used to modulate src color before write}
     backend: tDrawBackend;
     textureFilter: tTextureFilter;
+    markRegionHook: tMarkRegionProc;
     procedure applyTransform(var p: tPoint); inline;
     procedure applyTransformInv(var p: tPoint); inline;
     procedure applyTint(var col: RGBA); inline;
     function  smartBM(col: RGBA): tBlendMode;
     function  hasTint: boolean; inline;
     procedure markRegion(const rect: tRect); inline;
-
     {dispatch}
     procedure doBlitCol(pixels: pRGBA;len: int32;col: RGBA);
     procedure doBlendCol(pixels: pRGBA;len: int32;col: RGBA);
@@ -56,7 +58,6 @@ type
     procedure doTintImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
     procedure doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
     procedure doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
-
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
     procedure hLine(pos: tPoint;len: int32;col: RGBA);
@@ -83,7 +84,7 @@ type
     constructor create(aWidth, aHeight: word); overload;
     constructor createAsReference(aWidth, aHeight: word;pixelData: Pointer);
 
-    function  dc(blendMode: tBlendMode = bmBlend): tDrawContext;
+    function  getDC(blendMode: tBlendMode = bmBlend): tDrawContext;
     function  getAddress(x, y: integer): pointer; inline;
     function  getPixel(x, y: integer): RGBA; inline;
     function  getPixelF(fx,fy: single): RGBA;
@@ -199,7 +200,7 @@ begin
 end;
 
 {gets a default draw context for this page. best to call this once and cache it}
-function tPage.dc(blendMode: tBlendMode = bmBlend): tDrawContext;
+function tPage.getDC(blendMode: tBlendMode = bmBlend): tDrawContext;
 begin
   result.page := self;
   result.blendMode := blendMode;
@@ -211,6 +212,7 @@ begin
   else
     result.backend := dbASM;
   result.textureFilter := tfNearest;
+  result.markRegionHook := nil;
 end;
 
 {returns address in memory of given pixel. If out of bounds, returns nil}
@@ -486,7 +488,7 @@ end;
 function tPage.resized(aWidth, aHeight: integer): tPage;
 begin
   result := tPage.create(aWidth, aHeight);
-  result.dc(bmBlit).drawImage(self, Point(0, 0));
+  result.getDC(bmBlit).drawImage(self, Point(0, 0));
 end;
 
 procedure tPage.resize(aWidth, aHeight: integer);
@@ -498,7 +500,7 @@ begin
   self.height := aHeight;
   freeMem(self.pixels);
   getMem(self.pixels, aWidth*aHeight*4);
-  dc(bmBlit).drawImage(tmp, Point(0, 0));
+  getDC(bmBlit).drawImage(tmp, Point(0, 0));
   tmp.free;
 end;
 
@@ -510,7 +512,7 @@ end;
 function tPage.scaled(aWidth, aHeight: integer): tPage;
 begin
   result := tPage.create(aWidth, aHeight);
-  result.dc.stretchImage(self, result.bounds);
+  result.getDC().stretchImage(self, result.bounds);
 end;
 
 {Sets all instances of this color to transparent}
@@ -639,7 +641,7 @@ end;
 
 procedure tDrawContext.markRegion(const rect: tRect); inline;
 begin
-  // pass
+  if assigned(markRegionHook) then markRegionHook(rect);
 end;
 
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);
@@ -763,21 +765,6 @@ begin
   markRegion(dstRect);
 end;
 
-{-------------------------------------}
-{ constructed }
-{-------------------------------------}
-
-procedure tDrawContext.stretchSubImage(src: tPage; pos: tPoint; scaleX, scaleY: single; srcRect: tRect);
-var
-  dstRect: tRect;
-begin
-  dstRect.x := pos.x;
-  dstRect.y := pos.y;
-  dstRect.width := round(srcRect.width * scaleX);
-  dstRect.height := round(srcRect.height * scaleY);
-  self.stretchSubImage(src, dstRect, srcRect);
-end;
-
 procedure tDrawContext.stretchSubImage(src: tPage; dstRect: tRect; srcRect: tRect);
 var
   srcX1, srcY1, srcX2, srcY2: single;
@@ -805,11 +792,24 @@ begin
     tint, textureFilter, blendMode
   );
 
+  markRegion(dstRect);
+
 end;
 
 {----------------------}
 { Constructed: draw commands built from base commands }
 {----------------------}
+
+procedure tDrawContext.stretchSubImage(src: tPage; pos: tPoint; scaleX, scaleY: single; srcRect: tRect);
+var
+  dstRect: tRect;
+begin
+  dstRect.x := pos.x;
+  dstRect.y := pos.y;
+  dstRect.width := round(srcRect.width * scaleX);
+  dstRect.height := round(srcRect.height * scaleY);
+  self.stretchSubImage(src, dstRect, srcRect);
+end;
 
 procedure tDrawContext.drawImage(src: tPage; pos: tPoint);
 begin
@@ -896,7 +896,7 @@ begin
   img.clear(RGB(255,128,64,32));
   for backend in [dbREF, dbASM, dbMMX] do begin
 
-    dc := page.dc(bmBlit);
+    dc := page.getDC(bmBlit);
     dc.backend := backend;
 
     {putPixel}

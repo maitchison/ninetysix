@@ -45,12 +45,10 @@ var
   myLabel: tGuiLabel;
   myPanel: tGuiPanel;
   myWindow: tGuiWindow;
+  dc: tDrawContext;
 begin
 
   timer := tTimer.create('main');
-
-  myButton := tGuiButton.Create(Point(10, 100), 'Test button');
-  gui.append(myButton);
 
   myLabel := tGuiLabel.MakeLabel(Point(10, 150), 'This is some text that is a bit longer.');
   gui.append(myLabel);
@@ -60,6 +58,9 @@ begin
 
   myWindow := tGuiWindow.Create(Rect(350, 10, 200, 400));
   gui.append(myWindow);
+
+  myButton := tGuiButton.Create(Point(10, 10), 'Test button');
+  myWindow.append(myButton);
 
   repeat
 
@@ -73,9 +74,11 @@ begin
 
     input.update();
 
+    dc := screen.getDc;
+
     gui.update(elapsed);
     screen.clearAll();
-    gui.draw(screen);
+    gui.draw(dc);
     screen.flipAll();
 
     timer.stop();
