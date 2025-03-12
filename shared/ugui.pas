@@ -57,11 +57,13 @@ type
   tGuiState = (gsNormal, gsDisabled, gsHighlighted, gsPressed, gsSelected);
 
   tGuiComponent = class;
+  tGuiContainer = class;
 
   tHookProc = procedure(sender: tGuiComponent; msg: string; args: array of const);
 
   tGuiComponent = class
   protected
+    parent: tGuiContainer;
     style: tGuiStyle;
     bounds: tRect;
     isInteractive: boolean;
@@ -92,6 +94,8 @@ type
     procedure draw(dc: tDrawContext); virtual;
     procedure update(elapsed: single); virtual;
     function  state: tGuiState;
+    function  absBounds(): tRect;
+    function  absInnerBounds(): tRect;
     procedure addHook(aMsg: string; aProc: tHookProc);
   public
     procedure onKeyPress(code: word); virtual;
@@ -208,6 +212,7 @@ procedure tGuiContainer.append(x: tGuiComponent);
 begin
   setLength(elements, length(elements)+1);
   elements[length(elements)-1] := x;
+  x.parent := self;
 end;
 
 procedure tGuiContainer.draw(dc: tDrawContext);
@@ -215,6 +220,9 @@ var
   gc: tGuiComponent;
 begin
   doDraw(dc);
+
+  {todo: update clip rect aswell I guess}
+  dc.offset += innerBounds.pos;
   for gc in elements do if gc.isVisible then gc.draw(dc);
 end;
 
@@ -287,9 +295,6 @@ begin
   exit(gsNormal);
 end;
 
-{--------------------------------------------------------}
-{ UI Components }
-
 constructor tGuiComponent.create();
 begin
   inherited Create();
@@ -301,6 +306,21 @@ begin
   col := RGB(128,128,128);
   fontStyle.setDefault();
   style := DEFAULT_GUI_SKIN.styles['default'];
+end;
+
+{get absolute bounds by parent query}
+function tGuiComponent.absBounds(): tRect;
+begin
+  result := bounds;
+  if not assigned(parent) then exit;
+  result.pos += parent.absInnerBounds().pos;
+end;
+
+function tGuiComponent.absInnerBounds(): tRect;
+begin
+  result := innerBounds;
+  if not assigned(parent) then exit;
+  result.pos += parent.absInnerBounds().pos;
 end;
 
 procedure tGuiComponent.doUpdate(elapsed: single);
@@ -373,6 +393,10 @@ begin
     inc(drawY);
   end;
 
+  {note: font does not yet support draw contexts, so update position here...
+   we won't get clipping though}
+  drawX += dc.offset.x;
+  drawY += dc.offset.y;
   if fontStyle.shadow then
     font.textOut(dc.page, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
   font.textOut(dc.page, drawX, drawY, text, fontStyle.col);
@@ -394,7 +418,7 @@ begin
   mouseOverLastFrame := mouseOverThisFrame;
   mouseOverThisFrame := false;
   if not isEnabled then exit;
-  mouseOverThisFrame := bounds.isInside(input.mouseX, input.mouseY);
+  mouseOverThisFrame := absBounds.isInside(input.mouseX, input.mouseY);
 
   if isInteractive then begin
     {handle pressed logic}

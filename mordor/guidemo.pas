@@ -59,7 +59,7 @@ begin
   myWindow := tGuiWindow.Create(Rect(350, 10, 200, 400));
   gui.append(myWindow);
 
-  myButton := tGuiButton.Create(Point(10, 10), 'Test button');
+  myButton := tGuiButton.Create(Point(5, 5), 'Test button');
   myWindow.append(myButton);
 
   repeat
