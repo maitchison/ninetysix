@@ -41,12 +41,10 @@ type
   tMapGUI = class(tGuiComponent)
   protected
     background: tSprite;
-    canvas: tPage;
-    cSprite: tSprite; // todo: remove this and enabled pages to draw
     cursor: tPoint;
   protected
   function tilePos(x,y: integer): tPoint;
-    procedure drawCursor();
+    procedure drawCursor(dc: tDrawContext);
   const
     TILE_SIZE = 15;
   public
@@ -56,11 +54,10 @@ type
     constructor Create();
     destructor destroy(); override;
     procedure onKeyPress(code: word); override;
-    procedure renderTile(x,y: integer);
+    procedure renderTile(dc: tDrawContext; x,y: integer);
     procedure moveCursor(dx,dy: integer);
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(dc: tDrawContext); override;
-    procedure refresh();
   end;
 
 implementation
@@ -133,15 +130,11 @@ begin
   cursor.y := 0;
   //background := tSprite.create(gfx['darkmap']);
   setSize(512, 512);
-  canvas := tPage.create(bounds.width, bounds.height);
-  cSprite := tSprite.create(canvas);
   tileEditor := nil;
 end;
 
 destructor tMapGUI.destroy();
 begin
-  canvas.free;
-  cSprite.free;
   inherited destroy;
 end;
 
@@ -164,14 +157,16 @@ begin
     key_space:
       if assigned(map) and assigned(tileEditor) then begin
         tileEditor.applyToMapTile(map, cursor.x, cursor.y);
-        renderTile(cursor.x, cursor.y);
-        drawCursor();
+        //renderTile(cursor.x, cursor.y);
+        // todo: mark just this tile as dirty
+        isDirty := true;
+        //drawCursor();
       end;
   end;
 end;
 
 {renders a single map tile}
-procedure tMapGUI.renderTile(x,y: integer);
+procedure tMapGUI.renderTile(dc: tDrawContext; x, y: integer);
 var
   tile: tTile;
   pos: tPoint;
@@ -186,15 +181,15 @@ begin
   pos := tilePos(x,y);
 
   {todo: support background}
-  canvas.getDC().fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+  dc.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
 
   {floor}
   id := tile.floorSpec.spriteIdx;
-  if id >= 0 then mapSprites.sprites[id].draw(canvas.getDC(), pos.x, pos.y);
+  if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {medium}
   id := MEDIUM_SPRITE[tile.mediumType];
-  if id >= 0 then mapSprites.sprites[id].draw(canvas.getDC(), pos.x, pos.y);
+  if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {walls}
   {
@@ -218,15 +213,24 @@ begin
 end;
 
 procedure tMapGUI.doDraw(dc: tDrawContext);
+  var
+  x,y: integer;
 begin
-  {todo: change this to a canvas with double buffering...}
-  //cSprite.blit(dc, bounds.x, bounds.y);
+  inherited doDraw(dc); // do we need this?
+  if assigned(background) then
+    background.draw(dc, 0, 0);
+  if not assigned(map) then exit();
+  for y := 0 to map.height-1 do
+    for x := 0 to map.width-1 do
+      renderTile(dc, x, y);
+  if mode = mmEdit then
+    drawCursor(dc);
 end;
 
-procedure tMapGui.drawCursor();
+procedure tMapGui.drawCursor(dc: tDrawContext);
 begin
   mapSprites.sprites[CURSOR_SPRITE].draw(
-    canvas.getDC(),
+    dc,
     tilePos(cursor.x,cursor.y).x,
     tilePos(cursor.x,cursor.y).y
   );
@@ -239,22 +243,8 @@ begin
   oldCursor := cursor;
   cursor.x := clamp(cursor.x + dx, 0, map.width-1);
   cursor.y := clamp(cursor.y + dy, 0, map.height-1);
-  renderTile(oldCursor.x, oldCursor.y);
-  drawCursor;
-end;
-
-procedure tMapGui.refresh();
-var
-  x,y: integer;
-begin
-  if assigned(background) then
-    background.draw(canvas.getDC(), 0, 0);
-  if not assigned(map) then exit();
-  for y := 0 to map.height-1 do
-    for x := 0 to map.width-1 do
-      renderTile(x, y);
-  if mode = mmEdit then
-    drawCursor();
+  // todo: mark only these two tiles as dirty
+  isDirty := true;
 end;
 
 end.

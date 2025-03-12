@@ -112,6 +112,7 @@ type
     function  screenPos(): tPoint;
     function  screenBounds(): tRect;
     procedure addHook(aMsg: string; aProc: tHookProc);
+    procedure invalidate();
   public
     procedure onKeyPress(code: word); virtual;
   public
@@ -337,6 +338,12 @@ begin
   fHookKey.append(aMsg);
   setLength(fHookProc, length(fHookProc)+1);
   fHookProc[length(fHookProc)-1] := aProc;
+end;
+
+{notifies component that it should redraw on next draw call}
+procedure tGuiComponent.invalidate();
+begin
+  isDirty := true;
 end;
 
 function tGuiComponent.state: tGuiState;

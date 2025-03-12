@@ -173,7 +173,7 @@ procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
   note('Loading map');
   scene.map.load('map.dat');
-  scene.mapGUI.refresh();
+  scene.mapGUI.invalidate();
 end;
 
 procedure tMapEditScene.run();
@@ -213,7 +213,7 @@ begin
   gui.append(fpsLabel);
 
   makeRandomMap(map);
-  mapGUI.refresh();
+  mapGUI.invalidate();
 
   timer := tTimer.create('main');
   dc := screen.getDC();
