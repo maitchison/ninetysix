@@ -1,4 +1,4 @@
-unit res;
+unit uRes;
 
 interface
 

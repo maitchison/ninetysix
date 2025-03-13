@@ -12,7 +12,7 @@ uses
   uKeyboard,
   uFont,
   uGui,
-  res;
+  uRes;
 
 type
 

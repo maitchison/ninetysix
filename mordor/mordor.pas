@@ -22,13 +22,13 @@ uses
   uResource,
   {$i gui.inc}
   {game stuff}
-  res,
+  uRes,
+  uGame,
   uMapGui,
   uTileEditorGui,
   uMDRImporter,
   uScene,
-  uMap
-  ;
+  uMap;
 
 type
   tMapEditScene = class(tScene)
@@ -37,13 +37,20 @@ type
     mapGUI: tMapGUI;
   public
     constructor Create();
-    destructor Destroy(); override;
+    destructor destroy(); override;
+    procedure run(); override;
+  end;
+
+  tGameScene = class(tScene)
+  public
     procedure run(); override;
   end;
 
 var
   screen: tScreen;
   scene: tMapEditScene;
+
+{-------------------------------------------------------}
 
 procedure setup();
 begin
@@ -63,6 +70,8 @@ begin
 
   loadResources();
 end;
+
+{-------------------------------------------------------}
 
 procedure titleScreen();
 begin
@@ -154,16 +163,78 @@ end;
 
 {-------------------------------------------------------}
 
-constructor tMapEditScene.Create();
+procedure tGameScene.run();
 begin
-  inherited Create();
 end;
+(*
+var
+  elapsed: single;
+  editGUI: tTileEditorGUI;
+  saveButton, loadButton: tGuiButton;
+  fpsLabel: tGuiLabel;
+  timer: tTimer;
+  dc: tDrawContext;
+begin
 
-destructor tMapEditScene.destroy();
-begin
-  map.free();
-  inherited destroy();
+  map := tMap.create(32,32);
+
+  screen.background := gfx['title800'];
+  screen.pageClear();
+  screen.pageFlip();
+
+  editGui := tTileEditorGUI.Create(512+20+20,10);
+  gui.append(editGUI);
+
+  mapGUI := tMapGui.Create();
+  mapGUI.map := map;
+  mapGUI.mode := mmEdit;
+  mapGUI.pos := Point(20, 50);
+  mapGUI.tileEditor := editGui;
+  gui.append(mapGUI);
+
+  saveButton := tGuiButton.create(Point(650,400), 'Save');
+  savebutton.addHook(ON_MOUSE_CLICK, onSaveClick);
+  gui.append(saveButton);
+  loadButton := tGuiButton.create(Point(650,450), 'Load');
+  loadbutton.addHook(ON_MOUSE_CLICK, onLoadClick);
+  gui.append(loadButton);
+
+  fpsLabel := tGuiLabel.Create(Point(10,10));
+  gui.append(fpsLabel);
+
+  makeRandomMap(map);
+  mapGUI.invalidate();
+
+  timer := tTimer.create('main');
+  dc := screen.getDC();
+
+  importMap();
+
+  repeat
+
+    timer.start();
+
+    elapsed := clamp(timer.elapsed, 0.001, 0.1);
+    if timer.avElapsed > 0 then
+      fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
+
+    musicUpdate();
+
+    input.update();
+
+    gui.update(elapsed);
+    screen.clearAll();
+    gui.draw(dc);
+    screen.flipAll();
+
+    timer.stop();
+
+  until keyDown(key_esc);
+
 end;
+*)
+
+{-------------------------------------------------------}
 
 procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
@@ -262,6 +333,17 @@ begin
 
 end;
 
+constructor tMapEditScene.Create();
+begin
+  inherited Create();
+end;
+
+destructor tMapEditScene.destroy();
+begin
+  map.free();
+  inherited destroy();
+end;
+
 {-------------------------------------------------------}
 
 begin
@@ -279,7 +361,7 @@ begin
 
   //titleScreen();
   //encounterScreen();
-  scene := tMapEditScene.create();
+  scene := tMapEditScene.Create();
   scene.run();
   scene.free();
 

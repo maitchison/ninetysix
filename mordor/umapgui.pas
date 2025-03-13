@@ -15,7 +15,7 @@ uses
   uKeyboard,
   uFont,
   {game stuff}
-  res,
+  uRes,
   uTileEditorGui,
   uMap;
 
