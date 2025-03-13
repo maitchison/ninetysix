@@ -33,11 +33,8 @@ uses
 type
   tMapEditScene = class(tScene)
   protected
-    map: tMap;
     mapGUI: tMapGUI;
   public
-    constructor Create();
-    destructor destroy(); override;
     procedure run(); override;
   end;
 
@@ -239,13 +236,13 @@ end;
 procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
   note('Saving map');
-  scene.map.save('map.dat');
+  gameState.map.save('map.dat');
 end;
 
 procedure loadMap();
 begin
   note('Loading map');
-  scene.map.load('map.dat');
+  gameState.map.load('map.dat');
   scene.mapGUI.invalidate();
 end;
 
@@ -256,8 +253,8 @@ begin
   note('Importing map');
   importer := tMDRImporter.Create();
   importer.load('res\mdata11.mdr');
-  if assigned(scene.map) then scene.map.free;
-  scene.map := importer.readMap(1);
+  if assigned(gameState.map) then gameState.map.free;
+  gameState.map := importer.readMap(1);
   scene.mapGUI.invalidate();
 end;
 
@@ -276,7 +273,7 @@ var
   dc: tDrawContext;
 begin
 
-  map := tMap.create(32,32);
+  gameState.map := tMap.create(32,32);
 
   screen.background := gfx['title800'];
   screen.pageClear();
@@ -286,7 +283,7 @@ begin
   gui.append(editGUI);
 
   mapGUI := tMapGui.Create();
-  mapGUI.map := map;
+  mapGUI.map := gameState.map;
   mapGUI.mode := mmEdit;
   mapGUI.pos := Point(20, 50);
   mapGUI.tileEditor := editGui;
@@ -302,7 +299,7 @@ begin
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
 
-  makeRandomMap(map);
+  makeRandomMap(gameState.map);
   mapGUI.invalidate();
 
   timer := tTimer.create('main');
@@ -331,17 +328,6 @@ begin
 
   until keyDown(key_esc);
 
-end;
-
-constructor tMapEditScene.Create();
-begin
-  inherited Create();
-end;
-
-destructor tMapEditScene.destroy();
-begin
-  map.free();
-  inherited destroy();
 end;
 
 {-------------------------------------------------------}

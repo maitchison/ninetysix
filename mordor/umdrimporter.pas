@@ -102,7 +102,9 @@ var
   edgeTile: tTile;
   bits: bitpacked array[0..63] of boolean;
 begin
+
   map := tMap.Create(32,32);
+  result := map;
 
   ds.seek(0);
 

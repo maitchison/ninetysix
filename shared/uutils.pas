@@ -371,6 +371,7 @@ begin
         'h': begin
           case a.VType of
             vtInteger: result += hexToStr(a.VInteger);
+            vtPointer: result += hexToStr(dword(a.VPointer));
             vtInt64: result += hexToStr(a.VInt64^);
             vtExtended: result += hexToStr(trunc(a.VExtended^));
             else fatal('Invalid type for %h:'+IntToStr(a.VType));
