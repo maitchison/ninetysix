@@ -237,6 +237,8 @@ begin
   timer := tTimer.create('main');
   dc := screen.getDC();
 
+  importMap();
+
   repeat
 
     timer.start();

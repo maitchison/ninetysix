@@ -117,7 +117,7 @@ var
   pos: tPoint;
   dx,dy: integer;
   id: integer;
-  i: integer;
+  d: tDirection;
   padding : integer;
 begin
 
@@ -137,16 +137,14 @@ begin
   if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {walls}
-  {
-  for i := 0 to 3 do begin
-    id := WALL_SPRITE[tile.wall[i].t];
+  for d in tDirection do begin
+    id := WALL_SPRITE[map.wall[x,y,d].t];
     if id < 0 then continue;
-    dx := WALL_DX[i];
-    dy := WALL_DY[i];
+    dx := WALL_DX[d];
+    dy := WALL_DY[d];
     if dy <> 0 then inc(id); // rotated varient
-    mapSprites.sprites[id].draw(screen.canvas, atX+dx, atY+dy);
+    mapSprites.sprites[id].draw(dc, pos.x+dx, pos.y+dy);
   end;
-  }
 
   {cursor}
   if (mode = mmEdit) and (x = cursor.x) and (y = cursor.y) then

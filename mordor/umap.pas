@@ -41,8 +41,8 @@ const
 
   CURSOR_SPRITE = 19+32;
 
-  MD_X: array[tDirection] of integer = (0,+8,0,-7);
-  MD_Y: array[tDirection] of integer = (-7,0,+8,0);
+  WALL_DX: array[tDirection] of integer = (0,+8,0,-7);
+  WALL_DY: array[tDirection] of integer = (-7,0,+8,0);
 
 type
 

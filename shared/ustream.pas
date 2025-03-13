@@ -296,13 +296,19 @@ begin
 end;
 
 function tStream.readDWord: dword;
+var
+  d: dword;
 begin
-  readBlock(result, 4);
+  readBlock(d, 4);
+  result := d;
 end;
 
 function tStream.readInt64: int64;
+var
+  q: int64;
 begin
-  readBlock(result, 8);
+  readBlock(q, 8);
+  result := q;
 end;
 
 function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;

@@ -20,7 +20,7 @@ type
     constructor Create(aRecordSize: integer=1);
 
     function  readMDRWord(): word;
-    function  readCurrency(): double;
+    function  readCurrency(): extended;
     procedure recordSeek(recordNumber: int32);
     procedure nextRecord();
     function  getRecord: int32;
@@ -60,7 +60,7 @@ begin
   if recordSize > 2 then nextRecord;
 end;
 
-function tMDRDataStream.readCurrency(): double;
+function tMDRDataStream.readCurrency(): extended;
 begin
   result := readInt64() / 10000;
 end;
@@ -96,9 +96,10 @@ var
   levelOffset: word;
   header: tMDRMapHeader;
   xlp, ylp: integer;
-  value: dword;
+  value: int64;
   tile: tTile;
-  northWall,eastWall: tWall;
+  northWall, eastWall, edgeWall: tWall;
+  bits: bitpacked array[0..63] of boolean;
 begin
   map := tMap.Create(32,32);
 
@@ -123,35 +124,42 @@ begin
     raise ValueError('Map dims invalid (%d,%d)', [header.width, header.height]);
 
   // load field records
-  for ylp := 1 to header.height do begin
-    for xlp := 1 to header.width do begin
+  for ylp := 0 to header.height-1 do begin
+    for xlp := 0 to header.width-1 do begin
+
+      // area number
+      ds.readWord();
 
       // read in the bit values
       value := round(ds.readCurrency());
 
-      // copy accross the attributes
+      // copy across the attributes
       // these will need to be changed later
       move(value, tile.attributes, 4);
+      move(value, bits, 8);
 
       tile.clear();
       northWall.clear();
       eastWall.clear();
 
       // map MDR attributes to our map format.
-      if (value and (1 shl 1) <> 0) then eastWall.t := wtWall;
-      if (value and (1 shl 2) <> 0) then northWall.t := wtWall;
-      if (value and (1 shl 3) <> 0) then eastWall.t := wtDoor;
-      if (value and (1 shl 4) <> 0) then northWall.t := wtDoor;
-      if (value and (1 shl 5) <> 0) then eastWall.t := wtSecret;
-      if (value and (1 shl 6) <> 0) then northWall.t := wtSecret;
-      if (value and (1 shl 15) <> 0) then tile.floorType := ftWater;
-      if (value and (1 shl 16) <> 0) then tile.floorType := ftDirt;
-      if (value and (1 shl 19) <> 0) then tile.mediumType := mtRock;
-      if (value and (1 shl 20) <> 0) then tile.mediumType := mtFog;
-      if (value and (1 shl 26) <> 0) then tile.floorType := ftGrass;
+      if bits[0] then eastWall.t := wtWall;
+      if bits[1] then northWall.t := wtWall;
+      if bits[2] then eastWall.t := wtDoor;
+      if bits[3] then northWall.t := wtDoor;
+      if bits[4] then eastWall.t := wtSecret;
+      if bits[5] then northWall.t := wtSecret;
+
+      if bits[15] then tile.floorType := ftWater;
+      if bits[16] then tile.floorType := ftDirt;
+      // custom adjustment for grass
+      if bits[15] and bits[16] then tile.floorType := ftWater;
+
+      if bits[19] then tile.mediumType := mtRock;
+      if bits[20] then tile.mediumType := mtFog;
 
       map.tile[xlp,ylp] := tile;
-      map.wall[xlp,ylp,dNorth] := northWall;
+      map.wall[xlp,ylp+1,dNorth] := northWall;
       map.wall[xlp,ylp,dEast] := eastWall;
 
       // skip unused bytes in this record
@@ -159,7 +167,17 @@ begin
     end;
   end;
 
-
+  {set outer bounds}
+  edgeWall.clear();
+  edgeWall.t := wtWall;
+  for xlp := 0 to header.width-1 do begin
+    map.wall[xlp,0,dNorth] := edgeWall;
+    map.wall[xlp,header.height-1,dSouth] := edgeWall;
+  end;
+  for ylp := 0 to header.height-1 do begin
+    map.wall[0, ylp, dWest] := edgeWall;
+    map.wall[header.width-1, ylp, dEast] := edgeWall;
+  end;
 
 end;
 
