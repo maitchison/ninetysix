@@ -25,6 +25,7 @@ uses
   res,
   uMapGui,
   uTileEditorGui,
+  uMDRImporter,
   uScene,
   uMap
   ;
@@ -170,11 +171,28 @@ begin
   scene.map.save('map.dat');
 end;
 
-procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
+procedure loadMap();
 begin
   note('Loading map');
   scene.map.load('map.dat');
   scene.mapGUI.invalidate();
+end;
+
+procedure importMap();
+var
+  importer: tMDRImporter;
+begin
+  note('Importing map');
+  importer := tMDRImporter.Create();
+  importer.load('res\mdata11.mdr');
+  if assigned(scene.map) then scene.map.free;
+  scene.map := importer.readMap(1);
+  scene.mapGUI.invalidate();
+end;
+
+procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
+begin
+  importMap();
 end;
 
 procedure tMapEditScene.run();

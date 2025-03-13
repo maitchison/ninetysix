@@ -71,7 +71,8 @@ type
   protected
     procedure copyLine(x1, x2, y: int32);
     procedure flipLineToScreen(srcX,srcY,dstX,dstY: int32; pixelCnt: int32);
-    procedure doMarkRegion(const rect: tRect);
+    procedure doMarkRegion(const rect: tRect; flags: byte);
+    procedure debugTagRegion(aRect: tRect; col: RGBA;xofs: integer=0);
   public
     constructor create();
     destructor destroy(); override;
@@ -80,6 +81,7 @@ type
     function getDC: tDrawContext;
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
+    procedure setPixel(x, y: int32;col: RGBA);
     function  getViewPort(): tRect;
     procedure setViewPort(x,y: int32);
     procedure resize(aWidth: word; aHeight: word);
@@ -512,6 +514,21 @@ begin
   result := canvas.height;
 end;
 
+{indicate debuging color on screen at location}
+procedure tScreen.debugTagRegion(aRect: tRect; col: RGBA;xOfs: integer=0);
+var
+  x,y: integer;
+  x1,y1,x2,y2: integer;
+begin
+  x1 := aRect.left div 8;
+  x2 := aRect.right div 8;
+  y1 := aRect.top div 8;
+  y2 := aRect.bottom div 8;
+  for y := y1 to y2 do
+    for x := x1 to x2 do
+      setPixel(4+x*8+xOfs, 4+y*8, col);
+end;
+
 {copies region from canvas to screen.}
 procedure tScreen.copyRegion(rect: tRect);
 var
@@ -542,12 +559,21 @@ begin
   cnt := rect.width;
   for i := 0 to rect.height-1 do
     flipLineToScreen(srcX, srcY+i, dstX, dstY+i, cnt);
+
+  if keyDown(key_f7) then debugTagRegion(rect, RGB(255,rnd,0));
 end;
 
 function tScreen.getDC: tDrawContext;
 begin
   result := canvas.getDC();
   result.markRegionHook := self.doMarkRegion;
+  result.clearFlags := FG_FLIP+FG_CLEAR;
+end;
+
+{write pixel to screen}
+procedure tScreen.setPixel(x, y: int32;col: RGBA);
+begin
+  hLine(x,x+1,y,col);
 end;
 
 {draw line from x1,y -> x2,y, including final point}
@@ -635,9 +661,9 @@ begin
 end;
 
 {used for hooks, so not inline}
-procedure tScreen.doMarkRegion(const rect: tRect);
+procedure tScreen.doMarkRegion(const rect: tRect; flags: byte);
 begin
-  markRegion(rect);
+  markRegion(rect, flags);
 end;
 
 {indicates that region should fliped this frame, and cleared next frame}
@@ -756,12 +782,6 @@ begin
   rect.clipTo(bounds);
   if (rect.width <= 0) or (rect.height <= 0) then exit;
 
-  {debugging}
-  if keyDown(key_f7) then begin
-    canvas.getDC().fillRect(rect, rgba.create(rnd, 0, 0));
-    exit;
-  end;
-
   if assigned(background) then begin
     {calculate padding}
     paddingX := (canvas.width - background.width) div 2;
@@ -776,11 +796,11 @@ begin
         hline(rect.left, rect.right-1, y, backgroundColor)
       else
         copyLine(rect.left, rect.right-1, y);
-
     end else
       hline(rect.left, rect.right-1, y, backgroundColor);
   end;
 
+  if keyDown(key_f7) then debugTagRegion(rect, RGB(0,rnd,255), +1);
 end;
 
 {upload the entire page to video memory}

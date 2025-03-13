@@ -61,7 +61,9 @@ type
     // canvas is filled with RGBA.Clear, component should redraw everything, and result is blended into screen.
     dbmFullBlend,
     // canvas is not cleared and canvas is blitted to screen
-    dbmBlit
+    dbmBlit,
+    // force double buffering off
+    dbmOff
   );
 
   tGuiComponent = class;
@@ -253,7 +255,8 @@ begin
   setLength(elements, length(elements)+1);
   elements[length(elements)-1] := x;
   x.parent := self;
-  if GUI_DOUBLEBUFFER then x.enableDoubleBuffered();
+  if GUI_DOUBLEBUFFER and (x.doubleBufferMode <> dbmOff) then
+    x.enableDoubleBuffered();
 end;
 
 procedure tGuiContainer.draw(dc: tDrawContext);

@@ -34,7 +34,7 @@ type
 
   tPage = class;
 
-  tMarkRegionProc = procedure(const rect: tRect) of object;
+  tMarkRegionProc = procedure(const rect: tRect; flags: byte) of object;
 
   tDrawContext = record
     page: tPage;
@@ -44,6 +44,7 @@ type
     tint: RGBA;  {used to modulate src color before write}
     backend: tDrawBackend;
     textureFilter: tTextureFilter;
+    clearFlags: byte;
     markRegionHook: tMarkRegionProc;
     procedure applyTransform(var p: tPoint); inline;
     procedure applyTransformInv(var p: tPoint); inline;
@@ -223,6 +224,7 @@ begin
     result.backend := dbASM;
   result.textureFilter := tfNearest;
   result.markRegionHook := nil;
+  result.clearFlags := 0;
 end;
 
 {returns address in memory of given pixel. If out of bounds, returns nil}
@@ -662,7 +664,7 @@ end;
 
 procedure tDrawContext.markRegion(const rect: tRect); inline;
 begin
-  if assigned(markRegionHook) then markRegionHook(rect);
+  if assigned(markRegionHook) then markRegionHook(rect, clearFlags);
 end;
 
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);

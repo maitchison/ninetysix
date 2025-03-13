@@ -64,6 +64,9 @@ type
     function floorSpec: tFloorSpec;
   end;
 
+  pTile = ^tTile;
+  pWall = ^tWall;
+
   tMap = class
   protected
     fWidth,fHeight: integer;
@@ -84,7 +87,7 @@ type
     property width: integer read fWidth;
     property height: integer read fHeight;
     property tile[x,y: integer]: tTile read getTile write setTile;
-    property wall[x,y: integer;d: tDirection]: tWall read getWall;
+    property wall[x,y: integer;d: tDirection]: tWall read getWall write setWall;
   end;
 
 implementation

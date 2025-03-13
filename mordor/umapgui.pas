@@ -63,7 +63,7 @@ begin
   //background := tSprite.create(gfx['darkmap']);
   setSize(512, 512);
   tileEditor := nil;
-  doubleBufferMode := dbmBlit;
+  doubleBufferMode := dbmOff;
   invalidate();
 end;
 
@@ -166,6 +166,9 @@ procedure tMapGUI.doDraw(dc: tDrawContext);
   var
   x,y: integer;
 begin
+
+  dc.clearFlags := FG_FLIP;
+
   if not assigned(map) then exit();
 
   for y := 0 to map.height-1 do

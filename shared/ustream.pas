@@ -39,6 +39,7 @@ type
     function  readByte: byte; virtual;
     function  readWord: word; virtual;
     function  readDWord: dword; virtual;
+    function  readInt64: int64; virtual;
     procedure writeByte(b: byte); virtual;
     procedure writeWord(w: word); virtual;
     procedure writeDWord(d: dword); virtual;
@@ -295,10 +296,13 @@ begin
 end;
 
 function tStream.readDWord: dword;
-var
-  d: dword;
 begin
-  readBlock(d, 4); result := d;
+  readBlock(result, 4);
+end;
+
+function tStream.readInt64: int64;
+begin
+  readBlock(result, 8);
 end;
 
 function tStream.readSegment(n: int32;outBuffer: tDwords=nil): tDWords;
