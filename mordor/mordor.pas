@@ -46,7 +46,7 @@ type
 
   tGameScene = class(tScene)
   protected
-    map, exploredMap: tMDRMap;
+    map: tMDRMap;
     party : tMDRParty;
     mapGUI: tMapGUI;
     procedure moveParty(turn: integer; move: integer);
@@ -175,16 +175,44 @@ end;
 {-------------------------------------------------------}
 
 procedure tGameScene.moveParty(turn: integer; move: integer);
+var
+  tile: tTile;
+  wall: tWall;
+  dir: tDirection;
+  pos: tPoint;
 begin
   assert(abs(turn) <= 2);
   assert(abs(move) <= 1);
-  {todo: respect bounds and walls}
-  {todo: update map}
-  party.dir := tDirection((4 + ord(party.dir) + turn) mod 4);
-  party.pos.x += DX[party.dir] * move;
-  party.pos.y += DY[party.dir] * move;
-  mapGui.setCursorPos(party.pos);
-  mapGui.setCursorDir(party.dir);
+
+  pos := party.pos;
+  dir := party.dir;
+
+  dir := tDirection((4 + ord(dir) + turn) mod 4);
+  party.dir := dir;
+  mapGui.setCursorDir(dir);
+
+  if map.wall[pos.x, pos.y, dir].isSolid then begin
+    // play some sound?
+    exit;
+  end;
+
+  pos.x += DX[dir] * move;
+  pos.y += DY[dir] * move;
+
+  party.pos := pos;
+  mapGui.setCursorPos(pos);
+
+  {todo: if we transit through a secret door then reveal it}
+
+  {reveal new square}
+  tile := map.tile[pos.x, pos.y];
+  tile.status.explored := eFull;
+  map.tile[pos.x, pos.y] := tile;
+  for dir in tDirection do begin
+    wall := map.wall[pos.x, pos.y, dir];
+    wall.status.explored := ePartial;
+    map.wall[pos.x, pos.y, dir] := wall;
+  end;
 end;
 
 procedure tGameScene.onKeyPress(sender: tGuiComponent; msg: string; args: array of const);
@@ -194,6 +222,7 @@ var
 begin
   code := args[0].VInteger;
   shift := keyDown(key_leftshift) or keyDown(key_rightshift);
+
   case code of
     0: ;
     key_right: if shift then moveParty(1, 1) else moveParty(1, 0);
@@ -212,10 +241,7 @@ var
 begin
 
   map := tMDRMap.Create(32,32);
-  exploredMap := tMDRMap.Create(32,32);
   map.load('map.dat');
-  map.setExplored(eFull);
-  exploredMap.load('map.dat');
   map.setExplored(eNone);
 
   party := tMDRParty.create();
@@ -239,6 +265,7 @@ begin
   dc := screen.getDC();
 
   gui.addHook(ON_KEYPRESS, self.onKeyPress);
+  moveParty(0,0);
 
   repeat
 

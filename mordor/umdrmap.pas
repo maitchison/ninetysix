@@ -65,6 +65,7 @@ type
     padding: array[1..5] of byte;
     procedure clear();
     function asExplored(): tWall;
+    function isSolid: boolean;
   end;
 
   {16 bytes per tile}
@@ -151,6 +152,11 @@ end;
 procedure tWall.clear();
 begin
   fillchar(self, sizeof(self), 0);
+end;
+
+function tWall.isSolid: boolean;
+begin
+  result := t in [wtWall, wtLockedDoor];
 end;
 
 {returns copy of tile with exploration limited applied}
