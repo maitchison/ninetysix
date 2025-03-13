@@ -90,6 +90,7 @@ type
     procedure setValue(aKey, aValue: string);
     function  hasKey(aKey: string): boolean;
     function  getValue(aKey: string): string;
+    function  getInteger(aKey: string): int32;
     function  len: int32;
   end;
 
@@ -423,6 +424,11 @@ begin
     k := bins[i][j];
     result := values[k];
   end;
+end;
+
+function tStringToStringMap.getInteger(aKey: string): int32;
+begin
+  result := strToInt(getValue(aKey));
 end;
 
 function tStringToStringMap.len: int32;

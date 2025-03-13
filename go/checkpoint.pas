@@ -81,6 +81,7 @@ type
     procedure exportToFolder(path: string);
     procedure load(checkpoint: string);
     procedure save(checkpoint: string);
+    function  countLoC(ignoreCache: boolean=false): int32;
   end;
 
   tCheckpointRepo = class
@@ -292,6 +293,28 @@ begin
   finally
     t.free();
   end;
+end;
+
+function tCheckpoint.countLoC(ignoreCache: boolean=false): int32;
+var
+  lines: tStringList;
+  fileRef: tFileRef;
+  key: string;
+  fileLoC: integer;
+begin
+
+  result := 0;
+  for fileRef in fileList do begin
+    key := '_LOC_'+fileRef.hash;
+    if CACHE.hasKey(key) then begin
+      fileLoC := CACHE.getInteger(key);
+    end else begin
+      lines.load(fileRef.fqn);
+      fileLoC := lines.len();
+      CACHE.setValue(key, intToStr(fileLoC));
+    end;
+    result += fileLoc;
+  end
 end;
 
 {writes out objects to object database}
@@ -633,7 +656,7 @@ end;
 procedure saveCache();
 begin
   if assigned(CACHE) then
-    CACHE.save(CACHE_PATH, 100);
+    CACHE.save(CACHE_PATH, 1000);
 end;
 
 initialization

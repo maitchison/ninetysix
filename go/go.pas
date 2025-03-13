@@ -9,22 +9,14 @@ program go;
 
 {
 
-got commit "Comments"
+go commit "Comments"
   Commit all changes
-
-got status
+go status
   List changes since last commit.
-
-got revert
+go revert
   Revert back to previous commit. (but save a stash first)
-
-got loc
+go loc
   Write line counts per day
-
-
-Block header
-
-[MD5] [Path] [Date] [Comment]
 
 }
 
@@ -500,12 +492,104 @@ This is the old version that has many issues,
 
 {--------------------------------------------------}
 
-function countLoC()
-
-
 {show how many lines of code per day}
 procedure showLoc();
+var
+  i: integer;
+
+  currentDT: tMyDateTime;
+  dateCode, prevDateCode: string;
+  currentLoc, prevDayLoc, prevMonthLoc: int32;
+  dayCounter: integer;
+
+  repo: tCheckpointRepo;
+  checkpointNames: tStringList;
+  checkpointName: string;
+
+  skippedCheckpointName: string;
+
+  startDateCode: string;
+  nextDateCode: string;
+
+  totalLoc, totalDays: integer;
+
+  function countLoC(checkpointName: string): int32;
+  var
+    checkpoint: tCheckpoint;
+  begin
+    checkpoint := repo.load(checkpointName);
+    result := checkpoint.countLoC();
+    checkpoint.free;
+  end;
+
 begin
+
+  repo := tCheckpointRepo.create(REPO_PATH);
+  checkpointNames := repo.getCheckpointNames();
+  checkpointNames.reverse();
+
+  currentDT := now();
+  startDateCode := copy(currentDT.YYYYMMDD(''), 1, 6);
+
+  dateCode := '';
+  prevDateCode := '';
+  prevDayLoc := -1;
+  prevMonthLoc := -1;
+  totalLoC := 0;
+
+  dayCounter := 0;
+
+  writeln('Daily LOC');
+  writeln('-------------------------------------');
+  writeln('Date            LoC       Daily');
+
+  for i := 0 to checkpointNames.len-1 do begin
+
+    if keypressed then case readkey of
+      #3: break;
+    end;
+
+    {this this and next date code}
+    checkpointName := checkpointNames[i];
+    if i = checkpointNames.len-1 then
+      nextDateCode := ''
+    else
+      nextDateCode := copy(checkpointNames[i+1], 1, 8);
+    dateCode := copy(checkpointName, 1, 8);
+
+    if not dateCode.startsWith(startDateCode) then begin
+      skippedCheckpointName := checkpointName;
+      continue;
+    end;
+
+    {only show last checkpoint each day}
+    if not (dateCode <> nextDateCode) then continue;
+
+    if prevDayLoc < 0 then
+      {get loc from just before the first entry we print out}
+      prevDayLoc := countLoC(skippedCheckpointName);
+
+    currentLoc := countLoC(checkpointName);
+
+    writeln(format('%s     %s       %s', [
+      copy(checkpointName, 1, 8),
+      intToStr(currentLoc, 6, ' '),
+      intToStr(currentLoC-prevDayLoC, 5, ' ')
+      ]));
+
+    dayCounter += 1;
+    totalLoc += currentLoC-prevDayLoC;
+    prevDateCode := dateCode;
+    prevDayLoC := currentLoC;
+    if dayCounter > 10 then break;
+  end;
+
+  writeln('-------------------------------------');
+
+  if dayCounter > 0 then
+    writeln(format('AVG: %d (per day)', [totalLoC / dayCounter]));
+
+  repo.free;
 end;
 
 {generate per commit stats. Quite slow}
@@ -528,6 +612,8 @@ var
   dayTotal: tDiffStats;
   dateCode, prevDateCode: string;
 
+  dayLoC, monthLoc, totalLoc: int32;
+
 var
   csvFile: text;
 begin
@@ -535,7 +621,6 @@ begin
   textAttr := WHITE;
 
   repo := tCheckpointRepo.create(REPO_PATH);
-
   checkpoints := repo.getCheckpointNames();
 
   counter := 0;
