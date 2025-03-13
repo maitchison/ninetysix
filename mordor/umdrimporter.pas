@@ -99,6 +99,7 @@ var
   value: int64;
   tile: tTile;
   northWall, eastWall, edgeWall: tWall;
+  edgeTile: tTile;
   bits: bitpacked array[0..63] of boolean;
 begin
   map := tMap.Create(32,32);
@@ -122,6 +123,8 @@ begin
   // make sure it looks vaguely right
   if (byte(header.width) <> header.width) or (byte(header.height) <> header.height) then
     raise ValueError('Map dims invalid (%d,%d)', [header.width, header.height]);
+
+  note('Importing Mordor map %dx%d', [header.width, header.height]);
 
   // load field records
   for ylp := 0 to header.height-1 do begin
@@ -158,9 +161,10 @@ begin
       if bits[19] then tile.mediumType := mtRock;
       if bits[20] then tile.mediumType := mtFog;
 
-      map.tile[xlp,ylp] := tile;
-      map.wall[xlp,ylp+1,dNorth] := northWall;
-      map.wall[xlp,ylp,dEast] := eastWall;
+      {our map is 32x32, but the mordor map is 30, so add a border}
+      map.tile[xlp+1,ylp+1] := tile;
+      map.wall[xlp+1,ylp+2,dNorth] := northWall;
+      map.wall[xlp+1,ylp+1,dEast] := eastWall;
 
       // skip unused bytes in this record
       ds.nextRecord();
@@ -170,14 +174,31 @@ begin
   {set outer bounds}
   edgeWall.clear();
   edgeWall.t := wtWall;
-  for xlp := 0 to header.width-1 do begin
+  edgeTile.clear();
+  edgeTile.mediumType := mtNone;
+
+  for xlp := 1 to header.width do begin
+    map.wall[xlp,1,dNorth] := edgeWall;
+    map.wall[xlp,header.height,dSouth] := edgeWall;
+  end;
+  for ylp := 1 to header.height do begin
+    map.wall[1, ylp, dWest] := edgeWall;
+    map.wall[header.width, ylp, dEast] := edgeWall;
+  end;
+  {
+  for xlp := 0 to 31 do begin
     map.wall[xlp,0,dNorth] := edgeWall;
-    map.wall[xlp,header.height-1,dSouth] := edgeWall;
+    map.wall[xlp,31,dSouth] := edgeWall;
+    map.tile[xlp,0] := edgeTile;
+    map.tile[xlp,31] := edgeTile;
   end;
-  for ylp := 0 to header.height-1 do begin
+  for ylp := 0 to 31 do begin
     map.wall[0, ylp, dWest] := edgeWall;
-    map.wall[header.width-1, ylp, dEast] := edgeWall;
+    map.wall[31, ylp, dEast] := edgeWall;
+    map.tile[0, ylp] := edgeTile;
+    map.tile[31, ylp] := edgeTile;
   end;
+  }
 
 end;
 
