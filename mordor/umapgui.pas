@@ -45,7 +45,8 @@ type
     procedure onKeyPress(code: word); override;
     procedure renderTile(dc: tDrawContext; x,y: integer);
     procedure moveCursor(dx,dy: integer);
-    procedure setCursor(x,y: integer);
+    procedure setCursorPos(aPos: tPoint);
+    procedure setCursorDir(d: tDirection);
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(dc: tDrawContext); override;
     procedure invalidate(); override;
@@ -201,17 +202,23 @@ end;
 
 procedure tMapGui.moveCursor(dx,dy: integer);
 begin
-  setCursor(cursorPos.x+dx, cursorPos.y+dy);
+  setCursorPos(Point(cursorPos.x+dx, cursorPos.y+dy));
 end;
 
-procedure tMapGui.setCursor(x,y: integer);
+procedure tMapGui.setCursorPos(aPos: tPoint);
 var
   oldPos: tPoint;
 begin
   oldPos := cursorPos;
-  cursorPos.x := clamp(x, 0, map.width-1);
-  cursorPos.y := clamp(y, 0, map.height-1);
+  cursorPos.x := clamp(aPos.x, 0, map.width-1);
+  cursorPos.y := clamp(aPos.y, 0, map.height-1);
   invalidateTile(oldPos.x, oldPos.y);
+  invalidateTile(cursorPos.x, cursorPos.y);
+end;
+
+procedure tMapGui.setCursorDir(d: tDirection);
+begin
+  cursorDir := d;
   invalidateTile(cursorPos.x, cursorPos.y);
 end;
 

@@ -45,6 +45,9 @@ const
   WALL_DX: array[tDirection] of integer = (0,+8,0,-7);
   WALL_DY: array[tDirection] of integer = (-7,0,+8,0);
 
+  DX: array[tDirection] of integer = (0,+1,0,-1);
+  DY: array[tDirection] of integer = (-1,0,+1,0);
+
 type
 
   tExplorationStatus = (eNone, ePartial, eFull);

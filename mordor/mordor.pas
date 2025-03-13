@@ -23,7 +23,6 @@ uses
   {$i gui.inc}
   {game stuff}
   uRes,
-  uGameState,
   uMapGui,
   uTileEditorGui,
   uScene,
@@ -34,17 +33,25 @@ uses
 type
   tMapEditScene = class(tScene)
   protected
+    map: tMDRMap;
     mapGUI: tMapGUI;
     procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
     procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
+    procedure loadMap();
+    procedure saveMap();
+    procedure importMap();
   public
     procedure run(); override;
   end;
 
   tGameScene = class(tScene)
   protected
+    map, exploredMap: tMDRMap;
+    party : tMDRParty;
     mapGUI: tMapGUI;
+    procedure moveParty(turn: integer; move: integer);
     {todo: setup this up to auto hook, and then just override}
+
     procedure onKeyPress(sender: tGuiComponent; msg: string; args: array of const);
   public
     procedure run(); override;
@@ -167,17 +174,32 @@ end;
 
 {-------------------------------------------------------}
 
+procedure tGameScene.moveParty(turn: integer; move: integer);
+begin
+  assert(abs(turn) <= 2);
+  assert(abs(move) <= 1);
+  {todo: respect bounds and walls}
+  {todo: update map}
+  party.dir := tDirection((4 + ord(party.dir) + turn) mod 4);
+  party.pos.x += DX[party.dir] * move;
+  party.pos.y += DY[party.dir] * move;
+  mapGui.setCursorPos(party.pos);
+  mapGui.setCursorDir(party.dir);
+end;
+
 procedure tGameScene.onKeyPress(sender: tGuiComponent; msg: string; args: array of const);
 var
   code: word;
+  shift: boolean;
 begin
   code := args[0].VInteger;
+  shift := keyDown(key_leftshift) or keyDown(key_rightshift);
   case code of
     0: ;
-    key_right: begin
-      gs.party.pos.x += 1;
-      mapGui.setCursor(gs.party.pos.x, gs.party.pos.y);
-    end;
+    key_right: if shift then moveParty(1, 1) else moveParty(1, 0);
+    key_left: if shift then moveParty(-1, 1) else moveParty(-1, 0);
+    key_up: moveParty(0, 1);
+    key_down: if shift then moveParty(2, 1) else moveParty(2, 0);
   end;
 end;
 
@@ -189,23 +211,23 @@ var
   dc: tDrawContext;
 begin
 
-  gs.map := tMDRMap.Create(32,32);
-  gs.exploredMap := tMDRMap.Create(32,32);
-  gs.map.load('map.dat');
-  gs.map.setExplored(eFull);
-  gs.exploredMap.load('map.dat');
-  gs.map.setExplored(eNone);
+  map := tMDRMap.Create(32,32);
+  exploredMap := tMDRMap.Create(32,32);
+  map.load('map.dat');
+  map.setExplored(eFull);
+  exploredMap.load('map.dat');
+  map.setExplored(eNone);
 
-  gs.party := tMDRParty.create();
-  gs.party.pos := Point(9, 11);
-  gs.party.dir := dNorth;
+  party := tMDRParty.create();
+  party.pos := Point(9, 11);
+  party.dir := dNorth;
 
   screen.background := gfx['title800'];
   screen.pageClear();
   screen.pageFlip();
 
   mapGUI := tMapGui.Create();
-  mapGUI.map := gs.map;
+  mapGUI.map := map;
   mapGUI.mode := mmParty;
   mapGUI.pos := Point(20, 50);
   gui.append(mapGUI);
@@ -245,29 +267,32 @@ end;
 
 procedure tMapEditScene.onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
-  note('Saving map');
-  gs.map.save('map.dat');
+  saveMap();
 end;
 
-procedure loadMap();
+procedure tMapEditScene.saveMap();
+begin
+  note('Saving map');
+  map.save('map.dat');
+end;
+
+procedure tMapEditScene.loadMap();
 begin
   note('Loading map');
-  gs.map.load('map.dat');
-  // hmm... how to do this?
-  //scene.mapGUI.invalidate();
+  map.load('map.dat');
+  mapGUI.invalidate();
 end;
 
-procedure importMap();
+procedure tMapEditScene.importMap();
 var
   importer: tMDRImporter;
 begin
   note('Importing map');
   importer := tMDRImporter.Create();
   importer.load('res\mdata11.mdr');
-  if assigned(gs.map) then gs.map.free;
-  gs.map := importer.readMap(1);
-  // hmm... how to do this?
-  //scene.mapGUI.invalidate();
+  if assigned(map) then map.free;
+  map := importer.readMap(1);
+  mapGUI.invalidate();
 end;
 
 procedure tMapEditScene.onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
@@ -285,7 +310,7 @@ var
   dc: tDrawContext;
 begin
 
-  gs.map := tMDRMap.create(32,32);
+  map := tMDRMap.create(32,32);
 
   screen.background := gfx['title800'];
   screen.pageClear();
@@ -295,7 +320,7 @@ begin
   gui.append(editGUI);
 
   mapGUI := tMapGui.Create();
-  mapGUI.map := gs.map;
+  mapGUI.map := map;
   mapGUI.mode := mmEdit;
   mapGUI.pos := Point(20, 50);
   mapGUI.tileEditor := editGui;
@@ -311,7 +336,7 @@ begin
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
 
-  makeRandomMap(gs.map);
+  makeRandomMap(map);
   mapGUI.invalidate();
 
   timer := tTimer.create('main');
