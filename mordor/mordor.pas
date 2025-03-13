@@ -188,7 +188,7 @@ begin
 
   mapGUI := tMapGui.Create();
   mapGUI.map := gs.map;
-  mapGUI.mode := mmEdit;
+  mapGUI.mode := mmParty;
   mapGUI.pos := Point(20, 50);
   gui.append(mapGUI);
 

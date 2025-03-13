@@ -21,12 +21,13 @@ uses
 
 type
 
-  tMapMode = (mmView, mmEdit);
+  tMapMode = (mmView, mmEdit, mmParty);
 
   tMapGUI = class(tGuiComponent)
   protected
     background: tSprite;
-    cursor: tPoint;
+    cursorPos: tPoint;
+    cursorDir: tDirection;
     // todo: make this sizeable
     isTileDirty: array[0..31, 0..31] of boolean;
   protected
@@ -58,8 +59,8 @@ begin
   inherited Create();
   map := nil;
   mode := mmView;
-  cursor.x := 0;
-  cursor.y := 0;
+  cursorPos.x := 0;
+  cursorPos.y := 0;
   //background := tSprite.create(gfx['darkmap']);
   setSize(512, 512);
   tileEditor := nil;
@@ -104,8 +105,8 @@ begin
     key_down: moveCursor(0,+1);
     key_space:
       if assigned(map) and assigned(tileEditor) then begin
-        tileEditor.applyToMapTile(map, cursor.x, cursor.y);
-        invalidateTile(cursor.x, cursor.y);
+        tileEditor.applyToMapTile(map, cursorPos.x, cursorPos.y);
+        invalidateTile(cursorPos.x, cursorPos.y);
       end;
   end;
 end;
@@ -149,7 +150,7 @@ begin
   end;
 
   {cursor}
-  if (mode = mmEdit) and (x = cursor.x) and (y = cursor.y) then
+  if (x = cursorPos.x) and (y = cursorPos.y) then
     drawCursor(dc);
 
   isTileDirty[x,y] := false;
@@ -179,22 +180,30 @@ end;
 
 procedure tMapGui.drawCursor(dc: tDrawContext);
 begin
-  mapSprites.sprites[CURSOR_SPRITE].draw(
-    dc,
-    tilePos(cursor.x,cursor.y).x,
-    tilePos(cursor.x,cursor.y).y
-  );
+  case mode of
+    mmView: ;
+    mmEdit: mapSprites.sprites[CURSOR_SPRITE].draw(
+      dc,
+      tilePos(cursorPos.x,cursorPos.y).x,
+      tilePos(cursorPos.x,cursorPos.y).y
+      );
+    mmParty: mapSprites.sprites[PARTY_SPRITE+ord(cursorDir)].draw(
+      dc,
+      tilePos(cursorPos.x,cursorPos.y).x,
+      tilePos(cursorPos.x,cursorPos.y).y
+      );
+  end;
 end;
 
 procedure tMapGui.moveCursor(dx,dy: integer);
 var
-  oldCursor: tPoint;
+  oldPos: tPoint;
 begin
-  oldCursor := cursor;
-  cursor.x := clamp(cursor.x + dx, 0, map.width-1);
-  cursor.y := clamp(cursor.y + dy, 0, map.height-1);
-  invalidateTile(oldCursor.x, oldCursor.y);
-  invalidateTile(cursor.x, cursor.y);
+  oldPos := cursorPos;
+  cursorPos.x := clamp(cursorPos.x + dx, 0, map.width-1);
+  cursorPos.y := clamp(cursorPos.y + dy, 0, map.height-1);
+  invalidateTile(oldPos.x, oldPos.y);
+  invalidateTile(cursorPos.x, cursorPos.y);
 end;
 
 end.

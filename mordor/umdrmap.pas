@@ -40,6 +40,7 @@ const
     (-1, 0, 2, 4, 32+4);
 
   CURSOR_SPRITE = 19+32;
+  PARTY_SPRITE = 6;
 
   WALL_DX: array[tDirection] of integer = (0,+8,0,-7);
   WALL_DY: array[tDirection] of integer = (-7,0,+8,0);
