@@ -28,6 +28,7 @@ uses
   uTileEditorGui,
   uScene,
   uMDRImporter,
+  uMDRParty,
   uMDRMap;
 
 type
@@ -122,7 +123,7 @@ end;
 
 {-------------------------------------------------------}
 
-procedure makeRandomMap(map: tMap);
+procedure makeRandomMap(map: tMDRMap);
 var
   x,y: integer;
   i: integer;
@@ -170,12 +171,16 @@ var
   dc: tDrawContext;
 begin
 
-  gs.map := tMap.Create(32,32);
-  gs.exploredMap := tMap.Create(32,32);
+  gs.map := tMDRMap.Create(32,32);
+  gs.exploredMap := tMDRMap.Create(32,32);
   gs.map.load('map.dat');
   gs.map.setExplored(eFull);
   gs.exploredMap.load('map.dat');
   gs.map.setExplored(eNone);
+
+  gs.party := tMDRParty.create();
+  gs.party.pos := Point(9, 11);
+  gs.party.dir := dNorth;
 
   screen.background := gfx['title800'];
   screen.pageClear();
@@ -260,7 +265,7 @@ var
   dc: tDrawContext;
 begin
 
-  gs.map := tMap.create(32,32);
+  gs.map := tMDRMap.create(32,32);
 
   screen.background := gfx['title800'];
   screen.pageClear();

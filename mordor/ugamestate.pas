@@ -8,8 +8,9 @@ uses
   uMDRMap;
 
 type tGameState = class
-  class var map: tMap;
-  class var exploredMap: tMap;
+  class var map: tMDRMap;
+  class var exploredMap: tMDRMap;
+  class var party: tMDRParty;
   end;
 
 var

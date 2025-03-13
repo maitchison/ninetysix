@@ -35,7 +35,7 @@ type
     ds: tMDRDataStream;
   public
     procedure load(filename: string);
-    function  readMap(aLevelID: integer): tMap;
+    function  readMap(aLevelID: integer): tMDRMap;
   end;
 
 implementation
@@ -89,9 +89,9 @@ begin
   ds.readFromFile(filename);
 end;
 
-function tMDRImporter.readMap(aLevelID: integer): tMap;
+function tMDRImporter.readMap(aLevelID: integer): tMDRMap;
 var
-  map: tMap;
+  map: tMDRMap;
   numLevels: integer;
   levelOffset: word;
   header: tMDRMapHeader;
@@ -103,7 +103,7 @@ var
   bits: bitpacked array[0..63] of boolean;
 begin
 
-  map := tMap.Create(32,32);
+  map := tMDRMap.Create(32,32);
   result := map;
 
   ds.seek(0);

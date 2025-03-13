@@ -25,7 +25,7 @@ type
   public
     constructor Create(x,y: integer);
     procedure changeSelection(delta: integer);
-    procedure applyToMapTile(map: tMap; atX, atY: integer);
+    procedure applyToMapTile(map: tMDRMap; atX, atY: integer);
     procedure onKeyPress(code: word); override;
     procedure doDraw(dc: tDrawContext); override;
     property floorType: tFloorType read fFloorType;
@@ -42,7 +42,7 @@ begin
   fFloorType := ftStone;
 end;
 
-procedure tTileEditorGUI.applyToMapTile(map: tMap; atX, atY: integer);
+procedure tTileEditorGUI.applyToMapTile(map: tMDRMap; atX, atY: integer);
 var
   tile: tTile;
 begin

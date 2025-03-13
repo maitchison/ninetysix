@@ -36,7 +36,7 @@ type
   const
     TILE_SIZE = 15;
   public
-    map: tMap;
+    map: tMDRMap;
     mode: tMapMode;
     tileEditor: tTileEditorGUI;
     constructor Create();

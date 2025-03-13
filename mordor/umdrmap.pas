@@ -78,7 +78,7 @@ type
   pTile = ^tTile;
   pWall = ^tWall;
 
-  tMap = class
+  tMDRMap = class
   protected
     fWidth,fHeight: integer;
     fTile: array of tTile;
@@ -110,7 +110,7 @@ implementation
 
 type
   {32 bytes}
-  tMapHeader = packed record
+  tMDRMapHeader = packed record
     tag: string[4]; // MDRM     {4 bytes}
     width, height: word;        {4 bytes}
     padding: array[1..24] of byte; {24 bytes}
@@ -164,13 +164,13 @@ end;
 
 {-------------------------------------------------}
 
-constructor tMap.Create(aWidth, aHeight: word);
+constructor tMDRMap.Create(aWidth, aHeight: word);
 begin
   inherited Create();
   init(aWidth, aHeight);
 end;
 
-destructor tMap.destroy();
+destructor tMDRMap.destroy();
 begin
   setLength(fTile, 0);
   setLength(fWall, 0);
@@ -178,7 +178,7 @@ begin
 end;
 
 {initialize a map to given size}
-procedure tMap.init(aWidth, aHeight: integer);
+procedure tMDRMap.init(aWidth, aHeight: integer);
 var
   i: integer;
 begin
@@ -190,23 +190,23 @@ begin
   for i := 0 to length(fWall)-1 do fWall[i].clear();
 end;
 
-function tMap.getTile(x,y: integer): tTile;
+function tMDRMap.getTile(x,y: integer): tTile;
 begin
   result := fTile[getTileIdx(x,y)];
 end;
 
-procedure tMap.setTile(x,y: integer;aTile: tTile);
+procedure tMDRMap.setTile(x,y: integer;aTile: tTile);
 begin
   fTile[getTileIdx(x,y)] := aTile;
 end;
 
-function tMap.getTileIdx(x,y: integer): integer;
+function tMDRMap.getTileIdx(x,y: integer): integer;
 begin
   if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
   result := x+y*fWidth;
 end;
 
-function tMap.getWallIdx(x,y: integer;d: tDirection): integer;
+function tMDRMap.getWallIdx(x,y: integer;d: tDirection): integer;
 begin
   if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
   case d of
@@ -218,20 +218,20 @@ begin
   end;
 end;
 
-function tMap.getWall(x,y: integer;d: tDirection): tWall;
+function tMDRMap.getWall(x,y: integer;d: tDirection): tWall;
 begin
   result := fWall[getWallIdx(x,y,d)];
 end;
 
-procedure tMap.setWall(x,y: integer;d: tDirection; aWall: tWall);
+procedure tMDRMap.setWall(x,y: integer;d: tDirection; aWall: tWall);
 begin
   fWall[getWallIdx(x,y,d)] := aWall;
 end;
 
-procedure tMap.save(filename: string);
+procedure tMDRMap.save(filename: string);
 var
   f: tFileStream;
-  header: tMapHeader;
+  header: tMDRMapHeader;
 begin
   fillchar(header, sizeof(header), 0);
   header.tag := 'MDRM';
@@ -245,10 +245,10 @@ begin
   f.free();
 end;
 
-procedure tMap.load(filename: string);
+procedure tMDRMap.load(filename: string);
 var
   f: tFileStream;
-  header: tMapHeader;
+  header: tMDRMapHeader;
 begin
 
   header.tag := 'MDRM';
@@ -267,7 +267,7 @@ begin
 end;
 
 {set explored flag for every tile / wall}
-procedure tMap.setExplored(aExplored: tExplorationStatus);
+procedure tMDRMap.setExplored(aExplored: tExplorationStatus);
 var
   i: integer;
 begin
@@ -275,7 +275,7 @@ begin
   for i := 0 to length(fWall)-1 do fWall[i].status.explored := aExplored;
 end;
 
-procedure tMap.clear();
+procedure tMDRMap.clear();
 var
   tile: tTile;
   wall: tWall;
@@ -287,11 +287,11 @@ end;
 {----------------------------------------------------------}
 
 type
-  tMapTest = class(tTestSuite)
+  tMDRMapTest = class(tTestSuite)
     procedure run; override;
   end;
 
-procedure tMapTest.run();
+procedure tMDRMapTest.run();
 var
   tile: tTile;
   wall: tWall;
@@ -307,5 +307,5 @@ var
   i: integer;
 
 initialization
-  tMapTest.create('Map');
+  tMDRMapTest.create('MDRMap');
 end.
