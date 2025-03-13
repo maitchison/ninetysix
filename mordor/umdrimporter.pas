@@ -8,7 +8,7 @@ uses
   uUtils,
   uFileSystem,
   uStream,
-  uMap;
+  uMDRMap;
 
 type
   {used to read MDR files}

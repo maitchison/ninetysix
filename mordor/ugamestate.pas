@@ -4,7 +4,8 @@ unit uGameState;
 interface
 
 uses
-  uMap;
+  uMDRParty,
+  uMDRMap;
 
 type tGameState = class
   class var map: tMap;

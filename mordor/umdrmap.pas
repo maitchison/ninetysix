@@ -1,5 +1,5 @@
 {represents a single dungeon floor}
-unit uMap;
+unit uMDRMap;
 
 interface
 

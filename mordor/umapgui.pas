@@ -17,7 +17,7 @@ uses
   {game stuff}
   uRes,
   uTileEditorGui,
-  uMap;
+  uMDRMap;
 
 type
 

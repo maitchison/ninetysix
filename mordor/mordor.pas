@@ -26,9 +26,9 @@ uses
   uGameState,
   uMapGui,
   uTileEditorGui,
-  uMDRImporter,
   uScene,
-  uMap;
+  uMDRImporter,
+  uMDRMap;
 
 type
   tMapEditScene = class(tScene)

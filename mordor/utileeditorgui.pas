@@ -6,13 +6,13 @@ uses
   uDebug,
   uTest,
   uUtils,
-  uMap,
   uGraph32,
   uColor,
   uKeyboard,
   uFont,
   uGui,
-  uRes;
+  uRes,
+  uMDRMap;
 
 type
 
