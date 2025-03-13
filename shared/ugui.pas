@@ -69,7 +69,7 @@ type
   tGuiComponent = class;
   tGuiContainer = class;
 
-  tHookProc = procedure(sender: tGuiComponent; msg: string; args: array of const);
+  tHookProc = procedure(sender: tGuiComponent; msg: string; args: array of const) of object;
 
   tGuiComponent = class
   private
@@ -100,7 +100,7 @@ type
     procedure setText(aText: string); virtual;
     procedure setCol(col: RGBA); virtual;
     procedure setSize(aWidth, aHeight: integer);
-    procedure fireMessage(aMsg: string; args: array of const); overload;
+    procedure fireMessage(aMsg: string; args: array of const); virtual; overload;
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(dc: tDrawContext);
     function  bounds: tRect;
@@ -138,6 +138,7 @@ type
   tGuiContainer = class(tGuiComponent)
   protected
     elements: array of tGuiComponent;
+    procedure fireMessage(aMsg: string; args: array of const); override;
   public
     constructor Create();
     destructor destroy; override;
@@ -149,6 +150,7 @@ type
   tGui = class(tGuiContainer)
   public
     constructor Create();
+    procedure update(elapsed: single); override;
   end;
 
 const
@@ -274,21 +276,40 @@ end;
 procedure tGuiContainer.update(elapsed: single);
 var
   gc: tGuiComponent;
-  code: word;
 begin
+  for gc in elements do if gc.isEnabled then gc.update(elapsed);
+  doUpdate(elapsed)
+end;
+
+procedure tGuiContainer.fireMessage(aMsg: string; args: array of const);
+var
+  gc: tGuiComponent;
+begin
+  inherited fireMessage(aMsg, args);
+  for gc in elements do if gc.isEnabled then gc.fireMessage(aMsg, args);
+end;
+
+
+{--------------------------------------------------------}
+
+procedure tGui.update(elapsed: single);
+var
+  code: word;
+  gc: tGuiComponent;
+begin
+
   {process keys, if any}
   while true do begin
     code := dosGetKey.code;
     if code = 0 then break;
+    self.fireMessage(ON_KEYPRESS, [code]);
     for gc in elements do begin
       gc.fireMessage(ON_KEYPRESS, [code]);
       gc.onKeyPress(code);
     end;
   end;
 
-  for gc in elements do if gc.isEnabled then gc.update(elapsed);
-
-  doUpdate(elapsed)
+  inherited update(elapsed);
 end;
 
 {--------------------------------------------------------}

@@ -35,6 +35,8 @@ type
   tMapEditScene = class(tScene)
   protected
     mapGUI: tMapGUI;
+    procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
+    procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
   public
     procedure run(); override;
   end;
@@ -42,6 +44,8 @@ type
   tGameScene = class(tScene)
   protected
     mapGUI: tMapGUI;
+    {todo: setup this up to auto hook, and then just override}
+    procedure onKeyPress(sender: tGuiComponent; msg: string; args: array of const);
   public
     procedure run(); override;
   end;
@@ -163,6 +167,20 @@ end;
 
 {-------------------------------------------------------}
 
+procedure tGameScene.onKeyPress(sender: tGuiComponent; msg: string; args: array of const);
+var
+  code: word;
+begin
+  code := args[0].VInteger;
+  case code of
+    0: ;
+    key_right: begin
+      gs.party.pos.x += 1;
+      mapGui.setCursor(gs.party.pos.x, gs.party.pos.y);
+    end;
+  end;
+end;
+
 procedure tGameScene.run();
 var
   elapsed: single;
@@ -198,6 +216,8 @@ begin
   timer := tTimer.create('main');
   dc := screen.getDC();
 
+  gui.addHook(ON_KEYPRESS, self.onKeyPress);
+
   repeat
 
     timer.start();
@@ -223,7 +243,7 @@ end;
 
 {-------------------------------------------------------}
 
-procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
+procedure tMapEditScene.onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
   note('Saving map');
   gs.map.save('map.dat');
@@ -250,7 +270,7 @@ begin
   //scene.mapGUI.invalidate();
 end;
 
-procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
+procedure tMapEditScene.onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
   importMap();
 end;

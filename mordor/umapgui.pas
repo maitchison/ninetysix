@@ -45,6 +45,7 @@ type
     procedure onKeyPress(code: word); override;
     procedure renderTile(dc: tDrawContext; x,y: integer);
     procedure moveCursor(dx,dy: integer);
+    procedure setCursor(x,y: integer);
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(dc: tDrawContext); override;
     procedure invalidate(); override;
@@ -98,6 +99,9 @@ end;
 
 procedure tMapGUI.onKeyPress(code: word);
 begin
+  {in edit mode we own the cursor, so we need to move it when
+   keys are pressed}
+  if mode <> mmEdit then exit;
   case code of
     key_left: moveCursor(-1,0);
     key_right: moveCursor(+1,0);
@@ -196,12 +200,17 @@ begin
 end;
 
 procedure tMapGui.moveCursor(dx,dy: integer);
+begin
+  setCursor(cursorPos.x+dx, cursorPos.y+dy);
+end;
+
+procedure tMapGui.setCursor(x,y: integer);
 var
   oldPos: tPoint;
 begin
   oldPos := cursorPos;
-  cursorPos.x := clamp(cursorPos.x + dx, 0, map.width-1);
-  cursorPos.y := clamp(cursorPos.y + dy, 0, map.height-1);
+  cursorPos.x := clamp(x, 0, map.width-1);
+  cursorPos.y := clamp(y, 0, map.height-1);
   invalidateTile(oldPos.x, oldPos.y);
   invalidateTile(cursorPos.x, cursorPos.y);
 end;
