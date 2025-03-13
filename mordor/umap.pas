@@ -46,13 +46,18 @@ const
 
 type
 
-  tExploredStatus = (eNone, ePartial, eFull);
+  tExplorationStatus = (eNone, ePartial, eFull);
+
+  tVisionStatus = bitpacked record
+    explored: tExplorationStatus;
+    recent: boolean;
+  end;
 
   {8 bytes per wall}
   tWall = packed record
     t: tWallType;
     variation: byte;
-    explored: tExploredStatus;
+    status: tVisionStatus;
     padding: array[1..5] of byte;
     procedure clear();
     function asExplored(): tWall;
@@ -63,7 +68,7 @@ type
     attributes: bitpacked array[0..31] of boolean;  {4 bytes}
     floor: tFloorType;                              {1 byte}
     medium: tMediumType;                            {1 byte}
-    explored: tExploredStatus;                      {1 byte}
+    status: tVisionStatus;                          {1 byte}
     padding: array[1..9] of byte;                   {9 bytes}
     procedure clear();
     function floorSpec: tFloorSpec;
@@ -91,7 +96,7 @@ type
     procedure  save(filename: string);
     procedure  load(filename: string);
     procedure  clear();
-    procedure  setExplored(aExplored: tExploredStatus);
+    procedure  setExplored(aExplored: tExplorationStatus);
   public
     property width: integer read fWidth;
     property height: integer read fHeight;
@@ -127,7 +132,7 @@ end;
 function tTile.asExplored(): tTile;
 begin
   result := self;
-  case explored of
+  case status.explored of
     eNone: begin
       result.floor := ftNone;
       result.medium := mtNone;
@@ -148,7 +153,7 @@ end;
 function tWall.asExplored(): tWall;
 begin
   result := self;
-  case explored of
+  case status.explored of
     eNone: result.t := wtNone;
     ePartial: begin
       if result.t = wtSecret then result.t := wtWall;
@@ -262,12 +267,12 @@ begin
 end;
 
 {set explored flag for every tile / wall}
-procedure tMap.setExplored(aExplored: tExploredStatus);
+procedure tMap.setExplored(aExplored: tExplorationStatus);
 var
   i: integer;
 begin
-  for i := 0 to length(fTile)-1 do fTile[i].explored := aExplored;
-  for i := 0 to length(fWall)-1 do fWall[i].explored := aExplored;
+  for i := 0 to length(fTile)-1 do fTile[i].status.explored := aExplored;
+  for i := 0 to length(fWall)-1 do fWall[i].status.explored := aExplored;
 end;
 
 procedure tMap.clear();
