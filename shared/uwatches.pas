@@ -4,9 +4,9 @@ unit uWatches;
 interface
 
 uses
-  debug,
-  utils,
-  vertex;
+  uDebug,
+  uUtils,
+  uVertex;
 
 type
   tWatch = class

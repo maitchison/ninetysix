@@ -4,8 +4,8 @@ interface
 
 uses
   {$I baseunits.inc},
-  iniFile,
-  md5;
+  uIniFile,
+  uMD5;
 
 type
   tFileRef = class(iIniSerializable)
@@ -149,7 +149,7 @@ end;
 function tFileRef.getFilesize(): int64;
 begin
   if fSize < 0 then
-    fSize := fs.getFileSize(self.fqn);
+    fSize := fileSystem.getFileSize(self.fqn);
   result := fSize;
 end;
 
@@ -157,7 +157,7 @@ end;
 function tFileRef.getModified(): int32;
 begin
   if fModified < 0 then
-    fModified := fs.getModified(self.fqn);
+    fModified := fileSystem.getModified(self.fqn);
   result := fModified;
 end;
 
@@ -170,7 +170,7 @@ var
 begin
 
   if self.fileSize = 0 then begin
-    fHash := MD5.NULL_HASH.toHex;
+    fHash := uMD5.NULL_HASH.toHex;
     exit;
   end;
 
@@ -185,7 +185,7 @@ begin
     blockread(f, buffer[0], fileSize, bytesRead);
     if bytesRead <> fileSize then
       fatal(format('Did not read the correct number of bytes. Expecting %d but read %d', [fileSize, bytesRead]));
-    fHash := MD5.hash(buffer).toHex;
+    fHash := uMD5.hash(buffer).toHex;
   finally
     close(f);
   end;

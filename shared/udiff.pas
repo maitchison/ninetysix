@@ -12,13 +12,13 @@ interface
 {todo: support LCS accross a line aswell}
 
 uses
-  debug,
-  test,
-  sysTypes,
-  utils,
-  fileSystem,
-  list,
-  hashMap;
+  uDebug,
+  uTest,
+  uTypes,
+  uUtils,
+  uFileSystem,
+  uList,
+  uHashMap;
 
 type
 

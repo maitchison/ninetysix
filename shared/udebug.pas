@@ -42,7 +42,8 @@ var
   LogFileOpen: Boolean = False;
 
 procedure log(s: string; level: tLogLevel=llNote);
-procedure debug(s: string);
+procedure debug(s: string); overload;
+procedure debug(fmt: string; args: array of Const); overload;
 procedure note(s: string); overload;
 procedure note(fmt: string; args: array of const); overload;
 procedure info(s: string);
@@ -213,6 +214,11 @@ end;
 procedure note(fmt: string; args: array of Const);
 begin
   log(format(fmt, args), llNote);
+end;
+
+procedure debug(fmt: string; args: array of Const);
+begin
+  debug(format(fmt, args));
 end;
 
 procedure debug(s: string);

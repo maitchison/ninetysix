@@ -31,13 +31,13 @@ Block header
 uses
   {$I baseunits.inc},
   crt,
-  diff,
-  hashMap,
-  checkpoint,
-  fileRef,
+  uDiff,
+  uHashMap,
+  uMD5,
+  uTimer,
   objectStore,
-  md5,
-  timer;
+  checkpoint,
+  fileRef;
 
 {--------------------------------------------------------}
 
@@ -500,6 +500,14 @@ This is the old version that has many issues,
 
 {--------------------------------------------------}
 
+function countLoC()
+
+
+{show how many lines of code per day}
+procedure showLoc();
+begin
+end;
+
 {generate per commit stats. Quite slow}
 procedure showStats();
 var
@@ -858,7 +866,7 @@ begin
   if (paramCount = 2) then
     if paramSTR(2) = '-v' then begin
       {verbose mode}
-      debug.VERBOSE_SCREEN := llDebug;
+      uDebug.VERBOSE_SCREEN := llDebug;
     end;
 
   if command = 'diff' then
@@ -871,6 +879,8 @@ begin
     showStatus()
   else if command = 'stats' then
     showStats()
+  else if command = 'loc' then
+    showLOC()
   else if command = 'test' then
     runTests()
   else if command = 'verify' then

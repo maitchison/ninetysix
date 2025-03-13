@@ -6,12 +6,12 @@ interface
 uses
   {$I baseunits.inc},
   crt, {remove}
-  glob,
-  md5,
-  iniFile,
-  diff,
-  hashMap,
-  timer,
+  uGlob,
+  uMD5,
+  uIniFile,
+  uDiff,
+  uHashMap,
+  uTimer,
   objectStore,
   fileRef,
   dos;
@@ -200,13 +200,13 @@ var
   dstFile: string;
   srcFile: string;
 begin
-  fs.mkdir(path);
+  fileSystem.mkdir(path);
   for fileRef in fileList do begin
     dstFile := joinPath(path, fileRef.path);
     srcFile := joinPath(fileRef.root, fileRef.hash);
     {todo: support subfolders}
-    fs.copyFile(srcFile, dstFile);
-    fs.setModified(dstFile, fileRef.modified);
+    fileSystem.copyFile(srcFile, dstFile);
+    fileSystem.setModified(dstFile, fileRef.modified);
   end;
 end;
 
@@ -227,7 +227,7 @@ begin
 
   if not checkpoint.endsWith('.txt', true) then fatal(format('Checkpoint must be a .txt file but was "%s"', [checkpoint]));
 
-  if not fs.exists(checkpoint) then
+  if not fileSystem.exists(checkpoint) then
     fatal(format('Checkpoint "%s" does not exist.', [checkpoint]));
 
   clear();
@@ -312,12 +312,12 @@ begin
   inherited create();
 
   self.repoRoot := aRepoRoot;
-  if not fs.folderExists(self.repoDataPath) then fatal(format('No repo found at "%s"', [self.repoDataPath]));
+  if not fileSystem.folderExists(self.repoDataPath) then fatal(format('No repo found at "%s"', [self.repoDataPath]));
 
   objectStore := tObjectStore.create(joinPath(self.repoDataPath, 'store'));
   glob := tGlob.create();
   ignoreFilename := joinPath(repoRoot, 'ignore.ini');
-  if fs.exists(ignoreFilename) then
+  if fileSystem.exists(ignoreFilename) then
     glob.loadIgnoreFile(ignoreFilename);
 end;
 
@@ -347,14 +347,14 @@ begin
     // do not check ourselves
     if fileRef.path = originalFile.path then continue;
     fileSizeRatio := fileRef.fileSize / originalFile.fileSize;
-    debug.debug(format(' > fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile.path, fileRef.path]));
+    debug(' > fileSizeRatio %f %s %s ', [fileSizeRatio, originalFile.path, fileRef.path]);
     if (fileSizeRatio > 1.25) or (fileSizeRatio < 0.8) then continue;
 
     diff.init(originalFile, fileRef);
     stats := diff.getStats();
 
     changedRatio := stats.unchanged / stats.newLen;
-    debug.debug(format(' > changeratio %f %s %s ', [changedRatio, originalFile.path, fileRef.path]));
+    debug(' > changeratio %f %s %s ', [changedRatio, originalFile.path, fileRef.path]);
     if (changedRatio > 1.1) or (changedRatio < 0.9) then continue;
     result := fileRef;
     exit;
@@ -435,10 +435,10 @@ begin
     if renamedFiles.contains(fr) then continue;
     oldFr := oldFiles.lookup(fr.path);
     if not oldFr.assigned then continue;
-    if (not force) and (not fs.wasModified(fr.fqn, oldFr.fqn)) then continue;
+    if (not force) and (not fileSystem.wasModified(fr.fqn, oldFr.fqn)) then continue;
     {unfortunately we need to do a full comparision here as sometimes
      modified is changed but file is not}
-    if fs.compareText(fr.fqn, oldFr.fqn) then continue;
+    if fileSystem.compareText(fr.fqn, oldFr.fqn) then continue;
     result.append(tFileDiff.MakeModified(oldFr, fr));
   end;
   note(' - all done');
@@ -446,7 +446,7 @@ end;
 
 function tCheckpointRepo.hasCheckpoint(checkpointName: string): boolean;
 begin
-  result := fs.exists(getCheckpointPath(checkpointName));
+  result := fileSystem.exists(getCheckpointPath(checkpointName));
 end;
 
 {returns list of checkpoint names from most recent to least recent}
@@ -454,7 +454,7 @@ function tCheckpointRepo.getCheckpointNames(): tStringList;
 var
   i: integer;
 begin
-  result := fs.listFiles(self.repoDataPath+'\*.txt');
+  result := fileSystem.listFiles(self.repoDataPath+'\*.txt');
   for i := 0 to result.len-1 do
     result[i] := removeExtension(result[i]);
   result.sort();
@@ -587,46 +587,46 @@ var
   cacheKey: string;
 begin
 
-  debug.debug(format('Dif between old:%s and new:%s', [oldFile, newFile]));
+  debug('Dif between old:%s and new:%s', [oldFile, newFile]);
 
   startTimer('diff_read_file');
-  old := fs.readText(oldFile);
-  new := fs.readText(newFile);
+  old := fileSystem.readText(oldFile);
+  new := fileSystem.readText(newFile);
   stopTimer('diff_read_file');
-  debug.debug(format(' - read in %fms', [getTimer('diff_read_file').elapsed*1000]));
+  debug(' - read in %fms', [getTimer('diff_read_file').elapsed*1000]);
 
   startTimer('diff_cache_key');
-  if oldHash = '' then oldHash := MD5.hash(join(old.data)).toHex;
-  if newHash = '' then newHash := MD5.hash(join(new.data)).toHex;
+  if oldHash = '' then oldHash := uMD5.hash(join(old.data)).toHex;
+  if newHash = '' then newHash := uMD5.hash(join(new.data)).toHex;
   cacheKey := 'new:'+newHash+' old:'+oldHash;
   stopTimer('diff_cache_key');
-  debug.debug(format(' - cache key in %fms', [getTimer('diff_cache_key').elapsed*1000]));
+  debug(' - cache key in %fms', [getTimer('diff_cache_key').elapsed*1000]);
 
   if CACHE.hasKey(cacheKey) then begin
     startTimer('diff_cache_hit');
     sln.loadS(cache.getValue(cacheKey));
     stopTimer('diff_cache_hit');
-    debug.debug(format(' - lookup in %fms', [getTimer('diff_cache_hit').elapsed*1000]));
+    debug(' - lookup in %fms', [getTimer('diff_cache_hit').elapsed*1000]);
 
   end else begin
-    debug.debug(' - cache miss');
+    debug(' - cache miss');
     startTimer('diff_cache_miss');
     sln := run(old, new);
     CACHE.setValue(cacheKey, sln.dumpS);
     stopTimer('diff_cache_miss');
-    debug.debug(format(' - dif in %fms', [getTimer('diff_cache_miss').elapsed*1000]));
+    debug(' - dif in %fms', [getTimer('diff_cache_miss').elapsed*1000]);
   end;
 
   result.merge := sln;
   result.oldLen := old.len;
   result.newLen := new.len;
 
-  debug.debug(' - done');
+  debug(' - done');
 end;
 
 procedure loadCache();
 begin
-  if fs.exists(CACHE_PATH) then
+  if fileSystem.exists(CACHE_PATH) then
     CACHE.load(CACHE_PATH);
 end;
 

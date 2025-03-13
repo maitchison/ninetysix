@@ -3,11 +3,11 @@ unit uGlob;
 interface
 
 uses
-  utils,
-  inifile,
-  debug,
-  list,
-  fileSystem;
+  uUtils,
+  uInifile,
+  uDebug,
+  uList,
+  uFileSystem;
 
 type
 
@@ -69,14 +69,14 @@ begin
 
   result.clear();
 
-  for filename in fs.listFiles(joinPath(path, pattern)) do begin
+  for filename in fileSystem.listFiles(joinPath(path, pattern)) do begin
     if isFileIgnored(filename) then continue;
     result.append(filename);
   end;
 
   if not recursive then exit;
 
-  for subfolder in fs.listFolders(path) do begin
+  for subfolder in fileSystem.listFolders(path) do begin
     if isFolderIgnored(subfolder) then continue;
     subfolderFiles := getFiles(joinPath(path, subfolder), pattern, true);
     for filename in subfolderFiles do

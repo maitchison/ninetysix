@@ -3,10 +3,10 @@ unit uMd5;
 interface
 
 uses
-  test,
-  debug,
-  sysTypes,
-  utils;
+  uTest,
+  uDebug,
+  uTypes,
+  uUtils;
 
 type
   tDigestData = packed record

@@ -36,8 +36,8 @@ begin
   note(format(' -adding object %s <- %s',[copy(hash, 1, 8), objectPath]));
   srcFile := objectPath;
   dstFile := joinPath(root, hash);
-  fs.copyFile(srcFile, dstFile);
-  fs.setModified(dstFile, fs.getModified(srcFile));
+  fileSystem.copyFile(srcFile, dstFile);
+  fileSystem.setModified(dstFile, fileSystem.getModified(srcFile));
 
   {add to our list of files}
   fileRef := tFileRef.create(hash, root);
@@ -58,9 +58,9 @@ end;
 constructor tObjectStore.create(aPath: string);
 begin
   root := aPath;
-  if not fs.folderExists(aPath) then begin
+  if not fileSystem.folderExists(aPath) then begin
     note(format('Object store folder "%s" was not found, so creating it.', [aPath]));
-    fs.mkdir(aPath);
+    fileSystem.mkdir(aPath);
   end;
   files := nil;
   self.reload();
@@ -91,7 +91,7 @@ begin
   result := true;
   for fileRef in files do begin
     oldHash := fileRef.hash;
-    debug.debug(format('Checking %s', [fileRef.fqn]));
+    debug('Checking %s', [fileRef.fqn]);
     fileRef.updateHash();
     if oldHash <> fileRef.hash then begin
       warning(' - found invalid hash');
@@ -108,7 +108,7 @@ var
   i: integer;
 begin
   clear();
-  fileList := fs.listFiles(joinPath(root, '*.*'));
+  fileList := fileSystem.listFiles(joinPath(root, '*.*'));
   setLength(files, fileList.len);
   for i := 0 to fileList.len-1 do begin
     files[i] := tFileRef.create(fileList[i], root);
