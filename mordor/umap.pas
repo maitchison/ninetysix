@@ -46,7 +46,7 @@ const
 
 type
 
-  tExploredStatus = (esNone, esPartial, esFull);
+  tExploredStatus = (eNone, ePartial, eFull);
 
   {8 bytes per wall}
   tWall = packed record
@@ -55,17 +55,19 @@ type
     explored: tExploredStatus;
     padding: array[1..5] of byte;
     procedure clear();
+    function asExplored(): tWall;
   end;
 
   {16 bytes per tile}
   tTile = packed record
     attributes: bitpacked array[0..31] of boolean;  {4 bytes}
-    floorType: tFloorType;                          {1 byte}
-    mediumType: tMediumType;                        {1 byte}
-    explored: tExploredStatus;                   {1 byte}
+    floor: tFloorType;                              {1 byte}
+    medium: tMediumType;                            {1 byte}
+    explored: tExploredStatus;                      {1 byte}
     padding: array[1..9] of byte;                   {9 bytes}
     procedure clear();
     function floorSpec: tFloorSpec;
+    function asExplored(): tTile;
   end;
 
   pTile = ^tTile;
@@ -77,10 +79,11 @@ type
     fTile: array of tTile;
     fWall: array of tWall; {ordered north, west, north, west etc...}
     function  getTile(x,y: integer): tTile;
-    procedure setTile(x,y: integer; aTile: tTile);
-    function  getWallIdx(x,y: integer;d: tDirection): integer;
     function  getWall(x,y: integer; d: tDirection): tWall;
+    procedure setTile(x,y: integer; aTile: tTile);
     procedure setWall(x,y: integer; d: tDirection;aWall: tWall);
+    function  getWallIdx(x,y: integer;d: tDirection): integer;
+    function  getTileIdx(x,y: integer): integer;
     procedure init(aWidth, aHeight: integer);
   public
     constructor Create(aWidth, aHeight: word);
@@ -117,7 +120,21 @@ end;
 
 function tTile.floorSpec: tFloorSpec;
 begin
-  result := FLOOR_SPEC[floorType];
+  result := FLOOR_SPEC[floor];
+end;
+
+{returns copy of tile with exploration limited applied}
+function tTile.asExplored(): tTile;
+begin
+  result := self;
+  case explored of
+    eNone: begin
+      result.floor := ftNone;
+      result.medium := mtNone;
+    end;
+    ePartial:;
+    eFull: ;
+  end;
 end;
 
 {-------------------------------------------------}
@@ -125,6 +142,19 @@ end;
 procedure tWall.clear();
 begin
   fillchar(self, sizeof(self), 0);
+end;
+
+{returns copy of tile with exploration limited applied}
+function tWall.asExplored(): tWall;
+begin
+  result := self;
+  case explored of
+    eNone: result.t := wtNone;
+    ePartial: begin
+      if result.t = wtSecret then result.t := wtWall;
+    end;
+    eFull: ;
+  end;
 end;
 
 {-------------------------------------------------}
@@ -157,14 +187,18 @@ end;
 
 function tMap.getTile(x,y: integer): tTile;
 begin
-  if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
-  result := fTile[x+y*fWidth];
+  result := fTile[getTileIdx(x,y)];
 end;
 
 procedure tMap.setTile(x,y: integer;aTile: tTile);
 begin
+  fTile[getTileIdx(x,y)] := aTile;
+end;
+
+function tMap.getTileIdx(x,y: integer): integer;
+begin
   if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
-  fTile[x+y*fWidth] := aTile;
+  result := x+y*fWidth;
 end;
 
 function tMap.getWallIdx(x,y: integer;d: tDirection): integer;

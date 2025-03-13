@@ -23,7 +23,7 @@ uses
   {$i gui.inc}
   {game stuff}
   uRes,
-  uGame,
+  uGameState,
   uMapGui,
   uTileEditorGui,
   uMDRImporter,
@@ -39,13 +39,15 @@ type
   end;
 
   tGameScene = class(tScene)
+  protected
+    mapGUI: tMapGUI;
   public
     procedure run(); override;
   end;
 
 var
   screen: tScreen;
-  scene: tMapEditScene;
+  scene: tScene;
 
 {-------------------------------------------------------}
 
@@ -131,11 +133,11 @@ begin
     for x := 0 to map.width-1 do begin
       tile.clear();
       case rnd(10) of
-        0: tile.floorType := ftStone;
-        else tile.floorType := ftStone;
+        0: tile.floor := ftStone;
+        else tile.floor := ftStone;
       end;
       case rnd(10) of
-        2: tile.mediumType := mtRock;
+        2: tile.medium := mtRock;
       end;
       map.tile[x,y] := tile;
     end;
@@ -161,51 +163,35 @@ end;
 {-------------------------------------------------------}
 
 procedure tGameScene.run();
-begin
-end;
-(*
 var
   elapsed: single;
-  editGUI: tTileEditorGUI;
-  saveButton, loadButton: tGuiButton;
   fpsLabel: tGuiLabel;
   timer: tTimer;
   dc: tDrawContext;
 begin
 
-  map := tMap.create(32,32);
+  gs.map := tMap.Create(32,32);
+  gs.exploredMap := tMap.Create(32,32);
+  gs.map.load('map.dat');
+  gs.map.setExplored(eFull);
+  gs.exploredMap.load('map.dat');
+  gs.map.setExplored(eNone);
 
   screen.background := gfx['title800'];
   screen.pageClear();
   screen.pageFlip();
 
-  editGui := tTileEditorGUI.Create(512+20+20,10);
-  gui.append(editGUI);
-
   mapGUI := tMapGui.Create();
-  mapGUI.map := map;
+  mapGUI.map := gs.map;
   mapGUI.mode := mmEdit;
   mapGUI.pos := Point(20, 50);
-  mapGUI.tileEditor := editGui;
   gui.append(mapGUI);
-
-  saveButton := tGuiButton.create(Point(650,400), 'Save');
-  savebutton.addHook(ON_MOUSE_CLICK, onSaveClick);
-  gui.append(saveButton);
-  loadButton := tGuiButton.create(Point(650,450), 'Load');
-  loadbutton.addHook(ON_MOUSE_CLICK, onLoadClick);
-  gui.append(loadButton);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
 
-  makeRandomMap(map);
-  mapGUI.invalidate();
-
   timer := tTimer.create('main');
   dc := screen.getDC();
-
-  importMap();
 
   repeat
 
@@ -229,21 +215,21 @@ begin
   until keyDown(key_esc);
 
 end;
-*)
 
 {-------------------------------------------------------}
 
 procedure onSaveClick(sender: tGuiComponent; msg: string; args: array of const);
 begin
   note('Saving map');
-  gameState.map.save('map.dat');
+  gs.map.save('map.dat');
 end;
 
 procedure loadMap();
 begin
   note('Loading map');
-  gameState.map.load('map.dat');
-  scene.mapGUI.invalidate();
+  gs.map.load('map.dat');
+  // hmm... how to do this?
+  //scene.mapGUI.invalidate();
 end;
 
 procedure importMap();
@@ -253,9 +239,10 @@ begin
   note('Importing map');
   importer := tMDRImporter.Create();
   importer.load('res\mdata11.mdr');
-  if assigned(gameState.map) then gameState.map.free;
-  gameState.map := importer.readMap(1);
-  scene.mapGUI.invalidate();
+  if assigned(gs.map) then gs.map.free;
+  gs.map := importer.readMap(1);
+  // hmm... how to do this?
+  //scene.mapGUI.invalidate();
 end;
 
 procedure onLoadClick(sender: tGuiComponent; msg: string; args: array of const);
@@ -273,7 +260,7 @@ var
   dc: tDrawContext;
 begin
 
-  gameState.map := tMap.create(32,32);
+  gs.map := tMap.create(32,32);
 
   screen.background := gfx['title800'];
   screen.pageClear();
@@ -283,7 +270,7 @@ begin
   gui.append(editGUI);
 
   mapGUI := tMapGui.Create();
-  mapGUI.map := gameState.map;
+  mapGUI.map := gs.map;
   mapGUI.mode := mmEdit;
   mapGUI.pos := Point(20, 50);
   mapGUI.tileEditor := editGui;
@@ -299,7 +286,7 @@ begin
   fpsLabel := tGuiLabel.Create(Point(10,10));
   gui.append(fpsLabel);
 
-  makeRandomMap(gameState.map);
+  makeRandomMap(gs.map);
   mapGUI.invalidate();
 
   timer := tTimer.create('main');
@@ -347,7 +334,7 @@ begin
 
   //titleScreen();
   //encounterScreen();
-  scene := tMapEditScene.Create();
+  scene := tGameScene.Create();
   scene.run();
   scene.free();
 

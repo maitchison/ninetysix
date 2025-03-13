@@ -69,7 +69,7 @@ end;
 
 destructor tMapGUI.destroy();
 begin
-  inherited destroy;
+  inherited destroy();
 end;
 
 procedure tMapGUI.invalidate();
@@ -114,6 +114,7 @@ end;
 procedure tMapGUI.renderTile(dc: tDrawContext; x, y: integer);
 var
   tile: tTile;
+  wall: tWall;
   pos: tPoint;
   dx,dy: integer;
   id: integer;
@@ -121,7 +122,7 @@ var
   padding : integer;
 begin
 
-  tile := map.tile[x,y];
+  tile := map.tile[x,y].asExplored;
 
   pos := tilePos(x,y);
 
@@ -133,12 +134,13 @@ begin
   if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {medium}
-  id := MEDIUM_SPRITE[tile.mediumType];
+  id := MEDIUM_SPRITE[tile.medium];
   if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {walls}
   for d in tDirection do begin
-    id := WALL_SPRITE[map.wall[x,y,d].t];
+    wall := map.wall[x,y,d].asExplored;
+    id := WALL_SPRITE[wall.t];
     if id < 0 then continue;
     dx := WALL_DX[d];
     dy := WALL_DY[d];

@@ -49,7 +49,7 @@ begin
   case editMode of
     emFloor: begin
       tile := map.tile[atX, atY];
-      tile.floorType := fFloorType;
+      tile.floor := fFloorType;
       map.tile[atX, atY] := tile;
     end;
   end;

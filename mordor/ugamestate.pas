@@ -1,17 +1,21 @@
 {store global game state for Mordor}
-unit uGame;
+unit uGameState;
 
 interface
 
 uses
   uMap;
 
-type GameState = class
+type tGameState = class
   class var map: tMap;
   class var exploredMap: tMap;
   end;
 
+var
+  gs: tGameState;
+
 implementation
 
 begin
+  gs := tGameState.Create();
 end.

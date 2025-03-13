@@ -155,13 +155,13 @@ begin
       if bits[4] then eastWall.t := wtSecret;
       if bits[5] then northWall.t := wtSecret;
 
-      if bits[15] then tile.floorType := ftWater;
-      if bits[16] then tile.floorType := ftDirt;
+      if bits[15] then tile.floor := ftWater;
+      if bits[16] then tile.floor := ftDirt;
       // custom adjustment for grass
-      if bits[15] and bits[16] then tile.floorType := ftWater;
+      if bits[15] and bits[16] then tile.floor := ftWater;
 
-      if bits[19] then tile.mediumType := mtRock;
-      if bits[20] then tile.mediumType := mtFog;
+      if bits[19] then tile.medium := mtRock;
+      if bits[20] then tile.medium := mtFog;
 
       {our map is 32x32, but the mordor map is 30, so add a border}
       map.tile[xlp+1,ylp+1] := tile;
@@ -177,7 +177,7 @@ begin
   edgeWall.clear();
   edgeWall.t := wtWall;
   edgeTile.clear();
-  edgeTile.mediumType := mtNone;
+  edgeTile.medium := mtNone;
 
   for xlp := 1 to header.width do begin
     map.wall[xlp,1,dNorth] := edgeWall;
