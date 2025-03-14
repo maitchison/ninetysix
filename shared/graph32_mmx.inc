@@ -1,13 +1,16 @@
 {$link graph32_nasm.obj}
-procedure drawLine_Tint_Blend_MMX(); cdecl; external name 'drawLine_Tint_Blend_MMX';
-procedure drawLine_Tint_MMX(); cdecl; external name 'drawLine_Tint_MMX';
-procedure drawLine_Blend_MMX(); cdecl; external name 'drawLine_Blend_MMX';
-procedure drawLine_MMX(); cdecl; external name 'drawLine_MMX';
+procedure drawLine_MMX(); cdecl; external name 'DrawLine_MMX';
+procedure stretchLineNearest_MMX(); cdecl; external name 'StretchLineNearest_MMX';
 
-procedure stretchLine_Tint_Blend_Nearest_MMX(); cdecl; external name 'stretchLine_Tint_Blend_Nearest_MMX';
-procedure stretchLine_Blend_Nearest_MMX(); cdecl; external name 'stretchLine_Blend_Nearest_MMX';
-procedure stretchLine_Tint_Nearest_MMX(); cdecl; external name 'stretchLine_Tint_Nearest_MMX';
-procedure stretchLine_Nearest_MMX(); cdecl; external name 'stretchLine_Nearest_MMX';
+function getCallCode(blendMode: tBlendMode; tint: RGBA): int32;
+begin
+  result := 0;
+  case blendMode of
+    bmNone: exit(-1);
+    bmBlend: result += 1;
+  end;
+  if int32(tint) <> -1 then result += 2;
+end;
 
 procedure blitCol_MMX(pixels: pRGBA;count: int32;col: RGBA);
 asm
@@ -127,30 +130,16 @@ procedure drawImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRe
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
-  callProc: procedure cdecl;
-  needsTint: boolean;
+  callCode: int32;
 begin
+
+  callCode := getCallCode(blendMode, tint);
+  if callCode < 0 then exit;
+
   srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
   srcStride := (srcPage.width - srcRect.width) * 4;
   dstStride := (dstPage.width - srcRect.width) * 4;
-  needsTint := int32(tint) <> -1;
-
-  case blendMode of
-    bmNone: exit;
-    bmBlit: begin
-      if needsTint then
-        callProc := drawLine_Tint_MMX
-      else
-        callProc := drawLine_MMX;
-    end;
-    bmBlend: begin
-      if needsTint then
-        callProc := drawLine_Tint_Blend_MMX
-      else
-        callProc := drawLine_Blend_MMX;
-    end;
-  end;
 
   asm
     cli
@@ -172,7 +161,8 @@ begin
   @YLOOP:
     mov       ecx, SRCRECT.WIDTH
     push      ebx
-    call      callProc
+    mov       eax, CALLCODE
+    call      drawLine_MMX
     pop       ebx
 
     add esi, SRCSTRIDE
@@ -190,39 +180,21 @@ procedure stretchImage_MMX(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, 
 var
   i,j: integer;
   dstPtr: pRGBA;
-  needsTint: boolean;
   src: RGBA;
   tx,ty: dword;
   tdx,tdy: int32;
   linePtr: pointer;
-  callProc: procedure cdecl;
+  callCode: dword;
 begin
+
+  callCode := getCallCode(blendMode, tint);
+  if callCode < 0 then exit;
 
   if filter = tfLinear then begin
     {we don't currently support linear filtering...
      it wouldn't be too hard to put in though}
     stretchImage_REF(dstPage, srcPage, dstRect, srcX, srcY, srcDx, srcDy, tint, filter, blendMode);
     exit;
-  end;
-
-  needsTint := int32(tint) <> -1;
-
-  {dispatch}
-  {todo: build dispatch into nasm code}
-  case blendMode of
-    bmNone: exit;
-    bmBlit: begin
-      if needsTint then
-        callProc := stretchLine_Tint_Nearest_MMX
-      else
-        callProc := stretchLine_Nearest_MMX;
-    end;
-    bmBlend: begin
-      if needsTint then
-        callProc := stretchLine_Tint_Blend_Nearest_MMX
-      else
-        callProc := stretchLine_Blend_Nearest_MMX;
-    end;
   end;
 
   tdx := round(srcDx*65536);
@@ -250,7 +222,8 @@ begin
       movd      mm3, eax
       punpcklwd mm3, mm3
       punpckldq mm3, mm3
-      call callProc
+      mov       eax, CALLCODE
+      call      stretchLineNearest_MMX
       popad
       emms
       sti

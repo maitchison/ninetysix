@@ -1,6 +1,11 @@
 section .text
 [BITS 32]
 
+; drawCodes
+; 0 blendMode
+; 1 needsTint
+; 2 filter
+
 ; -------------------------------
 ; Register Conventions
 ; -------------------------------
@@ -10,27 +15,22 @@ section .text
 ; mm1: [used for current color]
 ; mm2: tint
 ; mm3: bias (255 as 4x uint16)
-; eax: [destroyed]
+; eax: draw code [destroyed]
 ; ebx: [preserved]
 ; ecx: pixel count [0]
 
-
-GLOBAL _drawLine_MMX
-GLOBAL _drawLine_Tint_Blend_MMX
-GLOBAL _drawLine_Tint_MMX
-GLOBAL _drawLine_Blend_MMX
-
-GLOBAL _stretchLine_Tint_Blend_Nearest_MMX
-GLOBAL _stretchLine_Blend_Nearest_MMX:
-GLOBAL _stretchLine_Tint_Nearest_MMX:
-GLOBAL _stretchLine_Nearest_MMX:
-
+GLOBAL _DrawLine_MMX
+GLOBAL _StretchLineNearest_MMX:
 
 ; common registers
 %define zer mm0
 %define src mm1
 %define tnt mm2
 %define b25 mm3
+
+; -------------------------------------------------
+; DRAWING
+; -------------------------------------------------
 
 %macro DRAW_SAMPLE 0
     movd      src, [esi]
@@ -81,43 +81,8 @@ GLOBAL _stretchLine_Nearest_MMX:
     jnz .xloop
 %endmacro
 
-; -------------------------------------------------
-; DRAWING
-; -------------------------------------------------
-
-_drawLine_Tint_Blend_MMX:
-.xloop:  
-  DRAW_SAMPLE
-  DRAW_TINT
-  DRAW_BLEND
-.blit:        
-  DRAW_BLIT
-.skip:    
-  DRAW_END
-  ret
-
-_drawLine_Tint_MMX:
-.xloop:    
-  DRAW_SAMPLE
-  DRAW_TINT 
-.blit:      
-  DRAW_BLIT  
-.skip:    
-  DRAW_END  
-  ret
-
-_drawLine_Blend_MMX:
-.xloop:    
-  DRAW_SAMPLE
-  DRAW_BLEND
-.blit:      
-  DRAW_BLIT    
-.skip:    
-  DRAW_END  
-  ret
-
 ; special case for direct blit.
-_drawLine_MMX:
+DrawLine_MMX:
   push ecx
   shr ecx, 2
   test ecx, ecx
@@ -137,11 +102,54 @@ _drawLine_MMX:
   rep movsd
   ret
 
+DrawLine_Tint_MMX:
+.xloop:    
+  DRAW_SAMPLE
+  DRAW_TINT 
+.blit:      
+  DRAW_BLIT  
+.skip:    
+  DRAW_END  
+  ret
+
+DrawLine_Blend_MMX:
+.xloop:    
+  DRAW_SAMPLE
+  DRAW_BLEND
+.blit:      
+  DRAW_BLIT    
+.skip:    
+  DRAW_END  
+  ret
+
+DrawLine_Tint_Blend_MMX:
+.xloop:  
+  DRAW_SAMPLE
+  DRAW_TINT
+  DRAW_BLEND
+.blit:        
+  DRAW_BLIT
+.skip:    
+  DRAW_END
+  ret
+
+draw_jump_table:
+  dd DrawLine_MMX
+  dd DrawLine_Blend_MMX
+  dd DrawLine_Tint_MMX
+  dd DrawLine_Tint_Blend_MMX
+
+_DrawLine_MMX:
+  and eax, $3  
+  mov eax, [draw_jump_table + eax * 4]
+  call eax
+  ret
+
 ; -------------------------------------------------
 ; SCALING
 ; -------------------------------------------------
 
-; stretchLine_MMX NASM implementation
+; stretchLineNearest_MMX NASM implementation
 ; ebx: tx * 65536
 ; edx: tdx * 65536
 
@@ -153,8 +161,37 @@ _drawLine_MMX:
   add       ebx, edx
 %endmacro
 
-_stretchLine_Tint_Blend_Nearest_MMX:
- .xloop:
+StretchLineNearest_MMX:
+.xloop:
+  STRETCH_SAMPLE
+.blit:        
+  DRAW_BLIT
+.skip:    
+  DRAW_END  
+  ret
+
+StretchLineNearest_Blend_MMX:
+.xloop:
+  STRETCH_SAMPLE
+  DRAW_BLEND  
+.blit:        
+  DRAW_BLIT
+.skip:    
+  DRAW_END  
+  ret
+
+StretchLineNearest_Tint_MMX:
+.xloop:
+  STRETCH_SAMPLE
+  DRAW_TINT
+.blit:        
+  DRAW_BLIT
+.skip:    
+  DRAW_END  
+  ret
+
+StretchLineNearest_Tint_Blend_MMX:
+.xloop:
   STRETCH_SAMPLE
   DRAW_TINT
   DRAW_BLEND
@@ -162,29 +199,16 @@ _stretchLine_Tint_Blend_Nearest_MMX:
   DRAW_BLIT
 .skip:    
   DRAW_END
+  ret
 
-_stretchLine_Tint_Nearest_MMX:
- .xloop:
-  STRETCH_SAMPLE
-  DRAW_TINT
-.blit:        
-  DRAW_BLIT
-.skip:    
-  DRAW_END  
+stretch_jump_table:
+  dd StretchLineNearest_MMX
+  dd StretchLineNearest_Blend_MMX
+  dd StretchLineNearest_Tint_MMX
+  dd StretchLineNearest_Tint_Blend_MMX
 
-_stretchLine_Blend_Nearest_MMX:
- .xloop:
-  STRETCH_SAMPLE
-  DRAW_BLEND  
-.blit:        
-  DRAW_BLIT
-.skip:    
-  DRAW_END  
-
-_stretchLine_Nearest_MMX:
- .xloop:
-  STRETCH_SAMPLE
-.blit:        
-  DRAW_BLIT
-.skip:    
-  DRAW_END  
+_StretchLineNearest_MMX:
+  and eax, $3  
+  mov eax, [stretch_jump_table + eax * 4]
+  call eax
+  ret
