@@ -75,6 +75,7 @@ begin
   dc.blendMode := bmBlit;
   sprite.draw(dc, bounds.x, bounds.y);
   weapon := player.tank.weapon;
+  dc.blendMode := bmBlend;
   weapon.weaponSprite.draw(dc, bounds.x + 9, bounds.y + 9);
   font.textOut(dc.page, dc.offset.x+bounds.x + 20, dc.offset.y+bounds.y + 5, weapon.tag, RGB(255, 255, 255));
   dc.markRegion(bounds);
@@ -134,7 +135,8 @@ end;
 procedure setupGUI();
 begin
   gui := tGui.Create();
-  fpsLabel := tGuiLabel.Create(Point(6, 18));
+  fpsLabel := tGuiLabel.MakeText(Point(6, 6));
+  fpsLabel.fontStyle.shadow := false;
   gui.append(fpsLabel);
 
   player1Gui := tPlayerGUI.Create(Point(0, 0), player1);
@@ -143,15 +145,16 @@ begin
   gui.append(player2Gui);
 
   {title stuff}
-  startLabel := tGuiLabel.Create(Point(160, 240-20));
+  startLabel := tGuiLabel.MakeText(Point(160, 240-20));
   startLabel.fontStyle.centered := true;
   startLabel.fontStyle.shadow := true;
   startLabel.text := 'Press any key to start';
   gui.append(startLabel);
 
-  verLabel := tGuiLabel.create(Point(320-100, 6));
+  verLabel := tGuiLabel.MakeText(Point(320-100, 6));
   verLabel.text := '0.3a (01/03/1996)';
   verLabel.textColor := RGB(228,228,238);
+  verLabel.fontStyle.shadow := false;
   gui.append(verLabel);
 
 end;
@@ -280,6 +283,7 @@ var
   p: tPoint;
 begin
   dc := screen.getDC();
+  dc.offset.x := 32;
   p := Point(input.mouseX-dc.offset.x, input.mouseY-dc.offset.y);
 
   if keyDown(key_f5) then debugShowWorldPixels(dc);
@@ -332,13 +336,17 @@ var
   screenFade: single;
   y: integer;
   oldFlags: byte;
+  backgroundDC: tDrawContext;
+  screenDC: tDrawContext;
 begin
   startTimer('draw');
   drawAll(dc);
   stopTimer('draw');
 
   startTimer('drawTerrain');
-  terrain.draw(screen.getBackgroundDC());
+  backgroundDC := screen.getBackgroundDC();
+  backgroundDC.offset := dc.offset;
+  terrain.draw(backgroundDC);
   stopTimer('drawTerrain');
 
   {special case}
@@ -347,10 +355,10 @@ begin
     dc.clearFlags := 0; // turn this off, as otherwise it'd be slow
     for y := 0 to 240 do begin
       case y and $3 of
-        0: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
-        1: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
-        2: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
-        3: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
+        0: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,96));
+        1: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,64));
+        2: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,96));
+        3: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,64));
       end;
     end;
     dc.clearFlags := oldFlags;
@@ -358,7 +366,7 @@ begin
   end;
 
   startTimer('guiDraw');
-  gui.draw(dc);
+  gui.draw(screen.getDC());
   stopTimer('guiDraw');
 
   {screen fading}
@@ -380,6 +388,7 @@ end;
 procedure mainLoop();
 var
   elapsed: single;
+  dc: tDrawContext;
 begin
 
   screen.background.clear(RGB(0,0,0));
@@ -392,6 +401,9 @@ begin
   gs.state := GS_TITLE;
   gs.nextState := GS_TITLE;
   gs.subState := SS_INIT;
+
+  dc := screen.getDC();
+  dc.offset.x := 32;
 
   repeat
 
@@ -451,7 +463,7 @@ begin
     screen.clearAll();
 
     doUpdate(elapsed);
-    doDraw(screen.getDC());
+    doDraw(dc);
 
     screen.flipAll();
 

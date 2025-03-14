@@ -30,6 +30,7 @@ implementation
 class function tGuiLabel.MakeText(aPos: tPoint; aText: string=''): tGuiLabel;
 begin
   result := tGuiLabel.Create(aPos, aText);
+  result.col := RGBA.Clear;
 end;
 
 {text with label, auto size}
