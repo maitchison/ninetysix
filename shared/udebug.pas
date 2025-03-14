@@ -49,8 +49,8 @@ procedure note(fmt: string; args: array of const); overload;
 procedure info(s: string);
 procedure warning(s: string);
 procedure error(s: string);
-procedure fatal(s: string; code: byte=255); overload;
-procedure fatal(fmt: string; args: array of const); overload;
+procedure fatal(s: string; code: byte=255); overload; noreturn;
+procedure fatal(fmt: string; args: array of const); overload; noreturn;
 
 function  getLogLevelColor(level: tLogLevel): byte;
 

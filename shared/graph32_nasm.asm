@@ -1,10 +1,22 @@
-; blendImage_MMX NASM implementation
-; srcPtr in esi
-; dstPtr in edi
-; srcStride, dstStride, srcHeight, srcWidth, tint passed via stack or registers as you prefer
+; drawLine_MMX NASM implementation
+; esi: srcPtr -> moved to end of line
+; edi: dstPtr -> moved to end of line
+; mm1: tintColor
+; mm3: bias (255 as 4x uint16)
+; eax -> destroyed
+; ebx: [preserved]
+; ecx: pixel count -> destroyed
+
+section .text
+[BITS 32]
+
+
+GLOBAL _drawLine_MMX
+GLOBAL _drawLine_Tint_Blend_MMX
+GLOBAL _drawLine_Tint_MMX
+GLOBAL _drawLine_Blend_MMX
 
 %macro DRAW_SAMPLE 0
-.xloop:  
     movd      mm2, [esi]
     punpcklbw mm2, mm0
 %endmacro
@@ -23,7 +35,7 @@
     je        .skip
     cmp       al, 255
     je        .blit
-.blend:
+    
     movd      mm6, [edi]
     punpcklbw mm6, mm0
 
@@ -42,13 +54,11 @@
 %endmacro
 
 %macro DRAW_BLIT 0
-.blit:  
     packuswb  mm2, mm2
     movd      [edi], mm2
 %endmacro
 
 %macro DRAW_EOL 0
-.skip:  
     add edi, 4
     add esi, 4
     dec ecx
@@ -56,26 +66,38 @@
 %endmacro
 
 ; Main Procedure
-drawLine_Tint_Blend_MMX:
+_drawLine_Tint_Blend_MMX:
+.xloop:  
   DRAW_SAMPLE
   DRAW_TINT
   DRAW_BLEND
+.blit:        
   DRAW_BLIT
+.skip:    
   DRAW_EOL
+  ret
 
-drawLine_Tint_MMX:
+_drawLine_Tint_MMX:
+.xloop:    
   DRAW_SAMPLE
   DRAW_TINT 
+.blit:      
   DRAW_BLIT  
+.skip:    
   DRAW_EOL  
+  ret
 
-drawLine_Blend_MMX:
+_drawLine_Blend_MMX:
+.xloop:    
   DRAW_SAMPLE
   DRAW_BLEND
+.blit:      
   DRAW_BLIT    
+.skip:    
   DRAW_EOL  
+  ret
 
-drawLine_MMX:
+_drawLine_MMX:
   push ecx
   shr ecx, 2
   test ecx, ecx
@@ -93,3 +115,4 @@ drawLine_MMX:
   pop ecx
   and ecx, 3  
   rep movsd
+  ret

@@ -39,25 +39,7 @@ begin
   end;
 end;
 
-procedure tintImage_REF(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
-var
-  i,j: integer;
-  srcPtr: pRGBA;
-  dstPtr: pRGBA;
-
-begin
-  for j := 0 to srcRect.height-1 do begin
-    srcPtr := srcPage.getAddress(srcRect.x, srcRect.y+j);
-    dstPtr := dstPage.getAddress(dstX, dstY+j);
-    for i := 0 to srcRect.width-1 do begin
-      dstPtr^ := srcPtr^ * tint;
-      inc(srcPtr);
-      inc(dstPtr);
-    end;
-  end;
-end;
-
-procedure blendImage_REF(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
+procedure drawImage_REF(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
 var
   i,j: integer;
   srcPtr: pRGBA;
@@ -65,17 +47,23 @@ var
   needsTint: boolean;
   src: RGBA;
 begin
+
   needsTint := int32(tint) <> -1;
+
+  if (blendMode = bmBlit) and (not needsTint) then begin
+    blitImage_REF(dstPage, srcPage, dstX, dstY, srcRect);
+    exit;
+  end;
+
   for j := 0 to srcRect.height-1 do begin
     srcPtr := srcPage.getAddress(srcRect.x, srcRect.y+j);
     dstPtr := dstPage.getAddress(dstX, dstY+j);
     for i := 0 to srcRect.width-1 do begin
       src := srcPtr^;
-      if src.a <> 0 then begin
-        if needsTint then src := src * tint;
-        if src.a = 255 then
-          dstPtr^ := src
-        else
+      if needsTint then src := src * tint;
+      case blendMode of
+        bmBlit: dstPtr^ := src;
+        bmBlend: if src.a <> 0 then
           dstPtr^ := RGBA.Blend(src, dstPtr^, src.a);
       end;
       inc(srcPtr);

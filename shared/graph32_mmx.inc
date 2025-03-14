@@ -1,3 +1,9 @@
+{$link graph32_nasm.obj}
+procedure drawLine_Tint_Blend_MMX(); cdecl; external name 'drawLine_Tint_Blend_MMX';
+procedure drawLine_Tint_MMX(); cdecl; external name 'drawLine_Tint_MMX';
+procedure drawLine_Blend_MMX(); cdecl; external name 'drawLine_Blend_MMX';
+procedure drawLine_MMX(); cdecl; external name 'drawLine_MMX';
+
 procedure blitCol_MMX(pixels: pRGBA;count: int32;col: RGBA);
 asm
 
@@ -112,118 +118,34 @@ asm
 
 end;
 
-{this is just a movq version... might not be that much faster that movsd}
-procedure blitImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);
+procedure drawImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
 var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
+  callProc: procedure cdecl;
+  needsTint: boolean;
 begin
   srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
   dstPtr := dstPage.getAddress(dstX, dstY);
   srcStride := (srcPage.width - srcRect.width) * 4;
   dstStride := (dstPage.width - srcRect.width) * 4;
-  asm
-    cli
-    pushad
-    mov esi, SRCPTR
-    mov edi, DSTPTR
-    mov ebx, SRCRECT.HEIGHT
-  @YLOOP:
-    mov ecx, SRCRECT.WIDTH
-    shr ecx, 2
-    test ecx, ecx
-    jz @FINAL
+  needsTint := int32(tint) <> -1;
 
-  @XLOOP:
-    movq MM0, [esi]
-    movq MM1, [esi+8]
-    movq [edi], MM0
-    movq [edi+8], MM1
-    add edi, 16
-    add esi, 16
-    dec ecx
-    jnz @XLOOP
-
-  @FINAL:
-    mov ecx, SRCRECT.WIDTH
-    and ecx, $3
-    rep movsd
-
-    add esi, SRCSTRIDE
-    add edi, DSTSTRIDE
-    dec ebx
-    jnz @YLOOP
-    popad
-    emms
-    sti
+  case blendMode of
+    bmNone: exit;
+    bmBlit: begin
+      if needsTint then
+        callProc := drawLine_Tint_MMX
+      else
+        callProc := drawLine_MMX;
+    end;
+    bmBlend: begin
+      if needsTint then
+        callProc := drawLine_Tint_Blend_MMX
+      else
+        callProc := drawLine_Blend_MMX;
+    end;
   end;
-end;
-
-{modulate color, but no blending}
-procedure tintImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
-var
-  srcPtr, dstPtr: pointer;
-  srcStride, dstStride: dword;
-begin
-
-  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
-  dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - srcRect.width) * 4;
-  dstStride := (dstPage.width - srcRect.width) * 4;
-  asm
-    cli
-    pushad
-    mov esi, SRCPTR
-    mov edi, DSTPTR
-    mov ebx, SRCRECT.HEIGHT
-
-    {MM0 <- 0}
-    pxor      MM0, MM0
-    {MM1 <- tintColor as int16}
-    movd      MM1, TINT
-    punpcklbw MM1, MM0
-    {MM3 <- bias}
-    mov       eax, $00ff00ff
-    movd      MM3, eax
-    punpckldq MM3, MM3
-
-  @YLOOP:
-    mov       ecx, SRCRECT.WIDTH
-
-  @XLOOP:
-    movd      MM2, [esi]
-    punpcklbw MM2, MM0    // convert to 16bit.
-
-    pmullw    MM2, MM1    // modulate
-    paddw     MM2, MM3    // add bias
-    psrlw     MM2, 8      // divide
-    packuswb  MM2, MM2
-    movd      [edi], MM2
-
-    add edi, 4
-    add esi, 4
-    dec ecx
-    jnz @XLOOP
-
-    add esi, SRCSTRIDE
-    add edi, DSTSTRIDE
-    dec ebx
-    jnz @YLOOP
-    popad
-    emms
-    sti
-  end;
-end;
-
-procedure blendImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
-var
-  srcPtr, dstPtr: pointer;
-  srcStride, dstStride: dword;
-begin
-  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
-  dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - srcRect.width) * 4;
-  dstStride := (dstPage.width - srcRect.width) * 4;
 
   asm
     cli
@@ -244,151 +166,9 @@ begin
 
   @YLOOP:
     mov       ecx, SRCRECT.WIDTH
-
-  @XLOOP:
-    {MM2 <- sARGB}
-    movd      MM2, [esi]
-    punpcklbw MM2, MM0    // convert to 16bit.
-
-    {tint}
-    {MM2 <- sARGB * tint}
-    pmullw    MM2, MM1    // modulate with tint
-    paddw     MM2, MM3    // add bias
-    psrlw     MM2, 8      // divide
-
-    {eax <- sA * tint}
-    {alpha test}
-    movq      MM7, MM2
-    psrlq     MM7, 48
-    movd      eax, MM7
-    cmp       al, 0
-    je @SKIP
-    cmp       al, 255
-    je @BLIT
-
-  @BLEND:
-
-    {MM6 <- dARGB}
-    movd      MM6, [edi]
-    punpcklbw MM6, MM0    // convert to 16bit.
-
-    {expand alpha}
-    {maybe a lookup for this is better?}
-    {MM4 <- 0a0a0a0a}
-    movd      MM4, eax
-    punpcklwd MM4, MM4
-    punpckldq MM4, MM4
-    {MM5 <- 0(1-a)0(1-a)0(1-a)0(1-a)}
-    movq      MM5, MM3      // 255
-    psubw     MM5, MM4      // 255-a
-
-    {blend}
-    {MM2 <- a * (sARGB * tint) * (1-a) * dARGB) + bias}
-    pmullw    MM2, MM4
-    pmullw    MM6, MM5
-    paddw     MM2, MM6
-    paddw     MM2, MM3
-    psrlw     MM2, 8
-
-  @BLIT:
-
-    {blit}
-    packuswb  MM2, MM2
-    movd      [edi], MM2
-
-  @SKIP:
-
-    add edi, 4
-    add esi, 4
-    dec ecx
-    jnz @XLOOP
-
-    add esi, SRCSTRIDE
-    add edi, DSTSTRIDE
-    dec ebx
-    jnz @YLOOP
-    popad
-    emms
-    sti
-  end;
-
-end;
-
-procedure blendImage_MMX_fast(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);
-var
-  srcPtr, dstPtr: pointer;
-  srcStride, dstStride: dword;
-begin
-  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
-  dstPtr := dstPage.getAddress(dstX, dstY);
-  srcStride := (srcPage.width - srcRect.width) * 4;
-  dstStride := (dstPage.width - srcRect.width) * 4;
-  asm
-    cli
-    pushad
-    mov esi, SRCPTR
-    mov edi, DSTPTR
-    mov ebx, SRCRECT.HEIGHT
-
-    {MM0 <- 0}
-    pxor      MM0, MM0
-    {MM3 <- bias}
-    mov       eax, $00ff00ff
-    movd      MM3, eax
-    punpckldq MM3, MM3
-
-  @YLOOP:
-    mov       ecx, SRCRECT.WIDTH
-
-  @XLOOP:
-    {MM2 <- sARGB}
-    mov       eax, [esi]
-    movd      MM2, eax
-    shr       eax, 24
-    punpcklbw MM2, MM0    // convert to 16bit.
-
-    {alpha test}
-    cmp       al, 0
-    je @SKIP
-    cmp       al, 255
-    je @BLIT
-
-  @BLEND:
-
-    {MM6 <- dARGB}
-    movd      MM6, [edi]
-    punpcklbw MM6, MM0    // convert to 16bit.
-
-    {expand alpha}
-    {maybe a lookup for this is better?}
-    {MM4 <- 0a0a0a0a}
-    movd      MM4, eax
-    punpcklwd MM4, MM4
-    punpckldq MM4, MM4
-    {MM5 <- 0(1-a)0(1-a)0(1-a)0(1-a)}
-    movq      MM5, MM3      // 255
-    psubw     MM5, MM4      // 255-a
-
-    {blend}
-    {MM2 <- a * (sARGB * tint) * (1-a) * dARGB) + bias}
-    pmullw    MM2, MM4
-    pmullw    MM6, MM5
-    paddw     MM2, MM6
-    paddw     MM2, MM3
-    psrlw     MM2, 8
-
-  @BLIT:
-
-    {blit}
-    packuswb  MM2, MM2
-    movd      [edi], MM2
-
-  @SKIP:
-
-    add edi, 4
-    add esi, 4
-    dec ecx
-    jnz @XLOOP
+    push      ebx
+    call      callProc
+    pop       ebx
 
     add esi, SRCSTRIDE
     add edi, DSTSTRIDE

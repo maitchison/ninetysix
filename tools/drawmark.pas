@@ -3,7 +3,8 @@ program drawMap;
 uses
   uDebug,
   uTest,
-  uVGADriver, uVESADriver, uS3Driver,
+  uVGADriver,
+  uVESADriver,
   uUtils,
   crt,
   uScreen,

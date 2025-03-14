@@ -61,9 +61,7 @@ type
     {dispatch}
     procedure doBlitCol(pixels: pRGBA;len: int32;col: RGBA);
     procedure doBlendCol(pixels: pRGBA;len: int32;col: RGBA);
-    procedure doBlitImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect);
-    procedure doTintImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
-    procedure doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
+    procedure doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
     procedure doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
     {basic drawing API}
     procedure putPixel(pos: tPoint; col: RGBA);
@@ -663,35 +661,12 @@ begin
   end;
 end;
 
-procedure tDrawContext.doBlitImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect);
+procedure tDrawContext.doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
 begin
   case backend of
-    dbREF: blitImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect);
-    dbASM: blitImage_ASM(dstPixels, srcPixels, dstX, dstY, srcRect);
-    dbMMX: blitImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect);
-  end;
-end;
-
-procedure tDrawContext.doTintImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
-begin
-  case backend of
-    dbREF: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
-    dbASM: tintImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
-    dbMMX: tintImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
-  end;
-end;
-
-procedure tDrawContext.doBlendImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
-begin
-  case backend of
-    dbREF: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
-    dbASM: blendImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint);
-    dbMMX: begin
-      if hasTint then
-        blendImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect, tint)
-      else
-        blendImage_MMX_fast(dstPixels, srcPixels, dstX, dstY, srcRect);
-      end;
+    dbREF: drawImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint, blendMode);
+    dbASM: drawImage_REF(dstPixels, srcPixels, dstX, dstY, srcRect, tint, blendMode);
+    dbMMX: drawImage_MMX(dstPixels, srcPixels, dstX, dstY, srcRect, tint, blendMode);
   end;
 end;
 
@@ -840,6 +815,8 @@ var
   srcOffset: tPoint;
 begin
 
+  if blendMode = bmNone then exit;
+
   applyTransform(pos);
 
   dstRect := Rect(pos.x, pos.y, srcRect.width, srcRect.height);
@@ -849,18 +826,7 @@ begin
   srcRect.height := dstRect.height;
   srcRect.pos -= (pos - dstRect.pos);
 
-  case blendMode of
-    bmNone: exit;
-    bmBlit: begin
-      if hasTint then
-        doTintImage(page, src, dstRect.x, dstRect.y, srcRect, tint)
-      else
-        doBlitImage(page, src, dstRect.x, dstRect.y, srcRect);
-      end;
-    bmBlend:
-      doBlendImage(page, src, dstRect.x, dstRect.y, srcRect, tint);
-  end;
-
+  doDrawImage(page, src, dstRect.x, dstRect.y, srcRect, tint, blendMode);
   markRegion(dstRect);
 end;
 
