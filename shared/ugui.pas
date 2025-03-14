@@ -101,7 +101,6 @@ type
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
     procedure setCol(col: RGBA); virtual;
-    procedure setSize(aWidth, aHeight: integer);
     procedure fireMessage(aMsg: string; args: array of const); virtual; overload;
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(dc: tDrawContext);
@@ -126,6 +125,7 @@ type
     function  screenBounds(): tRect;
     procedure addHook(aMsg: string; aProc: tHookProc);
     procedure invalidate(); virtual;
+    procedure setSize(aWidth, aHeight: integer);
   public
     procedure onKeyPress(code: word); virtual;
   public

@@ -242,6 +242,11 @@ var
   fpsLabel: tGuiLabel;
   timer: tTimer;
   dc: tDrawContext;
+  panel: tGuiComponent;
+const
+  RHS_DIVIDE = 280;
+  LOWER_DIVIDE = 160;
+  UPPER_DIVIDE = 200;
 begin
 
   map := tMDRMap.Create(32,32);
@@ -262,7 +267,25 @@ begin
   mapGUI.pos := Point(20, 50);
   gui.append(mapGUI);
 
+  {create some pannels to map out what this should look like}
+  panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
+  panel.text := 'Character';
+  gui.append(panel);
+  panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
+  panel.text := 'Party';
+  gui.append(panel);
+  panel := tGuiWindow.create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
+  panel.text := 'Log';
+  gui.append(panel);
+  panel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
+  panel.text := 'MAP';
+  gui.append(panel);
+  panel := tGuiWindow.create(Rect(0, 0, 800-RHS_DIVIDE, UPPER_DIVIDE));
+  panel.text := 'DUNGEON';
+  gui.append(panel);
+
   fpsLabel := tGuiLabel.Create(Point(10,10));
+  fpsLabel.setSize(40, 20);
   gui.append(fpsLabel);
 
   timer := tTimer.create('main');
