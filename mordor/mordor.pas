@@ -229,6 +229,10 @@ begin
     key_left: if shift then moveParty(-1, 1) else moveParty(-1, 0);
     key_up: moveParty(0, 1);
     key_down: if shift then moveParty(2, 1) else moveParty(2, 0);
+    key_z: begin
+      map.setExplored(eFull);
+      mapGui.invalidate();
+    end;
   end;
 end;
 
@@ -245,7 +249,7 @@ begin
   map.setExplored(eNone);
 
   party := tMDRParty.create();
-  party.pos := Point(9, 11);
+  party.pos := Point(5, 9);
   party.dir := dNorth;
 
   screen.background := gfx['title800'];
