@@ -510,7 +510,7 @@ begin
 
   result := tPage.Create(width, height);
 
-  if not (bpp in [24,32]) then
+  if not (bpp in [8, 24, 32]) then
     fatal('Invalid BitPerPixel '+intToStr(bpp));
 
   {make sure limits are sort of ok}

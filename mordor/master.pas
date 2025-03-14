@@ -79,6 +79,10 @@ begin
   if not preProcess(srcPath, dstPath) then exit;
 
   img := tPage.Load(srcPath);
+
+  {better compression if we convert}
+  img.convertColorSpace(csRUV);
+
   saveLC96(dstPath, img);
   textAttr := LightGreen;
   writeLn(format('[%dx%d]',[img.width, img.height]));

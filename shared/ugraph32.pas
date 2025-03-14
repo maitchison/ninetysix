@@ -524,7 +524,7 @@ begin
       c := getPixel(x,y);
       if c.a <> 255 then exit(32);
       case colorSpace of
-        csRGB: if (c.r <> c.g) or (c.r <> c.b) then hasColor := True;
+        csARGB: if (c.r <> c.g) or (c.r <> c.b) then hasColor := True;
         csRUV: if (c.g <> 0) or (c.b <> 0) then hasColor := True;
       end;
     end;
@@ -595,6 +595,7 @@ begin
     end;
   end else
     fatal('Invalid color space conversion');
+  colorSpace := aNewColorSpace;
 end;
 
 class function tPage.Load(filename: string): tPage;
