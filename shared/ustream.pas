@@ -321,7 +321,6 @@ begin
   result := uVlc.writeSegment(self, values, segmentType);
 end;
 
-
 {this is very slow. Make a copy of the entire stream from start to end
  as a tBytes}
 function tStream.asBytes(): tBytes;

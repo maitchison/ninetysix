@@ -1,5 +1,5 @@
 {Variable Length Coding: some simple entropy encoders, works in segments}
-unit uVlc;
+unit uVLC;
 
 interface
 
@@ -45,6 +45,7 @@ const
   {...}
   ST_RICE0 = 48; {48..63 = rice (max code is 15)}
   {...}
+  ST_SHORT = 128; // indicates that a rice segments does not have a length
 
 var
   RICE_EXCEPTIONS: dword = 0;
@@ -66,6 +67,12 @@ function  RICE_Bits(values: array of dword; k: integer): int32;
 function  RICE_MaxCodeLength(values: array of dword; k: integer): int32;
 
 implementation
+
+{$macro on}
+{$define CODES_PACK := ST_PACK0..ST_PACK0+31 }
+{$define CODES_RICE := ST_RICE0..ST_RICE0+15 }
+{$define CODES_RICE_SHORT := ST_SHORT+ST_RICE0..ST_SHORT+ST_RICE0+15 }
+
 
 {vlc1 - depricated}
 procedure VLC1_Write(stream: tStream; values: array of dword); forward;
@@ -137,8 +144,9 @@ begin
   case segmentType of
     ST_VLC1: result := 'VLC1';
     ST_VLC2: result := 'VLC2';
-    ST_PACK0..ST_PACK0+31: result := 'PACK'+intToStr(segmentType - ST_PACK0);
-    ST_RICE0..ST_RICE0+15: result := 'RICE'+intToStr(segmentType - ST_RICE0);
+    CODES_PACK: result := 'PACK'+intToStr(segmentType - ST_PACK0);
+    CODES_RICE: result := 'RICE'+intToStr(segmentType - ST_RICE0);
+    CODES_RICE_SHORT: result := 'RICE_SHORT'+intToStr(segmentType - ST_RICE0 - ST_SHORT);
     {special codes}
     ST_AUTO: result := 'AUTO';
     ST_PACK: result := 'PACK';
@@ -156,8 +164,9 @@ begin
   case segmentType of
     ST_VLC1: result := bytesForBits(VLC1_Bits(values));
     ST_VLC2: result := bytesForBits(VLC2_Bits(values));
-    ST_PACK0..ST_PACK0+31: result := bytesForBits((segmentType - ST_PACK0) * length(values));
-    ST_RICE0..ST_RICE0+15: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
+    CODES_PACK: result := bytesForBits((segmentType - ST_PACK0) * length(values));
+    CODES_RICE: result := bytesForBits(RICE_Bits(values, segmentType - ST_RICE0));
+    CODES_RICE_SHORT: result := bytesForBits(RICE_Bits(values, segmentType - ST_SHORT - ST_RICE0));
     else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 end;
@@ -173,7 +182,8 @@ begin
   lenCost := bytesForBits(VLC8_Bits(length(values)));
   segCost := getSegmentLengthWithoutHeader(values, segmentType);
   case segmentType of
-    ST_PACK0..ST_PACK0+31: result := tagCost + segCost;
+    CODES_PACK: result := tagCost + segCost;
+    CODES_RICE_SHORT: result := tagCost + segCost;
     else result := tagCost + lenCost + segCost;
   end;
 end;
@@ -272,15 +282,16 @@ begin
   {write out the data}
   startPos := s.pos;
   s.writeByte(segmentType);
-  if not (segmentType in [ST_PACK0..ST_PACK0+31]) then
+  if not (segmentType in [CODES_PACK, CODES_RICE_SHORT]) then
     s.writeVLC8(segmentLen);
 
   postHeaderPos := s.pos;
   case segmentType of
     ST_VLC1: VLC1_Write(s, values);
     ST_VLC2: VLC2_Write(s, values);
-    ST_PACK0..ST_PACK0+31: packBits(values, segmentType - ST_PACK0, s);
-    ST_RICE0..ST_RICE0+15: RICE_Write(s, values, segmentType - ST_RICE0);
+    CODES_PACK: packBits(values, segmentType - ST_PACK0, s);
+    CODES_RICE: RICE_Write(s, values, segmentType - ST_RICE0);
+    CODES_RICE_SHORT: RICE_Write(s, values, segmentType - ST_SHORT - ST_RICE0);
     else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 
@@ -311,10 +322,12 @@ end;
 procedure readSegmentAndLength(s: tStream; n: int32;out segmentType: byte;out segmentLen: dword);
 begin
   segmentType := s.readByte();
-  if segmentType in [ST_PACK0..ST_PACK0+31] then
-    segmentLen := bytesForBits(n*(segmentType-ST_PACK0))
-  else
-    segmentLen := s.readVLC8();
+  case segmentType of
+    CODES_PACK: segmentLen := bytesForBits(n*(segmentType-ST_PACK0));
+    // a bit of a hack, but just assume we're always <= 256 bytes
+    CODES_RICE_SHORT: segmentLen := 256;
+    else segmentLen := s.readVLC8();
+  end;
 end;
 
 
@@ -339,8 +352,9 @@ begin
   case segmentType of
     ST_VLC1: readVLC1Sequence_ASM(@IN_BUFFER[0], @outBuffer[0], n);
     ST_VLC2: readVLC2Sequence_ASM(@IN_BUFFER[0], @outBuffer[0], n);
-    ST_PACK0..ST_PACK0+31: unpack32(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
-    ST_RICE0..ST_RICE0+15: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
+    CODES_PACK: unpack32(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_PACK0);
+    CODES_RICE: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0);
+    CODES_RICE_SHORT: ReadRice32_ASM(@IN_BUFFER[0], @outBuffer[0], n, segmentType-ST_RICE0-ST_SHORT);
     else fatal('Invalid segment type '+intToStr(segmentType));
   end;
 
