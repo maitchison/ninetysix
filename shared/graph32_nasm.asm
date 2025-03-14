@@ -16,9 +16,11 @@ section .text
 ; mm2: tint
 ; mm3: bias (255 as 4x uint16)
 ; eax: draw code [destroyed]
-; ebx: [preserved]
+; ebx: varies
 ; ecx: pixel count [0]
+; edx: varies 
 
+GLOBAL _ColLine_MMX
 GLOBAL _DrawLine_MMX
 GLOBAL _StretchLineNearest_MMX:
 
@@ -142,6 +144,74 @@ draw_jump_table:
 _DrawLine_MMX:
   and eax, $3  
   mov eax, [draw_jump_table + eax * 4]
+  call eax
+  ret
+
+; -------------------------------------------------
+; COLOR FILL
+; -------------------------------------------------
+
+; ebx = fillColor
+
+; special case for direct blit.
+ColLine_MMX:
+  mov  eax, ebx
+  push ecx
+  shr  ecx, 2
+  test ecx, ecx
+  jz .final
+  
+  movd mm1, eax
+  punpckldq mm1, mm1
+.xloop:
+  movq [edi], mm1
+  movq [edi+8], mm1
+  add  edi, 16
+  dec  ecx
+  jnz .xloop
+.final:
+  pop  ecx
+  and  ecx, 3  
+  rep  stosd
+  ret
+
+ColLine_Blend_MMX:
+  ; replicate alpha
+  mov        eax, ebx
+  shr        eax, 24
+  movd       mm7, eax
+  punpcklwd  mm7, mm7
+  punpckldq  mm7, mm7        ; MM7 <- 0 A 0 A | 0 A 0 A
+  ; replicated 255-alpha
+  movq       mm4, b25
+  psubw      mm4, mm7        ; MM4 <- 0 `A 0 `A | 0 `A 0 `A}
+  ; premultiply source color
+  movd       src, ebx        ; MM1 <-  0  0  0  0|  0 Rs Gs Bs
+  punpcklbw  src, zer        ; MM1 <-  0  0  0 Rs|  0 Gs  0 Bs
+  pmullw     src, mm7        ; MM1 <-  0  A*Rs A*Gs A*bs
+.xloop:
+  mov        edx, [edi]
+  movd       mm6, edx         ; MM6 <-  0  0  0  0|  0 Rd Gd Bd
+  punpcklbw  mm6, zer         ; MM6 <-  0  0  0 Rd|  0 Gd  0 Bd
+  pmullw     mm6, mm4         ; MM6 <-  0  (255-A)*Rd (255-A)*Gd (255-A)*bd
+  paddw      mm6, src         ; MM6 <- A*Rs+(255-A)*Rd ...
+  paddw      mm6, b25
+  psrlw      mm6, 8           ; MM6 <- (A*Rs+(255-A)*Rd) / 256
+  packuswb   mm6, mm6         ; MM6 = 0 0 0 0 | 0 R G B
+  movd       eax, mm6
+  mov        [edi], eax
+  add        edi, 4
+  dec        ecx
+  jnz       .xloop
+  ret
+
+col_jump_table:
+  dd ColLine_MMX
+  dd ColLine_Blend_MMX
+
+_ColLine_MMX:
+  and eax, $1
+  mov eax, [col_jump_table + eax * 4]
   call eax
   ret
 

@@ -59,8 +59,7 @@ type
     function  hasTint: boolean; inline;
     procedure markRegion(const rect: tRect); inline;
     {dispatch}
-    procedure doBlitCol(pixels: pRGBA;len: int32;col: RGBA);
-    procedure doBlendCol(pixels: pRGBA;len: int32;col: RGBA);
+    procedure doDrawRect(dstPage: tPage;aRect: tRect;col: RGBA;blendmode: tBlendMode);
     procedure doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
     procedure doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
     {basic drawing API}
@@ -643,21 +642,12 @@ end;
 {-------------------------------------------------}
 { dispatch}
 
-procedure tDrawContext.doBlitCol(pixels: pRGBA;len: int32;col: RGBA);
+procedure tDrawContext.doDrawRect(dstPage: tPage;aRect: tRect;col: RGBA;blendmode: tBlendMode);
 begin
   case backend of
-    dbREF: blitCol_REF(pixels, len, col);
-    dbASM: blitCol_ASM(pixels, len, col);
-    dbMMX: blitCol_MMX(pixels, len, col);
-  end;
-end;
-
-procedure tDrawContext.doBlendCol(pixels: pRGBA;len: int32;col: RGBA);
-begin
-  case backend of
-    dbREF: blendCol_REF(pixels, len, col);
-    dbASM: blendCol_REF(pixels, len, col); // no ASM version yet
-    dbMMX: blendCol_MMX(pixels, len, col);
+    dbREF: drawRect_REF(dstPage, aRect, col, blendMode);
+    dbASM: drawRect_REF(dstPage, aRect, col, blendMode);
+    dbMMX: drawRect_MMX(dstPage, aRect, col, blendMode);
   end;
 end;
 
@@ -731,30 +721,6 @@ begin
   markRegion(Rect(pos.x, pos.y, 1, 1));
 end;
 
-procedure tDrawContext.hLine(pos: tPoint;len: int32;col: RGBA);
-var
-  endPos: tPoint;
-  i: integer;
-  pixels: pointer;
-begin
-  applyTransform(pos);
-  endPos := Point(pos.x+len, pos.y);
-  pos := clip.clipPoint(pos);
-  endPos := clip.clipPoint(endPos);
-  len := endPos.x - pos.x;
-  if len <= 0 then exit;
-
-  applyTint(col);
-  pixels := page.getAddress(pos.x, pos.y);
-
-  case smartBM(col) of
-    bmNone:   exit;
-    bmBlit:   doBlitCol(pixels, len, col);
-    bmBlend:  doBlendCol(pixels, len, col);
-  end;
-  markRegion(Rect(pos.x, pos.y, len, 1));
-end;
-
 procedure tDrawContext.fillRect(dstRect: tRect; col: RGBA);
 var
   y: integer;
@@ -768,21 +734,7 @@ begin
   if dstRect.isEmpty then exit;
 
   applyTint(col);
-  pixels := page.getAddress(dstRect.pos.x, dstRect.pos.y);
-  stride := page.width * 4;
-
-  case smartBM(col) of
-    bmNone:   exit;
-    bmBlit:   for y := dstRect.top to dstRect.bottom-1 do begin
-      doBlitCol(pixels, dstRect.width, col);
-      pixels += stride;
-    end;
-    bmBlend:  for y := dstRect.top to dstRect.bottom-1 do begin
-      doBlendCol(pixels, dstRect.width, col);
-      pixels += stride;
-    end;
-  end;
-
+  doDrawRect(page, dstRect, col, smartBM(col));
   markRegion(dstRect);
 end;
 
@@ -864,6 +816,11 @@ end;
 {----------------------}
 { Constructed: draw commands built from base commands }
 {----------------------}
+
+procedure tDrawContext.hLine(pos: tPoint;len: int32;col: RGBA);
+begin
+  fillRect(Rect(pos.x, pos.y, len, 1), col);
+end;
 
 procedure tDrawContext.stretchSubImage(src: tPage; pos: tPoint; scaleX, scaleY: single; srcRect: tRect);
 var

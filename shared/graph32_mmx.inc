@@ -1,5 +1,6 @@
 {$link graph32_nasm.obj}
 procedure drawLine_MMX(); cdecl; external name 'DrawLine_MMX';
+procedure colLine_MMX(); cdecl; external name 'ColLine_MMX';
 procedure stretchLineNearest_MMX(); cdecl; external name 'StretchLineNearest_MMX';
 
 function getCallCode(blendMode: tBlendMode; tint: RGBA): int32;
@@ -12,119 +13,44 @@ begin
   if int32(tint) <> -1 then result += 2;
 end;
 
-procedure blitCol_MMX(pixels: pRGBA;count: int32;col: RGBA);
-asm
+procedure drawRect_MMX(dstPage: tPage; aRect: tRect; col: RGBA; blendMode: tBlendMode);
+var
+  dstPtr: pointer;
+  dstStride: dword;
+  callCode: int32;
+begin
 
-  {this is almost 2x faster on real hardware}
+  callCode := getCallCode(blendMode, RGBA.White);
+  if callCode < 0 then exit;
 
-  cli
+  dstPtr := dstPage.getAddress(aRect.pos.x, aRect.pos.y);
+  dstStride := (dstPage.width - aRect.width) * 4;
 
-  push edi
-  push ecx
-  push eax
-
-  mov edi, PIXELS
-  mov ecx, COUNT
-  shr ecx, 2
-  test ecx, ecx
-  jz @FINAL
-
-  mov   eax, COL
-  movd  MM0, eax
-  punpckldq MM0, MM0
-
-@XLOOP:
-  movq [edi], MM0
-  movq [edi+8], MM0
-  add edi, 16
-  dec ecx
-  jnz @XLOOP
-
-@FINAL:
-  mov ecx, COUNT
-  and ecx, $3
-  rep stosd
-
-  pop eax
-  pop ecx
-  pop edi
-
-  emms
-  sti
+  asm
+    cli
+    pushad
+    mov       edi, DSTPTR
+    mov       ebx, ARECT.HEIGHT
+    pxor      mm0, mm0
+    mov       eax, $00ff00ff
+    movd      mm3, eax
+    punpckldq mm3, mm3
+  @YLOOP:
+    mov       ecx, ARECT.WIDTH
+    push      ebx
+    mov       eax, CALLCODE
+    mov       ebx, COL
+    call      colLine_MMX
+    pop       ebx
+    add       edi, DSTSTRIDE
+    dec       ebx
+    jnz      @YLOOP
+    popad
+    emms
+    sti
+  end;
 end;
 
-procedure blendCol_MMX(pixels: pointer;count: int32;col: RGBA);
-asm
-  // if mixer interrupt runs during the timer then we'll have
-  // fpu in invalid state, so block them during the hline
-  cli
-
-  pushad
-
-  mov edi, PIXELS
-
-  {we need a zero register to expand from byte to word}
-  pxor       mm0, mm0        // MM0 <-  0 0 0 0 | 0 0 0 0
-
-  mov eax, COL
-  bswap eax
-  mov cl, al
-  bswap eax
-
-  {replicate alpha across the words}
-  mov        ch, cl
-  shl        ecx, 8
-  mov        cl, ch
-  movd       mm3, ecx
-  punpcklbw  mm3, mm0        // MM3 <- 0 0 0 A | 0 A 0 A
-
-  {replicate = 255-alpha accross the words}
-  mov        cl, 255
-  sub        cl, ch
-  mov        ch, cl
-  shl        ecx, 8
-  mov        cl, ch
-  movd       mm4, ecx
-  punpcklbw  mm4, mm0      // MM4 <- 0 `A 0 `A | 0 `A 0 `A}
-
-  {expand and premultiply our source color}
-  movd       mm2, eax      // MM2 <-  0  0  0  0|  0 Rs Gs Bs
-  punpcklbw  mm2, mm0      // MM2 <-  0  0  0 Rs|  0 Gs  0 Bs
-  pmullw     mm2, mm3      // MM2 <-  0  A*Rs A*Gs A*bs
-
-  mov       ecx, COUNT
-
-@LOOP:
-  {read source pixel}
-  mov       edx, [edi]
-
-  {do the blend}
-  movd      mm1, edx      // MM1 <-  0  0  0  0|  0 Rd Gd Bd
-  punpcklbw mm1, mm0      // MM1 <-  0  0  0 Rd|  0 Gd  0 Bd
-  pmullw    mm1, mm4      // MM1 <-  0  (255-A)*Rd (255-A)*Gd (255-A)*bd
-  paddw     mm1, mm2      // MM1 <- A*Rs+(255-A)*Rd ...
-  psrlw     mm1, 8        // MM1 <- (A*Rs+(255-A)*Rd) / 256
-
-  { note, we should have divided by 255 instead of 255 but I don't think
-   anyone will notice. To reduce the error we could do a saturated subtract of 128
-   which makes the expected error 0 over uniform input}
-  packuswb  mm1, mm1      // MM1 = 0 0 0 0 | 0 R G B
-  movd      eax, mm1
-
-  mov dword ptr [edi], eax
-
-  add edi, 4
-
-  dec ecx
-  jnz @LOOP
-
-  popad
-
-  emms
-
-  sti
-
-end;
 
 procedure drawImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
 var
