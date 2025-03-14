@@ -15,6 +15,7 @@ uses
   uResource,
   uTypes,
   uInfo,
+  uTimer,
   uColor;
 
 type
@@ -574,28 +575,52 @@ begin
         setPixel(x,y, RGBA.create(0,0,0,0));
 end;
 
+procedure convertRUVtoRGB_REF(page: tPage);
+var
+  pixelsPtr: pRGBA;
+  i: integer;
+  c: RGBA;
+begin
+  pixelsPtr := page.pixels;
+  for i := 0 to page.width*page.height-1 do begin
+    c := pixelsPtr^;
+    c.g := byte(c.g+c.r);
+    c.b := byte(c.b+c.r);
+    pixelsPtr^ := c;
+    inc(pixelsPtr);
+  end;
+end;
+
+procedure convertRGBtoRUV_REF(page: tPage);
+var
+  pixelsPtr: pRGBA;
+  i: integer;
+  c: RGBA;
+begin
+  pixelsPtr := page.pixels;
+  for i := 0 to page.width*page.height-1 do begin
+    c := pixelsPtr^;
+    c.g := byte(c.g-c.r);
+    c.b := byte(c.b-c.r);
+    pixelsPtr^ := c;
+    inc(pixelsPtr);
+  end;
+end;
+
 procedure tPage.convertColorSpace(aNewColorSpace: tColorSpace);
 var
   x,y: integer;
   c: RGBA;
 begin
+  startTimer('convert');
   if (colorSpace = csARGB) and (aNewColorSpace = csRUV) then begin
-    for y := 0 to width-1 do begin
-      for x := 0 to height-1 do begin
-        c := getPixel(x,y);
-        setPixel(x,y,RGB(c.r, byte(c.g-c.r), byte(c.b-c.r), c.a));
-      end;
-    end;
+    convertRGBtoRUV_REF(self);
   end else if (colorSpace = csRUV) and (aNewColorSpace = csARGB) then begin
-    for y := 0 to width-1 do begin
-      for x := 0 to height-1 do begin
-        c := getPixel(x,y);
-        setPixel(x,y,RGB(c.r, byte(c.g+c.r), byte(c.b+c.r), c.a));
-      end;
-    end;
+    convertRUVtoRGB_REF(self);
   end else
     fatal('Invalid color space conversion');
   colorSpace := aNewColorSpace;
+  stopTimer('convert');
 end;
 
 class function tPage.Load(filename: string): tPage;
