@@ -102,7 +102,7 @@ begin
     for i := 0 to dstRect.width-1 do begin
       case filter of
         tfNearest: src := srcPage.getPixel(trunc(tx), trunc(ty));
-        tfLinear: src := srcPage.getPixelF(tx, ty);
+        tfLinear: src := srcPage.getPixelF(tx-0.5, ty-0.5);
         else src.init(255,0,255);
       end;
       if src.a <> 0 then begin
