@@ -4,6 +4,11 @@ procedure drawLine_Tint_MMX(); cdecl; external name 'drawLine_Tint_MMX';
 procedure drawLine_Blend_MMX(); cdecl; external name 'drawLine_Blend_MMX';
 procedure drawLine_MMX(); cdecl; external name 'drawLine_MMX';
 
+procedure stretchLine_Tint_Blend_Nearest_MMX(); cdecl; external name 'stretchLine_Tint_Blend_Nearest_MMX';
+procedure stretchLine_Blend_Nearest_MMX(); cdecl; external name 'stretchLine_Blend_Nearest_MMX';
+procedure stretchLine_Tint_Nearest_MMX(); cdecl; external name 'stretchLine_Tint_Nearest_MMX';
+procedure stretchLine_Nearest_MMX(); cdecl; external name 'stretchLine_Nearest_MMX';
+
 procedure blitCol_MMX(pixels: pRGBA;count: int32;col: RGBA);
 asm
 
@@ -156,9 +161,9 @@ begin
 
     {MM0 <- 0}
     pxor      MM0, MM0
-    {MM1 <- tintColor as int16}
-    movd      MM1, TINT
-    punpcklbw MM1, MM0
+    {MM2 <- tintColor as int16}
+    movd      MM2, TINT
+    punpcklbw MM2, MM0
     {MM3 <- bias}
     mov       eax, $00ff00ff
     movd      MM3, eax
@@ -180,155 +185,6 @@ begin
   end;
 end;
 
-procedure stretchLine_MMX_Blend(linePtr, dstPtr: pointer; tx, tdx, count: int32; tint:RGBA); assembler; pascal;
-asm
-  cli
-  pushad
-  {
-   optimization:
-    we could process two pixels at a time here...
-  {
-
-    mm0 = 0
-    mm1 = dstColor
-    mm2 = -
-    mm3 = srcColor
-    mm4 = tint color
-    mm5 = bias (255)
-    mm6 = alpha
-    mm7 = 255-alpha
-
-
-    esi = texture
-    edi = screen
-
-    ebx = textureX*65536
-    ecx = counter
-    edx = textureDX*65536
-  }
-
-  mov       esi, LINEPTR
-  mov       edi, DSTPTR
-
-  pxor      mm0, mm0
-
-  mov       ecx, count
-  mov       ebx, TX
-  mov       edx, TDX
-
-  movd      mm4, TINT
-  punpcklbw mm4, mm0
-
-  mov       eax, 255
-  movd      mm5, eax
-  punpcklwd mm5, mm5
-  punpckldq mm5, mm5
-
-@XLOOP:
-
-  {MM3 <- sARGB}
-  mov       eax, ebx
-  shr       eax, 16
-  movd      mm3, [esi+eax*4]
-  punpcklbw mm3, mm0
-
-  {MM3 <= sARGB*tint}
-  pmullw    mm3, mm4
-  paddw     mm3, mm5      // add bias
-  psrlw     mm3, 8
-
-@BLEND:
-  {eax <- alpha*tint}
-  movq      mm2, mm3
-  psrlq     mm2, 48
-  movd      eax, mm2
-  cmp      al, 0
-  je       @ENDOFLOOP
-  cmp       al, 255
-  je       @BLIT
-  {mm1 <- dstColor}
-  movd      mm1, [edi]
-  punpcklbw mm1, mm0
-  {mm6 <- 0a0a0a0a}
-  movd      mm6, eax
-  punpcklwd mm6, mm6
-  punpckldq mm6, mm6
-  {mm7 <- 0(1-a)0(1-a)0(1-a)0(1-a)}
-  movq      mm7, mm5      // 255
-  psubw     mm7, mm6      // 255-a
-  {mm3 <- a * (sARGB * tint) * (1-a) * dARGB) + bias}
-  pmullw    mm3, mm6
-  pmullw    mm1, mm7
-  paddw     mm3, mm1      // +dst
-  paddw     mm3, mm5      // bias
-  psrlw     mm3, 8
-
-@BLIT:
-  packuswb  mm3, mm3
-  movd      [edi], mm3
-
-@ENDOFLOOP:
-  add   ebx, edx
-  add   edi, 4
-
-  dec ecx
-  jnz @XLOOP
-
-  popad
-  emms
-  sti
-end;
-
-procedure stretchLine_MMX_Blit(linePtr, dstPtr: pointer; tx, tdx, count: int32; tint:RGBA); assembler; pascal;
-asm
-  cli
-  pushad
-
-  mov       esi, LINEPTR
-  mov       edi, DSTPTR
-
-  pxor      mm0, mm0
-
-  mov       ecx, COUNT
-  mov       ebx, TX
-  mov       edx, TDX
-
-  movd      mm4, TINT
-  punpcklbw mm4, mm0
-
-  mov       eax, 255
-  movd      mm5, eax
-  punpcklwd mm5, mm5
-  punpckldq mm5, mm5
-
-@XLOOP:
-
-  {MM3 <- sARGB}
-  mov       eax, ebx
-  shr       eax, 16
-  movd      mm3, [esi+eax*4]
-  punpcklbw mm3, mm0
-
-  {MM3 <= sARGB*tint}
-  pmullw    mm3, mm4
-  paddw     mm3, mm5      // add bias
-  psrlw     mm3, 8
-@BLIT:
-  packuswb  mm3, mm3
-  movd      [edi], mm3
-
-@ENDOFLOOP:
-  add       ebx, edx
-  add       edi, 4
-
-  dec ecx
-  jnz @XLOOP
-
-  popad
-  emms
-  sti
-end;
-
 {draw image stretched}
 procedure stretchImage_MMX(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
 var
@@ -339,6 +195,7 @@ var
   tx,ty: dword;
   tdx,tdy: int32;
   linePtr: pointer;
+  callProc: procedure cdecl;
 begin
 
   if filter = tfLinear then begin
@@ -349,17 +206,54 @@ begin
   end;
 
   needsTint := int32(tint) <> -1;
+
+  {dispatch}
+  {todo: build dispatch into nasm code}
+  case blendMode of
+    bmNone: exit;
+    bmBlit: begin
+      if needsTint then
+        callProc := stretchLine_Tint_Nearest_MMX
+      else
+        callProc := stretchLine_Nearest_MMX;
+    end;
+    bmBlend: begin
+      if needsTint then
+        callProc := stretchLine_Tint_Blend_Nearest_MMX
+      else
+        callProc := stretchLine_Blend_Nearest_MMX;
+    end;
+  end;
+
   tdx := round(srcDx*65536);
   tdy := round(srcDy*65536);
-
+  tx := round((srcX)*65536);
   ty := round(srcY*65536);
+
   for j := 0 to dstRect.height-1 do begin
     dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
-    linePtr := srcPage.getAddress(0, trunc(srcY+(j*srcDy)));
-    tx := round((srcX)*65536);
-    case blendMode of
-      bmBlit: stretchLine_MMX_Blit(linePtr, dstPtr, tx, tdx, dstRect.width, tint);
-      bmBlend: stretchLine_MMX_Blend(linePtr, dstPtr, tx, tdx, dstRect.width, tint);
+    linePtr := srcPage.getAddress(0, trunc(srcY+(srcDy*j)));
+
+    {todo: setup once and don't call emms every line}
+    asm
+      cli
+      pushad
+      mov       esi, LINEPTR
+      mov       edi, DSTPTR
+      mov       ecx, DSTRECT.WIDTH
+      mov       ebx, TX
+      mov       edx, TDX
+      pxor      mm0, mm0
+      movd      mm2, TINT
+      punpcklbw mm2, mm0
+      mov       eax, 255
+      movd      mm3, eax
+      punpcklwd mm3, mm3
+      punpckldq mm3, mm3
+      call callProc
+      popad
+      emms
+      sti
     end;
   end;
 end;
