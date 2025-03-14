@@ -238,11 +238,14 @@ begin
     bestBytes := getSegmentLength(values, segmentType);
 
     {check VLC}
+    {usually not helpful, and can be slow to decode}
+    {
     vlcBytes := getSegmentLength(values, ST_VLC2);
     if (vlcBytes < bestBytes) then begin
       segmentType := ST_VLC2;
       bestBytes := vlcBytes;
     end;
+    }
 
     {see if RICE is an upgrade}
     guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
