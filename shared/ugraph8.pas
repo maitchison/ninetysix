@@ -1,15 +1,15 @@
 {8bit template support}
 unit uGraph8;
 
-uses
-  test,
-  debug,
-  resource,
-  uColor,
-  utils;
-
-
 interface
+
+uses
+  uTest,
+  uDebug,
+  uResource,
+  uColor,
+  uUtils,
+  uGraph32;
 
 type
   {page stored as 8bit lumance}

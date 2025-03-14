@@ -9,7 +9,7 @@ uses
   terraNova,
   uGameObjects;
 
-procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
+procedure drawMarker(dc: tDrawContext; atX,atY: single; col: RGBA);
 procedure doBump(atX, atY: integer; radius: integer;power: single);
 procedure makeExplosion(atX, atY: single; power: single);
 procedure makeSmoke(atX, atY: single; power: single; vel: single=10;vx: single=0; vy: single=0);
@@ -26,24 +26,21 @@ uses
 { helpers }
 {----------------------------------------------------------}
 
-procedure drawMarker(screen: tScreen; atX,atY: single; col: RGBA);
+procedure drawMarker(dc: tDrawContext; atX,atY: single; col: RGBA);
 var
   x,y: integer;
   c: RGBA;
 begin
+  x := round(atX);
+  y := round(atY);
+
+  dc.putPixel(Point(x, y), col);
   c := col;
   c.a := c.a div 2;
-  x := round(atX+VIEWPORT_X);
-  y := round(atY+VIEWPORT_Y);
-
-  screen.canvas.putPixel(x, y, col);
-
-  screen.canvas.putPixel(x-1, y, c);
-  screen.canvas.putPixel(x+1, y, c);
-  screen.canvas.putPixel(x, y-1, c);
-  screen.canvas.putPixel(x, y+1, c);
-
-  screen.markRegion(rect(x-1, y-1, 3, 3));
+  dc.putPixel(Point(x-1, y), c);
+  dc.putPixel(Point(x+1, y), c);
+  dc.putPixel(Point(x, y-1), c);
+  dc.putPixel(Point(x, y+1), c);
 end;
 
 {turns cells into dust particles}

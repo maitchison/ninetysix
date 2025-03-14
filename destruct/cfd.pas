@@ -12,10 +12,11 @@ Grids are always 256x256
 interface
 
 uses
-  debug,
-  utils,
-  graph2d,
-  graph32,
+  uDebug,
+  uUtils,
+  uRect,
+  uGraph32,
+  uColor,
   uScreen;
 
 type

@@ -1,26 +1,39 @@
 program destruct;
 
 uses
-  debug, test,
+  uDebug,
+  uTest,
+  {$i gui.inc}
   {game specific}
-  uTank, uWeapon, game, res, uGameObjects, terraNova, controller,
+  uTank,
+  uWeapon,
+  game,
+  res,
+  uGameObjects,
+  terraNova,
+  controller,
   {general}
-  graph2d, graph32, vga, vesa,
-  sysInfo,
-  sprite, inifile,
-  vertex,
-  myMath,
-  timer,
-  gui,
+  uRect,
+  uColor,
+  uGraph32,
+  uVGADriver, uVESADriver,
+  uInput,
+  uInfo,
+  uSprite,
+  uInifile,
+  uVertex,
+  uMath,
+  uTimer,
   fx,
   crt, //todo: remove
   cfd,
-  keyboard,
-  lc96, la96,
-  mixlib,
-  mouse,
-  font, uScreen,
-  utils;
+  uKeyboard,
+  uLA96, uLP96,
+  uMixer,
+  uMouse,
+  uFont,
+  uScreen,
+  uUtils;
 
 type
   tPlayerGUI = class(tGuiComponent)
@@ -28,7 +41,7 @@ type
     player: tController;
     sprite: tSprite;
   protected
-    procedure doDraw(screen: tScreen); override;
+    procedure doDraw(dc: tDrawContext); override;
   public
     constructor create(aPos: tPoint; aPlayer: tController);
   end;
@@ -48,22 +61,23 @@ type
 
 var
   gs: tGlobalState;
-  gui: tGuiComponents;
+  gui: tGui;
   fpsLabel: tGuiLabel;
   startLabel, verLabel: tGuiLabel;
   player1Gui, player2Gui: tPlayerGUI;
 
 {-------------------------------------------}
 
-procedure tPlayerGUI.doDraw(screen: tScreen);
+procedure tPlayerGUI.doDraw(dc: tDrawContext);
 var
   weapon: tWeaponSpec;
 begin
-  sprite.blit(screen.canvas, bounds.x, bounds.y);
+  dc.blendMode := bmBlit;
+  sprite.draw(dc, bounds.x, bounds.y);
   weapon := player.tank.weapon;
-  weapon.weaponSprite.draw(screen.canvas, bounds.x + 9, bounds.y + 9);
-  font.textOut(screen.canvas, bounds.x + 20, bounds.y + 5, weapon.tag, RGB(255, 255, 255));
-  screen.markRegion(bounds);
+  weapon.weaponSprite.draw(dc, bounds.x + 9, bounds.y + 9);
+  font.textOut(dc.page, dc.offset.x+bounds.x + 20, dc.offset.y+bounds.y + 5, weapon.tag, RGB(255, 255, 255));
+  dc.markRegion(bounds);
 end;
 
 constructor tPlayerGUI.create(aPos: tPoint; aPlayer: tController);
@@ -71,7 +85,7 @@ begin
   inherited create();
   player := aPlayer;
   sprite := tankGuiSprite;
-  bounds := Rect(aPos.x, aPos.y, sprite.width, sprite.height);
+  setBounds(Rect(aPos.x, aPos.y, sprite.width, sprite.height));
 end;
 
 {-------------------------------------------}
@@ -119,20 +133,20 @@ end;
 
 procedure setupGUI();
 begin
-  gui := tGuiComponents.create();
-  fpsLabel := tGuiLabel.create(Point(6, 18));
+  gui := tGui.Create();
+  fpsLabel := tGuiLabel.Create(Point(6, 18));
   gui.append(fpsLabel);
 
-  player1Gui := tPlayerGUI.create(Point(0, 0), player1);
-  player2Gui := tPlayerGUI.create(Point(160, 0), player2);
+  player1Gui := tPlayerGUI.Create(Point(0, 0), player1);
+  player2Gui := tPlayerGUI.Create(Point(160, 0), player2);
   gui.append(player1Gui);
   gui.append(player2Gui);
 
   {title stuff}
-  startLabel := tGuiLabel.create(Point(160, 240-20));
-  startLabel.centered := true;
+  startLabel := tGuiLabel.Create(Point(160, 240-20));
+  startLabel.fontStyle.centered := true;
+  startLabel.fontStyle.shadow := true;
   startLabel.text := 'Press any key to start';
-  startLabel.shadow := true;
   gui.append(startLabel);
 
   verLabel := tGuiLabel.create(Point(320-100, 6));
@@ -261,24 +275,30 @@ end;
 {-------------------------------------------}
 
 procedure doDebugKeys(elapsed: single);
+var
+  dc: tDrawContext;
+  p: tPoint;
 begin
-  if keyDown(key_f5) then debugShowWorldPixels(screen);
+  dc := screen.getDC();
+  p := Point(input.mouseX-dc.offset.x, input.mouseY-dc.offset.y);
+
+  if keyDown(key_f5) then debugShowWorldPixels(dc);
   if keyDown(key_f4) then
     screen.pageFlip();
 
   if keyDown(key_1) then
-    terrain.burn(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 3);
+    terrain.burn(p.x, p.y, 20, 3);
   if keyDown(key_2) then
-    terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND);
+    terrain.putCircle(p.x, p.y, 20, DT_SAND);
   if keyDown(key_3) then
-    terrain.putCircle(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 15, DT_LAVA);
+    terrain.putCircle(p.x, p.y, 15, DT_LAVA);
   if keyDown(key_4) then
-    makeDust(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, DT_SAND, 25.0, 0, 0, elapsed);
+    makeDust(p.x, p.y, 20, DT_SAND, 25.0, 0, 0, elapsed);
   if keyDown(key_8) then
-    doBump(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 30, 50);
+    doBump(p.x, p.y, 30, 50);
 
   if keyDown(key_9) then
-    makeSparks(mouse_x-VIEWPORT_X, mouse_y-VIEWPORT_Y, 20, 100, 0, 0, round(1000*elapsed));
+    makeSparks(p.x, p.y, 20, 100, 0, 0, round(1000*elapsed));
 
   if keydown(key_z) then elapsed := 0.001;
   DEBUG_DRAW_BOUNDS := keydown(key_b);
@@ -307,34 +327,38 @@ begin
   gs.roundTimer += elapsed;
 end;
 
-procedure doDraw(elapsed: single);
+procedure doDraw(dc: tDrawContext);
 var
   screenFade: single;
   y: integer;
+  oldFlags: byte;
 begin
   startTimer('draw');
-  drawAll(screen);
+  drawAll(dc);
   stopTimer('draw');
 
   startTimer('drawTerrain');
-  terrain.draw(screen);
+  terrain.draw(screen.getBackgroundDC());
   stopTimer('drawTerrain');
 
   {special case}
   if gs.state = GS_TITLE then begin
+    oldFlags := dc.clearFlags;
+    dc.clearFlags := 0; // turn this off, as otherwise it'd be slow
     for y := 0 to 240 do begin
       case y and $3 of
-        0: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
-        1: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
-        2: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
-        3: screen.canvas.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
+        0: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
+        1: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
+        2: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,96));
+        3: dc.fillRect(rect(32,y,256,1), RGB(0,128,0,64));
       end;
     end;
+    dc.clearFlags := oldFlags;
     screen.markRegion(screen.bounds);
   end;
 
   startTimer('guiDraw');
-  gui.draw(screen);
+  gui.draw(dc);
   stopTimer('guiDraw');
 
   {screen fading}
@@ -346,11 +370,9 @@ begin
 
   screenFade := clamp(screenFade, 0.0, 1.0);
   if screenFade = 1.0 then begin
-    screen.canvas.clear(RGB(0,0,0));
-    screen.markRegion(screen.bounds);
+    dc.fillRect(screen.bounds, RGB(0,0,0));
   end else if screenFade > 0 then begin
-    screen.canvas.fillRect(screen.bounds, RGB(0,0,0,round(255*screenFade)));
-    screen.markRegion(screen.bounds);
+    dc.fillRect(screen.bounds, RGB(0,0,0,round(255*screenFade)));
   end;
 
 end;
@@ -392,18 +414,18 @@ begin
             terrain.generate(-16);
             setupAIvsAI();
             {note: would make sense to have a 'scene' with it's own ui to handle this}
-            player1Gui.visible := false;
-            player2Gui.visible := false;
-            startLabel.visible := true;
-            verLabel.visible := true;
+            player1Gui.isVisible := false;
+            player2Gui.isVisible := false;
+            startLabel.isVisible := true;
+            verLabel.isVisible := true;
           end;
           GS_BATTLE: begin
             terrain.generate();
             setupHumanvsAI();
-            player1Gui.visible := true;
-            player2Gui.visible := true;
-            startLabel.visible := false;
-            verLabel.visible := false;
+            player1Gui.isVisible := true;
+            player2Gui.isVisible := true;
+            startLabel.isVisible := false;
+            verLabel.isVisible := false;
           end;
         end;
         {todo: it's annoying to do this, make 'player' and a 'controller'}
@@ -429,7 +451,7 @@ begin
     screen.clearAll();
 
     doUpdate(elapsed);
-    doDraw(elapsed);
+    doDraw(screen.getDC());
 
     screen.flipAll();
 
@@ -471,7 +493,7 @@ begin
   textAttr := White + Blue*16;
   clrscr;
 
-  debug.VERBOSE_SCREEN := llNote;
+  uDebug.VERBOSE_SCREEN := llNote;
 
   runTestSuites();
   initKeyboard();

@@ -13,14 +13,16 @@ scale too much above 32 (I think).
 interface
 
 uses
-  debug,
-  test,
-  utils,
-  myMath,
-  sysInfo,
-  resource,
-  graph2d,
-  graph32;
+  uDebug,
+  uTest,
+  uUtils,
+  uMath,
+  uInfo,
+  uResource,
+  uRect,
+  uColor,
+  uGraph8,
+  uGraph32;
 
 type
 

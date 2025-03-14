@@ -5,10 +5,12 @@ interface
 uses
   {$i units},
   crt,
-  list,
+  uTank,
+  uGameObjects,
+  uWeapon,
   template,
   terraNova,
-  uWeapon, uTank, uGameObjects, controller;
+  controller;
 
 type
   tHitInfo = record
@@ -35,12 +37,12 @@ type
   end;
 
 procedure updateAll(elapsed: single);
-procedure drawAll(screen: tScreen);
+procedure drawAll(dc: tDrawContext);
 
 function  nextProjectile: tProjectile;
 function  nextParticle: tParticle;
 
-procedure debugShowWorldPixels(screen: tScreen);
+procedure debugShowWorldPixels(dc: tDrawContext);
 function  getObjectAtPos(x,y: integer; ignore: tGameObject=nil): tGameObject;
 function  traceRay(x1,y1: integer; angle: single; maxDistance: integer; ignore: tObject=nil;power:single=0): tHitInfo;
 
@@ -60,12 +62,6 @@ var
 
 const
   GRAVITY = 241.5;
-var
-  {note: I really should have created a viewport... anyway..
-   also, it would be good if screen.canvas could be 256x256}
-  {this is the mapping from game co-rds to canvas co-ords}
-  VIEWPORT_X: integer = 32;
-  VIEWPORT_Y: integer = 0;
 
 implementation
 
@@ -212,15 +208,14 @@ begin
   end;
 end;
 
-procedure debugShowWorldPixels(screen: tScreen);
+procedure debugShowWorldPixels(dc: tDrawContext);
 var
   x,y: integer;
 begin
   for y := 0 to 255 do
     for x := 0 to 255 do
       if assigned(getObjectAtPos(x,y)) then
-        screen.canvas.putPixel(x+VIEWPORT_X, y+VIEWPORT_Y, RGB(255,0,255));
-  screen.markRegion(Rect(VIEWPORT_X,VIEWPORT_Y,256,256));
+        dc.putPixel(Point(x, y), RGB(255,0,255));
 end;
 
 {returns the object at given location}
@@ -285,13 +280,13 @@ begin
   end;
 end;
 
-procedure drawAll(screen: tScreen);
+procedure drawAll(dc: tDrawContext);
 var
   tank: tTank;
 begin
-  tanks.draw(screen);
-  particles.draw(screen);
-  projectiles.draw(screen);
+  tanks.draw(dc);
+  particles.draw(dc);
+  projectiles.draw(dc);
 end;
 
 procedure screenInit();

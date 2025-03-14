@@ -61,7 +61,7 @@ type
     procedure updateHeliCollision(elapsed:single);
     procedure setCore(atX, atY: integer; dType: tDirtType);
     function  isFlipped: boolean;
-    procedure drawDamage(screen: tScreen);
+    procedure drawDamage(dc: tDrawContext);
   public
     function  weapon: tWeaponSpec;
     function  baseSprite: tSprite;
@@ -71,7 +71,7 @@ type
     procedure applyChassis(aChassis: tChassis);
     procedure reset(); override;
     procedure update(elapsed: single); override;
-    procedure draw(screen: tScreen); override;
+    procedure draw(dc: tDrawContext); override;
     procedure applyControl(xAction, yAction: single; elapsed: single);
     procedure adjustAim(deltaAngle: single; deltaPower: single = 0);
     procedure takeDamage(atX,atY: integer; damage: single;sender: tObject=nil);
@@ -266,12 +266,13 @@ begin
 end;
 
 {this is quite slow... but it'll do the trick}
-procedure tTank.drawDamage(screen: tScreen);
+procedure tTank.drawDamage(dc: tDrawContext);
 var
   xlp,ylp: integer;
   c: RGBA;
 begin
-  {todo: make this faster.}
+  {todo: now that we have drawContext, we can draw to the underlying sprite.
+   This means that every tank needs a copy of the tank graphic.}
   if not assigned(sprite) then exit;
   for ylp := 0 to sprite.height-1 do begin
     for xlp := 0 to sprite.width-1 do begin
@@ -279,7 +280,7 @@ begin
       if sprite.getPixel(xlp,ylp).a = 0 then continue;
       c := damageColors[xlp, ylp];
       c.a := damageSheet[ylp,xlp];
-      screen.canvas.putPixel(VIEWPORT_X+xPos+xlp-(sprite.pivot2x.x div 2),VIEWPORT_Y+yPos+ylp-(sprite.pivot2x.y div 2),c);
+      dc.putPixel(Point(xPos+xlp-(sprite.pivot2x.x div 2),yPos+ylp-(sprite.pivot2x.y div 2)), c);
     end;
   end;
 end;
@@ -289,25 +290,20 @@ begin
   result := (angle < 0) and (chassis.animationType = AT_TANK);
 end;
 
-procedure tTank.draw(screen: tScreen);
+procedure tTank.draw(dc: tDrawContext);
 var
-  p: tPoint;
-  r: tRect;
   markerColor: RGBA;
 begin
 
   if not assigned(sprite) then exit;
 
-  p := Point(xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
-
   if isFlipped() then
-    r := sprite.drawFlipped(screen.canvas, p.x, p.y)
+    {todo: support flipped draw}
+    sprite.drawFlipped(dc, xPos, yPos)
   else
-    r := sprite.draw(screen.canvas, p.x, p.y);
+    sprite.draw(dc, xPos, yPos);
 
-  drawDamage(screen);
-
-  screen.markRegion(r);
+  drawDamage(dc);
 
   {marker}
   if isSelected then
@@ -317,7 +313,7 @@ begin
 
   {draw target}
   drawMarker(
-    screen,
+    dc,
     xPos + sin(angle*DEG2RAD) * power * 2,
     yPos - cos(angle*DEG2RAD) * power * 2,
     markerColor

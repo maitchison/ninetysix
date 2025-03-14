@@ -30,7 +30,7 @@ type
     procedure reset(); override;
     procedure hit(other: tGameObject = nil);
     procedure update(elapsed: single); override;
-    procedure draw(screen: tScreen); override;
+    procedure draw(dc: tDrawContext); override;
   end;
 
   {note: we're using a 1:1 for weapons and projectiles here, but
@@ -122,7 +122,7 @@ end;
 
 procedure playRandomHit();
 var
-  hitSnd: tSoundEffect;
+  hitSnd: tSound;
   volume: single;
   pitch: single;
 begin
@@ -267,28 +267,23 @@ begin
     hit(nil);
 end;
 
-procedure tProjectile.draw(screen: tScreen);
+procedure tProjectile.draw(dc: tDrawContext);
 var
   angle: single;
-  r: tRect;
 begin
-  r.init(0, 0, 0, 0);
   case pType of
     PT_NONE:
       ;
     PT_SHELL,
     PT_BULLET,
     PT_PLASMA,
-    PT_DIRT:
-      r := sprite.draw(screen.canvas, xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
+    PT_DIRT: sprite.draw(dc, xPos, yPos);
     PT_ROCKET: begin
       angle := arcTan2(vel.y, vel.x) * RAD2DEG;
-      r := sprite.drawRotated(screen.canvas, Point(xPos+VIEWPORT_X, yPos+VIEWPORT_Y), angle, 0.75);
+      sprite.drawRotated(dc, Point(xPos, yPos), angle, 0.75);
     end;
     else fatal('Invalid projectile type '+intToStr(ord(pType)));
   end;
-  if r.width > 0 then
-    screen.markRegion(r);
 end;
 
 {--------------------------------------}

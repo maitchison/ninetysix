@@ -7,11 +7,8 @@ Every pixel is a particle, that can moves and collide
 }
 
 uses
-  test, debug,
-  utils,
-  vertex,
-  template,
-  graph2d, graph32, uScreen;
+  {$i units},
+  template;
 
 const
   BS_INACTIVE = 1;   // no updates required as no cells can move
@@ -77,7 +74,7 @@ type
 
     procedure generate(minHeight: integer=0);
 
-    procedure draw(screen: tScreen);
+    procedure draw(dc: tDrawContext);
     procedure update(elapsed: single);
   end;
 
@@ -115,8 +112,7 @@ implementation
 
 uses
   uGameObjects,
-  game,
-  keyboard; {for debugging}
+  game;
 
 var
   terrainColorLookup: array[tDirtType, 0..255] of RGBA;
@@ -368,7 +364,7 @@ begin
 end;
 
 {draw terrain to background}
-procedure tTerrain.draw(screen: tScreen);
+procedure tTerrain.draw(dc: tDrawContext);
 var
   c: RGBA;
   gx, gy: integer;
@@ -382,7 +378,7 @@ var
     c: RGBA;
     bi: tBlockInfo;
   begin
-    r := Rect(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y, 9,9);
+    r := Rect(gx*8, gy*8, 9,9);
     c := RGB(0,0,0);
     bi := blockInfo[gy, gx];
     {red = dirty}
@@ -393,8 +389,7 @@ var
       c.b := 255;
     if (bi.status and BS_LOWP <> 0) then
       c.g := 255;
-    screen.canvas.drawRect(r, c);
-    screen.markRegion(r);
+    dc.drawRect(r, c);
   end;
 
   procedure drawBlock_REF(gx, gy: integer);
@@ -414,10 +409,9 @@ var
         else
           c := terrainColorLookup[cell.dtype, cell.strength];
         if c.a = 0 then continue;
-        screen.background.setPixel(x+VIEWPORT_X, y+VIEWPORT_Y, c);
+        dc.putPixel(Point(x, y), c);
       end;
     end;
-    screen.markRegion(Rect(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y, 8,8));
   end;
 
   procedure drawBlock_ASM(gx, gy: integer);
@@ -426,7 +420,7 @@ var
     screenInc: dword;
   begin
     lookupPtr := @terrainColorLookup;
-    screenPtr := screen.background.getAddress(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y);
+    screenPtr := dc.page.getAddress(gx*8+dc.offset.x, gy*8+dc.offset.y);
     skyPtr := sky.getAddress(gx*8, gy*8);
     cellPtr := @cellInfo[gy*8, gx*8];
     screenInc := (screen.canvas.width-8) * 4;
@@ -477,7 +471,7 @@ var
 
     end;
 
-    screen.markRegion(Rect(gx*8+VIEWPORT_X, gy*8+VIEWPORT_Y, 8,8));
+    dc.markRegion(Rect(gx*8, gy*8, 8,8));
   end;
 
 begin

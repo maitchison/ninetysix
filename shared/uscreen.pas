@@ -79,6 +79,7 @@ type
     function width: word;
     function height: word;
     function getDC: tDrawContext;
+    function getBackgroundDC: tDrawContext;
     {basic drawing commands}
     procedure hLine(x1, x2, y: int32;col: RGBA);
     procedure setPixel(x, y: int32;col: RGBA);
@@ -570,6 +571,13 @@ begin
   result.clearFlags := FG_FLIP+FG_CLEAR;
 end;
 
+function tScreen.getBackgroundDC: tDrawContext;
+begin
+  result := background.getDC();
+  result.markRegionHook := self.doMarkRegion;
+  result.clearFlags := FG_FLIP+FG_CLEAR;
+end;
+
 {write pixel to screen}
 procedure tScreen.setPixel(x, y: int32;col: RGBA);
 begin
@@ -663,7 +671,10 @@ end;
 {used for hooks, so not inline}
 procedure tScreen.doMarkRegion(const rect: tRect; flags: byte);
 begin
-  markRegion(rect, flags);
+  if (rect.width = 1) and (rect.height=1) then
+    markPixel(rect.pos.x, rect.pos.y, flags)
+  else
+    markRegion(rect, flags);
 end;
 
 {indicates that region should fliped this frame, and cleared next frame}

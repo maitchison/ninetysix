@@ -664,7 +664,7 @@ end;
 
 procedure tDrawContext.markRegion(const rect: tRect); inline;
 begin
-  if assigned(markRegionHook) then markRegionHook(rect, clearFlags);
+  if (clearFlags <> 0) and assigned(markRegionHook) then markRegionHook(rect, clearFlags);
 end;
 
 procedure tDrawContext.putPixel(pos: tPoint;col: RGBA);

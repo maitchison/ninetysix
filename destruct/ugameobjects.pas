@@ -31,8 +31,8 @@ type
     function  isActive: boolean;
     function  getWorldPixel(atX, atY: integer): RGBA;
     function  getBounds(xOffset:integer=0;yOffset: integer=0): tRect;
-    procedure draw(screen: tScreen); virtual;
-    procedure drawBounds(screen: tScreen);
+    procedure draw(dc: tDrawContext); virtual;
+    procedure drawBounds(dc: tDrawContext);
     procedure update(elapsed: single); virtual;
     procedure markForRemoval();
 
@@ -54,7 +54,7 @@ type
     numFreeObjects: integer;
     constructor create(maxObjects: integer);
     procedure append(o: tGameObject);
-    procedure draw(screen: tScreen); virtual;
+    procedure draw(dc: tDrawContext); virtual;
     procedure update(elapsed: single); virtual;
     function  nextFree(): tGameObject;
   end;
@@ -68,7 +68,7 @@ type
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
-    procedure draw(screen: tScreen); override;
+    procedure draw(dc: tDrawContext); override;
   end;
 
 var
@@ -96,14 +96,14 @@ begin
   objects[length(objects)-1] := o;
 end;
 
-procedure tGameObjectList.draw(screen: tScreen);
+procedure tGameObjectList.draw(dc: tDrawContext);
 var
   go: tGameObject;
 begin
   for go in objects do
     if go.status = GO_ACTIVE then begin
-      go.draw(screen);
-      if DEBUG_DRAW_BOUNDS then go.drawBounds(screen);
+      go.draw(dc);
+      if DEBUG_DRAW_BOUNDS then go.drawBounds(dc);
     end;
 end;
 
@@ -216,21 +216,16 @@ begin
   );
 end;
 
-procedure tGameObject.draw(screen: tScreen);
+procedure tGameObject.draw(dc: tDrawContext);
 begin
-  screen.canvas.putPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, col);
-  screen.markRegion(rect(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, 1, 1));
+  dc.putPixel(Point(xPos, yPos), col);
 end;
 
-procedure tGameObject.drawBounds(screen: tScreen);
-var
-  bounds: tRect;
+procedure tGameObject.drawBounds(dc: tDrawContext);
 begin
-  screen.canvas.putPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, col);
+  dc.putPixel(Point(xPos, yPos), col);
   if radius <= 1 then exit;
-  bounds := getBounds(VIEWPORT_X, VIEWPORT_Y);
-  screen.canvas.drawRect(bounds, col);
-  screen.markRegion(bounds);
+  dc.drawRect(getBounds(), col);
 end;
 
 procedure tGameObject.update(elapsed: single);
@@ -279,7 +274,7 @@ begin
   end;
 end;
 
-procedure tParticle.draw(screen: tScreen);
+procedure tParticle.draw(dc: tDrawContext);
 var
   r: tRect;
 begin
@@ -287,12 +282,12 @@ begin
 
   // faster special case for radius=1
   if (radius = 1) and (blend = TDM_BLEND) then begin
-    screen.canvas.putPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y, col);
-    screen.markPixel(xPos+VIEWPORT_X, yPos+VIEWPORT_Y);
+    dc.putPixel(Point(xPos, yPos), col);
     exit;
   end;
-  r := particleTemplate.draw(screen.canvas, xPos+VIEWPORT_X, yPos+VIEWPORT_Y, radius-1, col, blend);
-  screen.markRegion(r);
+  {todo: hmm... update this so that DC understand page8? prob not...}
+  r := particleTemplate.draw(dc.page, dc.offset.x+xPos, dc.offset.y+yPos, radius-1, col, blend);
+  dc.markRegion(r);
 end;
 
 begin

@@ -4,13 +4,8 @@ unit netFont;
 interface
 
 uses
-  debug,
-  test,
-  font,
-  utils,
-  sprite,
-  graph2d,
-  graph32;
+  {$i units.inc},
+  uFont;
 
 function loadNetFont(filename: string): tFont;
 

@@ -4,9 +4,9 @@ interface
 
 uses
   {$i units},
-  font, netFont,
-  template,
-  fileSystem;
+  uFont,
+  netFont,
+  template;
 
 procedure loadResources();
 procedure freeResources();
@@ -24,7 +24,7 @@ implementation
 function sfxFilter(path: string): boolean;
 begin
   {only load 'short' audio'}
-  if fs.getFileSize(path) > 128*1024 then exit(false);
+  if fileSystem.getFileSize(path) > 128*1024 then exit(false);
   exit(true);
 end;
 

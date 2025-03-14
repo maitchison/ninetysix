@@ -81,7 +81,7 @@ type
     parent: tGuiContainer;
     style: tGuiStyle;
     isInteractive: boolean;
-    isVisible: boolean;
+    fVisible: boolean;
     isEnabled: boolean;
     isPressed: boolean;
     fText: string;
@@ -93,6 +93,8 @@ type
     canvas: tPage;
     isDirty: boolean;
     doubleBufferMode: tDoubleBufferMode;
+  public
+    property isVisible: boolean read fVisible write fVisible;
   protected
     procedure playSFX(sfxName: string);
     procedure doDraw(dc: tDrawContext); virtual;
@@ -270,7 +272,7 @@ begin
 
   {todo: update clip rect aswell I guess}
   dc.offset += innerBounds.pos + fPos;
-  for gc in elements do if gc.isVisible then gc.draw(dc);
+  for gc in elements do if gc.fVisible then gc.draw(dc);
 end;
 
 procedure tGuiContainer.update(elapsed: single);
@@ -391,7 +393,7 @@ end;
 constructor tGuiComponent.Create();
 begin
   inherited Create();
-  isVisible := true;
+  fVisible := true;
   isEnabled := true;
   isInteractive := false;
   fPos := Point(0, 0);

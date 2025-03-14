@@ -1,23 +1,24 @@
 {main stuff}
-  debug,
-  test,
-  utils,
-  systypes,
-  sysInfo,
+  uDebug,
+  uTest,
+  uUtils,
+  uTypes,
+  uInfo,
 {destruct specific}
 {some base units}
-  mymath,
-  keyboard,
-  timer,
+  uMath,
+  uKeyboard,
+  uTimer,
+  uList,
+  uFileSystem,
 {graphics}
-  graph2d,
-  graph32,
-  sprite,
-  ui,
-  vertex,
-  vga,
-  vesa,
+  uColor,
+  uRect,
+  uGraph32,
+  uSprite,
+  uVertex,
+  uVGADriver, uVESADriver,
   uScreen,
 {sound}
-  sound,
-  mixLib
+  uSound,
+  uMixer
