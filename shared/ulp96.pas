@@ -17,6 +17,7 @@ unit uLP96;
   v0.4 - Uses RICE
   v0.5 - switch from negEncode to zigZag
   v0.6 - add support for color spaces (better for black and white images)
+         as well as 8 BPP files
 }
 
 interface
@@ -83,6 +84,48 @@ begin
   {$R-}
   result := byte(a)+byte(zagZig(code));
   {$R+}
+end;
+
+{Encode a 4x4 patch at given location. (red channel only)}
+procedure encodePatch8(s: tStream; page: tPage; atX,atY: integer);
+var
+  i: integer;
+  c: RGBA;
+  x,y: integer;
+  o1,o2,o: RGBA;
+  cost1,cost2: int32;
+  choiceCode: dword;
+  deltas: array[0..16*1-1] of dword;
+  dPos: word;
+  BPP: byte;
+begin
+  {todo: make this one function}
+  page.defaultColor.init(0,0,0);
+  choiceCode := 0;
+  dPos := 0;
+  for y := 0 to 3 do begin
+    for x := 0 to 3 do begin
+      c := page.getPixel(atX+x, atY+y);
+      o1 := page.getPixel(atX+x-1, atY+y);
+      o2 := page.getPixel(atX+x, atY+y-1);
+      cost1 := wrappedSqr(c.r, o1.r);
+      cost2 := wrappedSqr(c.r, o2.r);
+      if cost1 <= cost2 then
+        o := o1
+      else begin
+        o := o2;
+        inc(choiceCode);
+      end;
+
+      deltas[dPos] := encodeByteDelta(o.r, c.r); inc(dPos);
+
+      choiceCode := choiceCode shl 1;
+    end;
+  end;
+
+  s.writeWord(choiceCode shr 1);
+  s.writeSegment(deltas);
+
 end;
 
 {Encode a 4x4 patch at given location.}
@@ -181,7 +224,7 @@ var
 
 {Decode a 4x4 patch at given location.}
 {reference implementation}
-procedure decodePatch_REF(s: tStream; page: tPage; atX,atY: integer;withAlpha: boolean);
+procedure decodePatch_REF(s: tStream; page: tPage; atX,atY: integer;bpp: byte);
 var
   i,j: int32;
   c: RGBA;
@@ -195,20 +238,32 @@ begin
   {output deltas}
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
-  if withAlpha then
-    s.readSegment(16*4, gDeltaCodes)
-  else
-    s.readSegment(16*3, gDeltaCodes);
+  s.readSegment(16*((BPP+7) div 8), gDeltaCodes);
 
   dPos := 0;
   for y := 0 to 3 do begin
     for x := 0 to 3 do begin
-      dr := gDeltaCodes[dpos]; inc(dpos);
-      dg := gDeltaCodes[dpos]; inc(dpos);
-      db := gDeltaCodes[dpos]; inc(dpos);
-      if withAlpha then begin
-        da := gDeltaCodes[dpos]; inc(dpos);
+      case bpp of
+        8: begin
+          dr := gDeltaCodes[dpos]; inc(dpos);
+          dg := dr;
+          db := dr;
+          da := 0;
+        end;
+        24: begin
+          dr := gDeltaCodes[dpos]; inc(dpos);
+          dg := gDeltaCodes[dpos]; inc(dpos);
+          db := gDeltaCodes[dpos]; inc(dpos);
+          da := 0;
+        end;
+        32: begin
+          dr := gDeltaCodes[dpos]; inc(dpos);
+          dg := gDeltaCodes[dpos]; inc(dpos);
+          db := gDeltaCodes[dpos]; inc(dpos);
+          da := gDeltaCodes[dpos]; inc(dpos);
+        end;
       end;
+
       if choiceCode and $8000 = $8000 then
         src := page.getPixel(atX+x, atY+y-1)
       else
@@ -217,11 +272,7 @@ begin
       c.r := applyByteDelta(src.r, dr);
       c.g := applyByteDelta(src.g, dg);
       c.b := applyByteDelta(src.b, db);
-
-      if withAlpha then
-        c.a := applyByteDelta(src.a, da)
-      else
-        c.a := 255;
+      c.a := applyByteDelta(src.a, da);
 
       page.setPixel(atX+x, atY+y, c);
       choiceCode := choiceCode shl 1;
@@ -231,7 +282,7 @@ begin
 end;
 
 {Decode a 4x4 patch at given location.}
-procedure decodePatch_ASM(s: tStream; page: tPage; atX,atY: int32;withAlpha: boolean);
+procedure decodePatch_ASM(s: tStream; page: tPage; atX,atY: int32;BPP: byte);
 var
   i,j: int32;
   c: RGBA;
@@ -253,7 +304,18 @@ var
   tmp1,tmp2: dword;
   xPos: dword;
 
+  withAlpha: boolean;
+
 begin
+
+  {no 8 BPP support yet}
+  if BPP = 8 then begin
+    decodePatch_REF(s, page, atX, atY, BPP);
+    exit;
+  end;
+
+  withAlpha := BPP = 32;
+
   {output deltas}
   page.defaultColor.init(0,0,0);
   choiceCode := s.readWord;
@@ -452,7 +514,7 @@ begin
   if not (bpp in [24,32]) then
     fatal('Invalid BitPerPixel '+intToStr(bpp));
 
-  hasAlpha := bpp = 32;
+  hasAlpha := (bpp = 32);
 
   {make sure limits are sort of ok}
   {typically this occurs with a corrupt file}
@@ -481,7 +543,7 @@ begin
 
   for py := 0 to result.height div 4-1 do
     for px := 0 to result.width div 4-1 do
-      decodePatch_ASM(data, result, px*4, py*4, hasAlpha);
+      decodePatch_ASM(data, result, px*4, py*4, BPP);
 
   data.free;
 
@@ -539,6 +601,9 @@ begin
 
   if withAlpha then bpp := 32 else bpp := 24;
 
+  {stub: - auto dected BPP required}
+  bpp := 8;
+
   numPatches := (page.width div 4) * (page.height div 4);
 
   {compress first so we know length}
@@ -546,8 +611,9 @@ begin
   for py := 0 to page.height div 4-1 do
     for px := 0 to page.width div 4-1 do
       case bpp of
-        32: encodePatch32(data, page, px*4, py*4);
+        8: encodePatch8(data, page, px*4, py*4);
         24: encodePatch24(data, page, px*4, py*4);
+        32: encodePatch32(data, page, px*4, py*4);
       end;
   compressedData := LZ4Compress(data.asBytes);
   compressedSize := length(compressedData);
