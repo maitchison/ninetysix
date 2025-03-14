@@ -33,11 +33,11 @@ uses
   uRect,
   uGraph32;
 
-procedure saveLC96(filename: string; page: tPage;forceAlpha: boolean=False);
+procedure saveLC96(filename: string; page: tPage;forceBPP: integer=-1);
 function loadLC96(filename: string): tPage;
 
 function decodeLC96(s: tStream): tPage;
-function encodeLC96(page: tPage;s: tStream=nil;withAlpha: boolean=False): tStream;
+function encodeLC96(page: tPage;s: tStream=nil;forceBPP: integer = -1): tStream;
 
 implementation
 
@@ -474,7 +474,6 @@ var
   decompressedBytes: tBytes;
   numPatches: dword;
   compressedSize,uncompressedSize: dword;
-  hasAlpha: boolean;
   verBig,verSmall: byte;
   startPos: int32;
   colorSpace: tColorSpace;
@@ -513,8 +512,6 @@ begin
 
   if not (bpp in [24,32]) then
     fatal('Invalid BitPerPixel '+intToStr(bpp));
-
-  hasAlpha := (bpp = 32);
 
   {make sure limits are sort of ok}
   {typically this occurs with a corrupt file}
@@ -561,7 +558,7 @@ end;
 {todo: would be better as a state machine, where I can set
  various settings, rather than pass everything in. I.e. we want
  a compressor class}
-function encodeLC96(page: tPage;s: tStream=nil;withAlpha: boolean=False): tStream;
+function encodeLC96(page: tPage;s: tStream=nil;forceBPP: integer=-1): tStream;
 var
   i: integer;
   c, prevc: rgba;
@@ -599,10 +596,10 @@ begin
 
   startPos := s.pos;
 
-  if withAlpha then bpp := 32 else bpp := 24;
-
-  {stub: - auto dected BPP required}
-  bpp := 8;
+  if forceBPP > 0 then
+    bpp := forceBPP
+  else
+    bpp := page.detectBPP();
 
   numPatches := (page.width div 4) * (page.height div 4);
 
@@ -652,14 +649,12 @@ end;
 {Saves LC96 file.
   forceAlpha: if true an alpha channel will always be saved. Otherwise only
   saves alpha channel if there is atleast one non-solid pixel}
-procedure saveLC96(filename: string; page: tPage;forceAlpha: boolean=False);
+procedure saveLC96(filename: string; page: tPage;forceBPP: integer=-1);
 var
   s: tMemoryStream;
-  withAlpha: boolean;
 begin
-  withAlpha := forceAlpha or page.checkForAlpha;
   s := tMemoryStream.create();
-  encodeLC96(page, s, withAlpha);
+  encodeLC96(page, s, forceBPP);
   s.writeToFile(filename);
   s.free;
 end;

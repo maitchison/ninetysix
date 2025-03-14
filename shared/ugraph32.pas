@@ -112,7 +112,7 @@ type
     procedure convertColorSpace(aNewColorSpace: tColorSpace);
 
     procedure setTransparent(col: RGBA);
-    function  checkForAlpha: boolean;
+    function  detectBPP: byte;
 
     class function Load(filename: string): tPage;
   end;
@@ -507,15 +507,30 @@ begin
   end;
 end;
 
-{returns true if any of the pixels have any transparency.}
-function tPage.checkForAlpha: boolean;
+{returns detected BPP which will be
+ 8 if grayscale
+ 24 if RGB with alpha=255
+ 32 otherwise
+}
+function tPage.detectBPP: byte;
 var
   x,y: int32;
+  hasColor: boolean;
+  c: RGBA;
 begin
-  for y := 0 to height-1 do
-    for x := 0 to width-1 do
-      if getPixel(x,y).a <> 255 then exit(True);
-  exit(False);
+  hasColor := false;
+  for y := 0 to height-1 do begin
+    for x := 0 to width-1 do begin
+      c := getPixel(x,y);
+      if c.a <> 255 then exit(32);
+      case colorSpace of
+        csRGB: if (c.r <> c.g) or (c.r <> c.b) then hasColor := True;
+        csRUV: if (c.g <> 0) or (c.b <> 0) then hasColor := True;
+      end;
+    end;
+  end;
+
+  if hasColor then exit(24) else exit(8)
 end;
 
 function tPage.resized(aWidth, aHeight: integer): tPage;
