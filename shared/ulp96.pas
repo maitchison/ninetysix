@@ -16,6 +16,7 @@ unit uLP96;
   v0.3 - Switch to VLC2 (faster loading, and slightly (~1%) more efficent).
   v0.4 - Uses RICE
   v0.5 - switch from negEncode to zigZag
+  v0.6 - add support for color spaces (better for black and white images)
 }
 
 interface
@@ -44,7 +45,7 @@ uses
 
 const
   VER_BIG = 0;
-  VER_SMALL = 5;
+  VER_SMALL = 6;
 
 var
   {stores byte(zagZig(x))}
@@ -414,6 +415,7 @@ var
   hasAlpha: boolean;
   verBig,verSmall: byte;
   startPos: int32;
+  colorSpace: tColorSpace;
 const
   CODE_4CC = 'LC96';
 
@@ -436,6 +438,7 @@ begin
   numPatches := s.readDWord;
   uncompressedSize := s.readDWord;
   compressedSize := s.readDWord;
+  colorSpace := tColorSpace(s.readWord);
 
   {read reserved bytes}
   while s.pos < startPos+32 do
@@ -485,6 +488,11 @@ begin
   {crop if needed}
   if (originalWidth <> width) or (originalHeight <> height) then
     result.resize(originalWidth, originalHeight);
+
+  {convert if needed}
+  result.colorSpace := colorSpace;
+  if result.colorSpace <> csARGB then
+    result.convertColorSpace(csARGB);
 end;
 
 {convert an image into 'lossless compression' format.}
@@ -551,11 +559,12 @@ begin
   s.writeWord(originalWidth);
   s.writeWord(originalHeight);
   s.writeWord(bpp);
-  s.writebyte(VER_SMALL);
-  s.writebyte(VER_BIG);
+  s.writeByte(VER_SMALL);
+  s.writeByte(VER_BIG);
   s.writeDWord(numPatches);
   s.writeDWord(uncompressedSize);
   s.writeDWord(compressedSize);
+  s.writeWord(ord(page.colorSpace));
 
   {write reserved space}
   while s.pos < startPos+32 do

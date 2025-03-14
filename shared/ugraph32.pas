@@ -36,6 +36,11 @@ type
 
   tMarkRegionProc = procedure(const rect: tRect; flags: byte) of object;
 
+  tColorSpace = (
+    csARGB,   // standard ARGB color
+    csRUV     // a sort of fake YUV format (r, r-g, r-b)
+  );
+
   tDrawContext = record
     page: tPage;
     offset: tPoint;
@@ -80,6 +85,7 @@ type
     isRef: boolean;
     pixels: pointer;
     defaultColor: RGBA;
+    colorSpace: tColorSpace;
 
     constructor Create(); overload;
     destructor  destroy(); override;
@@ -102,6 +108,8 @@ type
     function  resized(aWidth, aHeight: integer): tPage;
     procedure resize(aWidth, aHeight: integer);
     function  bounds(): tRect; inline;
+
+    procedure convertColorSpace(aNewColorSpace: tColorSpace);
 
     procedure setTransparent(col: RGBA);
     function  checkForAlpha: boolean;
@@ -178,11 +186,12 @@ begin
   self.pixels := nil;
   self.defaultColor := ERR_COL;
   self.isRef := false;
+  self.colorSpace := csARGB;
 end;
 
 constructor tPage.create(aWidth, aHeight: word); overload;
 begin
-  create();
+  Create();
   self.width := AWidth;
   self.height := AHeight;
   self.pixels := getMem(dword(aWidth) * aHeight * 4);
@@ -192,7 +201,7 @@ end;
 constructor tPage.CreateAsReference(aWidth, aHeight: word;pixelData: Pointer);
 {todo: support logical width}
 begin
-  create();
+  Create();
   self.width := AWidth;
   self.height := AHeight;
   self.pixels := PixelData;
@@ -472,6 +481,7 @@ begin
   result.pixels := getMem(self.width*self.height*4);
   result.isRef := false;
   result.defaultColor := self.defaultColor;
+  result.colorSpace := self.colorSpace;
   move(self.pixels^, result.pixels^, self.width*self.height*4);
 end;
 
@@ -547,6 +557,29 @@ begin
     for x := 0 to width-1 do
       if getPixel(x,y) = col then
         setPixel(x,y, RGBA.create(0,0,0,0));
+end;
+
+procedure tPage.convertColorSpace(aNewColorSpace: tColorSpace);
+var
+  x,y: integer;
+  c: RGBA;
+begin
+  if (colorSpace = csARGB) and (aNewColorSpace = csRUV) then begin
+    for y := 0 to width-1 do begin
+      for x := 0 to height-1 do begin
+        c := getPixel(x,y);
+        setPixel(x,y,RGB(c.r, byte(c.g-c.r), byte(c.b-c.r), c.a));
+      end;
+    end;
+  end else if (colorSpace = csRUV) and (aNewColorSpace = csARGB) then begin
+    for y := 0 to width-1 do begin
+      for x := 0 to height-1 do begin
+        c := getPixel(x,y);
+        setPixel(x,y,RGB(c.r, byte(c.g+c.r), byte(c.b+c.r), c.a));
+      end;
+    end;
+  end else
+    fatal('Invalid color space conversion');
 end;
 
 class function tPage.Load(filename: string): tPage;

@@ -215,7 +215,7 @@ var
   value: dword;
   ricePenality: int32;
   segmentLen: dword;
-
+  vlcBytes: integer;
 begin
 
   result := 0;
@@ -236,6 +236,13 @@ begin
     pkBits := bitsToStoreMaxValue(valueMax);
     segmentType := ST_PACK0 + pkBits;
     bestBytes := getSegmentLength(values, segmentType);
+
+    {check VLC}
+    vlcBytes := getSegmentLength(values, ST_VLC2);
+    if (vlcBytes < bestBytes) then begin
+      segmentType := ST_VLC2;
+      bestBytes := vlcBytes;
+    end;
 
     {see if RICE is an upgrade}
     guessK := clamp(round(log2(1+(valueSum / length(values)))), 0, 15);
