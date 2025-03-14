@@ -215,7 +215,6 @@ begin
   end;
 end;
 
-
 procedure blendImage_MMX(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect; tint: RGBA);
 var
   srcPtr, dstPtr: pointer;
@@ -225,6 +224,7 @@ begin
   dstPtr := dstPage.getAddress(dstX, dstY);
   srcStride := (srcPage.width - srcRect.width) * 4;
   dstStride := (dstPage.width - srcRect.width) * 4;
+
   asm
     cli
     pushad
@@ -261,7 +261,6 @@ begin
     movq      MM7, MM2
     psrlq     MM7, 48
     movd      eax, MM7
-
     cmp       al, 0
     je @SKIP
     cmp       al, 255
@@ -312,6 +311,7 @@ begin
     emms
     sti
   end;
+
 end;
 
 procedure blendImage_MMX_fast(dstPage, srcPage: tPage; dstX, dstY: int32; srcRect: tRect);

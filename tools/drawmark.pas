@@ -1,18 +1,16 @@
 program drawMap;
 
 uses
-  debug,
-  test,
-  vga,
-  vesa,
-  s3,
-  utils,
+  uDebug,
+  uTest,
+  uVGADriver, uVESADriver, uS3Driver,
+  uUtils,
   crt,
   uScreen,
   uColor,
-  graph2d,
-  graph32,
-  timer;
+  uRect,
+  uGraph32,
+  uTimer;
 
 var
   testPage: tPage;
@@ -33,9 +31,9 @@ begin
     dc.backend := backend;
     for i := 0 to ITERATIONS-1 do begin
       col.init(rnd, rnd, rnd, rnd);
-      timer.startTimer(tag+'_'+BACKEND_NAME[backend]);
+      startTimer(tag+'_'+BACKEND_NAME[backend]);
       dc.fillRect(Rect(rnd, rnd, 256, 256), col);
-      timer.stopTimer(tag+'_'+BACKEND_NAME[backend]);
+      stopTimer(tag+'_'+BACKEND_NAME[backend]);
       if (i mod 4 = 0) then begin
         screen.markRegion(screen.bounds);
         screen.flipAll();
@@ -52,9 +50,9 @@ begin
   for backend in [dbREF, dbASM, dbMMX] do begin
     dc.backend := backend;
     for i := 0 to ITERATIONS-1 do begin
-      timer.startTimer(tag+'_'+BACKEND_NAME[backend]);
+      startTimer(tag+'_'+BACKEND_NAME[backend]);
       dc.drawImage(testPage, Point(rnd, rnd));
-      timer.stopTimer(tag+'_'+BACKEND_NAME[backend]);
+      stopTimer(tag+'_'+BACKEND_NAME[backend]);
       if (i mod 4 = 0) then begin
         screen.markRegion(screen.bounds);
         screen.flipAll();
@@ -71,9 +69,9 @@ begin
   for backend in [dbREF] do begin
     dc.backend := backend;
     for i := 0 to (ITERATIONS div 2)-1 do begin
-      timer.startTimer(tag+'_'+BACKEND_NAME[backend]);
+      startTimer(tag+'_'+BACKEND_NAME[backend]);
       dc.stretchSubImage(testPage, Rect(rnd, rnd, 256, 256), Rect(0,0,32,32));
-      timer.stopTimer(tag+'_'+BACKEND_NAME[backend]);
+      stopTimer(tag+'_'+BACKEND_NAME[backend]);
       if (i mod 4 = 0) then begin
         screen.markRegion(screen.bounds);
         screen.flipAll();
@@ -103,33 +101,33 @@ begin
 
   startTimer('flip'); stopTimer('flip');
 
-  dc := screen.canvas.dc(bmBlit);
+  dc := screen.canvas.getDC(bmBlit);
   runFillTest(dc, 'fill_blit');
 
-  dc := screen.canvas.dc(bmBlend);
+  dc := screen.canvas.getDC(bmBlend);
   runFillTest(dc, 'fill_blend');
 
-  dc := screen.canvas.dc(bmBlit);
+  dc := screen.canvas.getDC(bmBlit);
   runDrawTest(dc, 'draw_blit');
 
-  dc := screen.canvas.dc(bmBlit);
+  dc := screen.canvas.getDC(bmBlit);
   dc.tint := RGB(255,128,64);
   runDrawTest(dc, 'draw_tint');
 
-  dc := screen.canvas.dc(bmBlend);
+  dc := screen.canvas.getDC(bmBlend);
   dc.tint := RGB(255,128,64,128);
   runDrawTest(dc, 'blend');
 
   {this tests the fast path for a=255 pixels, as well as no tint}
-  dc := screen.canvas.dc(bmBlend);
+  dc := screen.canvas.getDC(bmBlend);
   runDrawTest(dc, 'blend_fast');
 
   {this tests the fast path for a=255 pixels, as well as no tint}
-  dc := screen.canvas.dc(bmBlit);
+  dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfNearest;
   runStretchTest(dc, 'stretch_nearest');
 
-  dc := screen.canvas.dc(bmBlit);
+  dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfLinear;
   runStretchTest(dc, 'stretch_linear');
 
