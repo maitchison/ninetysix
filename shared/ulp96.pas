@@ -64,6 +64,17 @@ begin
   result := sqr(a.r-b.r) + sqr(a.g-b.g) + sqr(a.b-b.b) + sqr(a.a-b.a);
 end;
 
+function wrappedSqr(a,b: byte): int32; inline;
+begin
+  result := sqr(((int32(a)-b + 128) and $ff) - 128);
+end;
+
+{this is a better cost function than RMS, but doesn't seem to help much}
+function wrappedRMS(a,b: RGBA): int32; inline;
+begin
+  result := wrappedSqr(a.r, b.r) + wrappedSqr(a.g, b.g) + wrappedSqr(a.b, b.b) + wrappedSqr(a.a, b.a);
+end;
+
 function applyByteDelta(a, code: byte): byte; inline;
 var
   delta: integer;
@@ -96,8 +107,8 @@ begin
       o1 := page.getPixel(atX+x-1, atY+y);
       o2 := page.getPixel(atX+x, atY+y-1);
       o1.a := 255; o2.a := 255; c.a := 255; {make sure to ignore alpha}
-      cost1 := rms(c, o1);
-      cost2 := rms(c, o2);
+      cost1 := wrappedRMS(c, o1);
+      cost2 := wrappedRMS(c, o2);
       if cost1 <= cost2 then
         o := o1
       else begin
@@ -112,9 +123,8 @@ begin
       choiceCode := choiceCode shl 1;
     end;
   end;
-  {write choice word}
-  s.writeWord(choiceCode shr 1);
 
+  s.writeWord(choiceCode shr 1);
   s.writeSegment(deltas);
 
 end;
@@ -140,8 +150,8 @@ begin
       c := page.getPixel(atX+x, atY+y);
       o1 := page.getPixel(atX+x-1, atY+y);
       o2 := page.getPixel(atX+x, atY+y-1);
-      cost1 := rms(c, o1);
-      cost2 := rms(c, o2);
+      cost1 := wrappedRMS(c, o1);
+      cost2 := wrappedRMS(c, o2);
       if cost1 <= cost2 then begin
         deltas[dPos] := encodeByteDelta(o1.r, c.r); inc(dPos);
         deltas[dPos] := encodeByteDelta(o1.g, c.g); inc(dPos);
@@ -157,9 +167,10 @@ begin
       choiceCode := choiceCode shl 1;
     end;
   end;
-  {write choice word}
+
   s.writeWord(choiceCode shr 1);
   s.writeSegment(deltas);
+
 end;
 
 var
