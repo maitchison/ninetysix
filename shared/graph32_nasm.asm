@@ -231,13 +231,17 @@ _ColLine_MMX:
   add       ebx, edx
 %endmacro
 
+; special case, saves a few cycles
 StretchLineNearest_MMX:
 .xloop:
-  STRETCH_SAMPLE
-.blit:        
-  DRAW_BLIT
-.skip:    
-  DRAW_END  
+  mov       eax, ebx
+  shr       eax, 16
+  mov       eax, [esi+eax*4]
+  add       ebx, edx
+  mov       [edi], eax
+  add edi, 4    
+  dec ecx
+  jnz .xloop
   ret
 
 StretchLineNearest_Blend_MMX:

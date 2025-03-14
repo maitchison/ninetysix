@@ -28,7 +28,7 @@ var
   col: RGBA;
   backend: tDrawBackend;
 begin
-  for backend in [dbREF, dbASM, dbMMX] do begin
+  for backend in [dbREF, dbMMX] do begin
     dc.backend := backend;
     for i := 0 to ITERATIONS-1 do begin
       col.init(rnd, rnd, rnd, rnd);
@@ -48,7 +48,7 @@ var
   i: integer;
   backend: tDrawBackend;
 begin
-  for backend in [dbREF, dbASM, dbMMX] do begin
+  for backend in [dbREF, dbMMX] do begin
     dc.backend := backend;
     for i := 0 to ITERATIONS-1 do begin
       startTimer(tag+'_'+BACKEND_NAME[backend]);
@@ -67,7 +67,7 @@ var
   i: integer;
   backend: tDrawBackend;
 begin
-  for backend in [dbREF] do begin
+  for backend in [dbREF, dbMMX] do begin
     dc.backend := backend;
     for i := 0 to (ITERATIONS div 2)-1 do begin
       startTimer(tag+'_'+BACKEND_NAME[backend]);

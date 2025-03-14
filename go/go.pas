@@ -581,7 +581,6 @@ begin
     totalLoc += currentLoC-prevDayLoC;
     prevDateCode := dateCode;
     prevDayLoC := currentLoC;
-    if dayCounter > 10 then break;
   end;
 
   writeln('-------------------------------------');
