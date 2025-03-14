@@ -309,12 +309,12 @@ var
 begin
 
   {no 8 BPP support yet}
-  if BPP = 8 then begin
+  if BPP in [8] then begin
     decodePatch_REF(s, page, atX, atY, BPP);
     exit;
   end;
 
-  withAlpha := BPP = 32;
+  withAlpha := (BPP = 32);
 
   {output deltas}
   page.defaultColor.init(0,0,0);
@@ -550,8 +550,8 @@ begin
 
   {convert if needed}
   result.colorSpace := colorSpace;
-  if result.colorSpace <> csARGB then
-    result.convertColorSpace(csARGB);
+  if result.colorSpace <> csRGB then
+    result.convertColorSpace(csRGB);
 end;
 
 {convert an image into 'lossless compression' format.}

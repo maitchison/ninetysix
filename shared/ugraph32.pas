@@ -38,7 +38,7 @@ type
   tMarkRegionProc = procedure(const rect: tRect; flags: byte) of object;
 
   tColorSpace = (
-    csARGB,   // standard ARGB color
+    csRGB,    // standard ARGB color
     csRUV     // a sort of fake YUV format (r, r-g, r-b)
   );
 
@@ -187,7 +187,7 @@ begin
   self.pixels := nil;
   self.defaultColor := ERR_COL;
   self.isRef := false;
-  self.colorSpace := csARGB;
+  self.colorSpace := csRGB;
 end;
 
 constructor tPage.create(aWidth, aHeight: word); overload;
@@ -525,7 +525,7 @@ begin
       c := getPixel(x,y);
       if c.a <> 255 then exit(32);
       case colorSpace of
-        csARGB: if (c.r <> c.g) or (c.r <> c.b) then hasColor := True;
+        csRGB: if (c.r <> c.g) or (c.r <> c.b) then hasColor := True;
         csRUV: if (c.g <> 0) or (c.b <> 0) then hasColor := True;
       end;
     end;
@@ -538,6 +538,7 @@ function tPage.resized(aWidth, aHeight: integer): tPage;
 begin
   result := tPage.create(aWidth, aHeight);
   result.getDC(bmBlit).drawImage(self, Point(0, 0));
+  result.colorSpace := self.colorSpace;
 end;
 
 procedure tPage.resize(aWidth, aHeight: integer);
@@ -562,6 +563,7 @@ function tPage.scaled(aWidth, aHeight: integer): tPage;
 begin
   result := tPage.create(aWidth, aHeight);
   result.getDC().stretchImage(self, result.bounds);
+  result.colorSpace := self.colorSpace;
 end;
 
 {Sets all instances of this color to transparent}
@@ -613,9 +615,9 @@ var
   c: RGBA;
 begin
   startTimer('convert');
-  if (colorSpace = csARGB) and (aNewColorSpace = csRUV) then begin
+  if (colorSpace = csRGB) and (aNewColorSpace = csRUV) then begin
     convertRGBtoRUV_REF(self);
-  end else if (colorSpace = csRUV) and (aNewColorSpace = csARGB) then begin
+  end else if (colorSpace = csRUV) and (aNewColorSpace = csRGB) then begin
     convertRUVtoRGB_REF(self);
   end else
     fatal('Invalid color space conversion');
@@ -1004,8 +1006,25 @@ end;
 
 type
   tGraph32Test = class(tTestSuite)
+    procedure testColorConversion;
     procedure run; override;
   end;
+
+procedure tGraph32Test.testColorConversion();
+var
+  pageA, pageB: tPage;
+begin
+  pageA := tPage.create(32,32);
+  makePageRandom(pageA);
+  pageB := pageA.clone();
+
+  pageA.convertColorspace(csRUV);
+  pageA.convertColorspace(csRGB);
+  assertEqual(pageA, pageB);
+
+  pageA.free;
+  pageB.free;
+end;
 
 procedure tGraph32Test.run();
 var
@@ -1032,6 +1051,9 @@ var
   end;
 
 begin
+
+  testColorConversion();
+
   {test our core drawing routines}
   page := tPage.create(4,4);
   img := tPage.create(1,1);
