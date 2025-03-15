@@ -139,19 +139,19 @@ begin
   fpsLabel.fontStyle.shadow := false;
   gui.append(fpsLabel);
 
-  player1Gui := tPlayerGUI.Create(Point(0, 0), player1);
-  player2Gui := tPlayerGUI.Create(Point(160, 0), player2);
+  player1Gui := tPlayerGUI.Create(Point(32, 0), player1);
+  player2Gui := tPlayerGUI.Create(Point(32+128, 0), player2);
   gui.append(player1Gui);
   gui.append(player2Gui);
 
   {title stuff}
-  startLabel := tGuiLabel.MakeText(Point(160, 240-20));
+  startLabel := tGuiLabel.MakeText(Point(100, 240-20));
   startLabel.fontStyle.centered := true;
   startLabel.fontStyle.shadow := true;
   startLabel.text := 'Press any key to start';
   gui.append(startLabel);
 
-  verLabel := tGuiLabel.MakeText(Point(320-100, 6));
+  verLabel := tGuiLabel.MakeText(Point(320-72, 6));
   verLabel.text := '0.3a (01/03/1996)';
   verLabel.textColor := RGB(228,228,238);
   verLabel.fontStyle.shadow := false;
