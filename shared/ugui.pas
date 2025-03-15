@@ -510,11 +510,14 @@ begin
 
   {note: font does not yet support draw contexts, so update position here...
    we won't get clipping though}
-  drawX += dc.offset.x;
-  drawY += dc.offset.y;
-  if fontStyle.shadow then
-    font.textOut(dc.page, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
-  font.textOut(dc.page, drawX, drawY, text, fontStyle.col);
+  if text <> '' then begin
+    drawX += dc.offset.x;
+    drawY += dc.offset.y;
+    if fontStyle.shadow then
+      font.textOut(dc.page, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
+    font.textOut(dc.page, drawX, drawY, text, fontStyle.col);
+    dc.markRegion(font.textExtents(text, Point(drawX, drawY)));
+  end;
 
 end;
 

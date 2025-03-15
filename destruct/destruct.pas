@@ -78,7 +78,6 @@ begin
   dc.blendMode := bmBlend;
   weapon.weaponSprite.draw(dc, bounds.x + 9, bounds.y + 9);
   font.textOut(dc.page, dc.offset.x+bounds.x + 20, dc.offset.y+bounds.y + 5, weapon.tag, RGB(255, 255, 255));
-  dc.markRegion(bounds);
 end;
 
 constructor tPlayerGUI.create(aPos: tPoint; aPlayer: tController);
@@ -136,6 +135,7 @@ procedure setupGUI();
 begin
   gui := tGui.Create();
   fpsLabel := tGuiLabel.MakeText(Point(6, 6));
+  fpsLabel.setSize(40,8);
   fpsLabel.fontStyle.shadow := false;
   gui.append(fpsLabel);
 
@@ -301,8 +301,9 @@ begin
   if keyDown(key_8) then
     doBump(p.x, p.y, 30, 50);
 
+  {note: old 1k sparks runs at around 70-80 FPS}
   if keyDown(key_9) then
-    makeSparks(p.x, p.y, 20, 100, 0, 0, round(1000*elapsed));
+    makeSparks(p.x, p.y, 20, 100, 0, 0, round(10000*elapsed));
 
   if keydown(key_z) then elapsed := 0.001;
   DEBUG_DRAW_BOUNDS := keydown(key_b);
@@ -351,6 +352,8 @@ begin
 
   {special case}
   if gs.state = GS_TITLE then begin
+    {note: this is super slow... why can't we do it as a screen
+     transfer effect?}
     oldFlags := dc.clearFlags;
     dc.clearFlags := 0; // turn this off, as otherwise it'd be slow
     for y := 0 to 240 do begin
@@ -406,6 +409,8 @@ begin
   dc.offset.x := 32;
 
   repeat
+
+    input.update();
 
     startTimer('main');
     musicUpdate();

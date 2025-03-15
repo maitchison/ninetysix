@@ -23,7 +23,6 @@ type
     function mousePressed: boolean;
   end;
 
-
 var
   input: tInput;
 

@@ -42,7 +42,7 @@ begin
 
   sprites := tSpriteSheet.create(tPage.Load('res\sprites.p96'));
   sprites.grid(16, 16, true);
-  tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 155, 16));
+  tankGuiSprite := tSprite.create(sprites.page, Rect(0, 16*13, 128, 16));
 
   particleTemplate := tTemplate.Load('res\template.p96');
 
