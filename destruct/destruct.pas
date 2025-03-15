@@ -507,6 +507,10 @@ begin
 
   uDebug.VERBOSE_SCREEN := llNote;
 
+  {setup gui}
+  uGui.GUI_HQ := false;
+  uGui.GUI_DOUBLEBUFFER := false;
+
   runTestSuites();
   initKeyboard();
   loadResources();
