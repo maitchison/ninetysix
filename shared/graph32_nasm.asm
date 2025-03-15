@@ -1,5 +1,14 @@
-section .text
 [BITS 32]
+
+; globals for function calling
+section .data
+
+align 8
+_yFactor dq 0
+align 4
+_textureStride dd 0
+
+section .text
 
 ; drawCodes
 ; 0 blendMode
@@ -22,7 +31,11 @@ section .text
 
 GLOBAL _ColLine_MMX
 GLOBAL _DrawLine_MMX
-GLOBAL _StretchLineNearest_MMX:
+GLOBAL _StretchLineNearest_MMX
+GLOBAL _StretchLineLinear_MMX
+
+GLOBAL _textureStride
+GLOBAL _yFactor
 
 ; common registers
 %define zer mm0
@@ -31,13 +44,109 @@ GLOBAL _StretchLineNearest_MMX:
 %define b25 mm3
 
 ; -------------------------------------------------
-; DRAWING
+; COMPONENTS
 ; -------------------------------------------------
 
 %macro DRAW_SAMPLE 0
+  .xloop:    
     movd      src, [esi]
     add       esi, 4
     punpcklbw src, zer
+%endmacro
+
+%macro STRETCH_SAMPLE 0
+  .xloop:    
+    mov       eax, ebx
+    shr       eax, 16
+    movd      src, [esi+eax*4]
+    punpcklbw src, zer
+    add       ebx, edx
+%endmacro
+
+%macro LINEAR_SAMPLE 0
+
+    ;mm0 = 0
+    ;mm1 = acc
+    ;mm2 = tint
+    ;mm3 = bias
+    ;mm4 = ~tmp
+    ;mm5 = ~tmp
+    ;mm6 = pixel1
+    ;mm6 = pixel2
+    ;yFactor = y y (255-y) (255-y) (passed via MM4)
+    ;textureStride = source stride
+
+  .xloop:    
+    push      edx
+    mov       edx, ebx
+    shr       edx, 16
+
+    ; mm1 <- acc (set to bias)
+    movq      src, b25    
+
+    ; mm5 <- [(255-x), x, (255-x), x]
+    xor       eax, eax
+    mov       ax, bx
+    shr       ax, 8 
+    movd      mm6, eax
+    punpcklwd mm6, mm6
+    punpckldq mm6, mm6    ; mm4 <- x (x4)
+    movq      mm5, b25
+    psubw     mm5, mm6    ; mm5 <- (255-x) (x4)    
+    punpcklwd mm5, mm6
+
+    ; mm5 <- weights for each corner
+    movq      mm6, [_yFactor]
+    pmullw    mm5, mm6
+    paddusw   mm5, b25
+    psrlw     mm5, 8
+  
+  .ReadPixel1and2:    
+    movq      mm6, [esi+edx*4]  
+    movq      mm7, mm6
+    punpcklbw mm6, zer
+    punpckhbw mm7, zer
+  .Pixel1:
+    movq      mm4, mm5
+    psrlq     mm4, 32
+    punpcklwd mm4, mm4
+    punpckldq mm4, mm4    ; mm4 <- x*y
+    pmullw    mm6, mm4
+    paddw     src, mm6
+  .Pixel2:
+    movq      mm4, mm5
+    psrlq     mm4, 48
+    punpcklwd mm4, mm4
+    punpckldq mm4, mm4    
+    pmullw    mm7, mm4
+    paddw     src, mm7
+
+  .ReadPixel3and4:  
+    add       edx, [_textureStride]
+    movq      mm6, [esi+edx*4] 
+    movq      mm7, mm6
+    punpcklbw mm6, zer
+    punpckhbw mm7, zer
+  .Pixel3:
+    movq      mm4, mm5
+    psrlq     mm4, 0
+    punpcklwd mm4, mm4
+    punpckldq mm4, mm4    ; mm4 <- x*y
+    pmullw    mm6, mm4
+    paddw     src, mm6
+  .Pixel4:
+    movq      mm4, mm5
+    psrlq     mm4, 16
+    punpcklwd mm4, mm4
+    punpckldq mm4, mm4    
+    pmullw    mm7, mm4
+    paddw     src, mm7  
+
+    psrlw     src, 8
+
+    pop       edx
+    add       ebx, edx
+
 %endmacro
 
 %macro DRAW_TINT 0
@@ -73,15 +182,21 @@ GLOBAL _StretchLineNearest_MMX:
 %endmacro
 
 %macro DRAW_BLIT 0
+  .blit:
     packuswb  src, src
     movd      [edi], src
 %endmacro
 
 %macro DRAW_END 0
+  .skip:    
     add edi, 4    
     dec ecx
     jnz .xloop
 %endmacro
+
+; -------------------------------------------------
+; DRAWING
+; -------------------------------------------------
 
 ; special case for direct blit.
 DrawLine_MMX:
@@ -105,33 +220,24 @@ DrawLine_MMX:
   ret
 
 DrawLine_Tint_MMX:
-.xloop:    
-  DRAW_SAMPLE
+  DRAW_SAMPLE  
   DRAW_TINT 
-.blit:      
   DRAW_BLIT  
-.skip:    
   DRAW_END  
   ret
 
 DrawLine_Blend_MMX:
-.xloop:    
   DRAW_SAMPLE
   DRAW_BLEND
-.blit:      
   DRAW_BLIT    
-.skip:    
   DRAW_END  
   ret
 
 DrawLine_Tint_Blend_MMX:
-.xloop:  
   DRAW_SAMPLE
   DRAW_TINT
   DRAW_BLEND
-.blit:        
   DRAW_BLIT
-.skip:    
   DRAW_END
   ret
 
@@ -216,20 +322,14 @@ _ColLine_MMX:
   ret
 
 ; -------------------------------------------------
-; SCALING
+; SCALING (nearest)
 ; -------------------------------------------------
 
 ; stretchLineNearest_MMX NASM implementation
 ; ebx: tx * 65536
 ; edx: tdx * 65536
 
-%macro STRETCH_SAMPLE 0
-  mov       eax, ebx
-  shr       eax, 16
-  movd      src, [esi+eax*4]
-  punpcklbw src, zer
-  add       ebx, edx
-%endmacro
+; -------------------------------------------------
 
 ; special case, saves a few cycles
 StretchLineNearest_MMX:
@@ -245,33 +345,24 @@ StretchLineNearest_MMX:
   ret
 
 StretchLineNearest_Blend_MMX:
-.xloop:
   STRETCH_SAMPLE
   DRAW_BLEND  
-.blit:        
   DRAW_BLIT
-.skip:    
   DRAW_END  
   ret
 
 StretchLineNearest_Tint_MMX:
-.xloop:
   STRETCH_SAMPLE
   DRAW_TINT
-.blit:        
   DRAW_BLIT
-.skip:    
   DRAW_END  
   ret
 
 StretchLineNearest_Tint_Blend_MMX:
-.xloop:
   STRETCH_SAMPLE
   DRAW_TINT
   DRAW_BLEND
-.blit:        
   DRAW_BLIT
-.skip:    
   DRAW_END
   ret
 
@@ -286,3 +377,54 @@ _StretchLineNearest_MMX:
   mov eax, [stretch_jump_table + eax * 4]
   call eax
   ret
+
+; -------------------------------------------------
+; SCALING (linear)
+; -------------------------------------------------
+
+; stretchLineLinear_MMX NASM implementation
+; ebx: tx * 65536
+; edx: tdx * 65536
+
+; -------------------------------------------------
+
+; special case, saves a few cycles
+StretchLineLinear_MMX:
+  LINEAR_SAMPLE
+  DRAW_BLIT
+  DRAW_END  
+  ret
+
+StretchLineLinear_Blend_MMX:
+  LINEAR_SAMPLE
+  DRAW_BLEND  
+  DRAW_BLIT
+  DRAW_END  
+  ret
+
+StretchLineLinear_Tint_MMX:
+  LINEAR_SAMPLE
+  DRAW_TINT
+  DRAW_BLIT
+  DRAW_END  
+  ret
+
+StretchLineLinear_Tint_Blend_MMX:
+  LINEAR_SAMPLE
+  DRAW_TINT
+  DRAW_BLEND
+  DRAW_BLIT
+  DRAW_END
+  ret
+
+stretchLinear_jump_table:
+  dd StretchLineLinear_MMX
+  dd StretchLineLinear_Blend_MMX
+  dd StretchLineLinear_Tint_MMX
+  dd StretchLineLinear_Tint_Blend_MMX
+
+_StretchLineLinear_MMX:
+  and eax, $3  
+  mov eax, [stretchLinear_jump_table + eax * 4]
+  call eax
+  ret  

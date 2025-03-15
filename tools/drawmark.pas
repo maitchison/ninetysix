@@ -69,7 +69,7 @@ var
 begin
   for backend in [dbREF, dbMMX] do begin
     dc.backend := backend;
-    for i := 0 to (ITERATIONS div 2)-1 do begin
+    for i := 0 to ITERATIONS-1 do begin
       startTimer(tag+'_'+BACKEND_NAME[backend]);
       dc.stretchSubImage(testPage, Rect(rnd, rnd, 256, 256), Rect(0,0,32,32));
       stopTimer(tag+'_'+BACKEND_NAME[backend]);
@@ -101,7 +101,7 @@ begin
   makePageRandom(testPage);
 
   startTimer('flip'); stopTimer('flip');
-
+(*
   dc := screen.canvas.getDC(bmBlit);
   runFillTest(dc, 'fill_blit');
 
@@ -127,10 +127,12 @@ begin
   dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfNearest;
   runStretchTest(dc, 'stretch_nearest');
-
+  *)
   dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfLinear;
   runStretchTest(dc, 'stretch_linear');
+
+  readkey;
 
   videoDriver.setText();
   logTimers();
