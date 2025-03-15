@@ -7,6 +7,7 @@ align 8
 _yFactor dq 0
 align 4
 _textureStride dd 0
+_tdx dd 0
 
 section .text
 
@@ -72,12 +73,13 @@ GLOBAL _yFactor
     ;mm4 = ~tmp
     ;mm5 = ~tmp
     ;mm6 = pixel1
-    ;mm6 = pixel2
-    ;yFactor = y y (255-y) (255-y) (passed via MM4)
-    ;textureStride = source stride
+    ;mm7 = pixel2
+    ;yFactor = y y (255-y) (255-y) (passed via global)
+    ;textureStride = source stride (passed via global)
 
+    mov       [_tdx], edx
+  
   .xloop:    
-    push      edx
     mov       edx, ebx
     shr       edx, 16
 
@@ -87,7 +89,7 @@ GLOBAL _yFactor
     ; mm5 <- [(255-x), x, (255-x), x]
     xor       eax, eax
     mov       ax, bx
-    shr       ax, 8 
+    shr       ax, 8       ; will not work with negative?
     movd      mm6, eax
     punpcklwd mm6, mm6
     punpckldq mm6, mm6    ; mm4 <- x (x4)
@@ -112,14 +114,14 @@ GLOBAL _yFactor
     punpcklwd mm4, mm4
     punpckldq mm4, mm4    ; mm4 <- x*y
     pmullw    mm6, mm4
-    paddw     src, mm6
+    paddusw   src, mm6
   .Pixel2:
     movq      mm4, mm5
     psrlq     mm4, 48
     punpcklwd mm4, mm4
     punpckldq mm4, mm4    
     pmullw    mm7, mm4
-    paddw     src, mm7
+    paddusw   src, mm7
 
   .ReadPixel3and4:  
     add       edx, [_textureStride]
@@ -133,25 +135,24 @@ GLOBAL _yFactor
     punpcklwd mm4, mm4
     punpckldq mm4, mm4    ; mm4 <- x*y
     pmullw    mm6, mm4
-    paddw     src, mm6
+    paddusw   src, mm6
   .Pixel4:
     movq      mm4, mm5
     psrlq     mm4, 16
     punpcklwd mm4, mm4
     punpckldq mm4, mm4    
     pmullw    mm7, mm4
-    paddw     src, mm7  
+    paddusw   src, mm7  
 
     psrlw     src, 8
 
-    pop       edx
-    add       ebx, edx
+    add       ebx, [_tdx]
 
 %endmacro
 
 %macro DRAW_TINT 0
     pmullw    src, tnt
-    paddw     src, b25
+    paddusw     src, b25
     psrlw     src, 8
 %endmacro
 
@@ -176,8 +177,8 @@ GLOBAL _yFactor
 
     pmullw    src, mm4
     pmullw    mm6, mm5
-    paddw     src, mm6
-    paddw     src, b25
+    paddusw   src, mm6
+    paddusw   src, b25
     psrlw     src, 8
 %endmacro
 

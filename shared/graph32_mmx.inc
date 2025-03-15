@@ -115,7 +115,7 @@ var
   tx,ty: dword;
   tdx,tdy: int32;
   linePtr: pointer;
-  callCode: dword;
+  callCode: integer;
   callProc: procedure cdecl;
   yCode: integer;
   yCodes: array[0..3] of word;
@@ -148,7 +148,7 @@ begin
     linePtr := srcPage.getAddress(0, trunc(srcY+(srcDy*j)));
 
     {for linear filtering}
-    yCode := round(frac(srcY+(srcDy*j)) * 255);
+    yCode := clamp(round(frac(srcY+(srcDy*j)) * 255), 0, 255);
     yCodes[0] := yCode;
     yCodes[1] := yCode;
     yCodes[2] := 255-yCode;
@@ -161,7 +161,6 @@ begin
     {todo: setup once and don't call emms every line}
     asm
       cli
-      push      es
       pushad
       mov       esi, LINEPTR
       mov       edi, DSTPTR
@@ -179,7 +178,6 @@ begin
       mov       eax, CALLCODE
       call      callProc
       popad
-      pop       es
       emms
       sti
     end;
