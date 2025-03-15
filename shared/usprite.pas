@@ -251,17 +251,15 @@ end;
 {Draws sprite flipped on x-axis}
 procedure tSprite.drawFlipped(const dc: tDrawContext; atX, atY: integer);
 begin
-  //NIY
-  {
   atX -= pivot2x.x div 2;
   atY -= pivot2x.y div 2;
-  polyDraw_ASM(dstPage, page, srcRect,
+  drawPoly(dc, page, srcRect,
     Point(atX + srcRect.width - 1, atY),
     Point(atX, atY),
     Point(atX, atY + srcRect.height - 1),
     Point(atX + srcRect.width - 1, atY + srcRect.height - 1)
   );
-  }
+  dc.MarkRegion(Rect(atX, atY, srcRect.width, srcRect.height));
 end;
 
 {Draws sprite stetched to cover destination rect}
@@ -274,23 +272,17 @@ procedure tSprite.drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: sing
 var
   transform: tMatrix4x4;
 begin
-  // NIY
-  (*
   {todo: switch to a 3x2 matrix for this stuff}
   transform.setIdentity();
   transform.translate(V3(-pivot2x.x/2, -pivot2x.y/2, 0));
   transform.rotateXYZ(0, 0, zAngle * DEG2RAD);
   transform.scale(scale);
-  result := drawTransformed(dstPage, V3(atPos.x, atPos.y, 0), transform);
-  *)
+  drawTransformed(dc, V3(atPos.x, atPos.y, 0), transform);
 end;
 
 {identity transform will the centered on sprite center...
  todo: implement a default anchor}
 procedure tSprite.drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
-begin
-  // NIY
-(*
 var
   p1,p2,p3,p4: tPoint;
   minX, minY, maxX, maxY: integer;
@@ -315,19 +307,17 @@ var
   end;
 
 begin
+  {todo: clipping}
   minX := page.width;
   maxX := 0;
   minY := page.height;
   maxY := 0;
-  polyDraw_ASM(dstPage, page, srcRect,
+  drawPoly(dc, page, srcRect,
     xform(Point(0,0)),
     xform(Point(srcRect.width, 0)),
     xform(Point(srcRect.width, srcRect.height)),
     xform(Point(0, srcRect.height))
   );
-  result := Rect(minX, minY, maxX-minX+1, maxY-minY+1);
-end;
-*)
 end;
 
 {Draw sprite using nine-slice method}

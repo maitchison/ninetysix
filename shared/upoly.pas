@@ -61,10 +61,85 @@ var
 function UVCoord(x, y: single): tUVCoord; overload;
 function UVCoord(p: tPoint): tUVCoord; overload;
 
+procedure drawPoly(dc: tDrawContext; srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint);
+
 implementation
 
 {$i poly_ref.inc}
 {$i poly_asm.inc}
+
+{----------------------------------------------------}
+
+{draw an image stretched to fill poly}
+procedure drawPoly(dc: tDrawContext; srcPage: tPage; src: tRect; p1,p2,p3,p4: tPoint);
+var
+  y: integer;
+  t: tPoint;
+  f: single;
+  sl: tScanLine;
+  tl: tTextureLine;
+  t1,t2,t3,t4: tUVCoord;
+  tInitial, tDelta: tUVCoord;
+  x1,x2: integer;
+  b: tRect;
+  {for asm}
+  screenPtr, texturePtr: pointer;
+  texX, texY, texDeltaX, texDeltaY: int32; // as 16.16
+  textureWidth: dword;
+  textureSize: dword;
+  cnt: int32;
+begin
+
+  p1 += dc.offset;
+  p2 += dc.offset;
+  p3 += dc.offset;
+  p4 += dc.offset;
+
+  {src coords are inclusive-exclusive}
+  t1 := UVCoord(src.topLeft) + UVCoord(0.5,0.5);
+  t2 := UVCoord(src.topRight) + UVCoord(-0.5,0.5);
+  t3 := UVCoord(src.bottomRight) + UVCoord(-0.5,-0.5);
+  t4 := UVCoord(src.bottomLeft) + UVCoord(0.5,-0.5);
+  polyDraw.scanTextured(
+    dc.page,
+    p1, p2, p3, p4,
+    t1, t2, t3, t4
+  );
+  b := polyDraw.bounds;
+  if b.area = 0 then exit;
+  for y := b.top to b.bottom-1 do begin
+    sl := polyDraw.scanLine[y];
+    tl := polyDraw.textLine[y];
+    x1 := clamp(sl.xMin, 0, dc.page.width-1);
+    x2 := clamp(sl.xMax, 0, dc.page.width-1);
+    cnt := (x2-x1)+1;
+    if cnt <= 0 then continue;
+
+    {get initial texture pos (as 16.16}
+    if cnt = 1 then
+      f := 0
+    else
+      f := (x1-sl.xMin)/(sl.xMax-sl.xMin);
+    {todo: range check error here... I think just switch to simpler TX coord system}
+    texX := trunc(lerp(tl.t1.x, tl.t2.x, f));
+    texY := trunc(lerp(tl.t1.y, tl.t2.y, f));
+    {get delta}
+    f := ((x1+1)-sl.xMin)/(sl.xMax-sl.xMin);
+    texDeltaX := trunc(lerp(tl.t1.x, tl.t2.x, f)) - texX;
+    texDeltaY := trunc(lerp(tl.t1.y, tl.t2.y, f)) - texY;
+
+    screenPtr := dc.page.pixels + (x1 + (y * dc.page.width)) * 4;
+    texturePtr := srcPage.pixels;
+    textureWidth := srcPage.width;
+    textureSize := srcPage.width * srcPage.height;
+
+    if (textureWidth = 256) and (textureSize = 65536) then
+      polyLine256_ASM(screenPtr, texturePtr, texX, texY, texDeltaX, texDeltaY, textureWidth, textureSize, cnt)
+    else
+      polyLine_ASM(screenPtr, texturePtr, texX, texY, texDeltaX, texDeltaY, textureWidth, textureSize, cnt);
+  end;
+  dc.MarkRegion(b);
+end;
 
 {----------------------------------------------------}
 
