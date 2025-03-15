@@ -112,7 +112,7 @@ var
   i,j: integer;
   dstPtr: pRGBA;
   src: RGBA;
-  tx,ty: dword;
+  tx,ty: int32;
   tdx,tdy: int32;
   linePtr: pointer;
   callCode: integer;
@@ -120,35 +120,44 @@ var
   yCode: integer;
   yCodes: array[0..3] of word;
   stride: word;
+  ctx,cty: integer;
+  maxY: integer;
 begin
 
   callCode := getCallCode(blendMode, tint);
   if callCode < 0 then exit;
 
+  maxY := srcPage.width;
+
   case filter of
-    tfNearest: callProc := stretchLineNearest_MMX;
-    tfLinear: callProc := stretchLineLinear_MMX;
+    tfNearest: begin
+      callProc := stretchLineNearest_MMX;
+      {this seems to make things look better}
+      srcX += 0.25;
+      srcY += 0.25;
+    end;
+    tfLinear: begin
+      callProc := stretchLineLinear_MMX;
+      {adjust center offset for linear. Effectively moving from trunc to round}
+      srcX -= 0.5;
+      srcY -= 0.5;
+      dec(maxY); {due to filtering we can't sample the last line}
+    end;
   end;
 
-  (*
-  if filter = tfLinear then begin
-    {we don't currently support linear filtering...
-     it wouldn't be too hard to put in though}
-    stretchImage_REF(dstPage, srcPage, dstRect, srcX, srcY, srcDx, srcDy, tint, filter, blendMode);
-    exit;
-  end;*)
-
-  tdx := round(srcDx*65536);
-  tdy := round(srcDy*65536);
-  tx := round(srcX*65536);
-  ty := round(srcY*65536);
+  tdx := trunc(srcDx*65536);
+  tdy := trunc(srcDy*65536);
+  tx := trunc(srcX*65536);
+  ty := trunc(srcY*65536);
+  ctx := clamp(tx, 0, 65536*(srcPage.width-1)-1);
 
   for j := 0 to dstRect.height-1 do begin
     dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
-    linePtr := srcPage.getAddress(0, trunc(srcY+(srcDy*j)));
+    cty := clamp(ty, 0, (65536*maxY)-1);
+    linePtr := srcPage.getAddress(0, cty div 65536);
 
     {for linear filtering}
-    yCode := clamp(round(frac(srcY+(srcDy*j)) * 255), 0, 255);
+    yCode := (cty div 256) and $ff;
     yCodes[0] := yCode;
     yCodes[1] := yCode;
     yCodes[2] := 255-yCode;
@@ -165,7 +174,7 @@ begin
       mov       esi, LINEPTR
       mov       edi, DSTPTR
       mov       ecx, DSTRECT.WIDTH
-      mov       ebx, TX
+      mov       ebx, CTX
       mov       edx, TDX
       pxor      mm0, mm0
       movd      mm2, TINT
@@ -181,5 +190,7 @@ begin
       emms
       sti
     end;
+
+    ty += tdy;
   end;
 end;

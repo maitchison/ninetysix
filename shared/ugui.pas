@@ -197,7 +197,7 @@ end;
 constructor tGuiStyle.Create();
 begin
   inherited Create();
-  padding := Border(2,2,2,2);
+  padding := Border(0,0,0,0);
   sprites := tStringMap<tSprite>.Create();
   sounds := tStringMap<tSound>.Create();
 end;
@@ -664,7 +664,7 @@ begin
   style := tGuiStyle.Create();
   style.padding.init(8,11,8,11);
   style.sprites['default'] := makeSprite('ec_box', Border(40,40,40,40));
-  style.sprites['default'].innerBlendMode := ord(bmNone); // nothing to draw here
+  //style.sprites['default'].innerBlendMode := ord(bmNone); // nothing to draw here
   guiSkin.styles['box'] := style;
 
   style := tGuiStyle.Create();

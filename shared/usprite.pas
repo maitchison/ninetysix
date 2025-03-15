@@ -596,6 +596,7 @@ begin
   page.clear(c[0]);
   sprite.drawStretched(dc, Rect(0,0,4,4));
   testSln(page, sln[4]);
+
   (*
   {these are not implemented yet}
   {rotation}
@@ -606,8 +607,6 @@ begin
   page.clear(c[0]);
   sprite.drawRotated(page, Point(2, 2), 90);
   testSln(page, sln[3]);
-
-
   *)
 
   page.free;

@@ -794,9 +794,8 @@ begin
   bottomRight := dstRect.bottomRight;
   dstRect.clipTo(clip);
 
-  {todo: support negative width and height}
-  scaleX := srcRect.width / dstRect.width;
-  scaleY := srcRect.height / dstRect.height;
+  scaleX := ((srcRect.width-1)*65536) / ((dstRect.width-1)*65536);
+  scaleY := ((srcRect.height-1)*65536) / ((dstRect.height-1)*65536);
 
   {transform src rect based on clipping}
   srcX1 := (scaleX/2) + srcRect.left + ((dstRect.x - dstRect.pos.x) * scaleX);
