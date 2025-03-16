@@ -81,6 +81,11 @@ begin
   end;
 end;
 
+procedure runFillSpeedTests();
+begin
+
+end;
+
 begin
 
   {set video}
@@ -122,15 +127,20 @@ begin
   {this tests the fast path for a=255 pixels, as well as no tint}
   dc := screen.canvas.getDC(bmBlend);
   runDrawTest(dc, 'blend_fast');
+  *)
 
+  (*
   {this tests the fast path for a=255 pixels, as well as no tint}
   dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfNearest;
   runStretchTest(dc, 'stretch_nearest');
-  *)
+
   dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfLinear;
   runStretchTest(dc, 'stretch_linear');
+  *)
+
+  runFillSpeedTests();
 
   readkey;
 

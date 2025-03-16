@@ -5,9 +5,9 @@ program info;
 
 uses
   crt,
-  sysTypes,
-  sysInfo,
-  utils;
+  uTypes,
+  uInfo,
+  uUtils;
 
 var
   infoStr: string;
@@ -482,7 +482,7 @@ begin
   timer.stop(); timer.print();
 
   {this should be just a few cycles}
-  if sysInfo.getMMXSupport then begin
+  if uInfo.getMMXSupport then begin
     timer.mode := TM_CYCLES;
     timer.start('EMMS');
     asm
@@ -517,9 +517,9 @@ var
   cpuBrand: string;
 begin
   testInfo('CPUINFO','');
-  showFlag('CPUID' ,sysInfo.getCPUIDSupport);
+  showFlag('CPUID' ,uInfo.getCPUIDSupport);
   showFlag('CPU Name' ,getCPUName());
-  showFlag('MMX', sysInfo.getMMXSupport);
+  showFlag('MMX', uInfo.getMMXSupport);
 end;
 
 procedure benchCache();
