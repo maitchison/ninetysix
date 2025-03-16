@@ -10,10 +10,11 @@ linear space than to gamma space.
 interface
 
 uses
-  debug,
-  test,
-  graph32,
-  utils;
+  uDebug,
+  uTest,
+  uGraph32,
+  uColor,
+  uUtils;
 
 type
   tHDRPage = class
@@ -52,7 +53,7 @@ implementation
 constructor tHDRPage.create(aWidth, aHeight: integer);
 begin
   inherited create();
-  if aWidth mod 4 <> 0 then debug.fatal('Width must be a multiple of 4');
+  if aWidth mod 4 <> 0 then fatal('Width must be a multiple of 4');
   fWidth := aWidth;
   fHeight := aHeight;
   data := getMem(fWidth*fHeight*2);

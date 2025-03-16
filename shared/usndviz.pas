@@ -4,14 +4,15 @@ unit uSndViz;
 interface
 
 uses
-  debug,
-  test,
-  sound,
-  utils,
-  graph2d,
-  myMath,
-  hdr,
-  graph32;
+  uDebug,
+  uTest,
+  uSound,
+  uUtils,
+  uRect,
+  uMath,
+  uHDR,
+  uColor,
+  uGraph32;
 
 procedure displayWaveForm(page: tPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; color: RGBA);
 procedure displayWaveFormHDR(page: tHDRPage; dstRect: tRect; samplePtr: pAudioSample16S; sampleLen, sampleMax: integer; value: integer);
