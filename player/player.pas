@@ -17,9 +17,11 @@ uses
   uVESADriver,
   uRect,
   uGraph32,
+  uColor,
   uSndViz,
   uSprite,
-  ui,
+  uGUI,
+  uGuiLabel,
   uVLC,
   uHDR,
   uFont,
@@ -38,7 +40,7 @@ var
   screen: tScreen;
   hdrWave: tHDRPage;
   hdrPhase: tHDRPage;
-  music16: tSoundEffect;    // our original sound.
+  music16: tSound;    // our original sound.
 
 {--------------------------------------------------------}
 
@@ -57,7 +59,7 @@ type
   tGuiBuffer = class(tGuiComponent)
     valueMin, valueMax, value: integer;
   protected
-    procedure doDraw(screen: tScreen); override;
+    procedure doDraw(const dc: tDrawContext); override;
   public
     constructor create(aPos: tPoint;aMin,aMax: integer);
   end;
@@ -69,7 +71,6 @@ type
 
 var
   tracks: tTracks;
-  guiComponets: tGuiComponents;
   selectedTrackIndex: integer;
   {todo: these would be good as some kind of UI component}
   uiAlpha: single;
@@ -86,14 +87,14 @@ var
 
 {--------------------------------------------------------}
 
-procedure tGuiBuffer.doDraw(screen: tScreen);
+procedure tGuiBuffer.doDraw(const dc: tDrawContext);
 var
   bounds: tRect;
   col: RGBA;
   i: integer;
 begin
-  bounds := tRect.create(pos.x, pos.y, valueMax*5+1, 6);
-  screen.canvas.fillRect(bounds, rgb(0,0,0,192));
+  bounds := Rect(pos.x, pos.y, valueMax*5+1, 6);
+  dc.fillRect(bounds, rgb(0,0,0,192));
   for i := 0 to valueMax-1 do begin
     if (valueMax-i) <= valueMin then
       col := RGB(255,100,100)
@@ -101,14 +102,15 @@ begin
       col := RGB(100,255,100)
     else
       col := RGB(200,200,200);
-    screen.canvas.fillRect(tRect.create(bounds.x+i*5+1, bounds.y+1, 4, 4), col);
+    dc.fillRect(Rect(bounds.x+i*5+1, bounds.y+1, 4, 4), col);
   end;
-  screen.markRegion(bounds);
 end;
 
 constructor tGuiBuffer.create(aPos: tPoint;aMin,aMax: integer);
 begin
-  inherited create(aPos);
+  inherited Create();
+  // todo: fix this
+  setBounds(Rect(aPos.x, aPos.y, 100, 20)); // guess on dims
   valueMin := aMin;
   valueMax := aMax;
   value := 0;
@@ -174,16 +176,16 @@ end;
 {fast: only compresses HIGH profile in test mode, but also always recompresses}
 procedure testCompression(fastMode: boolean=false);
 var
-  music16, musicL, musicD: tSoundEffect;
+  music16, musicL, musicD: tSound;
   SAMPLE_LENGTH: int32;
   profile: tAudioCompressionProfile;
   log2mu, ulawBits, quantBits: integer;
   outStream: tMemoryStream;
   reader: tLA96Reader;
   writer: tLA96Writer;
-  outSFX: array of tSoundEffect;
-  deltaSFX: array of tSoundEffect;
-  curSFX, errSFX: tSoundEffect;
+  outSFX: array of tSound;
+  deltaSFX: array of tSound;
+  curSFX, errSFX: tSound;
   i: integer;
   profiles: array of tAudioCompressionProfile;
   selection: integer;
@@ -230,7 +232,7 @@ begin
   writeln();
   writeln('--------------------------');
   writeln('Loading Source Music.');
-  music16 := tSoundEffect.Load(joinPath('sample','sample.wav'));
+  music16 := tSound.Load(joinPath('sample','sample.wav'));
   writeln(format('Source RMS: %f',[music16.calculateRMS()]));
 
   setLength(outSfx, length(outSFX)+1);
@@ -249,7 +251,7 @@ begin
   for profile in PROFILES do begin
     {todo: stop using music16.tag for filename}
     music16.tag := profileToTagName(profile);
-    if fastMode or not fs.exists(music16.tag+'.a96') then begin
+    if fastMode or not fileSystem.exists(music16.tag+'.a96') then begin
 
       startTimer('encode');
       { for the moment encode to memory, as fileStream is not yet buffered
@@ -295,7 +297,7 @@ begin
     deltaSFX[length(deltaSFX)-1] := errSFX;
     {rms}
     writeln(format('FILE RMS: %f',[curSFX.calculateRMS()]));
-    writeln(format('FILE Size: %fkb',[fs.getFileSize(tag+'.a96')/1024]));
+    writeln(format('FILE Size: %fkb',[fileSystem.getFileSize(tag+'.a96')/1024]));
     writeln(format('ERROR RMS: %f',[errSFX.calculateRMS()]));
     writeln(format('Decoded at %fx', [(curSFX.length/44100)/getTimer('decode').elapsed]));
     {export}
@@ -305,7 +307,7 @@ begin
     end;
   end;
 
-  printTimers();
+  logTimers();
 
   {start playing sound}
   mixer.play(outSFX[0], 1.0, SCS_FIXED1); writeln(outSFX[0].tag);
@@ -339,6 +341,8 @@ var
   mm,ss: integer;
   i: integer;
   textColor: RGBA;
+  dc: tDrawContext;
+  font: tFont;
 begin
   if alpha < (1/255) then exit;
   alpha := clamp(alpha, 0, 1);
@@ -347,17 +351,18 @@ begin
   height := length(tracks) * 20 + 7;
   atX := (screen.width-width) div 2;
   atY := (screen.height-height) div 2 + 100;
-  screen.markRegion(tRect.create(atX,atY,width,height));
-  screen.canvas.fillRect(tRect.create(atX,atY,width,height), RGBA.create(20,20,20,round(alpha*200)));
-  screen.canvas.drawRect(tRect.create(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*128)));
+  font := DEFAULT_FONT;
+  dc := screen.getDC();
+  dc.fillRect(Rect(atX,atY,width,height), RGBA.create(20,20,20,round(alpha*200)));
+  dc.drawRect(Rect(atX,atY,width,height), RGBA.create(0,0,0,round(alpha*128)));
   for i := 0 to length(tracks)-1 do begin
     if (i = selectedTrackIndex) then begin
-      screen.canvas.fillRect(tRect.create(atX+1,atY+5+i*20, width-2, 18), RGBA.create(15,20,250,round(alpha*128)));
+      dc.fillRect(Rect(atX+1,atY+5+i*20, width-2, 18), RGBA.create(15,20,250,round(alpha*128)));
       textColor.init(255,255,0,round(255*alpha));
     end else
       textColor.init(250,250,250,round(240*alpha));
-    textOut(screen.canvas, atX+5, atY+5+i*20, tracks[i].title, textColor);
-    textOut(screen.canvas, atX+width-5-50, atY+5+i*20, format('(%s:%s)', [intToStr(tracks[i].minutes), intToStr(tracks[i].seconds,2)]), textColor);
+    font.textOut(screen.canvas, atX+5, atY+5+i*20, tracks[i].title, textColor);
+    font.textOut(screen.canvas, atX+width-5-50, atY+5+i*20, format('(%s:%s)', [intToStr(tracks[i].minutes), intToStr(tracks[i].seconds,2)]), textColor);
   end;
 end;
 
@@ -369,7 +374,8 @@ begin
 
   track := tracks[selectedTrackIndex];
   guiTitle.text := track.title;
-  guiTitle.showForSeconds := 3.5;
+  // todo: support fading again
+  //guiTitle.showForSeconds := 3.5;
 
   {buffer 0.5 seconds, enough time to read the next file}
   if musicReader.isLoaded then begin
@@ -398,7 +404,8 @@ begin
   {we need todo a soft reset here, a previous is still playing...}
   track := tracks[selectedTrackIndex];
   guiTitle.text := track.title;
-  guiTitle.showForSeconds := 3.5;
+  // todo: get this working again.
+  //guiTitle.showForSeconds := 3.5;
   musicReader.close();
   musicReader.open(track.filename);
   musicPlay(musicReader);
@@ -413,7 +420,7 @@ var
   tag: string;
   selected: integer;
   background: tSprite;
-  rect: tRect;
+  bounds: tRect;
   oldBufferPos: dword;
   elapsed: double;
   x,y: integer;
@@ -422,10 +429,10 @@ var
   exitFlag: boolean;
   cpuUsage: single;
   statsString: string;
-  refMusic: tSoundEffect;
+  refMusic: tSound;
   musicStats: tMusicStats;
 
-  gui: tGuiComponents;
+  gui: tGui;
 
   showBuffer: boolean = false;
 
@@ -446,31 +453,33 @@ begin
   oldBufferPos := 0;
 
   {setup gui}
-  gui := tGuiComponents.create();
+  gui := tGui.create();
+  gui.handlesInput := false;
 
   guiTitle := tGuiLabel.create(point(screen.width div 2, screen.height div 4-60));
-  guiTitle.centered := true;
-  guiTitle.autoFade := true;
-  guiTitle.alpha := 0;
+  guiTitle.fontStyle.centered := true;
+  //todo:
+  //guiTitle.autoFade := true;
+  //guiTitle.alpha := 0;
   gui.append(guiTitle);
 
   guiStats := tGuiLabel.create(point(10, screen.height-30));
-  guiStats.visible := false;
+  guiStats.isVisible := false;
   gui.append(guiStats);
 
   guiFPS := tGuiLabel.create(point(10, 10));
-  guiFPS.visible := false;
+  guiFPS.isVisible := false;
   gui.append(guiFPS);
 
   guiBuffer := tGuiBuffer.create(
     point(screen.width-10-5*(getMusicStats().bufferFramesMax div 4), 10),
     4, getMusicStats().bufferFramesMax div 4
   );
-  guiBuffer.visible := false;
+  guiBuffer.isVisible := false;
   gui.append(guiBuffer);
 
   {load tracks}
-  files := fs.listFiles('music\*.a96');
+  files := fileSystem.listFiles('music\*.a96');
   files.sort();
   setLength(tracks, 0);
   for filename in files do begin
@@ -516,20 +525,20 @@ begin
 
       {waveform}
       startTimer('waveform');
-      rect := tRect.create((640-hdrWave.width) div 2, 480-hdrWave.height-(hdrWave.height div 2), hdrWave.width, hdrWave.height);
+      bounds := Rect((640-hdrWave.width) div 2, 480-hdrWave.height-(hdrWave.height div 2), hdrWave.width, hdrWave.height);
       hdrWave.fade(0.92);
-      displayWaveFormHDR(hdrWave, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 256, 512, 8*1024);
-      hdrWave.mixTo(screen.canvas, rect.x, rect.y);
-      screen.markRegion(rect);
+      displayWaveFormHDR(hdrWave, Rect(0, 0, bounds.width, bounds.height), uMixer.scratchBufferPtr, 256, 512, 8*1024);
+      hdrWave.mixTo(screen.canvas, bounds.x, bounds.y);
+      screen.markRegion(bounds);
       stopTimer('waveform');
 
       {phase}
       startTimer('phase');
-      rect := tRect.create((640-hdrPhase.width) div 2-10, (480-hdrPhase.height) div 2-74, hdrPhase.width, hdrPhase.height);
+      bounds := Rect((640-hdrPhase.width) div 2-10, (480-hdrPhase.height) div 2-74, hdrPhase.width, hdrPhase.height);
       hdrPhase.fade(0.95);
-      displayPhaseScopeHDR(hdrPhase, tRect.create(0, 0, rect.width, rect.height), mixLib.scratchBufferPtr, 512, 256);
-      hdrPhase.mulTo(screen.canvas, rect.x, rect.y);
-      screen.markRegion(rect);
+      displayPhaseScopeHDR(hdrPhase, Rect(0, 0, bounds.width, bounds.height), uMixer.scratchBufferPtr, 512, 256);
+      hdrPhase.mulTo(screen.canvas, bounds.x, bounds.y);
+      screen.markRegion(bounds);
       stopTimer('phase');
 
       {fps:}
@@ -542,20 +551,20 @@ begin
       {stats}
       guiStats.text := format('CPU: %f%% RAM:%.2fMB', [100*getMusicStats().cpuUsage, getUsedMemory/1024/1024]);
       if mixClickDetection > 0 then
-        guiStats.text += ' click:'+intToStr(mixClickDetection);
+        guiStats.text := guiStats.text + ' click:'+intToStr(mixClickDetection);
 
       {buffer}
       guiBuffer.value := getMusicStats().bufferFramesFilled div 4;
-      guiBuffer.visible := showBuffer or (guiBuffer.value < 4);
+      guiBuffer.isVisible := showBuffer or (guiBuffer.value < 4);
 
-      key := getKey();
+      key := dosGetKey();
       if key.code <> 0 then case key.code of
         key_up: moveTrackSelection(-1);
         key_down: moveTrackSelection(+1);
         key_enter: applySelection();
         key_esc: exitFlag := true;
-        key_s: guiStats.visible := not guiStats.visible;
-        key_f: guiFPS.visible := not guiFPS.visible;
+        key_s: guiStats.isVisible := not guiStats.isVisible;
+        key_f: guiFPS.isVisible := not guiFPS.isVisible;
         key_b: showBuffer := not showBuffer;
       end;
 
@@ -570,7 +579,7 @@ begin
 
       {gui stuff}
       gui.update(elapsed);
-      gui.draw(screen);
+      gui.draw(screen.getDC());
 
       screen.flipAll();
 
@@ -600,7 +609,7 @@ begin
   textAttr := White + Blue*16;
   clrscr;
 
-  debug.VERBOSE_SCREEN := llNote;
+  uDebug.VERBOSE_SCREEN := llNote;
 
   runTestSuites();
   initKeyboard();

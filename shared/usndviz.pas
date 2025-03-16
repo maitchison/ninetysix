@@ -40,13 +40,15 @@ var
 procedure vLineAA(page: tPage; x: integer;y1,y2: single; col: RGBA);
 var
   tmp: single;
+  dc: tDrawContext;
 begin
+  dc := page.getDC();
   if y2 < y1 then begin tmp := y1; y1 := y2; y2 := tmp; end;
-  page.vLine(x, ceil(y1), floor(y2), col);
+  dc.vLine(Point(x, ceil(y1)), floor(y2)-ceil(y1), col);
   col.a := round((1-frac(y1))*255);
-  page.putPixel(x, floor(y1), col);
+  dc.putPixel(Point(x, floor(y1)), col);
   col.a := round((frac(y2))*255);
-  page.putPixel(x, ceil(y2)+1, col);
+  dc.putPixel(Point(x, ceil(y2)+1), col);
 end;
 
 {draw a vertical line with AA on the edges}
