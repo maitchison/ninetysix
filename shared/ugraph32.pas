@@ -58,6 +58,9 @@ type
     function  smartBM(col: RGBA): tBlendMode;
     function  hasTint: boolean; inline;
     procedure markRegion(const rect: tRect); inline;
+    {modifiers}
+    function  asBlendMode(aBlendMode: tBlendMode): tDrawContext;
+    function  asTint(aTint: RGBA): tDrawContext;
     {dispatch}
     procedure doDrawRect(dstPage: tPage;aRect: tRect;col: RGBA;blendmode: tBlendMode);
     procedure doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
@@ -640,6 +643,19 @@ begin
 end;
 
 {-------------------------------------------------}
+
+function tDrawContext.asBlendMode(aBlendMode: tBlendMode): tDrawContext;
+begin
+  result := self;
+  result.blendMode := aBlendMode;
+end;
+
+function tDrawContext.asTint(aTint: RGBA): tDrawContext;
+begin
+  result := self;
+  result.tint := aTint;
+end;
+
 { dispatch}
 
 procedure tDrawContext.doDrawRect(dstPage: tPage;aRect: tRect;col: RGBA;blendmode: tBlendMode);

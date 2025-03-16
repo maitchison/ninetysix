@@ -41,7 +41,7 @@ type
     player: tController;
     sprite: tSprite;
   protected
-    procedure doDraw(dc: tDrawContext); override;
+    procedure doDraw(const dc: tDrawContext); override;
   public
     constructor create(aPos: tPoint; aPlayer: tController);
   end;
@@ -68,15 +68,13 @@ var
 
 {-------------------------------------------}
 
-procedure tPlayerGUI.doDraw(dc: tDrawContext);
+procedure tPlayerGUI.doDraw(const dc: tDrawContext);
 var
   weapon: tWeaponSpec;
 begin
-  dc.blendMode := bmBlit;
-  sprite.draw(dc, bounds.x, bounds.y);
+  sprite.draw(dc.asBlendMode(bmBlit), bounds.x, bounds.y);
   weapon := player.tank.weapon;
-  dc.blendMode := bmBlend;
-  weapon.weaponSprite.draw(dc, bounds.x + 9, bounds.y + 9);
+  weapon.weaponSprite.draw(dc.asBlendMode(bmBlend), bounds.x + 9, bounds.y + 9);
   font.textOut(dc.page, dc.offset.x+bounds.x + 20, dc.offset.y+bounds.y + 5, weapon.tag, RGB(255, 255, 255));
 end;
 
@@ -134,6 +132,7 @@ end;
 procedure setupGUI();
 begin
   gui := tGui.Create();
+  gui.handlesInput := false; // fights with keyboard otherwise
   fpsLabel := tGuiLabel.MakeText(Point(6, 6));
   fpsLabel.setSize(40,8);
   fpsLabel.fontStyle.shadow := false;
@@ -152,7 +151,7 @@ begin
   gui.append(startLabel);
 
   verLabel := tGuiLabel.MakeText(Point(320-72, 6));
-  verLabel.text := '0.3a (01/03/1996)';
+  verLabel.text := '0.4a (16/03/1996)';
   verLabel.textColor := RGB(228,228,238);
   verLabel.fontStyle.shadow := false;
   gui.append(verLabel);
@@ -303,7 +302,7 @@ begin
 
   {note: old 1k sparks runs at around 70-80 FPS}
   if keyDown(key_9) then
-    makeSparks(p.x, p.y, 20, 100, 0, 0, round(10000*elapsed));
+    makeSparks(p.x, p.y, 20, 100, 0, 0, round(1000*elapsed));
 
   if keydown(key_z) then elapsed := 0.001;
   DEBUG_DRAW_BOUNDS := keydown(key_b);
@@ -332,13 +331,14 @@ begin
   gs.roundTimer += elapsed;
 end;
 
-procedure doDraw(dc: tDrawContext);
+procedure doDraw(const dc: tDrawContext);
 var
   screenFade: single;
   y: integer;
   oldFlags: byte;
   backgroundDC: tDrawContext;
   screenDC: tDrawContext;
+  noUpdateDC: tDrawContext;
 begin
   startTimer('draw');
   drawAll(dc);
@@ -354,17 +354,16 @@ begin
   if gs.state = GS_TITLE then begin
     {note: this is super slow... why can't we do it as a screen
      transfer effect?}
-    oldFlags := dc.clearFlags;
-    dc.clearFlags := 0; // turn this off, as otherwise it'd be slow
+    noUpdateDC := dc;
+    noUpdateDC.clearFlags := 0; // turn this off, as otherwise it'd be slow
     for y := 0 to 240 do begin
       case y and $3 of
-        0: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,96));
-        1: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,64));
-        2: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,96));
-        3: dc.fillRect(rect(0,y,256,1), RGB(0,128,0,64));
+        0: noUpdateDC.fillRect(rect(0,y,256,1), RGB(0,128,0,96));
+        1: noUpdateDC.fillRect(rect(0,y,256,1), RGB(0,128,0,64));
+        2: noUpdateDC.fillRect(rect(0,y,256,1), RGB(0,128,0,96));
+        3: noUpdateDC.fillRect(rect(0,y,256,1), RGB(0,128,0,64));
       end;
     end;
-    dc.clearFlags := oldFlags;
     screen.markRegion(screen.bounds);
   end;
 

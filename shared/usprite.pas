@@ -60,7 +60,7 @@ type
     procedure drawStretched(const dc: tDrawContext; dstRect: tRect);
     procedure drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
     procedure drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
-    procedure drawNineSlice(var dc: tDrawContext; dstRect: tRect);
+    procedure drawNineSlice(const dc: tDrawContext; dstRect: tRect);
 
     {iIniSerializable}
     procedure writeToIni(ini: tIniWriter);
@@ -321,7 +321,7 @@ begin
 end;
 
 {Draw sprite using nine-slice method}
-procedure tSprite.drawNineSlice(var dc: tDrawContext; dstRect: tRect);
+procedure tSprite.drawNineSlice(const dc: tDrawContext; dstRect: tRect);
 var
   oldRect: tRect;
   oldMode: tBlendMode;
@@ -345,12 +345,9 @@ begin
   {special case for center piece}
   srcRect := tRect.Inset(oldRect, border.left, border.top, -border.right, -border.bottom);
   insetRect := tRect.Inset(dstRect, border.left, border.top, -border.right, -border.bottom);
-  if innerBlendMode >= 0 then begin
-    oldMode := dc.blendMode;
-    dc.blendMode := tBlendMode(innerBlendMode);
-    drawStretched(dc, insetRect);
-    dc.blendMode := oldMode;
-  end else
+  if innerBlendMode >= 0 then
+    drawStretched(dc.asBlendMode(tBlendMode(innerBlendMode)), insetRect)
+  else
     drawStretched(dc, insetRect);
 
   srcRect := tRect.Inset(oldRect,-Border.Right, Border.Top, 0, -Border.Bottom);

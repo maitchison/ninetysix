@@ -30,7 +30,7 @@ type
     procedure reset(); override;
     procedure hit(other: tGameObject = nil);
     procedure update(elapsed: single); override;
-    procedure draw(dc: tDrawContext); override;
+    procedure draw(const dc: tDrawContext); override;
   end;
 
   {note: we're using a 1:1 for weapons and projectiles here, but
@@ -267,7 +267,7 @@ begin
     hit(nil);
 end;
 
-procedure tProjectile.draw(dc: tDrawContext);
+procedure tProjectile.draw(const dc: tDrawContext);
 var
   angle: single;
 begin

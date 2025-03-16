@@ -31,7 +31,7 @@ type
     function  isActive: boolean;
     function  getWorldPixel(atX, atY: integer): RGBA;
     function  getBounds(xOffset:integer=0;yOffset: integer=0): tRect;
-    procedure draw(dc: tDrawContext); virtual;
+    procedure draw(const dc: tDrawContext); virtual;
     procedure drawBounds(dc: tDrawContext);
     procedure update(elapsed: single); virtual;
     procedure markForRemoval();
@@ -68,7 +68,7 @@ type
   public
     procedure reset(); override;
     procedure update(elapsed: single); override;
-    procedure draw(dc: tDrawContext); override;
+    procedure draw(const dc: tDrawContext); override;
   end;
 
 var
@@ -216,7 +216,7 @@ begin
   );
 end;
 
-procedure tGameObject.draw(dc: tDrawContext);
+procedure tGameObject.draw(const dc: tDrawContext);
 begin
   dc.putPixel(Point(xPos, yPos), col);
 end;
@@ -274,15 +274,20 @@ begin
   end;
 end;
 
-procedure tParticle.draw(dc: tDrawContext);
+procedure tParticle.draw(const dc: tDrawContext);
 var
   r: tRect;
+  dx,dy: integer;
 begin
   if radius <= 0 then exit;
 
   // faster special case for radius=1
   if (radius = 1) and (blend = TDM_BLEND) then begin
-    dc.putPixel(Point(xPos, yPos), col);
+    {it's a little faster to do this directly than to go via DC}
+    dx := xPos+dc.offset.x;
+    dy := yPos+dc.offset.y;
+    dc.page.putPixel(dx, dy, col);
+    dc.markRegion(Rect(dx, dy, 1, 1));
     exit;
   end;
   {todo: hmm... update this so that DC understand page8? prob not...}

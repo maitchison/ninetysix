@@ -71,7 +71,7 @@ type
     procedure applyChassis(aChassis: tChassis);
     procedure reset(); override;
     procedure update(elapsed: single); override;
-    procedure draw(dc: tDrawContext); override;
+    procedure draw(const dc: tDrawContext); override;
     procedure applyControl(xAction, yAction: single; elapsed: single);
     procedure adjustAim(deltaAngle: single; deltaPower: single = 0);
     procedure takeDamage(atX,atY: integer; damage: single;sender: tObject=nil);
@@ -290,7 +290,7 @@ begin
   result := (angle < 0) and (chassis.animationType = AT_TANK);
 end;
 
-procedure tTank.draw(dc: tDrawContext);
+procedure tTank.draw(const dc: tDrawContext);
 var
   markerColor: RGBA;
 begin

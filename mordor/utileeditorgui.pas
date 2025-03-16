@@ -27,7 +27,7 @@ type
     procedure changeSelection(delta: integer);
     procedure applyToMapTile(map: tMDRMap; atX, atY: integer);
     procedure onKeyPress(code: word); override;
-    procedure doDraw(dc: tDrawContext); override;
+    procedure doDraw(const dc: tDrawContext); override;
     property floorType: tFloorType read fFloorType;
     property editMode: tEditMode read fEditMode;
   end;
@@ -68,7 +68,7 @@ begin
   end;
 end;
 
-procedure tTileEditorGUI.doDraw(dc: tDrawContext);
+procedure tTileEditorGUI.doDraw(const dc: tDrawContext);
 var
   ft: tFloorType;
   fs: tFloorSpec;

@@ -97,7 +97,7 @@ type
     property isVisible: boolean read fVisible write fVisible;
   protected
     procedure playSFX(sfxName: string);
-    procedure doDraw(dc: tDrawContext); virtual;
+    procedure doDraw(const dc: tDrawContext); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
     procedure setCol(col: RGBA); virtual;
@@ -151,6 +151,9 @@ type
 
   tGui = class(tGuiContainer)
   public
+    { If true checks for and handles keyboard input.
+      Unfortunately this conflicts a bit with my other keyboard unit}
+    handlesInput: boolean;
     constructor Create();
     procedure update(elapsed: single); override;
   end;
@@ -232,6 +235,7 @@ end;
 constructor tGui.Create();
 begin
   inherited Create();
+  handlesInput := true;
   fCol.a := 0;
 end;
 
@@ -301,7 +305,8 @@ var
 begin
 
   {process keys, if any}
-  while true do begin
+  {note: this fights with my keyboard handler...}
+  if handlesInput then while true do begin
     code := dosGetKey.code;
     if code = 0 then break;
     self.fireMessage(ON_KEYPRESS, [code]);
@@ -477,7 +482,7 @@ begin
   setSize(newBounds.width, newBounds.height);
 end;
 
-procedure tGuiComponent.doDraw(dc: tDrawContext);
+procedure tGuiComponent.doDraw(const dc: tDrawContext);
 var
   drawX, drawY: integer;
   textRect: tRect;
