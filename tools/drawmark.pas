@@ -5,6 +5,7 @@ uses
   uTest,
   uVGADriver,
   uVESADriver,
+  uS3Driver,
   uUtils,
   crt,
   uScreen,
@@ -18,6 +19,7 @@ var
   screen: tScreen;
   i: integer;
   dc: tDrawContext;
+  S3: tS3Driver;
 
 const
   ITERATIONS = 16;
@@ -81,9 +83,143 @@ begin
   end;
 end;
 
-procedure runFillSpeedTests();
+procedure runTransferSpeedTests();
+var
+  page: tPage;
+  i: integer;
+  vidSeg: word;
+  pixels: pointer;
 begin
 
+  page := tPage.Create(256,256);
+
+  note('Fillrate');
+
+  startTimer('fillrate_system', tmMBS);
+  for i := 1 to 10 do
+    page.Clear(RGB(rnd, rnd, rnd));
+  stopTimer('fillrate_system', 10*page.width*page.height*4);
+
+  startTimer('fillrate_video', tmMBS);
+  for i := 1 to 10 do begin
+    vidSeg := videoDriver.LFB_SEG;
+    asm
+      cld
+      pushad
+      push es
+      mov es, VIDSEG
+
+      mov ecx, 256*256
+      mov eax, 0
+      mov edi, 0
+      rep movsd
+      pop es
+      popad
+    end;
+  end;
+  stopTimer('fillrate_video', 10*256*256*4);
+
+  startTimer('fillrate_video_mmx', tmMBS);
+  for i := 1 to 10 do begin
+    vidSeg := videoDriver.LFB_SEG;
+    asm
+      cld
+      pushad
+      push es
+      mov es, VIDSEG
+
+      mov ecx, 256*256
+      mov eax, 0
+      mov edi, 0
+      shr ecx, 2
+      por mm0, mm0
+    @PIXELLOOP:
+      movq es:[edi], mm0
+      movq es:[edi+8], mm0
+      add edi,16
+      dec ecx
+      jnz @PIXELLOOP
+      pop es
+      popad
+      emms
+    end;
+  end;
+  stopTimer('fillrate_video_mmx', 10*256*256*4);
+
+  startTimer('fillrate_s3', tmMBS);
+  for i := 1 to 10 do begin
+    S3SetFGColor(RGB(rnd, rnd, rnd));
+    s3.fillRect(0,0,256,256);
+  end;
+  stopTimer('fillrate_s3', 10*256*256*4);
+
+  note('Transfer');
+
+  startTimer('sys_to_sys', tmMBS);
+  for i := 1 to 10 do begin
+    vidSeg := videoDriver.LFB_SEG;
+    pixels := page.pixels;
+
+    asm
+      cld
+      pushad
+      mov esi, PIXELS
+      mov edi, PIXELS
+      add edi, 128*256*4
+      mov ecx, 128*256
+      rep movsd
+      popad
+    end;
+
+  end;
+  stopTimer('sys_to_sys', 10*128*256*4);
+
+  startTimer('sys_to_vid', tmMBS);
+  for i := 1 to 10 do begin
+    vidSeg := videoDriver.LFB_SEG;
+    pixels := page.pixels;
+    asm
+      cld
+      pushad
+      push es
+      mov es,  VIDSEG
+      mov edi, 0
+      mov esi, PIXELS
+      mov ecx, 256*256
+      rep movsd
+      pop es
+      popad
+    end;
+  end;
+  stopTimer('sys_to_vid', 10*256*256*4);
+
+  startTimer('vid_to_vid', tmMBS);
+  for i := 1 to 10 do begin
+    vidSeg := videoDriver.LFB_SEG;
+    pixels := page.pixels;
+    asm
+      cld
+      pushad
+      push es
+      push ds
+      mov es,  VIDSEG
+      mov ds,  VIDSEG
+      mov esi, 0
+      mov edi, (128*256*4)
+      mov ecx, 128*256
+      rep movsd
+      pop ds
+      pop es
+      popad
+    end;
+  end;
+  stopTimer('vid_to_vid', 10*128*256*4);
+
+  startTimer('vid_to_vid (S3)', tmMBS);
+  for i := 1 to 10 do begin
+    S3CopyRect(0,0,128,0,256,128);
+  end;
+  stopTimer('vid_to_vid (S3)', 10*128*256*4);
 end;
 
 begin
@@ -129,7 +265,6 @@ begin
   runDrawTest(dc, 'blend_fast');
   *)
 
-  (*
   {this tests the fast path for a=255 pixels, as well as no tint}
   dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfNearest;
@@ -138,9 +273,10 @@ begin
   dc := screen.canvas.getDC(bmBlit);
   dc.textureFilter := tfLinear;
   runStretchTest(dc, 'stretch_linear');
-  *)
 
-  runFillSpeedTests();
+
+  S3 := tS3Driver.create();
+  runTransferSpeedTests();
 
   readkey;
 

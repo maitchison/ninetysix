@@ -8,11 +8,15 @@ uses
   uUtils;
 
 type
+
+  tTimerMode = (tmDefault, tmMBS);
+
   tTimer = class
     tag: string;
+    mode: tTimerMode;
     startTime: double;
     elapsed, maxElapsed, avElapsed, totalElapsed, lastStop: double;
-    cycles: int32;
+    cycles: int64;
     constructor Create(aTag: string);
     procedure reset(aTag: string);
     procedure start();
@@ -20,7 +24,8 @@ type
     function  toString(): string; override;
   end;
 
-procedure startTimer(aTag: string);
+procedure startTimer(aTag: string); overload;
+procedure startTimer(aTag: string; mode: tTimerMode); overload;
 procedure stopTimer(aTag: string; iterations: integer=1);
 function  getTimer(aTag: string): tTimer;
 
@@ -65,6 +70,12 @@ begin
   timer.start();
 end;
 
+procedure startTimer(aTag: string; mode: tTimerMode);
+begin
+  startTimer(aTag);
+  getTimer(aTag).mode := mode;
+end;
+
 procedure stopTimer(aTag: string;iterations: integer=1);
 var
   timer: tTimer;
@@ -92,6 +103,7 @@ begin
   avElapsed := 0;
   cycles := 0;
   totalElapsed := 0;
+  mode := tmDefault;
   lastStop := getSec;
 end;
 
@@ -133,10 +145,15 @@ end;
 
 function tTimer.toString(): string;
 begin
-  if avElapsed < 0.1 then
-    result := format('%s %.2fms (%fms) [total:%.2fs]', [pad(tag, 20), 1000*avElapsed, 1000*maxElapsed, 1.0*totalElapsed])
-  else
-    result := format('%s %.3fs (%fs) [total:%.2fs]', [pad(tag, 20), avElapsed, maxElapsed, totalElapsed]);
+  case mode of
+    tmDefault: begin
+      if avElapsed < 0.1 then
+        result := format('%s %.2fms (%fms) [total:%.2fs]', [pad(tag, 20), 1000*avElapsed, 1000*maxElapsed, 1.0*totalElapsed])
+      else
+        result := format('%s %.3fs (%fs) [total:%.2fs]', [pad(tag, 20), avElapsed, maxElapsed, totalElapsed]);
+    end;
+    tmMBS: result := format('%s %.1f MB/S', [pad(tag, 20), (cycles/1024/1024)/totalElapsed]);
+  end;
 end;
 
 var timer: tTimer;
