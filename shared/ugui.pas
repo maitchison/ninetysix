@@ -146,20 +146,11 @@ type
     property isDirty: boolean read fIsDirty write setIsDirty;
   end;
 
-  tGuiDrawMode = (
-    // every component will be draw (composited) every frame
-    gdmFull,
-    // only components that have updated will be drawn.
-    gdmDirty
-  );
-
-
   tGuiContainer = class(tGuiComponent)
   protected
     elements: array of tGuiComponent;
     procedure fireMessage(aMsg: string; args: array of const); override;
   public
-    drawMode: tGuiDrawMode;
     constructor Create();
     destructor destroy; override;
     procedure append(x: tGuiComponent); virtual;
@@ -176,6 +167,14 @@ type
     procedure update(elapsed: single); override;
   end;
 
+type
+  tGuiDrawMode = (
+    // every component will be draw (composited) every frame
+    gdmFull,
+    // only components that have updated will be drawn.
+    gdmDirty
+  );
+
 const
   {global GUI stuff}
   DEFAULT_GUI_SKIN: tGuiSkin = nil;
@@ -189,6 +188,7 @@ const
 
   GUI_HQ: boolean = true;
   GUI_DOUBLEBUFFER: boolean = true;
+  GUI_DRAWMODE: tGuiDrawMode = gdmFull;
 
 procedure initGuiSkinSimple();
 procedure initGuiSkinEpic();
@@ -266,7 +266,6 @@ begin
   fWidth := 100;
   fHeight := 100;
   setLength(elements, 0);
-  drawMode := gdmFull;
 end;
 
 destructor tGuiContainer.destroy;
@@ -300,10 +299,7 @@ begin
   childDC.clip := self.innerBounds;
   childDC.clip.pos += screenPos;
 
-  case drawMode of
-    gdmFull: for gc in elements do if gc.fVisible then gc.draw(childDC);
-    gdmDirty: for gc in elements do if gc.fVisible and gc.isDirty then gc.draw(childDC);
-  end;
+  for gc in elements do if gc.fVisible then gc.draw(childDC);
 end;
 
 procedure tGuiContainer.update(elapsed: single);
@@ -359,8 +355,6 @@ end;
 procedure tGuiComponent.setIsDirty(value: boolean);
 begin
   fIsDirty := value;
-  if value and assigned(parent) then
-    parent.setIsDirty(value);
 end;
 
 function tGuiComponent.getSprite(): tSprite;
@@ -577,6 +571,9 @@ begin
   {todo: check clipping bounds}
   drawDC := dc;
 
+  {draw component directly to dc}
+  if (GUI_DRAWMODE = gdmDirty) and (not fIsDirty) then exit;
+
   if isDoubleBuffered then begin
     {draw component to canvas, then write this to dc}
     if isDirty then begin
@@ -594,13 +591,14 @@ begin
       dbmBlit:
         drawDC.asBlendMode(bmBlit).drawImage(canvas, bounds.pos);
     end;
-  end else begin
-    {draw component directly to dc}
-    if GUI_HQ then drawDC.textureFilter := tfLinear;
-    drawDC.tint := col;
-    drawDC.offset += fPos;
-    doDraw(drawDC);
+    exit;
   end;
+
+  if GUI_HQ then drawDC.textureFilter := tfLinear;
+  drawDC.tint := col;
+  drawDC.offset += fPos;
+  doDraw(drawDC);
+  fIsDirty := false;
 end;
 
 procedure tGuiComponent.update(elapsed: single);

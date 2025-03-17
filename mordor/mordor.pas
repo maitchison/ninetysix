@@ -251,7 +251,7 @@ const
   UPPER_DIVIDE = 200;
 begin
 
-  gui.drawMode := gdmDirty;
+  uGui.GUI_DRAWMODE := gdmDirty;
 
   map := tMDRMap.Create(32,32);
   map.load('map.dat');
@@ -272,11 +272,9 @@ begin
   panel := tGuiWindow.create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'LOG';
   gui.append(panel);
-
   mapPanel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
   mapPanel.background := nil;
   gui.append(mapPanel);
-
   panel := tGuiWindow.create(Rect(0, 0, 800-RHS_DIVIDE, UPPER_DIVIDE));
   panel.text := 'DUNGEON';
   gui.append(panel);
