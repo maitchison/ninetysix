@@ -29,7 +29,7 @@ type
 
 
 procedure S3SetHardwareCursorLocation(x,y: int16);
-procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
+procedure S3CopyRect(srcX,srcY,dstX,dstY,dx,dy:word);
 procedure S3Scissors(x1,y1,x2,y2:int16);
 procedure S3SetLogicalWidth(width:word);
 function  S3GetLogicalWidth(): word;
@@ -398,7 +398,24 @@ begin
   S3LockRegs();
 end;
 
-procedure S3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
+procedure S3CopyRect(srcX,srcY,dstX,dstY,dx,dy:word);
+// from https://github.com/Panda381/DOS-Progs/blob/main/HELP/SVGA/SUPERVGA.PAS
+begin
+  S3Wait;
+  writew($82E8,SrcY);
+  writew($86E8,SrcX);
+  writew($8AE8,DstY);
+  writew($8EE8,DstX);
+
+  writew($96E8,dx);
+  writew($BAE8,$67);
+  writew($BEE8,dy-1);
+  writew($BEE8,$A000);
+  S3Wait;
+  writew($9AE8,$C0F1);
+end;
+
+procedure oldS3CopyRect(srcx,srcy,dstx,dsty,width,height:int16);
 var
   x1,y1,x2,y2: int16;
   XPOS: boolean;

@@ -258,7 +258,7 @@ begin
   videoDriver.setText();
   runTestSuites();
 
-  videoDriver.setTrueColor(800, 600);
+  videoDriver.setTrueColor(640, 480);
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 
