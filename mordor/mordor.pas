@@ -251,6 +251,8 @@ const
   UPPER_DIVIDE = 200;
 begin
 
+  gui.drawMode := gdmDirty;
+
   map := tMDRMap.Create(32,32);
   map.load('map.dat');
   map.setExplored(eNone);
@@ -258,10 +260,6 @@ begin
   party := tMDRParty.create();
   party.pos := Point(5, 9);
   party.dir := dNorth;
-
-  screen.background := gfx['title800'];
-  screen.pageClear();
-  screen.pageFlip();
 
   {create some pannels to map out what this should look like}
   panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
@@ -284,12 +282,13 @@ begin
   gui.append(panel);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
-  fpsLabel.setSize(40, 20);
+  fpsLabel.setSize(60, 21);
   gui.append(fpsLabel);
 
   mapGUI := tMapGui.Create();
   mapGUI.map := map;
   mapGUI.mode := mmParty;
+  mapGUI.pos := Point(10,10);
   mapPanel.append(mapGUI);
 
   timer := tTimer.create('main');
@@ -311,7 +310,6 @@ begin
     input.update();
 
     gui.update(elapsed);
-    screen.clearAll();
     gui.draw(dc);
     screen.flipAll();
 

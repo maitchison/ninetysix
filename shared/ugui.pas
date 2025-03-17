@@ -8,6 +8,7 @@ uses
   uTest,
   uUtils,
   uGraph32,
+  uVgaDriver,
   uFont,
   uFileSystem,
   uMouse,
@@ -57,7 +58,7 @@ type
   tGuiState = (gsNormal, gsDisabled, gsHighlighted, gsPressed, gsSelected);
 
   tDoubleBufferMode = (
-    // double buffer is blended during composition
+    // buffer is blended during composition (but only outed edge)
     dbmBlend,
     // buffer is blitted
     dbmBlit,
@@ -90,7 +91,7 @@ type
     mouseOverThisFrame, mouseOverLastFrame: boolean;
     {buffering}
     canvas: tPage;
-    isDirty: boolean;
+    fIsDirty: boolean;
     doubleBufferMode: tDoubleBufferMode;
     doubleBufferEdge: integer; {only this many pixels are blended when using double buffering}
     {background}
@@ -111,6 +112,7 @@ type
     function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
     procedure setBounds(aRect: tRect);
+    procedure setIsDirty(value: boolean);
     {style}
     function  getSprite(): tSprite;
   public
@@ -141,13 +143,23 @@ type
     property textColor: RGBA read fontStyle.col write fontStyle.col;
     property background: tPage read fBackground write fBackground;
     property backgroundColor: RGBA read fBackgroundCol write fBackgroundCol;
+    property isDirty: boolean read fIsDirty write setIsDirty;
   end;
+
+  tGuiDrawMode = (
+    // every component will be draw (composited) every frame
+    gdmFull,
+    // only components that have updated will be drawn.
+    gdmDirty
+  );
+
 
   tGuiContainer = class(tGuiComponent)
   protected
     elements: array of tGuiComponent;
     procedure fireMessage(aMsg: string; args: array of const); override;
   public
+    drawMode: tGuiDrawMode;
     constructor Create();
     destructor destroy; override;
     procedure append(x: tGuiComponent); virtual;
@@ -242,6 +254,7 @@ constructor tGui.Create();
 begin
   inherited Create();
   handlesInput := true;
+  setBounds(Rect(0,0,videoDriver.physicalWidth,videoDriver.physicalHeight));
   fCol.a := 0;
 end;
 
@@ -253,6 +266,7 @@ begin
   fWidth := 100;
   fHeight := 100;
   setLength(elements, 0);
+  drawMode := gdmFull;
 end;
 
 destructor tGuiContainer.destroy;
@@ -281,10 +295,15 @@ begin
   {draw ourselves}
   inherited draw(dc);
 
-  {todo: update clip rect aswell I guess}
   childDC := dc;
   childDC.offset += innerBounds.pos + fPos;
-  for gc in elements do if gc.fVisible then gc.draw(childDC);
+  childDC.clip := self.innerBounds;
+  childDC.clip.pos += screenPos;
+
+  case drawMode of
+    gdmFull: for gc in elements do if gc.fVisible then gc.draw(childDC);
+    gdmDirty: for gc in elements do if gc.fVisible and gc.isDirty then gc.draw(childDC);
+  end;
 end;
 
 procedure tGuiContainer.update(elapsed: single);
@@ -335,6 +354,13 @@ var
 begin
   if not style.sounds.contains(sfxName) then exit;
   mixer.play(style.sounds[sfxName]);
+end;
+
+procedure tGuiComponent.setIsDirty(value: boolean);
+begin
+  fIsDirty := value;
+  if value and assigned(parent) then
+    parent.setIsDirty(value);
 end;
 
 function tGuiComponent.getSprite(): tSprite;
@@ -534,8 +560,6 @@ begin
   if assigned(fBackground) then
     dc.asTint(fBackgroundCol).stretchImage(fBackground, innerBounds);
 
-  {note: font does not yet support draw contexts, so update position here...
-   we won't get clipping though}
   if text <> '' then begin
     if fontStyle.shadow then
       font.textOut(dc, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
@@ -565,14 +589,10 @@ begin
     drawDC.tint := RGBA.White;
     drawDC.offset += fPos;
     case doubleBufferMode of
-      dbmBlend: begin
-        drawDC.blendMode := bmBlend;
-        drawDC.inOutDraw(canvas, bounds.pos, doubleBufferEdge, bmBlit, bmBlend);
-      end;
-      dbmBlit: begin
-        drawDC.blendMode := bmBlit;
-        drawDC.drawImage(canvas, bounds.pos);
-      end;
+      dbmBlend:
+        drawDC.asBlendMode(bmBlend).inOutDraw(canvas, bounds.pos, doubleBufferEdge, bmBlit, bmBlend);
+      dbmBlit:
+        drawDC.asBlendMode(bmBlit).drawImage(canvas, bounds.pos);
     end;
   end else begin
     {draw component directly to dc}
