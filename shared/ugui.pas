@@ -13,6 +13,7 @@ uses
   uFileSystem,
   uMouse,
   uInput,
+  uVertex,
   uSound,
   uMixer,
   uTypes,
@@ -93,8 +94,9 @@ type
     fIsDirty: boolean;
     doubleBufferMode: tDoubleBufferMode;
     doubleBufferEdge: integer; {only this many pixels are blended when using double buffering}
-    {global color}
-    fTint: RGBA;
+    {global drawing}
+    fTint: RGBA; {only works with double buffering}
+    fScale: V2D; {only works with double buffering (blit only)}
     {background}
     fBackground: tSprite;
     fBackgroundCol: RGBA;
@@ -146,6 +148,7 @@ type
     property textColor: RGBA read fontStyle.col write fontStyle.col;
     {tint color - entire component is tinted using this}
     property tint: RGBA read fTint write fTint;
+    property scale: V2D read fScale write fScale;
     {background - nine-sliced}
     property background: tSprite read fBackground write fBackground;
     property backgroundCol: RGBA read fBackgroundCol write fBackgroundCol;
@@ -453,6 +456,7 @@ begin
   fHeight := 16;
   text := '';
   fTint := RGBA.White;
+  fScale := V2(1.0,1.0);
   fontStyle.setDefault();
   fGuiStyle := DEFAULT_GUI_SKIN.styles['default'];
   isDirty := true;
@@ -584,7 +588,6 @@ end;
 
 procedure tGuiComponent.draw(const dc: tDrawContext);
 var
-  oldTint: RGBA;
   canvasDC: tDrawContext;
   drawDC: tDrawContext;
 begin
@@ -608,7 +611,10 @@ begin
       dbmBlend:
         drawDC.asBlendMode(bmBlend).inOutDraw(canvas, bounds.pos, doubleBufferEdge, bmBlit, bmBlend);
       dbmBlit:
-        drawDC.asBlendMode(bmBlit).drawImage(canvas, bounds.pos);
+        if not fScale.isUnity then
+          drawDC.asBlendMode(bmBlit).stretchImage(canvas, Rect(bounds.pos.x, bounds.pos.y, round(bounds.width*scale.x), round(bounds.height*scale.y)));
+        else
+          drawDC.asBlendMode(bmBlit).drawImage(canvas, bounds.pos);
     end;
     exit;
   end;

@@ -23,6 +23,7 @@ type V2D = packed record
     function ToString(): shortstring;
 
     constructor Create(x, y: single);
+    function isUnity: boolean;
 
     class operator Add(a, b: V2D): V2D;
     class operator Subtract(a, b: V2D): V2D;
@@ -133,6 +134,11 @@ begin
 end;
 
 {-----------------------------------------}
+
+function V2D.isUnity: boolean;
+begin
+  result := (x = 1.0) and (y = 1.0);
+end;
 
 function V2D.Abs2: single;
 begin

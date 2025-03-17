@@ -11,6 +11,7 @@ uses
   uSprite,
   uScreen,
   uColor,
+  uVertex,
   uKeyboard,
   uFont,
   {$i gui.inc}
@@ -49,6 +50,8 @@ constructor tMonsterFrame.Create();
 begin
   inherited Create();
   guiStyle := DEFAULT_GUI_SKIN.styles['panel'].clone();
+  doubleBufferMode := dbmBlit;
+  scale := V2(0.75, 0.75);
   setBounds(Rect(0,0, 96, 128));
   frameImage := gfx['frame'];
   monsterImage:= gfx['wolf96'];
@@ -73,7 +76,7 @@ begin
       self.append(dungeonView);
       for i := 1 to 4 do begin
         monsterFrame[i] := tMonsterFrame.Create();
-        monsterFrame[i].pos := Point(10+(10+96*i), 10);
+        monsterFrame[i].pos := Point(10+(100*i), 10);
         monsterFrame[i].text := 'Monster';
         self.append(monsterFrame[i]);
       end;
