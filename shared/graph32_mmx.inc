@@ -127,7 +127,7 @@ begin
   callCode := getCallCode(blendMode, tint);
   if callCode < 0 then exit;
 
-  maxY := srcPage.width;
+  maxY := srcPage.height;
 
   case filter of
     tfNearest: begin
