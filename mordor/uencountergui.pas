@@ -7,6 +7,7 @@ uses
   uDebug,
   uUtils,
   uRect,
+  uVGADriver,
   uGraph32,
   uSprite,
   uScreen,
@@ -52,15 +53,25 @@ begin
   guiStyle := DEFAULT_GUI_SKIN.styles['panel'].clone();
   doubleBufferMode := dbmBlit;
   scale := V2(0.75, 0.75);
-  setBounds(Rect(0,0, 96, 128));
+  setBounds(Rect(0,0, 96+8, 128+38));
   frameImage := gfx['frame'];
   monsterImage:= gfx['wolf96'];
 end;
 
 procedure tMonsterFrame.doDraw(const dc: tDrawContext);
 begin
-  dc.asBlendMode(bmBlit).drawImage(monsterImage, Point(0,0));
-  dc.asBlendMode(bmBlend).drawImage(frameImage, Point(0,0));
+  {footer}
+  dc.fillRect(Rect(0,bounds.height-21-5,bounds.width,21), RGB($ff404346));
+  dc.drawRect(Rect(0,bounds.height-21-5,bounds.width,21), RGB(0,0,0,128));
+
+  {header}
+  dc.fillRect(Rect(0,5,bounds.width,21), RGB($FF959CA5));
+  dc.drawRect(Rect(0,5,bounds.width,21), RGB(0,0,0,128));
+  font.textOut(dc, 34,6, 'Wolf', RGBF(0,0,0,0.9));
+
+  {frame}
+  dc.asBlendMode(bmBlit).drawImage(monsterImage, Point(4,19));
+  dc.asBlendMode(bmBlend).drawImage(frameImage, Point(4,19));
 end;
 
 constructor tEncounterGUI.Create();
@@ -68,7 +79,10 @@ var
   i: integer;
 begin
   inherited Create();
-  backgroundCol := RGBA.Clear;
+  background := nil;
+  backgroundCol := RGB(0,0,0,0);
+  image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
+  imageCol := RGBA.White;
   setBounds(Rect(0, 0, 500, 180));
   case mode of
     egmType1: begin

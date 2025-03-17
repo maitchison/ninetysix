@@ -549,9 +549,11 @@ begin
     result.resize(originalWidth, originalHeight);
 
   {convert if needed}
-  result.colorSpace := colorSpace;
-  if result.colorSpace <> csRGB then
-    result.convertColorSpace(csRGB);
+  if bpp <> 8 then begin
+    result.colorSpace := colorSpace;
+    if result.colorSpace <> csRGB then
+      result.convertColorSpace(csRGB);
+  end;
 end;
 
 {convert an image into 'lossless compression' format.}
@@ -608,7 +610,7 @@ begin
   for py := 0 to page.height div 4-1 do
     for px := 0 to page.width div 4-1 do
       case bpp of
-        8: encodePatch8(data, page, px*4, py*4);
+        8:  encodePatch8(data, page, px*4, py*4);
         24: encodePatch24(data, page, px*4, py*4);
         32: encodePatch32(data, page, px*4, py*4);
       end;
@@ -705,6 +707,17 @@ begin
   {make sure we can encode and decode a simple page}
   img1 := tPage.Create(4,4);
   img1.clear(RGBA.create(255,0,128));
+  s := encodeLC96(img1);
+  s.seek(0);
+  img2 := decodeLC96(s);
+  assertEqual(img1, img2);
+  s.free;
+  img1.free();
+  img2.free();
+
+  {make sure black and white works}
+  img1 := tPage.Create(4,4);
+  img1.clear(RGBA.create(128,128,128));
   s := encodeLC96(img1);
   s.seek(0);
   img2 := decodeLC96(s);
