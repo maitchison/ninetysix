@@ -548,15 +548,16 @@ var
 begin
 
   {draw background}
-  backgroundDC := dc;
-  if (dc.page = canvas) then
-    // force blit if we are redrawing our own canvas
-    backgroundDC.blendMode := bmBlit;
-  s := getBackgroundSprite();
-  if assigned(s) then begin
-    s.drawNineSlice(backgroundDC, bounds);
-  end else begin
-    defaultBackgroundDraw(backgroundDC);
+  if fBackgroundCol.a <> 0 then begin
+    backgroundDC := dc;
+    if (dc.page = canvas) then
+      // force blit if we are redrawing our own canvas
+      backgroundDC.blendMode := bmBlit;
+    s := getBackgroundSprite();
+    if assigned(s) then
+      s.drawNineSlice(backgroundDC.asTint(backgroundCol), bounds)
+    else
+      defaultBackgroundDraw(backgroundDC);
   end;
 
   if fontStyle.centered then begin
@@ -611,9 +612,10 @@ begin
       dbmBlend:
         drawDC.asBlendMode(bmBlend).inOutDraw(canvas, bounds.pos, doubleBufferEdge, bmBlit, bmBlend);
       dbmBlit:
-        if not fScale.isUnity then
+        if not fScale.isUnity then begin
+          if GUI_HQ then drawDC.textureFilter := tfLinear;
           drawDC.asBlendMode(bmBlit).stretchImage(canvas, Rect(bounds.pos.x, bounds.pos.y, round(bounds.width*scale.x), round(bounds.height*scale.y)));
-        else
+        end else
           drawDC.asBlendMode(bmBlit).drawImage(canvas, bounds.pos);
     end;
     exit;

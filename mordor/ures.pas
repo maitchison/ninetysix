@@ -7,6 +7,7 @@ uses
   uTest,
   uSprite,
   uSound,
+  uColor,
   uGraph32;
 
 var
@@ -15,6 +16,12 @@ var
   mapSprites: tSpriteSheet;
 
 procedure loadResources();
+
+{global colors}
+const
+  MDR_LIGHTGRAY: RGBA = (b:$a5; g:$9C; r:$95; a:$ff);
+  MDR_DARKGRAY: RGBA  = (b:$46; g:$43; r:$40; a:$ff);
+  MDR_FOURNINES: RGBA = (b:230; g:230; r:230; a:230);
 
 implementation
 
