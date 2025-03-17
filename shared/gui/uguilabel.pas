@@ -30,14 +30,14 @@ implementation
 class function tGuiLabel.MakeText(aPos: tPoint; aText: string=''): tGuiLabel;
 begin
   result := tGuiLabel.Create(aPos, aText);
-  result.col := RGBA.Clear;
+  result.backgroundCol := RGBA.Clear;
 end;
 
 {text with label, auto size}
 class function tGuiLabel.MakeLabel(aPos: tPoint; aText: string=''): tGuiLabel;
 begin
   result := tGuiLabel.Create(aPos, aText);
-  result.col := RGBA.White;
+  result.backgroundCol := RGBA.White;
   result.autoSize := true;
   result.sizeToContent();
 end;
@@ -49,7 +49,7 @@ begin
   bounds.x := aPos.x;
   bounds.y := aPos.y;
 
-  style := DEFAULT_GUI_SKIN.styles['panel'].clone();
+  guiStyle := DEFAULT_GUI_SKIN.styles['panel'].clone();
 
   fontStyle.centered := false;
   fontStyle.shadow := true;
@@ -58,7 +58,7 @@ begin
   autoSize := false;
   setBounds(Rect(aPos.x, aPos.y, 120, 20));
 
-  col := RGB(128, 128, 138);
+  backgroundCol := RGB(128, 128, 138);
   text := aText;
 end;
 

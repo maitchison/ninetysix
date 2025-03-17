@@ -26,10 +26,9 @@ var
   s: tSprite;
 begin
   inherited Create();
-  col := RGBA.White;
-  style := DEFAULT_GUI_SKIN.styles['box'].clone();
-  fBackground := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
-  fBackgroundCol := RGBF(0.40,0.42,0.62);
+  guiStyle := DEFAULT_GUI_SKIN.styles['box'].clone();
+  fImage := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
+  fImageCol := RGBF(0.40,0.42,0.62);
   fontStyle.centered := true;
   fontStyle.shadow := true;
   setBounds(aRect);

@@ -79,13 +79,12 @@ type
     fPos: tPoint;
     fWidth, fHeight: integer;
     parent: tGuiContainer;
-    style: tGuiStyle;
+    fGuiStyle: tGuiStyle;
     isInteractive: boolean;
     fVisible: boolean;
     isEnabled: boolean;
     isPressed: boolean;
     fText: string;
-    fCol: RGBA;
     fHookKey: tStrings;
     fHookProc: array of tHookProc;
     mouseOverThisFrame, mouseOverLastFrame: boolean;
@@ -94,9 +93,14 @@ type
     fIsDirty: boolean;
     doubleBufferMode: tDoubleBufferMode;
     doubleBufferEdge: integer; {only this many pixels are blended when using double buffering}
+    {global color}
+    fTint: RGBA;
     {background}
-    fBackground: tPage;
+    fBackground: tSprite;
     fBackgroundCol: RGBA;
+    {image}
+    fImage: tPage;
+    fImageCol: RGBA;
   public
     property isVisible: boolean read fVisible write fVisible;
   protected
@@ -104,7 +108,6 @@ type
     procedure doDraw(const dc: tDrawContext); virtual;
     procedure doUpdate(elapsed: single); virtual;
     procedure setText(aText: string); virtual;
-    procedure setCol(col: RGBA); virtual;
     procedure fireMessage(aMsg: string; args: array of const); virtual; overload;
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(const dc: tDrawContext);
@@ -114,7 +117,8 @@ type
     procedure setBounds(aRect: tRect);
     procedure setIsDirty(value: boolean);
     {style}
-    function  getSprite(): tSprite;
+    procedure setGuiStyle(aStyle: tGuiStyle);
+    function  getBackgroundSprite(): tSprite;
   public
     {canvas}
     procedure enableDoubleBuffered();
@@ -136,14 +140,22 @@ type
     procedure onKeyPress(code: word); virtual;
   public
     property text: string read fText write setText;
-    property col: RGBA read fCol write setCol;
     property pos: tPoint read fPos write fPos;
     {style helpers}
     property font: tFont read fontStyle.font write fontStyle.font;
     property textColor: RGBA read fontStyle.col write fontStyle.col;
-    property background: tPage read fBackground write fBackground;
-    property backgroundColor: RGBA read fBackgroundCol write fBackgroundCol;
+    {tint color - entire component is tinted using this}
+    property tint: RGBA read fTint write fTint;
+    {background - nine-sliced}
+    property background: tSprite read fBackground write fBackground;
+    property backgroundCol: RGBA read fBackgroundCol write fBackgroundCol;
+    {image - stretched over inner size}
+    property image: tPage read fImage write fImage;
+    property imageCol: RGBA read fImageCol write fImageCol;
+    {}
+    property guiStyle: tGuiStyle read fGuiStyle write setGuiStyle;
     property isDirty: boolean read fIsDirty write setIsDirty;
+
   end;
 
   tGuiContainer = class(tGuiComponent)
@@ -255,7 +267,7 @@ begin
   inherited Create();
   handlesInput := true;
   setBounds(Rect(0,0,videoDriver.physicalWidth,videoDriver.physicalHeight));
-  fCol.a := 0;
+  fBackgroundCol.a := 0;
 end;
 
 {--------------------------------------------------------}
@@ -348,8 +360,8 @@ procedure tGuiComponent.playSFX(sfxName: string);
 var
   sfx: tSound;
 begin
-  if not style.sounds.contains(sfxName) then exit;
-  mixer.play(style.sounds[sfxName]);
+  if not fGuiStyle.sounds.contains(sfxName) then exit;
+  mixer.play(fGuiStyle.sounds[sfxName]);
 end;
 
 procedure tGuiComponent.setIsDirty(value: boolean);
@@ -357,12 +369,18 @@ begin
   fIsDirty := value;
 end;
 
-function tGuiComponent.getSprite(): tSprite;
+procedure tGuiComponent.setGuiStyle(aStyle: tGuiStyle);
+begin
+  fGuiStyle := aStyle;
+end;
+
+function tGuiComponent.getBackgroundSprite(): tSprite;
 var
   defaultSprite: tSprite;
 begin
-  defaultSprite := style.sprites.getWithDefault('default', nil);
-  result := style.sprites.getWithDefault(GUI_STATE_NAME[state], defaultSprite);
+  if assigned(fBackground) then exit(fBackground);
+  defaultSprite := fGuiStyle.sprites.getWithDefault('default', nil);
+  result := fGuiStyle.sprites.getWithDefault(GUI_STATE_NAME[state], defaultSprite);
 end;
 
 procedure tGuiComponent.enableDoubleBuffered();
@@ -434,14 +452,16 @@ begin
   fWidth := 16;
   fHeight := 16;
   text := '';
-  col := RGB(255,255,255);
+  fTint := RGBA.White;
   fontStyle.setDefault();
-  style := DEFAULT_GUI_SKIN.styles['default'];
+  fGuiStyle := DEFAULT_GUI_SKIN.styles['default'];
   isDirty := true;
   doubleBufferMode := dbmBlend;
   doubleBufferEdge := 8;
-  fBackground := nil;
   fBackgroundCol := RGBA.White;
+  {image}
+  fImage := nil;
+  fImageCol := RGBA.White;
 end;
 
 {get absolute bounds by parent query}
@@ -449,7 +469,7 @@ function tGuiComponent.screenPos(): tPoint;
 begin
   result := fPos;
   if not assigned(parent) then exit;
-  result += parent.fPos + Point(parent.style.padding.left, parent.style.padding.top);
+  result += parent.fPos + Point(parent.guiStyle.padding.left, parent.guiStyle.padding.top);
 end;
 
 function tGuiComponent.screenBounds(): tRect;
@@ -470,9 +490,9 @@ var
   backCol, frameCol: RGBA;
 begin
 
-  if col.a = 0 then exit;
+  if fBackgroundCol.a = 0 then exit;
 
-  backCol := col;
+  backCol := fBackgroundCol;
   frameCol := RGB(0,0,0,backCol.a div 2);
 
   case state of
@@ -488,7 +508,7 @@ end;
 
 function tGuiComponent.innerBounds: tRect;
 begin
-  result := style.padding.inset(bounds);
+  result := fGuiStyle.padding.inset(bounds);
 end;
 
 function tGuiComponent.bounds: tRect;
@@ -509,8 +529,8 @@ var
   newBounds: tRect;
 begin
   newBounds := font.textExtents(text);
-  newBounds.width += style.padding.horizontal;
-  newBounds.height += style.padding.vertical;
+  newBounds.width += guiStyle.padding.horizontal;
+  newBounds.height += guiStyle.padding.vertical;
   setSize(newBounds.width, newBounds.height);
 end;
 
@@ -528,7 +548,7 @@ begin
   if (dc.page = canvas) then
     // force blit if we are redrawing our own canvas
     backgroundDC.blendMode := bmBlit;
-  s := getSprite();
+  s := getBackgroundSprite();
   if assigned(s) then begin
     s.drawNineSlice(backgroundDC, bounds);
   end else begin
@@ -550,9 +570,9 @@ begin
     inc(drawY);
   end;
 
-  {stretched background}
-  if assigned(fBackground) then
-    dc.asTint(fBackgroundCol).stretchImage(fBackground, innerBounds);
+  {stretched image}
+  if assigned(fImage) then
+    dc.asTint(fImageCol).stretchImage(fImage, innerBounds);
 
   if text <> '' then begin
     if fontStyle.shadow then
@@ -579,11 +599,10 @@ begin
     if isDirty then begin
       canvasDC := canvas.getDC();
       if GUI_HQ then canvasDC.textureFilter := tfLinear;
-      //canvasDC.tint := col;
       doDraw(canvasDC);
       isDirty := false;
     end;
-    drawDC.tint := RGBA.White;
+    drawDC.tint := self.tint;
     drawDC.offset += fPos;
     case doubleBufferMode of
       dbmBlend:
@@ -595,7 +614,7 @@ begin
   end;
 
   if GUI_HQ then drawDC.textureFilter := tfLinear;
-  //drawDC.tint := col;
+  drawDC.tint := self.tint;
   drawDC.offset += fPos;
   doDraw(drawDC);
   fIsDirty := false;
@@ -643,13 +662,6 @@ procedure tGuiComponent.setText(aText: string);
 begin
   if (fText = aText) then exit;
   fText := aText;
-  isDirty := true;
-end;
-
-procedure tGuiComponent.setCol(col: RGBA);
-begin
-  if (fCol = col) then exit;
-  fCol := col;
   isDirty := true;
 end;
 

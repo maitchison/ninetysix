@@ -28,7 +28,7 @@ begin
 
   isInteractive := true;
 
-  style := DEFAULT_GUI_SKIN.styles['button'].clone();
+  guiStyle := DEFAULT_GUI_SKIN.styles['button'].clone();
 
   fontStyle.centered := true;
   fontStyle.shadow := true;

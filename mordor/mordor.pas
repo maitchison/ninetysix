@@ -272,7 +272,7 @@ begin
   {create some pannels to map out what this should look like}
   panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
   panel.text := 'CHARACTER';
-  panel.backgroundColor := RGBF(1.00,0.22,0.12);
+  panel.imageCol := RGBF(1.00,0.22,0.12);
   gui.append(panel);
   panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'PARTY';

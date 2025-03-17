@@ -26,8 +26,8 @@ var
 begin
   inherited Create();
 
-  col := RGB(128,128,128);
-  style := DEFAULT_GUI_SKIN.styles['panel'].clone();
+  backgroundCol := RGB(128,128,128);
+  guiStyle := DEFAULT_GUI_SKIN.styles['panel'].clone();
 
   fPos := rect.pos;
   setSize(rect.width, rect.height);

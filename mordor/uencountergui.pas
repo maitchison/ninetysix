@@ -24,8 +24,13 @@ type
   tEncounterGuiMode = (egmType1);
 
   tMonsterFrame = class(tGuiComponent)
-  public
+  protected
     monster: pointer;
+    frameImage: tPage;
+    monsterImage: tPage;
+  public
+    procedure  doDraw(const dc: tDrawContext); override;
+    constructor Create();
   end;
 
   tEncounterGUI = class(tGuiContainer)
@@ -40,12 +45,27 @@ implementation
 
 {-------------------------------------------------------}
 
+constructor tMonsterFrame.Create();
+begin
+  inherited Create();
+  guiStyle := DEFAULT_GUI_SKIN.styles['panel'].clone();
+  setBounds(Rect(0,0, 96, 128));
+  frameImage := gfx['frame'];
+  monsterImage:= gfx['wolf96'];
+end;
+
+procedure tMonsterFrame.doDraw(const dc: tDrawContext);
+begin
+  dc.asBlendMode(bmBlit).drawImage(monsterImage, Point(0,0));
+  dc.asBlendMode(bmBlend).drawImage(frameImage, Point(0,0));
+end;
+
 constructor tEncounterGUI.Create();
 var
   i: integer;
 begin
   inherited Create();
-  col := RGBA.Clear;
+  backgroundCol := RGBA.Clear;
   setBounds(Rect(0, 0, 500, 180));
   case mode of
     egmType1: begin
