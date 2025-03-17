@@ -579,7 +579,7 @@ begin
     if isDirty then begin
       canvasDC := canvas.getDC();
       if GUI_HQ then canvasDC.textureFilter := tfLinear;
-      canvasDC.tint := col;
+      //canvasDC.tint := col;
       doDraw(canvasDC);
       isDirty := false;
     end;
@@ -595,7 +595,7 @@ begin
   end;
 
   if GUI_HQ then drawDC.textureFilter := tfLinear;
-  drawDC.tint := col;
+  //drawDC.tint := col;
   drawDC.offset += fPos;
   doDraw(drawDC);
   fIsDirty := false;

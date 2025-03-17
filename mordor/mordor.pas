@@ -27,6 +27,7 @@ uses
   uMapGui,
   uTileEditorGui,
   uScene,
+  uEncounterGui,
   uMDRImporter,
   uMDRParty,
   uMDRMap;
@@ -50,6 +51,7 @@ type
     map: tMDRMap;
     party : tMDRParty;
     mapGUI: tMapGUI;
+    encounterGUI: tEncounterGUI;
     procedure moveParty(turn: integer; move: integer);
     {todo: setup this up to auto hook, and then just override}
 
@@ -244,7 +246,6 @@ var
   timer: tTimer;
   dc: tDrawContext;
   panel: tGuiWindow;
-  mapPanel: tGuiContainer;
 const
   RHS_DIVIDE = 280;
   LOWER_DIVIDE = 160;
@@ -261,6 +262,13 @@ begin
   party.pos := Point(5, 9);
   party.dir := dNorth;
 
+  encounterGui := tEncounterGui.Create();
+
+  mapGUI := tMapGui.Create();
+  mapGUI.map := map;
+  mapGUI.mode := mmParty;
+  mapGUI.pos := Point(10,10);
+
   {create some pannels to map out what this should look like}
   panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
   panel.text := 'CHARACTER';
@@ -272,22 +280,22 @@ begin
   panel := tGuiWindow.create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'LOG';
   gui.append(panel);
-  mapPanel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
-  mapPanel.background := nil;
-  gui.append(mapPanel);
+
+  panel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
+  panel.text := 'MAP';
+  panel.append(mapGUI);
+  gui.append(panel);
+
   panel := tGuiWindow.create(Rect(0, 0, 800-RHS_DIVIDE, UPPER_DIVIDE));
   panel.text := 'DUNGEON';
+  panel.append(encounterGui);
   gui.append(panel);
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
   fpsLabel.setSize(60, 21);
   gui.append(fpsLabel);
 
-  mapGUI := tMapGui.Create();
-  mapGUI.map := map;
-  mapGUI.mode := mmParty;
-  mapGUI.pos := Point(10,10);
-  mapPanel.append(mapGUI);
+
 
   timer := tTimer.create('main');
   dc := screen.getDC();
