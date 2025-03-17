@@ -55,12 +55,11 @@ type
   end;
 
   tGuiState = (gsNormal, gsDisabled, gsHighlighted, gsPressed, gsSelected);
+
   tDoubleBufferMode = (
-    // canvas is filled with RGBA.Clear, component should redraw everything, and result is blended into screen, blending only performed on outer 8 pixels
-    dbmPartialBlend,
-    // canvas is filled with RGBA.Clear, component should redraw everything, and result is blended into screen.
-    dbmFullBlend,
-    // canvas is not cleared and canvas is blitted to screen
+    // double buffer is blended during composition
+    dbmBlend,
+    // buffer is blitted
     dbmBlit,
     // force double buffering off
     dbmOff
@@ -93,9 +92,10 @@ type
     canvas: tPage;
     isDirty: boolean;
     doubleBufferMode: tDoubleBufferMode;
+    doubleBufferEdge: integer; {only this many pixels are blended when using double buffering}
     {background}
-    background: tPage;
-    backgroundCol: RGBA;
+    fBackground: tPage;
+    fBackgroundCol: RGBA;
   public
     property isVisible: boolean read fVisible write fVisible;
   protected
@@ -113,6 +113,7 @@ type
     procedure setBounds(aRect: tRect);
     {style}
     function  getSprite(): tSprite;
+  public
     {canvas}
     procedure enableDoubleBuffered();
     procedure disableDoubleBuffered();
@@ -138,6 +139,8 @@ type
     {style helpers}
     property font: tFont read fontStyle.font write fontStyle.font;
     property textColor: RGBA read fontStyle.col write fontStyle.col;
+    property background: tPage read fBackground write fBackground;
+    property backgroundColor: RGBA read fBackgroundCol write fBackgroundCol;
   end;
 
   tGuiContainer = class(tGuiComponent)
@@ -349,6 +352,7 @@ begin
     exit;
   if assigned(canvas) then canvas.free();
   canvas := tPage.create(fWidth, fHeight);
+  canvas.Clear(RGBA.Clear);
   isDirty := true;
 end;
 
@@ -414,9 +418,10 @@ begin
   fontStyle.setDefault();
   style := DEFAULT_GUI_SKIN.styles['default'];
   isDirty := true;
-  doubleBufferMode := dbmPartialBlend;
-  background := nil;
-  backgroundCol := RGBA.White;
+  doubleBufferMode := dbmBlend;
+  doubleBufferEdge := 8;
+  fBackground := nil;
+  fBackgroundCol := RGBA.White;
 end;
 
 {get absolute bounds by parent query}
@@ -495,14 +500,19 @@ var
   textRect: tRect;
   style: tGuiStyle;
   s: tSprite;
+  backgroundDC: tDrawContext;
 begin
 
   {draw background}
+  backgroundDC := dc;
+  if (dc.page = canvas) then
+    // force blit if we are redrawing our own canvas
+    backgroundDC.blendMode := bmBlit;
   s := getSprite();
   if assigned(s) then begin
-    s.drawNineSlice(dc, bounds);
+    s.drawNineSlice(backgroundDC, bounds);
   end else begin
-    defaultBackgroundDraw(dc);
+    defaultBackgroundDraw(backgroundDC);
   end;
 
   if fontStyle.centered then begin
@@ -521,8 +531,8 @@ begin
   end;
 
   {stretched background}
-  if assigned(background) then
-    dc.asTint(backgroundCol).stretchImage(background, innerBounds);
+  if assigned(fBackground) then
+    dc.asTint(fBackgroundCol).stretchImage(fBackground, innerBounds);
 
   {note: font does not yet support draw contexts, so update position here...
    we won't get clipping though}
@@ -546,9 +556,7 @@ begin
   if isDoubleBuffered then begin
     {draw component to canvas, then write this to dc}
     if isDirty then begin
-      if doubleBufferMode in [dbmPartialBlend, dbmFullBlend] then
-        canvas.clear(RGB(0,0,0,0));
-      canvasDC := canvas.getDC(bmBlend);
+      canvasDC := canvas.getDC();
       if GUI_HQ then canvasDC.textureFilter := tfLinear;
       canvasDC.tint := col;
       doDraw(canvasDC);
@@ -557,13 +565,9 @@ begin
     drawDC.tint := RGBA.White;
     drawDC.offset += fPos;
     case doubleBufferMode of
-      dbmPartialBlend: begin
+      dbmBlend: begin
         drawDC.blendMode := bmBlend;
-        drawDC.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
-      end;
-      dbmFullBlend: begin
-        drawDC.blendMode := bmBlend;
-        drawDC.drawImage(canvas, bounds.pos);
+        drawDC.inOutDraw(canvas, bounds.pos, doubleBufferEdge, bmBlit, bmBlend);
       end;
       dbmBlit: begin
         drawDC.blendMode := bmBlit;
@@ -650,11 +654,11 @@ var
   style: tGuiStyle;
   guiSkin: tGuiSkin;
 
-  function makeSprite(tag: string; aBorder: tBorder): tSprite;
+  function makeSprite(tag: string; aBorder: tBorder;innerBlendMode: tBlendMode=bmBlit): tSprite; overload;
   begin
     result := tSprite.Create(guiSkin.gfx[tag]);
     result.border := aBorder;
-    result.innerBlendMode := ord(bmBlit); // faster
+    result.innerBlendMode := ord(innerBlendMode);
   end;
 
   procedure makeStateSprites(style: tGuiStyle; tag: string; aBorder: tBorder);
@@ -681,8 +685,7 @@ begin
 
   style := tGuiStyle.Create();
   style.padding.init(8,11,8,11);
-  style.sprites['default'] := makeSprite('ec_box', Border(40,40,40,40));
-  //style.sprites['default'].innerBlendMode := ord(bmNone); // nothing to draw here
+  style.sprites['default'] := makeSprite('ec_box', Border(20,20,20,20), bmNone);
   guiSkin.styles['box'] := style;
 
   style := tGuiStyle.Create();

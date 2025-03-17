@@ -20,6 +20,7 @@ uses
   uUtils,
   uRect,
   uResource,
+  uColor,
   {$i gui.inc}
   {game stuff}
   uRes,
@@ -242,7 +243,8 @@ var
   fpsLabel: tGuiLabel;
   timer: tTimer;
   dc: tDrawContext;
-  panel: tGuiComponent;
+  panel: tGuiWindow;
+  mapPanel: tGuiContainer;
 const
   RHS_DIVIDE = 280;
   LOWER_DIVIDE = 160;
@@ -261,25 +263,22 @@ begin
   screen.pageClear();
   screen.pageFlip();
 
-  mapGUI := tMapGui.Create();
-  mapGUI.map := map;
-  mapGUI.mode := mmParty;
-  mapGUI.pos := Point(20, 50);
-  gui.append(mapGUI);
-
   {create some pannels to map out what this should look like}
   panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
-  panel.text := 'Character';
+  panel.text := 'CHARACTER';
+  panel.backgroundColor := RGBF(1.00,0.22,0.12);
   gui.append(panel);
   panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
-  panel.text := 'Party';
+  panel.text := 'PARTY';
   gui.append(panel);
   panel := tGuiWindow.create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
-  panel.text := 'Log';
+  panel.text := 'LOG';
   gui.append(panel);
-  panel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
-  panel.text := 'MAP';
-  gui.append(panel);
+
+  mapPanel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
+  mapPanel.background := nil;
+  gui.append(mapPanel);
+
   panel := tGuiWindow.create(Rect(0, 0, 800-RHS_DIVIDE, UPPER_DIVIDE));
   panel.text := 'DUNGEON';
   gui.append(panel);
@@ -287,6 +286,11 @@ begin
   fpsLabel := tGuiLabel.Create(Point(10,10));
   fpsLabel.setSize(40, 20);
   gui.append(fpsLabel);
+
+  mapGUI := tMapGui.Create();
+  mapGUI.map := map;
+  mapGUI.mode := mmParty;
+  mapPanel.append(mapGUI);
 
   timer := tTimer.create('main');
   dc := screen.getDC();
