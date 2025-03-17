@@ -93,6 +93,9 @@ type
     canvas: tPage;
     isDirty: boolean;
     doubleBufferMode: tDoubleBufferMode;
+    {background}
+    background: tPage;
+    backgroundCol: RGBA;
   public
     property isVisible: boolean read fVisible write fVisible;
   protected
@@ -103,7 +106,7 @@ type
     procedure setCol(col: RGBA); virtual;
     procedure fireMessage(aMsg: string; args: array of const); virtual; overload;
     procedure fireMessage(aMsg: string); overload;
-    procedure defaultBackgroundDraw(dc: tDrawContext);
+    procedure defaultBackgroundDraw(const dc: tDrawContext);
     function  bounds: tRect;
     function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
@@ -118,7 +121,7 @@ type
     fontStyle: tFontStyle;
   public
     constructor Create();
-    procedure draw(dc: tDrawContext); virtual;
+    procedure draw(const dc: tDrawContext); virtual;
     procedure update(elapsed: single); virtual;
     function  state: tGuiState;
     function  screenPos(): tPoint;
@@ -145,7 +148,7 @@ type
     constructor Create();
     destructor destroy; override;
     procedure append(x: tGuiComponent); virtual;
-    procedure draw(dc: tDrawContext); override;
+    procedure draw(const dc: tDrawContext); override;
     procedure update(elapsed: single); override;
   end;
 
@@ -267,16 +270,18 @@ begin
     x.enableDoubleBuffered();
 end;
 
-procedure tGuiContainer.draw(dc: tDrawContext);
+procedure tGuiContainer.draw(const dc: tDrawContext);
 var
   gc: tGuiComponent;
+  childDC: tDrawContext;
 begin
   {draw ourselves}
   inherited draw(dc);
 
   {todo: update clip rect aswell I guess}
-  dc.offset += innerBounds.pos + fPos;
-  for gc in elements do if gc.fVisible then gc.draw(dc);
+  childDC := dc;
+  childDC.offset += innerBounds.pos + fPos;
+  for gc in elements do if gc.fVisible then gc.draw(childDC);
 end;
 
 procedure tGuiContainer.update(elapsed: single);
@@ -410,6 +415,8 @@ begin
   style := DEFAULT_GUI_SKIN.styles['default'];
   isDirty := true;
   doubleBufferMode := dbmPartialBlend;
+  background := nil;
+  backgroundCol := RGBA.White;
 end;
 
 {get absolute bounds by parent query}
@@ -433,7 +440,7 @@ begin
 end;
 
 {the fallback default background draw}
-procedure tGuiComponent.defaultBackgroundDraw(dc: tDrawContext);
+procedure tGuiComponent.defaultBackgroundDraw(const dc: tDrawContext);
 var
   backCol, frameCol: RGBA;
 begin
@@ -513,25 +520,28 @@ begin
     inc(drawY);
   end;
 
+  {stretched background}
+  if assigned(background) then
+    dc.asTint(backgroundCol).stretchImage(background, innerBounds);
+
   {note: font does not yet support draw contexts, so update position here...
    we won't get clipping though}
   if text <> '' then begin
-    drawX += dc.offset.x;
-    drawY += dc.offset.y;
     if fontStyle.shadow then
-      font.textOut(dc.page, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
-    font.textOut(dc.page, drawX, drawY, text, fontStyle.col);
-    dc.markRegion(font.textExtents(text, Point(drawX, drawY)));
+      font.textOut(dc, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
+    font.textOut(dc, drawX, drawY, text, fontStyle.col);
   end;
 
 end;
 
-procedure tGuiComponent.draw(dc: tDrawContext);
+procedure tGuiComponent.draw(const dc: tDrawContext);
 var
   oldTint: RGBA;
   canvasDC: tDrawContext;
+  drawDC: tDrawContext;
 begin
   {todo: check clipping bounds}
+  drawDC := dc;
 
   if isDoubleBuffered then begin
     {draw component to canvas, then write this to dc}
@@ -544,28 +554,28 @@ begin
       doDraw(canvasDC);
       isDirty := false;
     end;
-    dc.tint := RGBA.White;
-    dc.offset += fPos;
+    drawDC.tint := RGBA.White;
+    drawDC.offset += fPos;
     case doubleBufferMode of
       dbmPartialBlend: begin
-        dc.blendMode := bmBlend;
-        dc.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
+        drawDC.blendMode := bmBlend;
+        drawDC.inOutDraw(canvas, bounds.pos, 8, bmBlit, bmBlend);
       end;
       dbmFullBlend: begin
-        dc.blendMode := bmBlend;
-        dc.drawImage(canvas, bounds.pos);
+        drawDC.blendMode := bmBlend;
+        drawDC.drawImage(canvas, bounds.pos);
       end;
       dbmBlit: begin
-        dc.blendMode := bmBlit;
-        dc.drawImage(canvas, bounds.pos);
+        drawDC.blendMode := bmBlit;
+        drawDC.drawImage(canvas, bounds.pos);
       end;
     end;
   end else begin
     {draw component directly to dc}
-    if GUI_HQ then dc.textureFilter := tfLinear;
-    dc.tint := col;
-    dc.offset += fPos;
-    doDraw(dc);
+    if GUI_HQ then drawDC.textureFilter := tfLinear;
+    drawDC.tint := col;
+    drawDC.offset += fPos;
+    doDraw(drawDC);
   end;
 end;
 

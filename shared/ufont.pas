@@ -30,14 +30,14 @@ type
     {todo: put this and chars both on the heep}
     kerning: array[0..255, 0..255] of shortint;
   protected
-    function charOut(Page: tPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
+    function charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
   public
     constructor create();
     class function Load(filename: string): tFont; static;
 
-    procedure textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
-    function textExtents(s: string; p: tPoint): tRect; overload;
-    function textExtents(s: string): tRect; overload;
+    procedure textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA);
+    function  textExtents(s: string; p: tPoint): tRect; overload;
+    function  textExtents(s: string): tRect; overload;
 
   end;
 
@@ -155,7 +155,7 @@ begin
   end;
 end;
 
-function tFont.charOut(Page: tPage;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
+function tFont.charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
 var
   char: tChar;
 begin
@@ -163,12 +163,12 @@ begin
   atX += kerning[ord(prevc), ord(c)];
 
   char := chars[ord(c)];
-  drawSubImage(page, atX+char.xoffset, atY+char.yoffset, bitmap, char.rect, col);
+  dc.asTint(col).drawSubImage(bitmap, Point(atX+char.xoffset, atY+char.yoffset), char.rect);
   atX += char.xadvance;
   result := atX;
 end;
 
-procedure tFont.textOut(page: tPage; atX, atY: integer; s: string;col: RGBA);
+procedure tFont.textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA);
 var
   i: integer;
   prevChar: char;
@@ -176,7 +176,7 @@ begin
   if not assigned(self) then exit;
   prevChar := #0;
   for i := 1 to length(s) do begin
-    atX := charOut(page, atX, atY, s[i], col, prevChar);
+    atX := charOut(dc, atX, atY, s[i], col, prevChar);
     prevChar := s[i];
   end;
 end;

@@ -120,6 +120,7 @@ begin
     srcPath := tLazyResource(resources[id]).path;
     resources[id].free;
     resources[id] := loadResource(srcPath);
+    resources[id].tag := aTag;
   end;
   result := resources[id];
 end;

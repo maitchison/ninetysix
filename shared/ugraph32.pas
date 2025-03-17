@@ -161,7 +161,7 @@ end;
 function tGFXLibrary.getWithDefault(aTag: string;aDefault: tPage): tPage;
 begin
   if hasResource(aTag) then
-    exit(self[aTag])
+    exit(getGFXByTag(aTag))
   else
     exit(aDefault);
 end;

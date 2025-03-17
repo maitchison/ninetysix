@@ -48,7 +48,7 @@ type
     procedure setCursorPos(aPos: tPoint);
     procedure setCursorDir(d: tDirection);
     procedure doUpdate(elapsed: single); override;
-    procedure doDraw(dc: tDrawContext); override;
+    procedure doDraw(const dc: tDrawContext); override;
     procedure invalidate(); override;
   end;
 
@@ -168,19 +168,21 @@ begin
   if keyDown(key_space) then onKeyPress(key_space);
 end;
 
-procedure tMapGUI.doDraw(dc: tDrawContext);
-  var
+procedure tMapGUI.doDraw(const dc: tDrawContext);
+var
   x,y: integer;
+  flipDc: tDrawContext;
 begin
 
-  dc.clearFlags := FG_FLIP;
-
   if not assigned(map) then exit();
+
+  flipDC := dc;
+  flipDC.clearFlags := FG_FLIP;
 
   for y := 0 to map.height-1 do
     for x := 0 to map.width-1 do
       if isTileDirty[x,y] then
-        renderTile(dc, x, y);
+        renderTile(flipDC, x, y);
 end;
 
 procedure tMapGui.drawCursor(dc: tDrawContext);

@@ -84,7 +84,7 @@ begin
       mapSprites.sprites[fs.spriteIdx].draw(dc, bounds.x+i*16, bounds.y);
     if ft = floorType then begin
       mapSprites.sprites[CURSOR_SPRITE].draw(dc, bounds.x+i*16, bounds.y);
-      DEFAULT_FONT.textOut(dc.page, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
+      DEFAULT_FONT.textOut(dc, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
     end;
   end;
 end;
