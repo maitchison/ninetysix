@@ -37,10 +37,10 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 type
   tVoxel = class
   protected
-    vox: tPage;
     fLog2Width,fLog2Height: byte;
     fWidth,fHeight,fDepth: int16;
-
+  public
+    vox: tPage;
     function getDistance_L1(x,y,z: integer): integer;
     function getDistance_L2(x,y,z: integer): single;
     function generateSDF(): tPage;
@@ -51,7 +51,8 @@ type
 
   public
 
-    constructor create(filename: string; height: integer);
+    constructor Create(aWidth, aDepth, aHeight: integer);
+    constructor Create(filename: string; height: integer);
     destructor destroy(); override;
 
     function getSize(): V3D16;
@@ -163,7 +164,7 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tVoxel.create(filename: string; height: integer);
+constructor tVoxel.Create(filename: string; height: integer);
 begin
   inherited create();
   fWidth := 0;
@@ -173,6 +174,20 @@ begin
   fLog2Height := 0;
   vox := nil;
   loadFromFile(filename, height);
+end;
+
+constructor tVoxel.Create(aWidth, aDepth, aHeight: integer);
+begin
+  inherited create();
+  assert(isPowerOfTwo(aWidth));
+  assert(isPowerOfTwo(aDepth));
+  assert(isPowerOfTwo(aHeight));
+  fWidth := aWidth;
+  fHeight := aHeight;
+  fDepth := aDepth;
+  fLog2Width := round(log2(aWidth));
+  fLog2Height := round(log2(aDepth));
+  vox := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
 destructor tVoxel.destroy();
