@@ -36,6 +36,20 @@ var
   page: tPage;
   pixelsPtr: pointer;
   dc: tDrawContext;
+
+  procedure decimateLayer(depth: integer;p: single);
+  var
+    x,y: integer;
+    c: RGBA;
+  begin
+    for x := 0 to 31 do begin
+      for y := 0 to 31 do begin
+        if (random > p) then continue;
+        page.setPixel(x,y+depth*32,RGBA.Clear);
+      end;
+    end;
+  end;
+
 begin
   page := voxelCell.vox;
   assertEqual(page.width, 32);
@@ -46,12 +60,23 @@ begin
   //dc.fillRect(Rect(0,0*32,32,32), MDR_DARKGRAY);
   //dc.fillRect(Rect(0,1*32,32,32), MDR_LIGHTGRAY);
   {floor}
-  dc.fillRect(Rect(0,30*32,32,32), MDR_LIGHTGRAY);
-  dc.asBlendMode(bmBlend).asTint(RGB(255,255,255,128)).drawImage(noise, Point(0,30*32));
+  case tile.floor of
+    ftStone: begin
+      //bedrock
+      dc.fillRect(Rect(0,31*32,32,32), MDR_DARKGRAY);
+      //stone layer
+      dc.fillRect(Rect(0,30*32,32,32), MDR_LIGHTGRAY);
+      dc.asBlendMode(bmBlend).asTint(RGB(255,255,255,128)).drawImage(noise, Point(0,30*32));
+      decimateLayer(30, 0.1);
+    end;
+    ftDirt: begin
+      dc.fillRect(Rect(0,30*32,32,32), MDR_LIGHTGRAY);
+      dc.asBlendMode(bmBlend).asTint(RGB(255,255,255,128)).drawImage(noise, Point(0,30*32));
+    end;
+  end;
+  {trim}
   dc.fillRect(Rect(0,0+29*32,32,32), MDR_LIGHTGRAY);
   dc.fillRect(Rect(1,1+29*32,30,30), RGBA.Clear);
-  {trim}
-
 
   {uniform CDF for now... can optimize later}
   pixelsPtr := page.pixels;
@@ -107,6 +132,9 @@ begin
       c := rnd div 2 + 64;
       noise.setPixel(x,y, RGB(c,c,c));
     end;
+
+  tile.floor := ftDirt;
+
   composeVoxelCell(tile, walls);
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 end;
