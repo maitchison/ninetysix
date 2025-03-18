@@ -37,10 +37,11 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 type
   tVoxel = class
   protected
+    fWidth,fHeight,fDepth: int32;
     fLog2Width,fLog2Height: byte;
-    fWidth,fHeight,fDepth: int16;
   public
-    vox: tPage;
+    vox: tPage;     {RGBD}
+    attr: tPage;    {Emmisive-Ambient-x-x}
     function getDistance_L1(x,y,z: integer): integer;
     function getDistance_L2(x,y,z: integer): single;
     function generateSDF(): tPage;
@@ -50,13 +51,12 @@ type
     procedure loadFromFile(filename: string; height: integer);
 
   public
-
     constructor Create(aWidth, aDepth, aHeight: integer);
     constructor Create(filename: string; height: integer);
     destructor destroy(); override;
 
     function getSize(): V3D16;
-    function getVoxel(x,y,z:int32): RGBA;
+    function getVoxel(x,y,z:int32): RGBA; inline; register;
     procedure setVoxel(x,y,z:int32;c: RGBA);
     function draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
@@ -173,6 +173,7 @@ begin
   fLog2Width := 0;
   fLog2Height := 0;
   vox := nil;
+  attr := nil;
   loadFromFile(filename, height);
 end;
 
@@ -188,6 +189,7 @@ begin
   fLog2Width := round(log2(aWidth));
   fLog2Height := round(log2(aDepth));
   vox := tPage.Create(aWidth, aHeight*aDepth);
+  attr := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
 destructor tVoxel.destroy();
@@ -238,14 +240,14 @@ begin
   result.w := 0;
 end;
 
-function tVoxel.getVoxel(x,y,z:int32): RGBA;
+function tVoxel.getVoxel(x,y,z:int32): RGBA; inline; register;
 begin
   {todo: fast asm}
-  result.init(255,0,255,0);
-  if (x < 0) or (x >= fWidth) then exit;
-  if (y < 0) or (y >= fHeight) then exit;
-  if (z < 0) or (z >= fDepth) then exit;
-  result := vox.getPixel(x,y+z*fHeight);
+  result.r := 255; result.g := 0; result.b := 255; result.a := 255;
+  if (dword(x) >= fWidth) then exit;
+  if (dword(y) >= fHeight) then exit;
+  if (dword(z) >= fDepth) then exit;
+  result := pRGBA(vox.pixels + ((x+((y+(z shl fLog2Height)) shl fLog2Width))) shl 2)^;
 end;
 
 procedure tVoxel.setVoxel(x,y,z:int32;c: RGBA);
@@ -377,12 +379,16 @@ var
     deltaX := cameraX + cameraDir*txDelta;
     deltaY := cameraY + cameraDir*tyDelta;
 
+    //stub:
+    {
     if cpuInfo.hasMMX then
       traceProc := traceScanline_MMX
     else
       traceProc := traceScanline_ASM;
     if keyDown(key_f5) then
       traceProc := traceScanline_REF;
+    }
+    traceProc := traceScanline_REF;
 
     for y := polyBounds.top to polyBounds.bottom-1 do begin
 

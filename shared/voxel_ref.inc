@@ -12,6 +12,7 @@ var
   sx,sy,sz: int32;
   depth: int32;
   voxPtr: pointer;
+  shadeShift: byte;
 begin
 
   LAST_TRACE_COUNT := 0;
@@ -39,6 +40,8 @@ begin
 
   voxPtr := voxSprite.vox.pixels;
 
+  if size.x < 16 then shadeShift := 1 else shadeShift := 0;
+
   for k := 0 to MAX_SAMPLES-1 do begin
 
     inc(VX_TRACE_COUNT);
@@ -50,35 +53,34 @@ begin
 
     if (x < 0) or (x >= size.x) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGBA.create(255,0,0));
+      exit(RGB(255,0,0));
     end;
     if (y < 0) or (y >= size.y) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGBA.create(0,255,0));
+      exit(RGB(0,255,0));
     end;
     if (z < 0) or (z >= size.z) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGBA.create(0,0,255));
+      exit(RGB(0,0,255));
     end;
 
     c := voxSprite.getVoxel(x, y, z);
 
     if c.a = 255 then begin
       {shade by distance from bounding box}
-      c *= (255-(depth*2))/255;
+      c *= (255-(depth shl shadeShift))/255;
       exit(c)
     end else begin
       if VX_USE_SDF then begin
         {move to next voxel}
         d := (255-c.a);
-        {d is distance * 4}
-        sx := sx + ((dx * d) div 4);
-        sy := sy + ((dy * d) div 4);
-        sz := sz + ((dz * d) div 4);
       end else begin
         d := 1;
       end;
-
+      {d is distance * 4}
+      sx := sx + ((dx * d) div 4);
+      sy := sy + ((dy * d) div 4);
+      sz := sz + ((dz * d) div 4);
       depth += d;
     end;
   end;
@@ -105,10 +107,10 @@ begin
 
     col := trace_REF(voxSprite, pos, dir, size);
 
-    if VX_GHOST_MODE then
+    if (VX_GHOST_MODE or keyDown(key_f4)) then
        col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);
 
-    if VX_UVW_MODE and (col.a = 0) then
+    if (VX_UVW_MODE or keyDown(key_f5) )and (col.a = 0) then
        col.init(trunc(pos.x*4), trunc(pos.y*8), trunc(pos.z*16));
 
     if keyDown(key_f6) then begin
@@ -124,16 +126,11 @@ begin
         fillchar(col16, sizeof(col16), 0);
       for i := 0 to 1 do
         for j := 0 to 1 do begin
-          {the first sample is at pixel center (0.5,0.5)
-          each of these four samples is taken uniformally at random
-          from each of the pixels quadrants.
-          update: disabled random sampling
-          }
-
+          {The first sample is at pixel center (0.5,0.5)
+          each of these four samples is taken in a grid around the
+          center pixel}
           dx := ((i * 2) - 1) * 0.25;
           dy := ((i * 2) - 1) * 0.25;
-          //dx += ((rnd/256) - 0.5) * 0.50;
-          //dy += ((rnd/256) - 0.5) * 0.50;
           col := trace_REF(voxSprite, pos+(deltaX*dx)+(deltaY*dy), dir, size);
           if col.a > 0 then begin
             col16.r += col.r; col16.g += col.g; col16.b += col.b; col16.a += col.a;
