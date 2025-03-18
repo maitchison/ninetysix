@@ -19,6 +19,7 @@ type
   tDungeonViewGui = class(tGuiPanel)
   protected
     noisePage: tPage;
+    voxelPage: tPage;
   public
     procedure composeVoxelCell(tile: tTile; walls: array of tWall);
     procedure doUpdate(elapsed: single); override;
@@ -116,7 +117,7 @@ var
   end;
 
 begin
-  page := voxelCell.vox;
+  page := voxelPage;
   assertEqual(page.width, 32);
   assertEqual(page.height, 32*32);
   page.clear(RGBA.Clear());
@@ -188,11 +189,11 @@ begin
   if walls[ord(dNorth)].isSolid or walls[ord(dWest)].isSolid then
     pillar(0,0);
   if walls[ord(dNorth)].isSolid or walls[ord(dEast)].isSolid then
-    pillar(31,0);
+    pillar(32-3,0);
   if walls[ord(dSouth)].isSolid or walls[ord(dWest)].isSolid then
-    pillar(0,31);
+    pillar(0,32-3);
   if walls[ord(dSouth)].isSolid or walls[ord(dEast)].isSolid then
-    pillar(31,31);
+    pillar(32-3,32-3);
 
   {trim}
   {todo: get trim from neighbours... ah... we do want map then...
@@ -250,6 +251,7 @@ var
 begin
   inherited Create(Rect(20, 10, 96, 124), 'View');
   voxelCell := tVoxel.Create(32,32,32);
+  voxelPage := voxelCell.vox.clone();
   noisePage := tPage.Create(32,32);
   for y := 0 to 31 do
     for x := 0 to 31 do begin
@@ -264,6 +266,8 @@ begin
   walls[4].t := wtNone;
 
   composeVoxelCell(tile, walls);
+  voxelCell.generateLighting(lmGradient, voxelPage);
+
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 end;
 

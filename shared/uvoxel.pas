@@ -23,7 +23,7 @@ var
   VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
   VX_GHOST_MODE: boolean = false;
-  VX_USE_SDF: boolean = true;
+  VX_USE_SDF: boolean = false;
   VX_UVW_MODE: boolean = false;
 
 
@@ -44,13 +44,12 @@ type
     fLog2Width,fLog2Height: byte;
   public
     vox: tPage;     {RGBD - baked (todo: 2 bits of D are for alpha)}
-    diffuse: tPage; {RGBA - no lighting applied}
     function getDistance_L1(x,y,z: integer): integer;
     function getDistance_L2(x,y,z: integer): single;
     function generateSDF(): tPage;
     procedure transferSDF(sdf: tPage);
 
-    procedure generateLighting(mode: tLightingMode);
+    procedure generateLighting(mode: tLightingMode; diffuse: tPage);
 
     procedure setPage(page: tPage; height: integer);
     procedure loadFromFile(filename: string; height: integer);
@@ -198,20 +197,57 @@ end;
 destructor tVoxel.destroy();
 begin
   freeAndNil(vox);
-  freeAndNil(diffuse);
   inherited destroy();
 end;
 
-procedure tVoxel.generateLighting(mode: tLightingMode);
+procedure tVoxel.generateLighting(mode: tLightingMode; diffuse: tPage);
 var
-  emmisive, ambient: tPage;
+  emisive, ambient: tPage;
+  x,y,z: int32;
+  v: single;
+  amb,emi,dif,col: RGBA;
 begin
+  if mode = lmNone then begin
+    vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
+    exit;
+  end;
+
+  emisive := diffuse.clone();
+  emisive.clear();
+  ambient := diffuse.clone();
+  ambient.clear();
+
   case mode of
-    lmNone: begin
-      vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
-      exit;
+    lmGradient: begin
+      for x := 0 to fWidth-1 do
+        for y := 0 to fHeight-1 do
+          for z := 0 to fDepth-1 do begin
+            v := 1-sqr(z / (fDepth-1));
+            ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
+              RGB($FF7F7F7F),
+              RGB($FFBACEEF),
+              v
+            ));
+          end;
     end;
   end;
+
+  {modulate}
+  for x := 0 to fWidth-1 do
+    for y := 0 to fHeight-1 do
+      for z := 0 to fDepth-1 do begin
+        dif := diffuse.getPixel(x,y+z*fWidth);
+        amb := ambient.getPixel(x,y+z*fWidth);
+        if dif.a < 255 then
+          dif := RGBA.Clear
+        else
+          dif := RGBA.White;
+        col := dif*amb;
+        vox.setPixel(x,y+z*fWidth, col);
+      end;
+
+  emisive.free();
+  ambient.free();
 end;
 
 procedure tVoxel.loadFromFile(filename: string; height: integer);
@@ -230,10 +266,9 @@ begin
     sdf := self.generateSDF();
     saveLC96(filename+'.sdf', sdf);
   end;
-
-  self.diffuse := img.clone();
+  self.generateLighting(lmGradient, img);
   self.transferSDF(sdf);
-  self.generateLighting(lmNone);
+
   sdf.free();
 end;
 
