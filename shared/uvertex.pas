@@ -112,7 +112,22 @@ function V2(x,y: single): V2D;
 function V2Polar(degree,r: single): V2D;
 function V3(x,y,z: single): V3D;
 
+function sampleShell(): V3D;
+
 implementation
+
+{-----------------------------------------}
+
+{returns a vector sampled from a shell of unit radius}
+function sampleShell(): V3D;
+begin
+  {todo: do this properly}
+  result.x := (rnd-128);
+  result.y := (rnd-128);
+  result.z := (rnd-128);
+  result.w := 1;
+  result := result.normed;
+end;
 
 {-----------------------------------------}
 
@@ -630,7 +645,7 @@ end;
 
 class operator V3D32.equal(a,b: V3D32): boolean; inline;
 begin
-  result := (a.x=b.x) and (a.y=b.y) and (a.z=b.z) and (a.w=b.w);
+  result := (a.x=b.x) and (a.y=b.y) and (a.z=b.z);
 end;
 
 {-----------------------------------------------------}

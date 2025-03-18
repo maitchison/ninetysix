@@ -261,12 +261,12 @@ begin
 
   tile.floor := ftStone;
   walls[1].t := wtWall;
-  walls[2].t := wtNone;
+  walls[2].t := wtWall;
   walls[3].t := wtNone;
   walls[4].t := wtNone;
 
   composeVoxelCell(tile, walls);
-  voxelCell.generateLighting(lmSimple, voxelPage);
+  voxelCell.generateLighting(lmGI, voxelPage);
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 end;

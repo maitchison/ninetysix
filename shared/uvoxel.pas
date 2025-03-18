@@ -29,7 +29,7 @@ var
 
 
 type
-  tLightingMode = (lmNone, lmGradient, lmSimple);
+  tLightingMode = (lmNone, lmGradient, lmSimple, lmGI);
 
 {restrictions
 X,Y,Z <= 256
@@ -40,7 +40,7 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 
 type
 
-  tTraceHit = record
+  tRayHit = record
     pos: V3D;
     didHit: boolean;
     d: single;
@@ -71,7 +71,7 @@ type
     function  inBounds(x,y,z:int32): boolean; inline; register;
     function  getVoxel(x,y,z:int32): RGBA; inline; register;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    function  trace(pos: V3D; dir: V3D): tTraceHit;
+    function  trace(pos: V3D; dir: V3D; ignore: V3D32): tRayHit;
 
     function  draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
@@ -230,6 +230,55 @@ var
     if diffuse.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
   end;
 
+  {guess which way the voxel is 'pointing'}
+  function guessNorm(): V3D;
+  begin
+    result := V3(0,0,0);
+    if diffuse.getPixel((x-1),(y)+(z)*fWidth).a = 255 then result += V3(+1,0,0);
+    if diffuse.getPixel((x+1),(y)+(z)*fWidth).a = 255 then result += V3(-1,0,0);
+    if diffuse.getPixel((x),(y-1)+(z)*fWidth).a = 255 then result += V3(0,+1,0);
+    if diffuse.getPixel((x),(y+1)+(z)*fWidth).a = 255 then result += V3(0,-1,0);
+    if diffuse.getPixel((x),(y)+(z-1)*fWidth).a = 255 then result += V3(0,0,+1);
+    if diffuse.getPixel((x),(y)+(z+1)*fWidth).a = 255 then result += V3(0,0,-1);
+    if result.abs2 = 0 then exit else result := result.normed();
+  end;
+
+  {returns proportion of sphere unaccluded}
+  function sampleGI(): single;
+  var
+    i: integer;
+    p,d: V3D;
+    hit: tRayHit;
+    hits: integer;
+    norm: V3D;
+    hasNorm: boolean;
+    orig: V3D32;
+  const
+    SAMPLES = 32;
+  begin
+    orig.x := x; orig.y := y; orig.z := z;
+    norm := guessNorm();
+    hasNorm := norm.abs2 <> 0;
+    p := V3(x, y, z) + norm + V3(0.5, 0.5, 0.5);
+    hits := 0;
+    for i := 0 to SAMPLES-1 do begin
+      d := sampleShell();
+      {hemisphere sampling}
+      if hasNorm and (d.dot(norm) < 0) then d *= -1;
+      (*
+      if d.z > 0 then begin
+        {hit a pretend floor plane}
+        inc(hits);
+        continue;
+      end;
+      *)
+      hit := trace(p, d, orig);
+      if hit.didHit then inc(hits);
+    end;
+    result := (hits / SAMPLES);
+    note('%f', [result]);
+  end;
+
 begin
   if mode = lmNone then begin
     vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
@@ -244,13 +293,17 @@ begin
   for x := 0 to fWidth-1 do
     for y := 0 to fHeight-1 do
       for z := 0 to fDepth-1 do begin
+        if diffuse.getPixel(x,y+z*fWidth).a <> 255 then continue;
         case mode of
-          lmGradient: v := 1-sqr(z / (fDepth-1));
-          lmSimple: v := countNeighbours()/6;
+          lmGradient: v := sqr(z / (fDepth-1));
+          lmSimple: v := 1-(countNeighbours()/6);
+          lmGI: v := sampleGI();
         end;
         ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-          RGB($FF7F7F7F),
-          RGB($FFBACEEF),
+          //RGB($FF7F7F7F),
+          //RGB($FFBACEEF),
+          RGBA.White,
+          RGBA.Black,
           v
         ));
       end;
@@ -261,12 +314,12 @@ begin
       for z := 0 to fDepth-1 do begin
         dif := diffuse.getPixel(x,y+z*fWidth);
         amb := ambient.getPixel(x,y+z*fWidth);
-        {
+
         if dif.a < 255 then
           dif := RGBA.Clear
         else
           dif := RGBA.White;
-        }
+
         col := dif*amb;
         vox.setPixel(x,y+z*fWidth, col);
       end;
@@ -337,12 +390,12 @@ begin
 end;
 
 {
-Trace ray through object. ignores initial voxel.
+Trace ray through object.
 Very slow for the moment.
 (0.5,0.5 is center of voxel)
 dir should be normalized
 }
-function tVoxel.trace(pos: V3D; dir: V3D): tTraceHit;
+function tVoxel.trace(pos: V3D; dir: V3D; ignore: V3D32): tRayHit;
 var
   i: integer;
   maxSteps: integer;
@@ -355,10 +408,10 @@ begin
   maxSteps := ceil(sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth))/STEP_SIZE);
   result.pos := pos;
   result.d := 0;
-  old := V3D32.Trunc(pos);
+  old.x := -1; old.y := -1; old.z := -1;
   for i := 0 to maxSteps-1 do begin
     cur := V3D32.Trunc(result.pos);
-    if (cur <> old) then begin
+    if (cur <> old) and (cur <> ignore) then begin
       {we moved to a new cell}
       if not inBounds(cur.x, cur.y, cur.z) then begin
         result.didHit := false;
@@ -369,6 +422,7 @@ begin
         result.didHit := true;
         exit;
       end;
+      old := cur;
     end;
     result.pos += dir * STEP_SIZE;
     result.d += STEP_SIZE;
