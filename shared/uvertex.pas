@@ -77,6 +77,7 @@ type
 
     class function round(a: V3D): V3D32; static; inline;
     class function trunc(a: V3D): V3D32; static; inline;
+    class operator equal(a,b: V3D32): boolean; inline;
     end;
 
 type
@@ -625,6 +626,11 @@ begin
   result.z := system.trunc(a.z);
   result.w := 0;
   {$R+,Q+}
+end;
+
+class operator V3D32.equal(a,b: V3D32): boolean; inline;
+begin
+  result := (a.x=b.x) and (a.y=b.y) and (a.z=b.z) and (a.w=b.w);
 end;
 
 {-----------------------------------------------------}

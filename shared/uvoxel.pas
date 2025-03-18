@@ -12,6 +12,7 @@ uses
   uColor,
   uRect,
   uGraph32,
+  uMath,
   uFilesystem,
   uInfo,
   uVGADriver,
@@ -38,15 +39,22 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 }
 
 type
+
+  tTraceHit = record
+    pos: V3D;
+    didHit: boolean;
+    d: single;
+  end;
+
   tVoxel = class
   protected
     fWidth,fHeight,fDepth: int32;
     fLog2Width,fLog2Height: byte;
   public
     vox: tPage;     {RGBD - baked (todo: 2 bits of D are for alpha)}
-    function getDistance_L1(x,y,z: integer): integer;
-    function getDistance_L2(x,y,z: integer): single;
-    function generateSDF(): tPage;
+    function  getDistance_L1(x,y,z: integer): integer;
+    function  getDistance_L2(x,y,z: integer): single;
+    function  generateSDF(): tPage;
     procedure transferSDF(sdf: tPage);
 
     procedure generateLighting(mode: tLightingMode; diffuse: tPage);
@@ -59,10 +67,13 @@ type
     constructor Create(filename: string; height: integer);
     destructor destroy(); override;
 
-    function getSize(): V3D16;
-    function getVoxel(x,y,z:int32): RGBA; inline; register;
+    function  getSize(): V3D16;
+    function  inBounds(x,y,z:int32): boolean; inline; register;
+    function  getVoxel(x,y,z:int32): RGBA; inline; register;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    function draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
+    function  trace(pos: V3D; dir: V3D): tTraceHit;
+
+    function  draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
 
 implementation
@@ -295,14 +306,62 @@ begin
   result.w := 0;
 end;
 
+function tVoxel.inBounds(x,y,z: int32): boolean; inline; register;
+begin
+  if (dword(x) >= fWidth) then exit(false);
+  if (dword(y) >= fHeight) then exit(false);
+  if (dword(z) >= fDepth) then exit(false);
+  result := true;
+end;
+
 function tVoxel.getVoxel(x,y,z:int32): RGBA; inline; register;
 begin
   {todo: fast asm}
   result.r := 255; result.g := 0; result.b := 255; result.a := 255;
-  if (dword(x) >= fWidth) then exit;
-  if (dword(y) >= fHeight) then exit;
-  if (dword(z) >= fDepth) then exit;
+  if not inBounds(x,y,z) then exit;
   result := pRGBA(vox.pixels + ((x+((y+(z shl fLog2Height)) shl fLog2Width))) shl 2)^;
+end;
+
+{
+Trace ray through object. ignores initial voxel.
+Very slow for the moment.
+(0.5,0.5 is center of voxel)
+dir should be normalized
+}
+function tVoxel.trace(pos: V3D; dir: V3D): tTraceHit;
+var
+  i: integer;
+  maxSteps: integer;
+  c: RGBA;
+  old,cur: V3D32;
+const
+  STEP_SIZE = 0.1;
+begin
+  assert(abs(dir.abs2-1.0) < 1e-6);
+  maxSteps := ceil(sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth))/STEP_SIZE);
+  result.pos := pos;
+  result.d := 0;
+  old := V3D32.Trunc(pos);
+  for i := 0 to maxSteps-1 do begin
+    cur := V3D32.Trunc(result.pos);
+    if (cur <> old) then begin
+      {we moved to a new cell}
+      if not inBounds(cur.x, cur.y, cur.z) then begin
+        result.didHit := false;
+        exit;
+      end;
+      c := getVoxel(cur.x, cur.y, cur.z);
+      if c.a = 255 then begin
+        result.didHit := true;
+        exit;
+      end;
+    end;
+    result.pos += dir * STEP_SIZE;
+    result.d += STEP_SIZE;
+  end;
+
+  result.didHit := false;
+
 end;
 
 procedure tVoxel.setVoxel(x,y,z:int32;c: RGBA);
