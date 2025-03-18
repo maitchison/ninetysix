@@ -27,6 +27,9 @@ var
   VX_UVW_MODE: boolean = false;
 
 
+type
+  tLightingMode = (lmNone, lmGradient);
+
 {restrictions
 X,Y,Z <= 256
 X,Y powers of 2
@@ -40,12 +43,14 @@ type
     fWidth,fHeight,fDepth: int32;
     fLog2Width,fLog2Height: byte;
   public
-    vox: tPage;     {RGBD}
-    attr: tPage;    {Emmisive-Ambient-x-x}
+    vox: tPage;     {RGBD - baked (todo: 2 bits of D are for alpha)}
+    diffuse: tPage; {RGBA - no lighting applied}
     function getDistance_L1(x,y,z: integer): integer;
     function getDistance_L2(x,y,z: integer): single;
     function generateSDF(): tPage;
     procedure transferSDF(sdf: tPage);
+
+    procedure generateLighting(mode: tLightingMode);
 
     procedure setPage(page: tPage; height: integer);
     procedure loadFromFile(filename: string; height: integer);
@@ -173,7 +178,6 @@ begin
   fLog2Width := 0;
   fLog2Height := 0;
   vox := nil;
-  attr := nil;
   loadFromFile(filename, height);
 end;
 
@@ -189,13 +193,25 @@ begin
   fLog2Width := round(log2(aWidth));
   fLog2Height := round(log2(aDepth));
   vox := tPage.Create(aWidth, aHeight*aDepth);
-  attr := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
 destructor tVoxel.destroy();
 begin
   freeAndNil(vox);
+  freeAndNil(diffuse);
   inherited destroy();
+end;
+
+procedure tVoxel.generateLighting(mode: tLightingMode);
+var
+  emmisive, ambient: tPage;
+begin
+  case mode of
+    lmNone: begin
+      vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
+      exit;
+    end;
+  end;
 end;
 
 procedure tVoxel.loadFromFile(filename: string; height: integer);
@@ -207,13 +223,17 @@ begin
   img.setTransparent(RGBA.create(255,255,255));
   note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
   self.setPage(img, height);
+
   if fileSystem.exists(filename+'.sdf') then begin
     sdf := loadLC96(filename+'.sdf');
   end else begin
     sdf := self.generateSDF();
     saveLC96(filename+'.sdf', sdf);
   end;
+
+  self.diffuse := img.clone();
   self.transferSDF(sdf);
+  self.generateLighting(lmNone);
   sdf.free();
 end;
 
