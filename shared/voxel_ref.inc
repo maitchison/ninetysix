@@ -1,8 +1,8 @@
 type
-  tTraceScanlineProc = procedure(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
+  tTraceScanlineProc = procedure(canvas: tPage; voxSprite: tVoxel; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
 
 {trace ray at location and direction (in object space)}
-function trace_REF(voxSprite: tVoxelSprite; pos: V3D;dir: V3D;size: V3D16): RGBA;
+function trace_REF(voxSprite: tVoxel; pos: V3D;dir: V3D;size: V3D16): RGBA;
 var
   k: integer;
   c: RGBA;
@@ -84,7 +84,7 @@ begin
 
 end;
 
-procedure traceScanline_REF(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
+procedure traceScanline_REF(canvas: tPage; voxSprite: tVoxel; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
 var
   x: int16;
   size: V3D16;

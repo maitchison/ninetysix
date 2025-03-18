@@ -6,16 +6,17 @@ unit uVoxel;
 interface
 
 uses
-  utils,
-  test,
-  debug,
-  graph32,
-  graph2d,
-  filesystem,
-  sysInfo,
-  vga,
-  vertex,
-  lc96;
+  uUtils,
+  uTest,
+  uDebug,
+  uColor,
+  uRect,
+  uGraph32,
+  uFilesystem,
+  uInfo,
+  uVGADriver,
+  uVertex,
+  uLP96;
 
 var
   {debugging stuff}
@@ -33,7 +34,7 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 }
 
 type
-  tVoxelSprite = class
+  tVoxel = class
   protected
     vox: tPage;
     fLog2Width,fLog2Height: byte;
@@ -61,8 +62,8 @@ type
 implementation
 
 uses
-  poly,
-  keyboard; {for debugging}
+  uPoly,
+  uKeyboard; {for debugging}
 
 const
   MAX_SAMPLES = 64;
@@ -79,7 +80,7 @@ var
 { Signed distance calculations }
 {-----------------------------------------------------}
 
-function tVoxelSprite.getDistance_L1(x,y,z: integer): integer;
+function tVoxel.getDistance_L1(x,y,z: integer): integer;
 var
   dx,dy,dz: integer;
   d: integer;
@@ -96,7 +97,7 @@ begin
   exit(MAX_D);
 end;
 
-function tVoxelSprite.getDistance_L2(x,y,z: integer): single;
+function tVoxel.getDistance_L2(x,y,z: integer): single;
 var
   dx,dy,dz: integer;
   d: integer;
@@ -120,7 +121,7 @@ begin
 end;
 
 {calculate SDF (the slow way)}
-function tVoxelSprite.generateSDF(): tPage;
+function tVoxel.generateSDF(): tPage;
 var
   i,j,k: int32;
   d: single;
@@ -142,7 +143,7 @@ begin
 end;
 
 {store SDF on the alpha channel of this voxel sprite}
-procedure tVoxelSprite.transferSDF(sdf: tPage);
+procedure tVoxel.transferSDF(sdf: tPage);
 var
   x,y: integer;
   c: RGBA;
@@ -161,7 +162,7 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tVoxelSprite.create(filename: string; height: integer);
+constructor tVoxel.create(filename: string; height: integer);
 begin
   inherited create();
   fWidth := 0;
@@ -173,13 +174,13 @@ begin
   loadFromFile(filename, height);
 end;
 
-destructor tVoxelSprite.destroy();
+destructor tVoxel.destroy();
 begin
   freeAndNil(vox);
   inherited destroy();
 end;
 
-procedure tVoxelSprite.loadFromFile(filename: string; height: integer);
+procedure tVoxel.loadFromFile(filename: string; height: integer);
 var
   img: tPage;
   sdf: tPage;
@@ -188,7 +189,7 @@ begin
   img.setTransparent(RGBA.create(255,255,255));
   note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
   self.setPage(img, height);
-  if fs.exists(filename+'.sdf') then begin
+  if fileSystem.exists(filename+'.sdf') then begin
     sdf := loadLC96(filename+'.sdf');
   end else begin
     sdf := self.generateSDF();
@@ -198,7 +199,7 @@ begin
   sdf.free();
 end;
 
-procedure tVoxelSprite.setPage(page: tPage; height: integer);
+procedure tVoxel.setPage(page: tPage; height: integer);
 begin
   vox := page;
   fWidth := page.width;
@@ -213,7 +214,7 @@ begin
 end;
 
 {get size as 16bit vector}
-function tVoxelSprite.getSize(): V3D16;
+function tVoxel.getSize(): V3D16;
 begin
   result.x := fWidth;
   result.y := fHeight;
@@ -221,7 +222,7 @@ begin
   result.w := 0;
 end;
 
-function tVoxelSprite.getVoxel(x,y,z:int32): RGBA;
+function tVoxel.getVoxel(x,y,z:int32): RGBA;
 begin
   {todo: fast asm}
   result.init(255,0,255,0);
@@ -231,7 +232,7 @@ begin
   result := vox.getPixel(x,y+z*fHeight);
 end;
 
-procedure tVoxelSprite.setVoxel(x,y,z:int32;c: RGBA);
+procedure tVoxel.setVoxel(x,y,z:int32;c: RGBA);
 begin
   {todo: fast asm}
   if (x < 0) or (x >= fWidth) then exit;
@@ -243,14 +244,15 @@ end;
 {draw voxel sprite, with position given in world space.
 returns the bounding rect of the drawn object.
 }
-function tVoxelSprite.draw(canvas: tPage;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
+{todo: update to draw context}
+function tVoxel.draw(canvas: tPage;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
 var
   c, debugCol: RGBA;
   faceColor: array[1..6] of RGBA;
   size: V3D; {half size of cuboid}
   cameraX, cameraY, cameraZ, cameraDir: V3D;
   p: array[1..8] of V3D; {world space}
-  ps: tPolyStats;
+  polyBounds: tRect;
 
   {view is identity as we have no camera}
   model, projection: tMatrix4X4;
@@ -293,7 +295,7 @@ var
   var
     c: RGBA;
     cross: single;
-    y, yMin, yMax: int32;
+    y: int32;
     x: int32;
     worldPos: V3D;
     t: single;
@@ -317,20 +319,22 @@ var
     end;
 
     {scan the sides of the polygon}
-    if not scanPoly(p1.toPoint, p2.tPoint, p3.toPoint, p4.toPoint, ps) then exit;
+    polyDraw.scanPoly(canvas, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
+    polyBounds := polyDraw.bounds;
+    if polyBounds.area = 0 then exit;
 
     {alternative solid face render (for debugging)}
     if (faceID in []) then begin
-      for y := ps.yMin to ps.yMax do
-        canvas.hLine(screenLines[y].xMin, y, screenLines[y].xMax, faceColor[faceID]);
+      for y := polyBounds.top to polyBounds.bottom do
+        canvas.getDC().hLine(Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len, faceColor[faceID]);
       exit;
     end;
 
     if asShadow then begin
-      for y := ps.yMin to ps.yMax do
-        canvas.hline(
-          screenLines[y].xMin, y, screenLines[y].xMax,
-          rgba.create(0,0,0,48));
+      for y := polyBounds.top to polyBounds.bottom do
+        canvas.getDC().hline(
+          Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len,
+          RGB(0,0,0,48));
       exit;
     end;
 
@@ -364,16 +368,16 @@ var
     if keyDown(key_f5) then
       traceProc := traceScanline_REF;
 
-    for y := yMin to yMax-1 do begin
+    for y := polyBounds.top to polyBounds.bottom-1 do begin
 
-      if screenLines[y].xMax < screenLines[y].xMin then
+      if polyDraw.scanLine[y].xMax < polyDraw.scanLine[y].xMin then
         continue;
 
       {find the ray's origin given current screenspace coord}
       {note: we trace from the middle of the pixel, not the top-left corner.
        this resolves some precision errors}
       rayOrigin :=
-        cameraX*((screenLines[y].xMin)-atPos.x+0.5) +
+        cameraX*((polyDraw.scanLine[y].xMin)-atPos.x+0.5) +
         cameraY*(y-atPos.y+0.5)+
         cameraDir*(0-atPos.z);
 
@@ -392,7 +396,7 @@ var
 
       traceProc(
         canvas, self,
-        screenLines[y].xMin, screenLines[y].xMax, y,
+        polyDraw.scanLine[y].xMin, polyDraw.scanLine[y].xMax, y,
         pos, cameraDir, deltaX, deltaY
       );
     end;
@@ -468,7 +472,7 @@ begin
   traceFace(6, p[4], p[3], p[7], p[8]);
 
   {return our bounds}
-  result := tRect.create(p[1].toPoint.x,p[1].toPoint.y,0,0);
+  result := Rect(p[1].toPoint.x,p[1].toPoint.y,0,0);
   for i := 2 to 8 do
     result.expandToInclude(p[i].toPoint);
   {seems like we're off by one for some reason}

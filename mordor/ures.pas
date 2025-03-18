@@ -8,12 +8,15 @@ uses
   uSprite,
   uSound,
   uColor,
+  uUtils,
+  uVoxel,
   uGraph32;
 
 var
   gfx: tGFXLibrary;
   sfx: tSFXLibrary;
   mapSprites: tSpriteSheet;
+  doorVoxel: tVoxel;
 
 procedure loadResources();
 
@@ -35,6 +38,9 @@ begin
 
   mapSprites := tSpriteSheet.create(gfx['map']);
   mapSprites.grid(16,16);
+
+  doorVoxel := tVoxel.Create(joinPath('res', 'door_64'), 64);
+
 end;
 
 begin

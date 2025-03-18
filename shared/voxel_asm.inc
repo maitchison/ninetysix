@@ -131,7 +131,7 @@ begin
 
 end;
 
-procedure traceScanline_ASM(canvas: tPage; voxSprite: tVoxelSprite; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
+procedure traceScanline_ASM(canvas: tPage; voxSprite: tVoxel; xMin, xMax: int16; y: int16; pos, dir, deltaX, deltaY: V3D);
 var
   x: int16;
   col: RGBA;

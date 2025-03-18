@@ -25,6 +25,7 @@ type
 
   tScanLine = record
     xMin, xMax: int32; // inclusive
+    function len: integer;
     procedure reset();
   end;
 
@@ -203,6 +204,11 @@ procedure tScanLine.reset(); inline;
 begin
   xMax := -9999;
   xMin := 9999;
+end;
+
+function tScanLine.len: integer;
+begin
+  result := (xMax-xMin)+1;
 end;
 
 {----------------------------------------------------}
