@@ -7,11 +7,14 @@ uses
   uTest,
   uDebug,
   uRect,
+  uUtils,
   uMDRRes,
+  uVertex,
   uGraph32;
 
 type
   tDungeonViewGui = class(tGuiPanel)
+    procedure doUpdate(elapsed: single); override;
     procedure doDraw(const dc: tDrawContext); override;
     constructor Create();
   end;
@@ -19,9 +22,18 @@ type
 implementation
 
 procedure tDungeonViewGui.doDraw(const dc: tDrawContext);
+var
+  pos, angle: V3D;
 begin
   inherited doDraw(dc);
-  //tVoxel.draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
+  pos := V3(32+32,32+64,0);
+  angle := V3(0,getSec,0);
+  doorVoxel.draw(dc, pos, angle);
+end;
+
+procedure tDungeonViewGui.doUpdate(elapsed: single);
+begin
+  isDirty := true;
 end;
 
 constructor tDungeonViewGui.Create();
