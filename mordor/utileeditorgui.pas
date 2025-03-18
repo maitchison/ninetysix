@@ -11,7 +11,7 @@ uses
   uKeyboard,
   uFont,
   uGui,
-  uRes,
+  uMDRRes,
   uMDRMap;
 
 type

@@ -23,7 +23,7 @@ uses
   uColor,
   {$i gui.inc}
   {game stuff}
-  uRes,
+  uMDRRes,
   uMapGui,
   uTileEditorGui,
   uScene,

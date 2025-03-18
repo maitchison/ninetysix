@@ -17,8 +17,9 @@ uses
   uFont,
   {$i gui.inc}
   {game stuff}
-  uRes,
+  uMDRRes,
   uTileEditorGui,
+  uDungeonViewGui,
   uMDRMap;
 
 type
@@ -38,7 +39,7 @@ type
   tEncounterGUI = class(tGuiContainer)
   public
     mode: tEncounterGuiMode;
-    dungeonView: tGuiPanel;
+    dungeonView: tDungeonViewGui;
     monsterFrame: array[1..4] of tMonsterFrame;
     constructor Create();
   end;
@@ -86,8 +87,7 @@ begin
   setBounds(Rect(0, 0, 500, 180));
   case mode of
     egmType1: begin
-      dungeonView := tGuiPanel.Create(Rect(20, 10, 96, 124), 'View');
-      dungeonView.backgroundCol := MDR_LIGHTGRAY;
+      dungeonView := tDungeonViewGui.Create();
       self.append(dungeonView);
       for i := 1 to 4 do begin
         monsterFrame[i] := tMonsterFrame.Create();

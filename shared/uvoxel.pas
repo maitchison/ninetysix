@@ -56,7 +56,7 @@ type
     function getSize(): V3D16;
     function getVoxel(x,y,z:int32): RGBA;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    function draw(canvas: tPage;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
+    function draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
 
 implementation
@@ -243,9 +243,9 @@ end;
 
 {draw voxel sprite, with position given in world space.
 returns the bounding rect of the drawn object.
+todo: correctly account for offset and clip
 }
-{todo: update to draw context}
-function tVoxel.draw(canvas: tPage;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
+function tVoxel.draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
 var
   c, debugCol: RGBA;
   faceColor: array[1..6] of RGBA;
@@ -319,20 +319,20 @@ var
     end;
 
     {scan the sides of the polygon}
-    polyDraw.scanPoly(canvas, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
+    polyDraw.scanPoly(dc.page, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
     polyBounds := polyDraw.bounds;
     if polyBounds.area = 0 then exit;
 
     {alternative solid face render (for debugging)}
     if (faceID in []) then begin
       for y := polyBounds.top to polyBounds.bottom do
-        canvas.getDC().hLine(Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len, faceColor[faceID]);
+        dc.hLine(Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len, faceColor[faceID]);
       exit;
     end;
 
     if asShadow then begin
       for y := polyBounds.top to polyBounds.bottom do
-        canvas.getDC().hline(
+        dc.hline(
           Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len,
           RGB(0,0,0,48));
       exit;
@@ -395,7 +395,7 @@ var
       pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
 
       traceProc(
-        canvas, self,
+        dc.page, self,
         polyDraw.scanLine[y].xMin, polyDraw.scanLine[y].xMax, y,
         pos, cameraDir, deltaX, deltaY
       );

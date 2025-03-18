@@ -1,4 +1,4 @@
-unit uRes;
+unit uMDRRes;
 
 interface
 
