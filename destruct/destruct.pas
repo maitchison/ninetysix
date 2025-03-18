@@ -28,7 +28,8 @@ uses
   crt, //todo: remove
   cfd,
   uKeyboard,
-  uLA96, uLP96,
+  uA96,
+  uP96,
   uMixer,
   uMouse,
   uFont,

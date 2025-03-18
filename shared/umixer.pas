@@ -9,7 +9,7 @@ uses
   uTest,
   uDebug,
   uUtils,
-  uLA96,
+  uA96,
   go32,
   uSound,
   uTimer,

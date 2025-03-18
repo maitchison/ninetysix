@@ -9,7 +9,7 @@ uses
   uRect,
   uGraph32,
   uUtils,
-  uLP96;
+  uP96;
 
 type
 

@@ -1,5 +1,5 @@
 {Audio compression library}
-unit uLA96;
+unit uA96;
 
 {$MODE delphi}
 

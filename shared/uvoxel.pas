@@ -16,7 +16,7 @@ uses
   uInfo,
   uVGADriver,
   uVertex,
-  uLP96;
+  uP96;
 
 var
   {debugging stuff}

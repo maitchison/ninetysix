@@ -10,8 +10,8 @@ uses
   uFileSystem,
   uSound,
   uUtils,
-  uLA96,
-  uLP96;
+  uA96,
+  uP96;
 
 type
   tResourceInfo = record

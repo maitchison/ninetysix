@@ -1,5 +1,5 @@
 {lossless image compression}
-unit uLP96;
+unit uP96;
 
 {$MODE Delphi}
 

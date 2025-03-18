@@ -16,7 +16,7 @@ uses
   uScreen,
   uGraph32,
   uSprite,
-  uLA96,
+  uA96,
   uUtils,
   uRect,
   uResource,
