@@ -12,7 +12,6 @@ var
   sx,sy,sz: int32;
   depth: int32;
   voxPtr: pointer;
-  shadeShift: byte;
 begin
 
   LAST_TRACE_COUNT := 0;
@@ -40,8 +39,6 @@ begin
 
   voxPtr := voxSprite.vox.pixels;
 
-  if size.x < 16 then shadeShift := 1 else shadeShift := 0;
-
   for k := 0 to MAX_SAMPLES-1 do begin
 
     inc(VX_TRACE_COUNT);
@@ -51,38 +48,35 @@ begin
     y := sy div 256;
     z := sz div 256;
 
-    if (x < 0) or (x >= size.x) then begin
+    if (dword(x) >= size.x) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
       exit(RGB(255,0,0));
     end;
-    if (y < 0) or (y >= size.y) then begin
+    if (dword(y) >= size.y) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
       exit(RGB(0,255,0));
     end;
-    if (z < 0) or (z >= size.z) then begin
+    if (dword(z) >= size.z) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
       exit(RGB(0,0,255));
     end;
 
     c := voxSprite.getVoxel(x, y, z);
 
-    if c.a = 255 then begin
-      {shade by distance from bounding box}
-      c *= (255-(depth shl shadeShift))/255;
-      exit(c)
+    if c.a = 255 then exit(c);
+
+    if VX_USE_SDF then begin
+      {move to next voxel}
+      d := (255-c.a);
     end else begin
-      if VX_USE_SDF then begin
-        {move to next voxel}
-        d := (255-c.a);
-      end else begin
-        d := 1;
-      end;
-      {d is distance * 4}
-      sx := sx + ((dx * d) div 4);
-      sy := sy + ((dy * d) div 4);
-      sz := sz + ((dz * d) div 4);
-      depth += d;
+      d := 4;
     end;
+
+    {d is distance * 4}
+    sx := sx + ((dx * d) div 4);
+    sy := sy + ((dy * d) div 4);
+    sz := sz + ((dz * d) div 4);
+    depth += d;
   end;
 
   {color used when we ran out of samples}
