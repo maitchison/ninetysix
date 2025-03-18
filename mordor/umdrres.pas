@@ -17,6 +17,7 @@ var
   sfx: tSFXLibrary;
   mapSprites: tSpriteSheet;
   doorVoxel: tVoxel;
+  carVoxel: tVoxel;
 
 procedure loadResources();
 
@@ -39,7 +40,8 @@ begin
   mapSprites := tSpriteSheet.create(gfx['map']);
   mapSprites.grid(16,16);
 
-  doorVoxel := tVoxel.Create(joinPath('res', 'door_64'), 64);
+  doorVoxel := tVoxel.Create(joinPath('res', 'door_32'), 32);
+  carVoxel := tVoxel.Create(joinPath('res', 'carRed'), 16);
 
 end;
 

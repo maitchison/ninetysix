@@ -26,9 +26,10 @@ var
   pos, angle: V3D;
 begin
   inherited doDraw(dc);
-  pos := V3(32+32,32+64,0);
-  angle := V3(0,getSec,0);
-  doorVoxel.draw(dc, pos, angle);
+  pos := V3(bounds.width/2,bounds.height/2,0);
+  angle := V3(0,getSec,0.0);
+  doorVoxel.draw(dc, pos, angle, 2.25);
+  carVoxel.draw(dc, pos, angle, 2.0);
 end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);

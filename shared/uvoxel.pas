@@ -23,6 +23,7 @@ var
   VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
   VX_GHOST_MODE: boolean = false;
+  VX_USE_SDF: boolean = true;
   VX_UVW_MODE: boolean = false;
 
 
@@ -321,17 +322,17 @@ var
     {scan the sides of the polygon}
     polyDraw.scanPoly(dc.page, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
     polyBounds := polyDraw.bounds;
-    if polyBounds.area = 0 then exit;
+    if polyBounds.area <= 0 then exit;
 
     {alternative solid face render (for debugging)}
-    if (faceID in []) then begin
-      for y := polyBounds.top to polyBounds.bottom do
+    if (keyDown(key_0)) then begin
+      for y := polyBounds.top to polyBounds.bottom-1 do
         dc.hLine(Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len, faceColor[faceID]);
       exit;
     end;
 
     if asShadow then begin
-      for y := polyBounds.top to polyBounds.bottom do
+      for y := polyBounds.top to polyBounds.bottom-1 do
         dc.hline(
           Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len,
           RGB(0,0,0,48));
@@ -396,7 +397,7 @@ var
 
       traceProc(
         dc.page, self,
-        polyDraw.scanLine[y].xMin, polyDraw.scanLine[y].xMax, y,
+        polyDraw.scanLine[y].xMin+dc.offset.x, polyDraw.scanLine[y].xMax+dc.offset.x, y+dc.offset.y,
         pos, cameraDir, deltaX, deltaY
       );
     end;
@@ -464,6 +465,7 @@ begin
   p[8] := mvp.apply(V3D.create(-size.x, +size.y, +size.z, 1));
 
   {trace each side of the cubeoid}
+  polyDraw.backfaceCull := true;
   traceFace(1, p[1], p[2], p[3], p[4]);
   traceFace(2, p[8], p[7], p[6], p[5]);
   traceFace(3, p[4], p[8], p[5], p[1]);

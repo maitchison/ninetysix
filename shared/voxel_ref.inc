@@ -68,12 +68,16 @@ begin
       c *= (255-(depth*2))/255;
       exit(c)
     end else begin
-      {move to next voxel}
-      d := (255-c.a);
-      {d is distance * 4}
-      sx := sx + ((dx * d) div 4);
-      sy := sy + ((dy * d) div 4);
-      sz := sz + ((dz * d) div 4);
+      if VX_USE_SDF then begin
+        {move to next voxel}
+        d := (255-c.a);
+        {d is distance * 4}
+        sx := sx + ((dx * d) div 4);
+        sy := sy + ((dy * d) div 4);
+        sz := sz + ((dz * d) div 4);
+      end else begin
+        d := 1;
+      end;
 
       depth += d;
     end;
