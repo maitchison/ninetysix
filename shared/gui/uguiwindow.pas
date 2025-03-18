@@ -11,6 +11,7 @@ uses
   uGraph32,
   uColor,
   uScreen,
+  uMDRRes,
   uGui;
 
 type
@@ -28,7 +29,7 @@ begin
   inherited Create();
   guiStyle := DEFAULT_GUI_SKIN.styles['box'].clone();
   fImage := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
-  fImageCol := RGBF(0.40,0.42,0.62);
+  fImageCol := MDR_BLUE;
   fontStyle.centered := true;
   fontStyle.shadow := true;
   setBounds(aRect);
