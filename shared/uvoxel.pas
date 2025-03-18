@@ -29,7 +29,7 @@ var
 
 
 type
-  tLightingMode = (lmNone, lmGradient);
+  tLightingMode = (lmNone, lmGradient, lmSimple);
 
 {restrictions
 X,Y,Z <= 256
@@ -217,6 +217,19 @@ var
   x,y,z: int32;
   v: single;
   amb,emi,dif,col: RGBA;
+
+  {returns number of neighbours for current cell}
+  function countNeighbours(): integer;
+  begin
+    result := 0;
+    if diffuse.getPixel((x-1),(y)+(z)*fWidth).a = 255 then inc(result);
+    if diffuse.getPixel((x+1),(y)+(z)*fWidth).a = 255 then inc(result);
+    if diffuse.getPixel((x),(y-1)+(z)*fWidth).a = 255 then inc(result);
+    if diffuse.getPixel((x),(y+1)+(z)*fWidth).a = 255 then inc(result);
+    if diffuse.getPixel((x),(y)+(z-1)*fWidth).a = 255 then inc(result);
+    if diffuse.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
+  end;
+
 begin
   if mode = lmNone then begin
     vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
@@ -228,20 +241,19 @@ begin
   ambient := diffuse.clone();
   ambient.clear();
 
-  case mode of
-    lmGradient: begin
-      for x := 0 to fWidth-1 do
-        for y := 0 to fHeight-1 do
-          for z := 0 to fDepth-1 do begin
-            v := 1-sqr(z / (fDepth-1));
-            ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-              RGB($FF7F7F7F),
-              RGB($FFBACEEF),
-              v
-            ));
-          end;
-    end;
-  end;
+  for x := 0 to fWidth-1 do
+    for y := 0 to fHeight-1 do
+      for z := 0 to fDepth-1 do begin
+        case mode of
+          lmGradient: v := 1-sqr(z / (fDepth-1));
+          lmSimple: v := countNeighbours()/6;
+        end;
+        ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
+          RGB($FF7F7F7F),
+          RGB($FFBACEEF),
+          v
+        ));
+      end;
 
   {modulate}
   for x := 0 to fWidth-1 do
@@ -249,10 +261,12 @@ begin
       for z := 0 to fDepth-1 do begin
         dif := diffuse.getPixel(x,y+z*fWidth);
         amb := ambient.getPixel(x,y+z*fWidth);
+        {
         if dif.a < 255 then
           dif := RGBA.Clear
         else
           dif := RGBA.White;
+        }
         col := dif*amb;
         vox.setPixel(x,y+z*fWidth, col);
       end;

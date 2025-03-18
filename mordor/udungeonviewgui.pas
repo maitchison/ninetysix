@@ -266,7 +266,7 @@ begin
   walls[4].t := wtNone;
 
   composeVoxelCell(tile, walls);
-  voxelCell.generateLighting(lmGradient, voxelPage);
+  voxelCell.generateLighting(lmSimple, voxelPage);
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 end;
