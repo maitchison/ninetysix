@@ -54,13 +54,13 @@ type
     fRadius: single;
     fLog2Width,fLog2Height: byte;
   protected
-    function  generateSDF_fast(maxDistance: integer=-1): tPage;
-    function  generateSDF_slow(maxDistance: integer=-1): tPage;
+    procedure generateSDF_fast(maxDistance: integer=-1);
+    function  getSDF_slow(maxDistance: integer=-1): tPage;
     procedure transferSDF(sdf: tPage);
   public
     vox: tPage;     // RGBD - baked (todo: 2 bits of D are for alpha)
-    function  getDistance_L1(x,y,z: integer;maxDistance: integer=-1): integer;
-    function  getDistance_L2(x,y,z: integer;maxDistance: integer=-1): single;
+    function  getDistance_L1(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): integer;
+    function  getDistance_L2(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): single;
     procedure generateSDF(quality: tSDFQuality=sdfFast);
 
     procedure generateLighting(lightingMode: tLightingMode; diffuse: tPage=nil);
@@ -106,75 +106,126 @@ var
 { Signed distance calculations }
 {-----------------------------------------------------}
 
-function tVoxel.getDistance_L1(x,y,z: integer;maxDistance: integer=-1): integer;
+function tVoxel.getDistance_L1(x,y,z: integer;minDistance: integer=-1;maxDistance: integer=-1): integer;
 var
   dx,dy,dz: integer;
   d: integer;
 begin
   if getVoxel(x,y,z).a = 255 then exit(0);
   if maxDistance < 0 then maxDistance := ceil(fRadius);
+  if minDistance < 0 then minDistance := 0;
   for d := 1 to maxDistance do
     for dx := -d to d do
       for dy := -d to d do
         for dz := -d to d do
-          if getVoxel(x+dx, y+dy, z+dz).a = 255 then
-            exit(d);
+          if getVoxel(x+dx, y+dy, z+dz).a = 255 then exit(d);
   exit(maxDistance);
 end;
 
-function tVoxel.getDistance_L2(x,y,z: integer;maxDistance: integer=-1): single;
+function tVoxel.getDistance_L2(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): single;
 var
   dx,dy,dz: integer;
   d: integer;
   d2: single;
+  innerD: integer;
   bestD2: single;
 begin
   if getVoxel(x,y,z).a = 255 then exit(0);
   {if we hit something L1 distance away, then closest L2 distance must
-   be between L1 and sqrt(3)*L1}
-  d := trunc(getDistance_L1(x,y,z) * sqrt(2) + 0.999);
+   be between L1 and sqrt(2)*L1}
+  innerD := getDistance_L1(x,y,z);
+  d := trunc(innerD * sqrt(2) + 0.999);
   bestD2 := d*d;
-  for dx := -d to d do
-    for dy := -d to d do
-      for dz := -d to d do
+  for dx := -d to d do begin
+    for dy := -d to d do begin
+      for dz := -d to d do begin
         if getVoxel(x+dx, y+dy, z+dz).a = 255 then begin
           d2 := sqr(dx)+sqr(dy)+sqr(dz);
           bestD2 := minf(bestD2, d2);
         end;
+      end
+    end;
+  end;
   exit(sqrt(bestD2));
 end;
 
 {calculate SDF (the fast way)}
-function tVoxel.generateSDF_Fast(maxDistance: integer=-1): tPage;
+procedure tVoxel.generateSDF_Fast(maxDistance: integer=-1);
 var
   d,i,j,k: integer;
   depth: array of byte;
+  vPtr: pRGBA;
+  dPtr: pByte;
+  lp: dword;
+  layerCount: array of int32;
 
-  procedure setNeighbours(x: integer);
+  function getDepth(x,y,z: integer): integer; inline;
   begin
-
+    if not inBounds(x,y,z) then exit(-1);
+    result := depth[getAddr(x,y,z)];
   end;
 
-  {
-  function getDepth(x,y,z: integer): integer;
+  procedure setDepth(x,y,z: integer;d:byte); inline;
+  var
+    addr: dword;
   begin
-    result := depth[x+y shl log2
+    if not inBounds(x,y,z) then exit;
+    addr := getAddr(x,y,z);
+    if depth[addr] = 255 then begin
+      inc(layerCount[z]);
+      depth[addr] := d;
+    end;
   end;
-  }
+
+  procedure setNeighbours(x,y,z: integer;d: byte);
+  var
+    dx,dy,dz: integer;
+  begin
+    for dx := -1 to 1 do
+      for dy := -1 to 1 do
+        for dz := -1 to 1 do
+          setDepth(x+dx, y+dy, z+dz, d);
+  end;
 
 begin
 
-  setLength(depth, fWidth*fHeight*fDepth);
-  fillchar(depth[0], length(depth), 0);
+  if maxDistance < 0 then maxDistance := ceil(fRadius);
 
-  for d := 0 to 32 do begin
+  {number of set voxels in each depth layer}
+  setLength(layerCount, fDepth);
+  filldword(layerCount[0], fDepth, 0);
+
+  {init distance field}
+  setLength(depth, fWidth*fHeight*fDepth);
+  fillchar(depth[0], length(depth), 255);
+  vPtr := vox.pixels;
+  dPtr := @depth[0];
+  for lp := 0 to fWidth*fHeight*fDepth-1 do begin
+    if vPtr^.a = 255 then dPtr^ := 0;
+    inc(vPtr);
+    inc(dPtr);
+  end;
+
+  for d := 0 to maxDistance-1 do
     for k := 0 to fDepth-1 do begin
-      for i := 0 to fWidth-1 do begin
-        for j := 0 to fHeight-1 do begin
-          //if getDepth(
-        end;
+      if layerCount[k] = (fWidth*fHeight) then continue;
+      dPtr := @depth[getAddr(0,0,k)];
+      for lp := 0 to fWidth*fHeight-1 do begin
+        if dPtr^ = d then
+          setNeighbours(lp and (fWidth-1), lp shr fLog2Width, k, d+1);
+        inc(dPtr);
       end;
     end;
+
+  {apply back}
+  vPtr := vox.pixels;
+  dPtr := @depth[0];
+  for lp := 0 to fWidth*fHeight*fDepth-1 do begin
+    d := dPtr^;
+    if d = 255 then d := maxDistance;
+    vPtr^.a := 255-d;
+    inc(vPtr);
+    inc(dPtr);
   end;
 
   setLength(depth,0);
@@ -182,7 +233,7 @@ end;
 
 
 {calculate SDF (the slow way)}
-function tVoxel.generateSDF_Slow(maxDepth: integer=-1): tPage;
+function tVoxel.getSDF_Slow(maxDepth: integer=-1): tPage;
 var
   i,j,k: int32;
   d: single;
@@ -204,21 +255,13 @@ end;
 
 {calculate SDF}
 procedure tVoxel.generateSDF(quality: tSDFQuality=sdfFast);
-var
-  sdf: tPage;
 begin
   case quality of
-    sdfNone: begin
-      sdf := vox.clone();
-      sdf.clear(RGB(1,4,16));
-    end;
-    sdfFast: sdf := generateSDF_Slow(8);
-    sdfFull: sdf := generateSDF_Slow();
+    sdfNone: generateSDF_Fast(0);
+    sdfFast: generateSDF_Fast(8);
+    sdfFull: generateSDF_Fast(ceil(fRadius));
   end;
-  transferSDF(sdf);
-  sdf.free;
 end;
-
 
 {store SDF on the alpha channel of this voxel sprite}
 procedure tVoxel.transferSDF(sdf: tPage);
@@ -681,7 +724,8 @@ var
       traceProc := traceScanline_MMX
     else
       traceProc := traceScanline_ASM;
-    if keyDown(key_f5) then
+
+    if keyDown(key_f4) or keyDown(key_f5) or keyDown(key_f6) or keyDown(key_f7) then
       traceProc := traceScanline_REF;
 
     for y := polyBounds.top to polyBounds.bottom-1 do begin

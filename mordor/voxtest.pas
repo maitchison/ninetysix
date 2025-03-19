@@ -72,9 +72,8 @@ begin
 
   result := tVoxel.Create(tileBuilder.page, 32);
 
-  {todo: must be a better way of putting this all together}
   startTimer('TileSDF');
-  result.generateSDF();
+  result.generateSDF(sdfFast);
   stopTimer('TileSDF');
 
   startTimer('TileLighting');
@@ -101,7 +100,7 @@ begin
 
   dc := screen.getDC();
 
-  tileVox := generateTile(lmGI);
+  tileVox := generateTile(lmAO);
 
   tileCanvas := tPage.Create(128,128);
 
