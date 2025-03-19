@@ -1,7 +1,7 @@
 @echo off
 
 set VERSION=01
-set MAIN=mordor
+set MAIN=mdr
 set BUILD_DIR=c:\dev\build\%MAIN%\%VERSION%
 set LATEST_DIR=c:\dev\build\%MAIN%\latest
 
