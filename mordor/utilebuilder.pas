@@ -147,21 +147,22 @@ begin
   assertEqual(page.height, 32*32);
   page.clear(RGBA.Clear());
   {ceiling (temp)}
-  {dc.fillRect(Rect(0,0*32,16,32), MDR_DARKGRAY);
-  dc.fillRect(Rect(0,1*32,16,32), MDR_LIGHTGRAY);}
+  {
+  dc.fillRect(Rect(0,20*32,32,32), MDR_DARKGRAY);
+  dc.fillRect(Rect(0,21*32,32,32), MDR_LIGHTGRAY);
+  }
   {floor}
   case tile.floor of
     ftStone: begin
       //bedrock
-      layer := 31;
-      fill(MDR_DARKGRAY);
+      layer := 30;
+      fill(MDR_DARKGRAY, 1);
       noise(0.25);
       //stone
-      layer := 30;
-      fill(MDR_LIGHTGRAY);
+      layer := 31;
+      fill(MDR_LIGHTGRAY, 1);
       noise(0.5);
-      //stub:
-      //decimate(0.1);
+      decimate(0.1);
     end;
     ftDirt: begin
       //bedrock

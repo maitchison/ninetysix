@@ -299,10 +299,20 @@ begin
 end;
 
 constructor tVoxel.Create(aPage: tPage; aHeight: integer);
+var
+  pPtr: pRGBA;
+  lp: dword;
 begin
   Create(aPage.width, aHeight, aPage.height div aHeight);
   // transfer diffuse to voxels
   vox.getDC(bmBlit).drawImage(aPage, Point(0,0));
+
+  // set very simple SDF, but treat all a<>0 pixels as solid.
+  pPtr := vox.pixels;
+  for lp := 0 to (fWidth*fHeight*fDepth)-1 do begin
+    if pPtr^.a = 0 then pPtr^.a := 255-4 else pPtr^.a := 255-0;
+    inc(pPtr);
+  end;
 end;
 
 constructor tVoxel.Create(aWidth, aDepth, aHeight: integer);

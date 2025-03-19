@@ -67,7 +67,7 @@ begin
   walls[4].t := wtNone;
 
   startTimer('TileCompose');
-  tileBuilder.composeVoxelCell(tile,walls);
+  tileBuilder.composeVoxelCell(tile, walls);
   stopTimer('TileCompose');
 
   result := tVoxel.Create(tileBuilder.page, 32);
@@ -117,7 +117,7 @@ begin
     input.update();
 
     {draw our tile}
-    tileCanvas.clear(RGB(255,0,255));
+    tileCanvas.clear(RGB(12,12,12));
     tileVox.draw(tileCanvas.getDC(), V3(64,64,0), V3(0,0,getSec), 2.0);
     screen.getDC.asBlendMode(bmBlit).drawImage(
       tileCanvas,
