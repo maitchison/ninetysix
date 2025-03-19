@@ -12,6 +12,8 @@ uses
   uVertex,
   uVoxel,
   uColor,
+  uFileSystem,
+  uP96,
   uMDRMap,
   uGraph32;
 
@@ -249,6 +251,7 @@ var
   c: byte;
   tile: tTile;
   walls: array[1..4] of tWall;
+  cached: string;
 begin
   inherited Create(Rect(20, 10, 96, 124), 'View');
   voxelCell := tVoxel.Create(32,32,32);
@@ -260,14 +263,19 @@ begin
       noisePage.setPixel(x,y, RGB(c,c,c));
     end;
 
-  tile.floor := ftStone;
-  walls[1].t := wtWall;
-  walls[2].t := wtWall;
-  walls[3].t := wtNone;
-  walls[4].t := wtNone;
-
-  composeVoxelCell(tile, walls);
-  voxelCell.generateLighting(lmGI, voxelPage);
+  cached := joinPath('res', 'tile1');
+  if fileSystem.exists(cached+'.vox') then begin
+    voxelCell.loadVoxFromFile(cached, 32);
+  end else begin
+    tile.floor := ftStone;
+    walls[1].t := wtWall;
+    walls[2].t := wtWall;
+    walls[3].t := wtNone;
+    walls[4].t := wtNone;
+    composeVoxelCell(tile, walls);
+    voxelCell.generateLighting(lmGI, voxelPage);
+    saveLC96(cached+'.vox', voxelCell.vox);
+  end;
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 end;

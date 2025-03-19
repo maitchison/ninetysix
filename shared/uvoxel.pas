@@ -60,7 +60,8 @@ type
     procedure generateLighting(mode: tLightingMode; diffuse: tPage);
 
     procedure setPage(page: tPage; height: integer);
-    procedure loadFromFile(filename: string; height: integer);
+    procedure loadP96FromFile(filename: string; height: integer);
+    procedure loadVoxFromFile(filename: string; height: integer);
 
   public
     constructor Create(aWidth, aDepth, aHeight: integer);
@@ -188,7 +189,7 @@ begin
   fLog2Width := 0;
   fLog2Height := 0;
   vox := nil;
-  loadFromFile(filename, height);
+  loadP96FromFile(filename, height);
 end;
 
 constructor tVoxel.Create(aWidth, aDepth, aHeight: integer);
@@ -347,10 +348,11 @@ begin
   ambient.free();
 end;
 
-procedure tVoxel.loadFromFile(filename: string; height: integer);
+procedure tVoxel.loadP96FromFile(filename: string; height: integer);
 var
   img: tPage;
   sdf: tPage;
+  loadFilename: string;
 begin
   img := tPage.Load(filename+'.p96');
   img.setTransparent(RGBA.create(255,255,255));
@@ -363,7 +365,31 @@ begin
     sdf := self.generateSDF();
     saveLC96(filename+'.sdf', sdf);
   end;
+  // is this a good idea?
   self.generateLighting(lmGradient, img);
+  self.transferSDF(sdf);
+
+  sdf.free();
+end;
+
+{with lighting built it}
+procedure tVoxel.loadVoxFromFile(filename: string; height: integer);
+var
+  img: tPage;
+  sdf: tPage;
+  loadFilename: string;
+begin
+  img := tPage.Load(filename+'.vox');
+  img.setTransparent(RGBA.create(255,255,255));
+  note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
+  self.setPage(img, height);
+
+  if fileSystem.exists(filename+'.sdf') then begin
+    sdf := loadLC96(filename+'.sdf');
+  end else begin
+    sdf := self.generateSDF();
+    saveLC96(filename+'.sdf', sdf);
+  end;
   self.transferSDF(sdf);
 
   sdf.free();
