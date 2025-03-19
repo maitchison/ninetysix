@@ -222,8 +222,8 @@ begin
   dPtr := @depth[0];
   for lp := 0 to fWidth*fHeight*fDepth-1 do begin
     d := dPtr^;
-    if d = 255 then d := maxDistance;
-    vPtr^.a := 255-d;
+    if d = 255 then d := maxDistance*4;
+    vPtr^.a := clamp(255-(d*4), 0, 255);
     inc(vPtr);
     inc(dPtr);
   end;
