@@ -253,7 +253,7 @@ var
   walls: array[1..4] of tWall;
   cached: string;
 begin
-  inherited Create(Rect(20, 10, 96, 124), 'View');
+  inherited Create(Rect(20, 30, 96, 124), 'View');
   voxelCell := tVoxel.Create(32,32,32);
   voxelPage := voxelCell.vox.clone();
   noisePage := tPage.Create(32,32);

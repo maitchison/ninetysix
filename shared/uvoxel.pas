@@ -24,7 +24,7 @@ var
   VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
   VX_GHOST_MODE: boolean = false;
-  VX_USE_SDF: boolean = false;
+  VX_USE_SDF: boolean = true;
   VX_UVW_MODE: boolean = false;
 
 
@@ -46,6 +46,8 @@ type
     d: single;
   end;
 
+  tSDFQuality = (sdfFast, sdfFull);
+
   tVoxel = class
   protected
     fWidth,fHeight,fDepth: int32;
@@ -54,7 +56,7 @@ type
     vox: tPage;     {RGBD - baked (todo: 2 bits of D are for alpha)}
     function  getDistance_L1(x,y,z: integer): integer;
     function  getDistance_L2(x,y,z: integer): single;
-    function  generateSDF(): tPage;
+    function  generateSDF(quality: tSDFQuality=sdfFast): tPage;
     procedure transferSDF(sdf: tPage);
 
     procedure generateLighting(mode: tLightingMode; diffuse: tPage);
@@ -84,7 +86,7 @@ uses
   uKeyboard; {for debugging}
 
 const
-  MAX_SAMPLES = 64;
+  MAX_SAMPLES = 128;
 
 var
   LAST_TRACE_COUNT: dword = 0;
@@ -139,7 +141,7 @@ begin
 end;
 
 {calculate SDF (the slow way)}
-function tVoxel.generateSDF(): tPage;
+function tVoxel.generateSDF(quality: tSDFQuality=sdfFast): tPage;
 var
   i,j,k: int32;
   d: single;
@@ -319,7 +321,7 @@ begin
           lmGI: v := sqr(sampleGI());
         end;
         ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-          RGB($FF2F2F2F),
+          RGB($FF000000),
           RGB($FFBACEEF),
           //RGBA.Black,
           //RGBA.White,
@@ -334,11 +336,10 @@ begin
         dif := diffuse.getPixel(x,y+z*fWidth);
         amb := ambient.getPixel(x,y+z*fWidth);
 
-        {if dif.a < 255 then
+        if dif.a < 255 then
           dif := RGBA.Clear
         else
           dif := RGBA.White;
-          }
 
         col := dif*amb;
         vox.setPixel(x,y+z*fWidth, col);
@@ -379,7 +380,7 @@ var
   sdf: tPage;
   loadFilename: string;
 begin
-  img := tPage.Load(filename+'.vox');
+  img := loadLC96(filename+'.vox');
   img.setTransparent(RGBA.create(255,255,255));
   note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
   self.setPage(img, height);
@@ -607,15 +608,12 @@ var
     deltaY := cameraY + cameraDir*tyDelta;
 
     //stub:
-    {
     if cpuInfo.hasMMX then
       traceProc := traceScanline_MMX
     else
       traceProc := traceScanline_ASM;
     if keyDown(key_f5) then
       traceProc := traceScanline_REF;
-    }
-    traceProc := traceScanline_REF;
 
     for y := polyBounds.top to polyBounds.bottom-1 do begin
 

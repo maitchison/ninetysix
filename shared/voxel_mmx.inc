@@ -199,6 +199,8 @@ begin
 
     @HIT:
       // shading
+      // we'll use this for depth based shading
+      (*
       mov cl, depth
       shl cl, 1             // todo: shading as part of sprite
       not cl                // cl = v = (255-(depth*2))
@@ -212,6 +214,7 @@ begin
 
       movd      mm6, ecx    // 00|00|vv|vv
       punpcklbw mm6, mm0    // 0v|0v|0v|0v
+
       movd      mm7, eax    // 00|00|ar|gb
       punpcklbw mm7, mm0    // 0a|0r|0g|0b
 
@@ -220,6 +223,8 @@ begin
 
       packuswb  mm6, mm6    // 00|00|ar|gb
       movd      eax, mm6
+      mov       [edi], eax
+      *)
       mov       [edi], eax
 
     @FINISH:

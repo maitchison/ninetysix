@@ -75,7 +75,7 @@ begin
   if (tVesaDriver(videoDriver).videoMemory) < 1*1024*1024 then
     fatal('Requires 1MB video card.');
   videoDriver.setTrueColor(800, 600);
-  musicPlay('res\mordor.a96');
+  musicPlay('res\prologue.a96');
   initMouse();
   initKeyboard();
   initGuiSkinEpic();
@@ -255,8 +255,8 @@ begin
   uGui.GUI_DRAWMODE := gdmDirty;
 
   map := tMDRMap.Create(32,32);
-  map.load('map.dat');
-  map.setExplored(eNone);
+  //map.load('map.dat');
+  //map.setExplored(eNone);
 
   party := tMDRParty.create();
   party.pos := Point(5, 9);
