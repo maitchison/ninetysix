@@ -46,7 +46,7 @@ type
     d: single;
   end;
 
-  tSDFQuality = (sdfFast, sdfFull);
+  tSDFQuality = (sdfNone, sdfFast, sdfFull);
 
   tVoxel = class
   protected
@@ -56,22 +56,23 @@ type
   protected
     function  generateSDF_fast(maxDistance: integer=-1): tPage;
     function  generateSDF_slow(maxDistance: integer=-1): tPage;
+    procedure transferSDF(sdf: tPage);
   public
-    vox: tPage;     {RGBD - baked (todo: 2 bits of D are for alpha)}
+    vox: tPage;     // RGBD - baked (todo: 2 bits of D are for alpha)
     function  getDistance_L1(x,y,z: integer;maxDistance: integer=-1): integer;
     function  getDistance_L2(x,y,z: integer;maxDistance: integer=-1): single;
-    function  generateSDF(quality: tSDFQuality=sdfFast): tPage;
-    procedure transferSDF(sdf: tPage);
+    procedure generateSDF(quality: tSDFQuality=sdfFast);
 
-    procedure generateLighting(lightingMode: tLightingMode; diffuse: tPage);
+    procedure generateLighting(lightingMode: tLightingMode; diffuse: tPage=nil);
 
     procedure setPage(page: tPage; height: integer);
-    procedure loadP96FromFile(filename: string; height: integer);
+    //procedure loadP96FromFile(filename: string; height: integer);
     procedure loadVoxFromFile(filename: string; height: integer);
 
   public
-    constructor Create(aWidth, aDepth, aHeight: integer);
-    constructor Create(filename: string; height: integer);
+    constructor Create(aWidth, aDepth, aHeight: integer); overload;
+    constructor Create(aFilename: string; aHeight: integer); overload;
+    constructor Create(aPage: tPage; aHeight: integer); overload;
     destructor destroy(); override;
 
     function  getSize(): V3D16;
@@ -192,7 +193,6 @@ begin
    lets me trace super fast in many directions}
   {note, it would be nice to actually have negative for interior... but
   for now just closest is fine}
-
   for i := 0 to fWidth-1 do
     for j := 0 to fHeight-1 do
       for k := 0 to fDepth-1 do begin
@@ -203,12 +203,20 @@ begin
 end;
 
 {calculate SDF}
-function tVoxel.generateSDF(quality: tSDFQuality=sdfFast): tPage;
+procedure tVoxel.generateSDF(quality: tSDFQuality=sdfFast);
+var
+  sdf: tPage;
 begin
   case quality of
-    sdfFast: generateSDF_SLow(8);
-    sdfFull: generateSDF_SLow();
+    sdfNone: begin
+      sdf := vox.clone();
+      sdf.clear(RGB(1,4,16));
+    end;
+    sdfFast: sdf := generateSDF_Slow(8);
+    sdfFull: sdf := generateSDF_Slow();
   end;
+  transferSDF(sdf);
+  sdf.free;
 end;
 
 
@@ -232,9 +240,9 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tVoxel.Create(filename: string; height: integer);
+constructor tVoxel.Create(aFilename: string; aHeight: integer);
 begin
-  inherited create();
+  inherited Create();
   fWidth := 0;
   fHeight := 0;
   fDepth := 0;
@@ -242,12 +250,20 @@ begin
   fLog2Height := 0;
   fRadius := 0;
   vox := nil;
-  loadP96FromFile(filename, height);
+  loadVoxFromFile(aFilename, aHeight);
+end;
+
+constructor tVoxel.Create(aPage: tPage; aHeight: integer);
+begin
+  Create(aPage.width, aHeight, aPage.height div aHeight);
+  // transfer diffuse to voxels
+  vox.getDC(bmBlit).drawImage(aPage, Point(0,0));
+  // simple SDF
 end;
 
 constructor tVoxel.Create(aWidth, aDepth, aHeight: integer);
 begin
-  inherited create();
+  inherited Create();
   assert(isPowerOfTwo(aWidth));
   assert(isPowerOfTwo(aDepth));
   assert(isPowerOfTwo(aHeight));
@@ -266,7 +282,7 @@ begin
   inherited destroy();
 end;
 
-procedure tVoxel.generateLighting(lightingMode: tLightingMode; diffuse: tPage);
+procedure tVoxel.generateLighting(lightingMode: tLightingMode; diffuse: tPage=nil);
 var
   emisive, ambient: tPage;
   x,y,z: int32;
@@ -352,6 +368,8 @@ var
 
 begin
 
+  if not assigned(diffuse) then diffuse := self.vox;
+
   {start with diffuse}
   vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
 
@@ -403,6 +421,8 @@ begin
   ambient.free();
 end;
 
+// todo: remove this
+(*
 procedure tVoxel.loadP96FromFile(filename: string; height: integer);
 var
   img: tPage;
@@ -426,28 +446,18 @@ begin
 
   sdf.free();
 end;
+*)
 
 {with lighting built it}
 procedure tVoxel.loadVoxFromFile(filename: string; height: integer);
 var
   img: tPage;
-  sdf: tPage;
   loadFilename: string;
 begin
   img := loadLC96(filename+'.vox');
   img.setTransparent(RGBA.create(255,255,255));
   note(format(' - voxel sprite is (%d, %d)', [img.width, img.height]));
   self.setPage(img, height);
-
-  if fileSystem.exists(filename+'.sdf') then begin
-    sdf := loadLC96(filename+'.sdf');
-  end else begin
-    sdf := self.generateSDF();
-    saveLC96(filename+'.sdf', sdf);
-  end;
-  self.transferSDF(sdf);
-
-  sdf.free();
 end;
 
 procedure tVoxel.setPage(page: tPage; height: integer);

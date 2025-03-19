@@ -228,29 +228,6 @@ begin
     dc.fillRect(Rect(1,1+29*32,30,30), RGBA.Clear);
   end;
 
-  {uniform CDF for now... can optimize later}
-  {todo: remove this}
-  pixelsPtr := page.pixels;
-  asm
-    pushad
-    mov edi, PIXELSPTR
-    mov ecx, 32*32*32
-  @PIXELLOOP:
-    mov eax, [edi]
-    and eax, $00ffffff
-    jz @EMPTY
-  @SOLID:
-    or  eax, $ff000000  //256 = solid
-    jmp @APPLY
-  @EMPTY:
-    or  eax, $fa000000  //255-4 = 1 unit (for empty cells)
-  @APPLY:
-    mov [edi], eax
-    add edi, 4
-    dec ecx
-    jnz @PIXELLOOP
-    popad
-  end;
 end;
 
 begin

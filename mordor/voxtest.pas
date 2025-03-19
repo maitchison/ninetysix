@@ -59,7 +59,6 @@ var
 begin
 
   startTimer('TileGenerate');
-
   tileBuilder := tTileBuilder.Create();
   tile.floor := ftStone;
   walls[1].t := wtWall;
@@ -71,11 +70,15 @@ begin
   tileBuilder.composeVoxelCell(tile,walls);
   stopTimer('TileCompose');
 
-  {todo: SDF}
+  result := tVoxel.Create(tileBuilder.page, 32);
 
-  result := tVoxel.Create(32,32,32);
+  {todo: must be a better way of putting this all together}
+  startTimer('TileSDF');
+  result.generateSDF();
+  stopTimer('TileSDF');
+
   startTimer('TileLighting');
-  result.generateLighting(lightingMode, tileBuilder.page);
+  result.generateLighting(lightingMode);
   stopTimer('TileLighting');
 
   tileBuilder.free;
