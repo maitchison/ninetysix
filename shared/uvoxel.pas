@@ -29,7 +29,7 @@ var
 
 
 type
-  tLightingMode = (lmNone, lmGradient, lmSimple, lmGI);
+  tLightingMode = (lmNone, lmGradient, lmSimple, lmGI, lmAO);
 
 {restrictions
 X,Y,Z <= 256
@@ -63,7 +63,7 @@ type
     function  generateSDF(quality: tSDFQuality=sdfFast): tPage;
     procedure transferSDF(sdf: tPage);
 
-    procedure generateLighting(mode: tLightingMode; diffuse: tPage);
+    procedure generateLighting(lightingMode: tLightingMode; diffuse: tPage);
 
     procedure setPage(page: tPage; height: integer);
     procedure loadP96FromFile(filename: string; height: integer);
@@ -266,7 +266,7 @@ begin
   inherited destroy();
 end;
 
-procedure tVoxel.generateLighting(mode: tLightingMode; diffuse: tPage);
+procedure tVoxel.generateLighting(lightingMode: tLightingMode; diffuse: tPage);
 var
   emisive, ambient: tPage;
   x,y,z: int32;
@@ -355,7 +355,7 @@ begin
   {start with diffuse}
   vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
 
-  if mode = lmNone then exit;
+  if lightingMode = lmNone then exit;
 
   emisive := diffuse.clone();
   emisive.clear();
@@ -367,16 +367,16 @@ begin
       for z := 0 to fDepth-1 do begin
         if not isSolid(x,y,z) then continue;
         //if isOccluded then continue;
-        case mode of
-          lmGradient: v := sqr(z / (fDepth-1));
-          lmSimple: v := 1-(countNeighbours()/6);
-          lmGI: v := sqr(sampleGI());
+        case lightingMode of
+          lmGradient: v := 1.2-sqr(z / (fDepth-1));
+          lmSimple: v := 1.2-(countNeighbours()/6);
+          lmGI, lmAO: v := sqr(sampleGI());
         end;
         ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-          RGB($FF000000),
-          RGB($FFBACEEF),
-          //RGBA.Black,
-          //RGBA.White,
+          //RGB($FF000000),
+          //RGB($FFBACEEF),
+          RGBA.Black,
+          RGBA.White,
           v
         ));
       end;
@@ -388,10 +388,12 @@ begin
         dif := diffuse.getPixel(x,y+z*fWidth);
         amb := ambient.getPixel(x,y+z*fWidth);
 
-        if dif.a < 255 then
-          dif := RGBA.Clear
-        else
-          dif := RGBA.White;
+        if lightingMode in [lmAO] then begin
+          if dif.a < 255 then
+            dif := RGBA.Clear
+          else
+            dif := RGBA.White;
+        end;
 
         col := dif*amb;
         vox.setPixel(x,y+z*fWidth, col);

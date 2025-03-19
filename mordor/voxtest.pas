@@ -98,7 +98,7 @@ begin
 
   dc := screen.getDC();
 
-  tileVox := generateTile(lmNone);
+  tileVox := generateTile(lmGI);
 
   tileCanvas := tPage.Create(128,128);
 
