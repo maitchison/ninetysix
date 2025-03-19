@@ -13,22 +13,28 @@ uses
   uSound,
   uMixer,
   uInput,
+  uRect,
+  uVertex,
+  uVoxel,
+  uColor,
   uGraph32,
   {$i gui.inc}
+  uMDRMap,
   uTileBuilder,
   uVESADriver,
   uVGADriver;
 
 type
   tTestScene = class(tScene)
+  protected
+    function generateTile(lightingMode: tLightingMode): tVoxel;
+  public
     procedure run(); override;
   end;
 
 var
   screen: tScreen;
   scene: tTestScene;
-  tileBuilder: tTileBuilder;
-
 
 procedure setup();
 begin
@@ -45,15 +51,56 @@ begin
   screen.scrollMode := SSM_COPY;
 end;
 
+function tTestScene.generateTile(lightingMode: tLightingMode): tVoxel;
+var
+  tileBuilder: tTileBuilder;
+  tile: tTile;
+  walls: array[1..4] of tWall;
+begin
+
+  startTimer('TileGenerate');
+
+  tileBuilder := tTileBuilder.Create();
+  tile.floor := ftStone;
+  walls[1].t := wtWall;
+  walls[2].t := wtWall;
+  walls[3].t := wtNone;
+  walls[4].t := wtNone;
+
+  startTimer('TileCompose');
+  tileBuilder.composeVoxelCell(tile,walls);
+  stopTimer('TileCompose');
+
+  {todo: SDF}
+
+  result := tVoxel.Create(32,32,32);
+  startTimer('TileLighting');
+  result.generateLighting(lightingMode, tileBuilder.page);
+  stopTimer('TileLighting');
+
+  tileBuilder.free;
+
+  stopTimer('TileGenerate');
+end;
+
 procedure tTestScene.run();
 var
   timer: tTimer;
   elapsed: single;
   dc: tDrawContext;
+  tileVox: tVoxel;
+  tileCanvas: tPage;
+  bounds: tRect;
+
+
 begin
   timer := startTimer('main');
 
   dc := screen.getDC();
+
+  tileVox := generateTile(lmNone);
+
+  tileCanvas := tPage.Create(128,128);
 
   repeat
 
@@ -67,6 +114,14 @@ begin
 
     input.update();
 
+    {draw our tile}
+    tileCanvas.clear(RGB(255,0,255));
+    tileVox.draw(tileCanvas.getDC(), V3(64,64,0), V3(0,0,getSec), 2.0);
+    screen.getDC.asBlendMode(bmBlit).drawImage(
+      tileCanvas,
+      Point((screen.canvas.bounds.width-128) div 2, (screen.canvas.bounds.height-128) div 2)
+    );
+
     gui.update(elapsed);
     gui.draw(dc);
     screen.flipAll();
@@ -75,7 +130,6 @@ begin
 
   until keyDown(key_esc);
 
-
 end;
 
 begin
@@ -83,5 +137,6 @@ begin
   scene := tTestScene.Create();
   scene.run();
   videoDriver.setText();
+  logTimers();
   printLog(32);
 end.
