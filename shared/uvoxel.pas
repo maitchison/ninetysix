@@ -63,7 +63,7 @@ type
     function  getDistance_L2(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): single;
     procedure generateSDF(quality: tSDFQuality=sdfFast);
 
-    procedure generateLighting(lightingMode: tLightingMode; diffuse: tPage=nil);
+    procedure generateLighting(lightingMode: tLightingMode);
 
     procedure setPage(page: tPage; height: integer);
     //procedure loadP96FromFile(filename: string; height: integer);
@@ -92,7 +92,7 @@ uses
   uKeyboard; {for debugging}
 
 const
-  MAX_SAMPLES = 128;
+  MAX_SAMPLES = 32; // stub: just for debugging, should be 128
 
 var
   LAST_TRACE_COUNT: dword = 0;
@@ -325,30 +325,32 @@ begin
   inherited destroy();
 end;
 
-procedure tVoxel.generateLighting(lightingMode: tLightingMode; diffuse: tPage=nil);
+procedure tVoxel.generateLighting(lightingMode: tLightingMode);
 var
   emisive, ambient: tPage;
   x,y,z: int32;
   v: single;
-  amb,emi,dif,col: RGBA;
+  amb,emi,col: RGBA;
+  pVox: pRGBA;
+  addr: dword;
 
   {returns number of neighbours for current cell}
   function countNeighbours(): integer;
   begin
     result := 0;
-    if diffuse.getPixel((x-1),(y)+(z)*fWidth).a = 255 then inc(result);
-    if diffuse.getPixel((x+1),(y)+(z)*fWidth).a = 255 then inc(result);
-    if diffuse.getPixel((x),(y-1)+(z)*fWidth).a = 255 then inc(result);
-    if diffuse.getPixel((x),(y+1)+(z)*fWidth).a = 255 then inc(result);
-    if diffuse.getPixel((x),(y)+(z-1)*fWidth).a = 255 then inc(result);
-    if diffuse.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x-1),(y)+(z)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x+1),(y)+(z)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x),(y-1)+(z)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x),(y+1)+(z)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x),(y)+(z-1)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
   end;
 
   function isSolid(x,y,z: int32): boolean;
   begin
     if z < 0 then exit(false); {open sky}
     if not inBounds(x,y,z) then exit(true);
-    result := diffuse.getPixel(x,y+z*fWidth).a = 255;
+    result := vox.getPixel(x,y+z*fWidth).a = 255;
   end;
 
   function isOccluded(): boolean;
@@ -411,16 +413,11 @@ var
 
 begin
 
-  if not assigned(diffuse) then diffuse := self.vox;
-
-  {start with diffuse}
-  vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
-
   if lightingMode = lmNone then exit;
 
-  emisive := diffuse.clone();
+  emisive := vox.clone();
   emisive.clear();
-  ambient := diffuse.clone();
+  ambient := vox.clone();
   ambient.clear();
 
   for x := 0 to fWidth-1 do
@@ -446,18 +443,15 @@ begin
   for x := 0 to fWidth-1 do
     for y := 0 to fHeight-1 do
       for z := 0 to fDepth-1 do begin
-        dif := diffuse.getPixel(x,y+z*fWidth);
-        amb := ambient.getPixel(x,y+z*fWidth);
-
+        addr := getAddr(x,y,z);
+        pVox := pRGBA(vox.pixels+addr*4);
+        if (pVox^.a <> 255) then continue;
+        amb := pRGBA(ambient.pixels+addr*4)^;
         if lightingMode in [lmAO] then begin
-          if dif.a < 255 then
-            dif := RGBA.Clear
-          else
-            dif := RGBA.White;
+          pVox^.r := 255; pVox^.g := 255; pVox^.b := 255;
         end;
-
-        col := dif*amb;
-        vox.setPixel(x,y+z*fWidth, col);
+        col := pVox^*amb;
+        pVox^ := col;
       end;
 
   emisive.free();
