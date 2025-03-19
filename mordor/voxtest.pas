@@ -73,7 +73,7 @@ begin
   result := tVoxel.Create(tileBuilder.page, 32);
 
   startTimer('TileSDF');
-  result.generateSDF(sdfFast);
+  result.generateSDF(sdfFull);
   stopTimer('TileSDF');
 
   startTimer('TileLighting');

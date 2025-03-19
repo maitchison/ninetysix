@@ -75,6 +75,8 @@ type
     constructor Create(aPage: tPage; aHeight: integer); overload;
     destructor destroy(); override;
 
+    function  validateSDF(): single;
+
     function  getSize(): V3D16;
     function  inBounds(x,y,z:int32): boolean; inline; register;
     function  getAddr(x,y,z:int32): int32; inline; register;
@@ -92,7 +94,7 @@ uses
   uKeyboard; {for debugging}
 
 const
-  MAX_SAMPLES = 32; // stub: just for debugging, should be 128
+  MAX_SAMPLES = 128;
 
 var
   LAST_TRACE_COUNT: dword = 0;
@@ -220,9 +222,9 @@ begin
   {apply back}
   vPtr := vox.pixels;
   dPtr := @depth[0];
-  for lp := 0 to fWidth*fHeight*fDepth-1 do begin
+  for lp := 0 to (fWidth*fHeight*fDepth)-1 do begin
     d := dPtr^;
-    if d = 255 then d := maxDistance*4;
+    if d = 255 then d := maxDistance;
     vPtr^.a := clamp(255-(d*4), 0, 255);
     inc(vPtr);
     inc(dPtr);
@@ -301,7 +303,6 @@ begin
   Create(aPage.width, aHeight, aPage.height div aHeight);
   // transfer diffuse to voxels
   vox.getDC(bmBlit).drawImage(aPage, Point(0,0));
-  // simple SDF
 end;
 
 constructor tVoxel.Create(aWidth, aDepth, aHeight: integer);
@@ -330,7 +331,7 @@ var
   emisive, ambient: tPage;
   x,y,z: int32;
   v: single;
-  amb,emi,col: RGBA;
+  amb,emi: RGBA;
   pVox: pRGBA;
   addr: dword;
 
@@ -400,15 +401,9 @@ var
         continue;
       end;
       hit := trace(p, d, orig);
-      if (x = 12) and (y = 15) and (z = 30) then begin
-        note('Norm:%s Ray %s %s: hit:%s d:%f didhit:%d', [norm.toString, p.toString, d.toString, hit.pos.toString, hit.d, byte(hit.didHit)]);
-        note('%s', [guessNorm.toString]);
-        note('%d %d %d', [byte(isSolid(x-1,y,z)),byte(isSolid(x+0,y,z)),byte(isSolid(x+1,y,z))]);
-      end;
       if hit.didHit then inc(hits);
     end;
     result := 1-(hits/SAMPLES);
-    //note('%f', [result]);
   end;
 
 begin
@@ -450,8 +445,7 @@ begin
         if lightingMode in [lmAO] then begin
           pVox^.r := 255; pVox^.g := 255; pVox^.b := 255;
         end;
-        col := pVox^*amb;
-        pVox^ := col;
+        pVox^ := pVox^*amb;
       end;
 
   emisive.free();
@@ -511,6 +505,12 @@ begin
   fLog2Height := round(log2(fHeight));
 end;
 
+{returns how close SDF is to true L2 SDF}
+function tVoxel.validateSDF(): single;
+begin
+  // pass
+end;
+
 {get size as 16bit vector}
 function tVoxel.getSize(): V3D16;
 begin
@@ -552,32 +552,30 @@ var
   i: integer;
   maxSteps: integer;
   c: RGBA;
-  old,cur: V3D32;
-const
-  STEP_SIZE = 0.25;
+  cur: V3D32;
+  stepSize: single;
 begin
   assert(abs(dir.abs2-1.0) < 1e-6);
-  maxSteps := ceil(fRadius/STEP_SIZE);
+  maxSteps := ceil(fRadius)+1;
   result.pos := pos;
   result.d := 0;
-  old.x := -1; old.y := -1; old.z := -1;
   for i := 0 to maxSteps-1 do begin
     cur := V3D32.Floor(result.pos);
-    if (cur <> old) and (cur <> ignore) then begin
-      {we moved to a new cell}
-      if not inBounds(cur.x, cur.y, cur.z) then begin
-        result.didHit := false;
-        exit;
-      end;
-      c := getVoxel(cur.x, cur.y, cur.z);
-      if c.a = 255 then begin
-        result.didHit := true;
-        exit;
-      end;
-      old := cur;
+    if not inBounds(cur.x, cur.y, cur.z) then begin
+      result.didHit := false;
+      exit;
     end;
-    result.pos += dir * STEP_SIZE;
-    result.d += STEP_SIZE;
+
+    c := getVoxel(cur.x, cur.y, cur.z);
+    if c.a = 255 then begin
+      result.didHit := true;
+      exit;
+    end;
+
+    stepSize := (255-c.a) / 4;
+
+    result.pos += dir * stepSize;
+    result.d += stepSize;
   end;
 
   result.didHit := false;
