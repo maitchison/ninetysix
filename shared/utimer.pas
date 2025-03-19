@@ -24,8 +24,8 @@ type
     function  toString(): string; override;
   end;
 
-procedure startTimer(aTag: string); overload;
-procedure startTimer(aTag: string; mode: tTimerMode); overload;
+function  startTimer(aTag: string): tTimer; overload;
+function  startTimer(aTag: string; mode: tTimerMode): tTimer; overload;
 procedure stopTimer(aTag: string; iterations: integer=1);
 function  getTimer(aTag: string): tTimer;
 
@@ -58,7 +58,7 @@ begin
   TIMERS[length(TIMERS)-1] := timer;
 end;
 
-procedure startTimer(aTag: string);
+function startTimer(aTag: string): tTimer;
 var
   timer: tTimer;
 begin
@@ -68,12 +68,13 @@ begin
     addTimer(timer);
   end;
   timer.start();
+  result := timer;
 end;
 
-procedure startTimer(aTag: string; mode: tTimerMode);
+function startTimer(aTag: string; mode: tTimerMode): tTimer;
 begin
-  startTimer(aTag);
-  getTimer(aTag).mode := mode;
+  result := startTimer(aTag);
+  result.mode := mode;
 end;
 
 procedure stopTimer(aTag: string;iterations: integer=1);
