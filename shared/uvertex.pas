@@ -77,6 +77,7 @@ type
 
     class function round(a: V3D): V3D32; static; inline;
     class function trunc(a: V3D): V3D32; static; inline;
+    class function floor(a: V3D): V3D32; static; inline;
     class operator equal(a,b: V3D32): boolean; inline;
     end;
 
@@ -120,13 +121,17 @@ implementation
 
 {returns a vector sampled from a shell of unit radius}
 function sampleShell(): V3D;
+var
+  abs2: single;
 begin
-  {todo: do this properly}
-  result.x := (rnd-128);
-  result.y := (rnd-128);
-  result.z := (rnd-128);
   result.w := 1;
-  result := result.normed;
+  repeat
+    result.x := (rnd-127.5);
+    result.y := (rnd-127.5);
+    result.z := (rnd-127.5);
+    abs2 := result.abs2;
+  until (result.abs2 <> 0) and (result.abs2 <= (127.5*127.5));
+  result := result.normed();
 end;
 
 {-----------------------------------------}
@@ -639,6 +644,16 @@ begin
   result.x := system.trunc(a.x);
   result.y := system.trunc(a.y);
   result.z := system.trunc(a.z);
+  result.w := 0;
+  {$R+,Q+}
+end;
+
+class function V3D32.floor(a: V3D): V3D32; static; inline;
+begin
+  {$R-,Q-}
+  result.x := uMath.floor(a.x);
+  result.y := uMath.floor(a.y);
+  result.z := uMath.floor(a.z);
   result.w := 0;
   {$R+,Q+}
 end;

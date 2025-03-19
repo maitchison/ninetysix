@@ -230,20 +230,32 @@ var
     if diffuse.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
   end;
 
+  function isSolid(x,y,z: int32): boolean;
+  begin
+    if z < 0 then exit(false); {open sky}
+    if not inBounds(x,y,z) then exit(true);
+    result := diffuse.getPixel(x,y+z*fWidth).a = 255;
+  end;
+
+  function isOccluded(): boolean;
+  begin
+    result := (x<>0) and (y<>0) and (z<>0) and (x<>fWidth-1) and (y<>fHeight-1) and (z<>fDepth-1) and (countNeighbours = 6);
+  end;
+
   {guess which way the voxel is 'pointing'}
   function guessNorm(): V3D;
   begin
     result := V3(0,0,0);
-    if diffuse.getPixel((x-1),(y)+(z)*fWidth).a = 255 then result += V3(+1,0,0);
-    if diffuse.getPixel((x+1),(y)+(z)*fWidth).a = 255 then result += V3(-1,0,0);
-    if diffuse.getPixel((x),(y-1)+(z)*fWidth).a = 255 then result += V3(0,+1,0);
-    if diffuse.getPixel((x),(y+1)+(z)*fWidth).a = 255 then result += V3(0,-1,0);
-    if diffuse.getPixel((x),(y)+(z-1)*fWidth).a = 255 then result += V3(0,0,+1);
-    if diffuse.getPixel((x),(y)+(z+1)*fWidth).a = 255 then result += V3(0,0,-1);
-    if result.abs2 = 0 then exit else result := result.normed();
+    if not isSolid(x-1,y,z) then result += V3(-1,0,0);
+    if not isSolid(x+1,y,z) then result += V3(+1,0,0);
+    if not isSolid(x,y-1,z) then result += V3(0,-1,0);
+    if not isSolid(x,y+1,z) then result += V3(0,+1,0);
+    if not isSolid(x,y,z-1) then result += V3(0,0,-1);
+    if not isSolid(x,y,z+1) then result += V3(0,0,+1);
+    result := result.normed();
   end;
 
-  {returns proportion of sphere unaccluded}
+  {returns how much ambient light is at xyz}
   function sampleGI(): single;
   var
     i: integer;
@@ -253,8 +265,9 @@ var
     norm: V3D;
     hasNorm: boolean;
     orig: V3D32;
+    s: string;
   const
-    SAMPLES = 32;
+    SAMPLES = 64;
   begin
     orig.x := x; orig.y := y; orig.z := z;
     norm := guessNorm();
@@ -265,25 +278,29 @@ var
       d := sampleShell();
       {hemisphere sampling}
       if hasNorm and (d.dot(norm) < 0) then d *= -1;
-      (*
       if d.z > 0 then begin
         {hit a pretend floor plane}
         inc(hits);
         continue;
       end;
-      *)
       hit := trace(p, d, orig);
+      if (x = 12) and (y = 15) and (z = 30) then begin
+        note('Norm:%s Ray %s %s: hit:%s d:%f didhit:%d', [norm.toString, p.toString, d.toString, hit.pos.toString, hit.d, byte(hit.didHit)]);
+        note('%s', [guessNorm.toString]);
+        note('%d %d %d', [byte(isSolid(x-1,y,z)),byte(isSolid(x+0,y,z)),byte(isSolid(x+1,y,z))]);
+      end;
       if hit.didHit then inc(hits);
     end;
-    result := (hits / SAMPLES);
-    note('%f', [result]);
+    result := 1-(hits/SAMPLES);
+    //note('%f', [result]);
   end;
 
 begin
-  if mode = lmNone then begin
-    vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
-    exit;
-  end;
+
+  {start with diffuse}
+  vox.getDC(bmBlit).drawImage(diffuse, Point(0,0));
+
+  if mode = lmNone then exit;
 
   emisive := diffuse.clone();
   emisive.clear();
@@ -293,17 +310,18 @@ begin
   for x := 0 to fWidth-1 do
     for y := 0 to fHeight-1 do
       for z := 0 to fDepth-1 do begin
-        if diffuse.getPixel(x,y+z*fWidth).a <> 255 then continue;
+        if not isSolid(x,y,z) then continue;
+        //if isOccluded then continue;
         case mode of
           lmGradient: v := sqr(z / (fDepth-1));
           lmSimple: v := 1-(countNeighbours()/6);
-          lmGI: v := sampleGI();
+          lmGI: v := sqr(sampleGI());
         end;
         ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-          //RGB($FF7F7F7F),
-          //RGB($FFBACEEF),
-          RGBA.White,
-          RGBA.Black,
+          RGB($FF2F2F2F),
+          RGB($FFBACEEF),
+          //RGBA.Black,
+          //RGBA.White,
           v
         ));
       end;
@@ -315,10 +333,11 @@ begin
         dif := diffuse.getPixel(x,y+z*fWidth);
         amb := ambient.getPixel(x,y+z*fWidth);
 
-        if dif.a < 255 then
+        {if dif.a < 255 then
           dif := RGBA.Clear
         else
           dif := RGBA.White;
+          }
 
         col := dif*amb;
         vox.setPixel(x,y+z*fWidth, col);
@@ -402,7 +421,7 @@ var
   c: RGBA;
   old,cur: V3D32;
 const
-  STEP_SIZE = 0.1;
+  STEP_SIZE = 0.25;
 begin
   assert(abs(dir.abs2-1.0) < 1e-6);
   maxSteps := ceil(sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth))/STEP_SIZE);
@@ -410,7 +429,7 @@ begin
   result.d := 0;
   old.x := -1; old.y := -1; old.z := -1;
   for i := 0 to maxSteps-1 do begin
-    cur := V3D32.Trunc(result.pos);
+    cur := V3D32.Floor(result.pos);
     if (cur <> old) and (cur <> ignore) then begin
       {we moved to a new cell}
       if not inBounds(cur.x, cur.y, cur.z) then begin

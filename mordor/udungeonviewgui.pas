@@ -92,7 +92,7 @@ var
         end;
   end;
 
-  procedure wall(d: tDirection; height: integer=16);
+  procedure wall(d: tDirection; height: integer=30);
   var
     i,j: integer;
   begin
@@ -122,9 +122,9 @@ begin
   assertEqual(page.height, 32*32);
   page.clear(RGBA.Clear());
   dc := page.getDC(bmBlit);
-  {ceiling}
-  //dc.fillRect(Rect(0,0*32,32,32), MDR_DARKGRAY);
-  //dc.fillRect(Rect(0,1*32,32,32), MDR_LIGHTGRAY);
+  {ceiling (temp)}
+  {dc.fillRect(Rect(0,0*32,16,32), MDR_DARKGRAY);
+  dc.fillRect(Rect(0,1*32,16,32), MDR_LIGHTGRAY);}
   {floor}
   case tile.floor of
     ftStone: begin
@@ -136,7 +136,8 @@ begin
       layer := 30;
       fill(MDR_LIGHTGRAY);
       noise(0.5);
-      decimate(0.1);
+      //stub:
+      //decimate(0.1);
     end;
     ftDirt: begin
       //bedrock
