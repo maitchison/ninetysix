@@ -51,11 +51,15 @@ type
   tVoxel = class
   protected
     fWidth,fHeight,fDepth: int32;
+    fRadius: single;
     fLog2Width,fLog2Height: byte;
+  protected
+    function  generateSDF_fast(maxDistance: integer=-1): tPage;
+    function  generateSDF_slow(maxDistance: integer=-1): tPage;
   public
     vox: tPage;     {RGBD - baked (todo: 2 bits of D are for alpha)}
-    function  getDistance_L1(x,y,z: integer): integer;
-    function  getDistance_L2(x,y,z: integer): single;
+    function  getDistance_L1(x,y,z: integer;maxDistance: integer=-1): integer;
+    function  getDistance_L2(x,y,z: integer;maxDistance: integer=-1): single;
     function  generateSDF(quality: tSDFQuality=sdfFast): tPage;
     procedure transferSDF(sdf: tPage);
 
@@ -72,6 +76,7 @@ type
 
     function  getSize(): V3D16;
     function  inBounds(x,y,z:int32): boolean; inline; register;
+    function  getAddr(x,y,z:int32): int32; inline; register;
     function  getVoxel(x,y,z:int32): RGBA; inline; register;
     procedure setVoxel(x,y,z:int32;c: RGBA);
     function  trace(pos: V3D; dir: V3D; ignore: V3D32): tRayHit;
@@ -100,34 +105,32 @@ var
 { Signed distance calculations }
 {-----------------------------------------------------}
 
-function tVoxel.getDistance_L1(x,y,z: integer): integer;
+function tVoxel.getDistance_L1(x,y,z: integer;maxDistance: integer=-1): integer;
 var
   dx,dy,dz: integer;
   d: integer;
-const
-  MAX_D=16;
 begin
   if getVoxel(x,y,z).a = 255 then exit(0);
-  for d := 1 to MAX_D do
+  if maxDistance < 0 then maxDistance := ceil(fRadius);
+  for d := 1 to maxDistance do
     for dx := -d to d do
       for dy := -d to d do
         for dz := -d to d do
           if getVoxel(x+dx, y+dy, z+dz).a = 255 then
             exit(d);
-  exit(MAX_D);
+  exit(maxDistance);
 end;
 
-function tVoxel.getDistance_L2(x,y,z: integer): single;
+function tVoxel.getDistance_L2(x,y,z: integer;maxDistance: integer=-1): single;
 var
   dx,dy,dz: integer;
   d: integer;
   d2: single;
   bestD2: single;
 begin
-
   if getVoxel(x,y,z).a = 255 then exit(0);
   {if we hit something L1 distance away, then closest L2 distance must
-   be between L1 and sqrt(2)*L1}
+   be between L1 and sqrt(3)*L1}
   d := trunc(getDistance_L1(x,y,z) * sqrt(2) + 0.999);
   bestD2 := d*d;
   for dx := -d to d do
@@ -140,8 +143,45 @@ begin
   exit(sqrt(bestD2));
 end;
 
+{calculate SDF (the fast way)}
+function tVoxel.generateSDF_Fast(maxDistance: integer=-1): tPage;
+var
+  d,i,j,k: integer;
+  depth: array of byte;
+
+  procedure setNeighbours(x: integer);
+  begin
+
+  end;
+
+  {
+  function getDepth(x,y,z: integer): integer;
+  begin
+    result := depth[x+y shl log2
+  end;
+  }
+
+begin
+
+  setLength(depth, fWidth*fHeight*fDepth);
+  fillchar(depth[0], length(depth), 0);
+
+  for d := 0 to 32 do begin
+    for k := 0 to fDepth-1 do begin
+      for i := 0 to fWidth-1 do begin
+        for j := 0 to fHeight-1 do begin
+          //if getDepth(
+        end;
+      end;
+    end;
+  end;
+
+  setLength(depth,0);
+end;
+
+
 {calculate SDF (the slow way)}
-function tVoxel.generateSDF(quality: tSDFQuality=sdfFast): tPage;
+function tVoxel.generateSDF_Slow(maxDepth: integer=-1): tPage;
 var
   i,j,k: int32;
   d: single;
@@ -161,6 +201,16 @@ begin
         result.setPixel(i,j+k*fHeight, c);
       end;
 end;
+
+{calculate SDF}
+function tVoxel.generateSDF(quality: tSDFQuality=sdfFast): tPage;
+begin
+  case quality of
+    sdfFast: generateSDF_SLow(8);
+    sdfFull: generateSDF_SLow();
+  end;
+end;
+
 
 {store SDF on the alpha channel of this voxel sprite}
 procedure tVoxel.transferSDF(sdf: tPage);
@@ -190,6 +240,7 @@ begin
   fDepth := 0;
   fLog2Width := 0;
   fLog2Height := 0;
+  fRadius := 0;
   vox := nil;
   loadP96FromFile(filename, height);
 end;
@@ -205,6 +256,7 @@ begin
   fDepth := aDepth;
   fLog2Width := round(log2(aWidth));
   fLog2Height := round(log2(aDepth));
+  fRadius := sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth));
   vox := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
@@ -427,12 +479,17 @@ begin
   result := true;
 end;
 
+function tVoxel.getAddr(x,y,z:int32): int32; inline; register;
+begin
+  result := x+((y+(z shl fLog2Height)) shl fLog2Width);
+end;
+
 function tVoxel.getVoxel(x,y,z:int32): RGBA; inline; register;
 begin
   {todo: fast asm}
   result.r := 255; result.g := 0; result.b := 255; result.a := 255;
   if not inBounds(x,y,z) then exit;
-  result := pRGBA(vox.pixels + ((x+((y+(z shl fLog2Height)) shl fLog2Width))) shl 2)^;
+  result := pRGBA(vox.pixels + getAddr(x,y,z)*4)^;
 end;
 
 {
@@ -451,7 +508,7 @@ const
   STEP_SIZE = 0.25;
 begin
   assert(abs(dir.abs2-1.0) < 1e-6);
-  maxSteps := ceil(sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth))/STEP_SIZE);
+  maxSteps := ceil(fRadius/STEP_SIZE);
   result.pos := pos;
   result.d := 0;
   old.x := -1; old.y := -1; old.z := -1;
