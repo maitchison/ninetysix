@@ -55,6 +55,8 @@ begin
   fontStyle.shadow := true;
   fontStyle.col := RGB(250, 250, 250, 230);
 
+  guiStyle.padding := Border(3,3,3,3);
+
   autoSize := false;
   setBounds(Rect(aPos.x, aPos.y, 120, 20));
 

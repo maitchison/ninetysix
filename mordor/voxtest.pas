@@ -53,8 +53,6 @@ var
 begin
   timer := startTimer('main');
 
-  gui := tGui.Create();
-
   dc := screen.getDC();
 
   repeat
