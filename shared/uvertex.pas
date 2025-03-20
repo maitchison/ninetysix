@@ -99,6 +99,7 @@ type
 
     procedure setIdentity();
     procedure setTranslate(v: V3D);
+    procedure setPerspective(nearZ, farZ: single; aspect: single=1; fov: single=45);
     procedure setRotationX(theta: single);
     procedure setRotationZYX(thetaZ, thetaY, thetaX: single);
     procedure setRotationXYZ(thetaX, thetaY, thetaZ: single);
@@ -490,6 +491,21 @@ begin
   setM(4, 1, v.x);
   setM(4, 2, v.y);
   setM(4, 3, v.z);
+end;
+
+procedure tMatrix4X4.setPerspective(nearZ, farZ: single; aspect: single=1; fov: single=45);
+var
+  fovRads,f,invRange: double;
+begin
+  fov := fov * DEG2RAD;
+  f := 1 / tan(fov * 0.5);
+  invRange := 1 / (nearZ - farZ);
+  fillchar(data, sizeof(data), 0);
+  setM(1,1, f / aspect);
+  setM(2,2, f);
+  setM(3,3, (farZ + nearZ) * invRange);
+  setM(3,4, -1);
+  setM(4,3, 2.0 * farZ * nearZ * invRange);
 end;
 
 procedure tMatrix4X4.setRotationX(theta: single);

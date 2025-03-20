@@ -20,6 +20,7 @@ function ceil(x: tFloat): int64;
 function floor(x: tFloat): int64;
 function arccos(x: tFloat): tFloat;
 function arctan2(y,x: tFloat): tFloat;
+function tan(x: tFloat): tFloat;
 
 const
   DEG2RAD = pi / 180;
@@ -80,6 +81,11 @@ begin
       else
         result += pi;
   end;
+end;
+
+function tan(x: tFloat): tFloat;
+begin
+  result := sin(x) / cos(x);
 end;
 
 {--------------------------------------------------------}

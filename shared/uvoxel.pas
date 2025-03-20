@@ -27,6 +27,15 @@ var
   VX_USE_SDF: boolean = true;
   VX_UVW_MODE: boolean = false;
 
+const
+  VX_FACE_COLOR: array[1..6] of RGBA = (
+    (b: $00; g: $00; r: $ff; a:$ff),
+    (b: $00; g: $00; r: $7f; a:$ff),
+    (b: $00; g: $ff; r: $00; a:$ff),
+    (b: $00; g: $7f; r: $00; a:$ff),
+    (b: $ff; g: $00; r: $00; a:$ff),
+    (b: $7f; g: $00; r: $00; a:$ff)
+  );
 
 type
   tLightingMode = (lmNone, lmGradient, lmSimple, lmGI, lmAO);
@@ -358,7 +367,6 @@ var
   hit: tRayHit;
   hits: integer;
   norm,tangent,biTangent: V3D;
-  hasNorm: boolean;
   orig: V3D32;
 
   function isSolid(x,y,z: int32): boolean; inline;
@@ -394,7 +402,6 @@ begin
   for i := 0 to lSamples-1 do begin
     d := sampleCosine(norm, tangent, bitangent);
     {hemisphere sampling}
-    if hasNorm and (d.dot(norm) < 0) then d *= -1;
     if d.z > 0 then begin
       {hit a pretend floor plane}
       inc(hits);
@@ -656,7 +663,6 @@ todo: correctly account for offset and clip
 function tVoxel.draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
 var
   c, debugCol: RGBA;
-  faceColor: array[1..6] of RGBA;
   size: V3D; {half size of cuboid}
   cameraX, cameraY, cameraZ, cameraDir: V3D;
   p: array[1..8] of V3D; {world space}
@@ -735,7 +741,7 @@ var
     {alternative solid face render (for debugging)}
     if (keyDown(key_0)) then begin
       for y := polyBounds.top to polyBounds.bottom-1 do
-        dc.hLine(Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len, faceColor[faceID]);
+        dc.hLine(Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len, VX_FACE_COLOR[faceID]);
       exit;
     end;
 
@@ -833,13 +839,6 @@ begin
   VX_TRACE_COUNT := 0;
   if scale = 0 then exit;
 
-  faceColor[1].init(255,0,0);
-  faceColor[2].init(128,0,0);
-  faceColor[3].init(0,255,0);
-  faceColor[4].init(0,128,0);
-  faceColor[5].init(0,0,255);
-  faceColor[6].init(0,0,128);
-
   {note:
     I make use of transpose to invert the rotation matrix, but
     this means I need to apply scale and translate later on
@@ -850,7 +849,10 @@ begin
   model.setRotationXYZ(angle.x, angle.y, angle.z);
   if asShadow then
     model.scale(1,1,0);
+
+  {ortho projection:}
   projection.setRotationX(-0.615); //~35 degrees
+
   mvp := model * projection;
 
   {convert given world position}

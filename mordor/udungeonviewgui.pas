@@ -16,6 +16,7 @@ uses
   uP96,
   uMDRMap,
   uTileBuilder,
+  uVoxelScene,
   uGraph32;
 
 type
@@ -24,6 +25,7 @@ type
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(const dc: tDrawContext); override;
   public
+    voxelScene: tVoxelScene;
     voxelCell: tVoxel;
     constructor Create();
     destructor destroy(); override;
@@ -36,9 +38,14 @@ var
   pos, angle: V3D;
 begin
   inherited doDraw(dc);
+  {
   pos := V3(bounds.width/2,bounds.height/2,0);
   angle := V3(0,0,getSec);
-  voxelCell.draw(dc, pos, angle, 3.0);
+  voxelCell.draw(dc, pos, angle, 1.0);
+  }
+  {bug stub... camera movement}
+  voxelScene.render(dc);
+
 end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);
@@ -57,6 +64,8 @@ var
 begin
   inherited Create(Rect(20, 30, 96, 124), 'View');
   voxelCell := tVoxel.Create(32,32,32);
+
+  voxelScene := tVoxelScene.Create();
 
   cached := joinPath('res', 'tile1');
   if fileSystem.exists(cached+'.vox') then begin
@@ -82,6 +91,8 @@ end;
 
 destructor tDungeonViewGui.destroy();
 begin
+  voxelScene.free;
+  voxelCell.free;
   inherited destroy;
 end;
 
