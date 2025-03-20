@@ -341,7 +341,7 @@ begin
   fLog2Height := round(log2(aDepth));
   fRadius := sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth));
   fVolume := fWidth * fHeight * fDepth;
-  lSamples := 256;
+  lSamples := 64;
   vox := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
@@ -357,10 +357,9 @@ var
   p,d: V3D;
   hit: tRayHit;
   hits: integer;
-  norm: V3D;
+  norm,tangent,biTangent: V3D;
   hasNorm: boolean;
   orig: V3D32;
-  s: string;
 
   function isSolid(x,y,z: int32): boolean; inline;
   begin
@@ -387,13 +386,14 @@ var
 begin
   orig.x := x; orig.y := y; orig.z := z;
   norm := guessNorm();
-  hasNorm := norm.abs2 <> 0;
   p := V3(x, y, z) + norm + V3(0.5, 0.5, 0.5);
   hits := 0;
+
+  norm.getBasis(tangent, bitangent);
+
   for i := 0 to lSamples-1 do begin
-    d := sampleShell();
+    d := sampleCosine(norm, tangent, bitangent);
     {hemisphere sampling}
-    {todo: cosign here}
     if hasNorm and (d.dot(norm) < 0) then d *= -1;
     if d.z > 0 then begin
       {hit a pretend floor plane}
@@ -407,6 +407,8 @@ begin
 end;
 
 function tVoxel.updateLighting(maxSamples: integer=1): boolean;
+var
+  pVox: pRGBA;
 
   procedure nextVoxel();
   begin
@@ -420,19 +422,31 @@ function tVoxel.updateLighting(maxSamples: integer=1): boolean;
       ly := 0;
       inc(lz);
     end;
-    if lz >= fDepth then
+    if lz >= fDepth then begin
       lMode := lmNone;
+      lz := 0;
+    end;
   end;
 begin
   if lMode = lmNone then exit(true);
-  {find a voxel we need to shade}
+
+  {update the lighting for current voxel}
+  applyLighting(lx,ly,lz,lMode);
+  {find next voxel to}
   repeat
     nextVoxel();
-  until (lMode = lmNone) or (getVoxel(lx,ly,lz).a = 255);
-  {update the lighting for that voxel}
-  applyLighting(lx,ly,lz,lMode);
+    pVox := pRGBA(vox.pixels + getAddr(lx,ly,lz)*4);
+  until (lMode = lmNone) or (pVox^.a = 255);
+
   {return if we are done}
   result := (lMode = lmNone);
+  {mark it for debugging}
+  if not result then begin
+    pVox^.r := 255;
+    pVox^.g := 0;
+    pVox^.b := 255;
+  end;
+
 end;
 
 procedure tVoxel.applyLighting(x,y,z: integer; lightingMode: tLightingMode);
@@ -467,7 +481,7 @@ begin
     lmSimple: v := 1.2-(countNeighbours()/6);
     lmGI, lmAO:
       // this is the technically correct one
-      //v := power(sampleGI(), 0.4545);
+      //v := power(calculateGI(x,y,z), 0.4545);
       // this look much better though
       v := sqr(calculateGI(x,y,z));
   end;

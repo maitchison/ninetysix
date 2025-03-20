@@ -35,16 +35,18 @@ type
   V3D = packed record
     x, y, z, w: single;
 
-    function abs2: single;
-    function abs: single;
-    function toString(): shortstring;
-    function normed(): V3D;
+    function  abs2: single;
+    function  abs: single;
+    function  toString(): shortstring;
+    function  normed(): V3D;
 
-    constructor create(x, y, z: single; w:single=0);
+    constructor Create(x, y, z: single; w:single=0);
 
-    function toPoint: tPoint; inline;
-    function rotated(thetaX, thetaY, thetaZ: single): V3D;
-    function dot(other: V3D): single;
+    procedure getBasis(out tangent: V3D; out biTangent: V3D);
+    function  toPoint: tPoint; inline;
+    function  rotated(thetaX, thetaY, thetaZ: single): V3D;
+    function  dot(other: V3D): single;
+    function  cross(other: V3D): V3D;
     procedure clip(maxLen: single);
 
     class operator Add(a, b: V3D): V3D; inline;
@@ -114,6 +116,7 @@ function V2Polar(degree,r: single): V2D;
 function V3(x,y,z: single): V3D;
 
 function sampleShell(): V3D;
+function sampleCosine(norm,tangent,bitangent: V3D): V3D;
 
 implementation
 
@@ -132,6 +135,23 @@ begin
     abs2 := result.abs2;
   until (result.abs2 <> 0) and (result.abs2 <= (127.5*127.5));
   result := result.normed();
+end;
+
+{returns a vector sampled from a hemisphere with cosign weighting}
+function sampleCosine(norm,tangent,bitangent: V3D): V3D;
+var
+  theta, phi: single;
+  u,v: single;
+  vec: V3D;
+begin
+  u := rnd/255;
+  v := rnd/255;
+  theta := arccos(sqrt(u));
+  phi := 2*pi*v;
+  vec.x := sin(theta)*cos(phi);
+  vec.y := sin(theta)*sin(phi);
+  vec.z := cos(theta);
+  result := tangent * vec.x + biTangent * vec.y + norm * vec.z;
 end;
 
 {-----------------------------------------}
@@ -212,6 +232,15 @@ end;
 
 
 // --------------------------------------------------------------------
+
+procedure V3D.getBasis(out tangent: V3D; out biTangent: V3D);
+var
+  up: V3D;
+begin
+  if (system.abs(z) < 0.9999) then up := V3(0,0,1) else up := V3(1,0,0);
+  tangent := up.cross(self).normed();
+  biTangent := self.cross(tangent).normed();
+end;
 
 function V3D.Abs2: single;
 begin
@@ -308,6 +337,13 @@ end;
 function V3D.dot(other: V3D): single;
 begin
   result := x*other.x + y*other.y + z*other.z;
+end;
+
+function V3D.cross(other: V3D): V3D;
+begin
+  result.x := self.y*other.z - self.z * other.y;
+  result.y := self.z*other.x - self.x * other.z;
+  result.z := self.x*other.y - self.y * other.x;
 end;
 
 constructor V3D.Create(x, y, z: single; w: single=0);
