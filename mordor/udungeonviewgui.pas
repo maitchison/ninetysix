@@ -43,9 +43,7 @@ begin
   angle := V3(0,0,getSec);
   voxelCell.draw(dc, pos, angle, 1.0);
   }
-  {bug stub... camera movement}
   voxelScene.render(dc);
-
 end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);
@@ -83,6 +81,15 @@ begin
     voxelCell.generateLighting(lmGI);
     saveLC96(cached+'.vox', voxelCell.vox);
     tileBuilder.free;
+  end;
+
+  for x := 0 to 31 do begin
+    for y := 0 to 31 do begin
+      if rnd < 150 then
+        voxelScene.cells[x,y] := voxelCell
+      else
+        voxelScene.cells[x,y] := nil;
+    end;
   end;
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);

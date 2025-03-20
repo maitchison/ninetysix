@@ -18,9 +18,11 @@ uses
   uSprite,
   uA96,
   uUtils,
+  uVertex,
   uRect,
   uResource,
   uColor,
+  uMath,
   {$i gui.inc}
   {game stuff}
   uMDRRes,
@@ -216,6 +218,7 @@ begin
     wall.status.explored := ePartial;
     map.wall[pos.x, pos.y, dir] := wall;
   end;
+
 end;
 
 procedure tGameScene.onKeyPress(sender: tGuiComponent; msg: string; args: array of const);
@@ -314,6 +317,10 @@ begin
     musicUpdate();
 
     input.update();
+
+    {update view - there should be a better place to do this}
+    encounterGui.dungeonView.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
+    encounterGui.dungeonView.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
 
     gui.update(elapsed);
     gui.draw(dc);

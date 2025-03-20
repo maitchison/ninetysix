@@ -51,8 +51,9 @@ type
 
   tRayHit = record
     pos: V3D;
-    didHit: boolean;
+    col: RGBA;
     d: single;
+    didHit: boolean;
   end;
 
   tSDFQuality = (sdfNone, sdfFast, sdfFull);
@@ -95,14 +96,12 @@ type
     constructor Create(aPage: tPage; aHeight: integer); overload;
     destructor destroy(); override;
 
-    function  validateSDF(): single;
-
     function  getSize(): V3D16;
     function  inBounds(x,y,z:int32): boolean; inline; register;
     function  getAddr(x,y,z:int32): int32; inline; register;
     function  getVoxel(x,y,z:int32): RGBA; inline; register;
     procedure setVoxel(x,y,z:int32;c: RGBA);
-    function  trace(pos: V3D; dir: V3D; ignore: V3D32): tRayHit;
+    function  trace(pos: V3D; dir: V3D): tRayHit;
 
     function  draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
@@ -407,7 +406,7 @@ begin
       inc(hits);
       continue;
     end;
-    hit := trace(p, d, orig);
+    hit := trace(p, d);
     if hit.didHit then inc(hits);
   end;
   result := 1-(hits/lSamples);
@@ -570,12 +569,6 @@ begin
   fLog2Height := round(log2(fHeight));
 end;
 
-{returns how close SDF is to true L2 SDF}
-function tVoxel.validateSDF(): single;
-begin
-  // pass
-end;
-
 {get size as 16bit vector}
 function tVoxel.getSize(): V3D16;
 begin
@@ -608,11 +601,11 @@ end;
 
 {
 Trace ray through object.
-Very slow for the moment.
+a bit slow for the moment.
 (0.5,0.5 is center of voxel)
 dir should be normalized
 }
-function tVoxel.trace(pos: V3D; dir: V3D; ignore: V3D32): tRayHit;
+function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 var
   i: integer;
   maxSteps: integer;
@@ -624,6 +617,7 @@ begin
   maxSteps := ceil(fRadius)+1;
   result.pos := pos;
   result.d := 0;
+  result.col := RGBA.Clear;
   for i := 0 to maxSteps-1 do begin
     cur := V3D32.Floor(result.pos);
     if not inBounds(cur.x, cur.y, cur.z) then begin
@@ -634,6 +628,7 @@ begin
     c := getVoxel(cur.x, cur.y, cur.z);
     if c.a = 255 then begin
       result.didHit := true;
+      result.col := c;
       exit;
     end;
 

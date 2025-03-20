@@ -12,13 +12,16 @@ uses
   uGraph32,
   uPoly,
   uColor,
+  uMath,
   uVoxel;
 
 type
+
   tVoxelScene = class
   protected
-    procedure drawCell(const dc: tDrawContext;x,y: integer);
+    function  traceRay(pos: V3D; dir: V3D): tRayHit;
   public
+    cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
     cameraAngle: single; {radians, 0=north}
     procedure  render(const dc: tDrawContext);
@@ -31,76 +34,105 @@ constructor tVoxelScene.Create();
 begin
   cameraPos := V3(5, 21,0);
   cameraAngle := 0;
+  fillchar(cells, sizeof(cells), 0);
 end;
 
-procedure tVoxelScene.drawCell(const dc: tDrawContext; x,y: integer);
+{for the moment just trace through scene and return depth}
+function tVoxelScene.traceRay(pos: V3D; dir: V3D): tRayHit;
 var
   i: integer;
-  {screen midpoint}
-  screenMid: tPoint;
-  {points in object space}
-  p: array[1..8] of V3D;
-  {points in screen space}
-  s: array[1..8] of V3D;
-  pos: V3D;
+  rx,ry,rz: integer;
+  hit: tRayHit;
+  vox: tVoxel;
+  stepSize: single;
+  autoX, autoY: single;
 
-  function worldToScreen(p: V3D): V3D;
+  function autoStep(p,d: single): single;
   begin
-    result.x := 10*(p.x / (1+p.z)) + screenMid.x;
-    result.y := 10*(p.y / (1+p.z)) + screenMid.y;
-    result.z := p.z;
-  end;
-
-  procedure traceFace(faceID: byte; p1,p2,p3,p4: V3D);
-  var
-    bounds: tRect;
-    y: integer;
-  begin
-    {scan the sides of the polygon}
-    polyDraw.scanPoly(dc, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
-    bounds := polyDraw.bounds;
-    if bounds.area <= 0 then exit;
-    {draw color}
-    for y := bounds.top to bounds.bottom-1 do
-      dc.hline(
-        Point(polyDraw.scanLine[y].xMin, y), polyDraw.scanLine[y].len,
-        VX_FACE_COLOR[faceid]);
-      exit;
+    if d > 0 then result := 1-frac(p) else if d < 0 then result := frac(p) else result := 1.0;
   end;
 
 
 begin
-  screenMid := Point((dc.clip.left + dc.clip.right) div 2-dc.offset.x, (dc.clip.top + dc.clip.bottom) div 2-dc.offset.y);
+  {ok... the super slow way for the moment...}
+  {breseham is probably the way to go here}
+  {although we'll be dense, so maybe it doesn't matter}
+  result.col := RGBA.Clear;
+  result.didHit := false;
+  result.d := 0;
+  for i := 0 to 1000 do begin
+    rx := floor(pos.x);
+    ry := floor(pos.y);
+    rz := floor(pos.z);
+    {out of bounds?}
+    if (dword(rx) >= 32) or (dword(ry) >= 32) then begin
+      result.col := RGB(255,0,255);
+      exit;
+    end;
+    if (rz < 0) then begin
+      result.col := RGB(128,0,0); // floor
+      result.didHit := true;
+      exit;
+    end;
+    if (rz >= 1) then begin
+      result.col := RGB(0,0,128); // sky
+      result.didHit := true;
+      exit;
+    end;
 
-  pos := V3(x+0.5, y+0.5, 0.5);
-
-  p[1] := V3(-0.5, -0.5, -0.5);
-  p[2] := V3(+0.5, -0.5, -0.5);
-  p[3] := V3(+0.5, +0.5, -0.5);
-  p[4] := V3(-0.5, +0.5, -0.5);
-  p[5] := V3(-0.5, -0.5, +0.5);
-  p[6] := V3(+0.5, -0.5, +0.5);
-  p[7] := V3(+0.5, +0.5, +0.5);
-  p[8] := V3(-0.5, +0.5, +0.5);
-  for i := 1 to 8 do begin
-    s[i] := worldToScreen(p[1]+pos-cameraPos);
+    vox := cells[rx,ry];
+    if not assigned(vox) then begin
+      {work out a good step size}
+      stepSize := minf(autoStep(pos.x, dir.x), autoStep(pos.y, dir.y)) + 0.01;
+      pos += dir * stepSize;
+      result.d += stepSize;
+    end else begin
+      {trace through the cell}
+      hit := vox.trace(V3(frac(32*pos.x), frac(32*pos.y), frac(32*pos.z)), dir);
+      pos += dir * (hit.d/32);
+      result.d += (hit.d/32);
+      if hit.didHit then begin
+        result.col := hit.col;
+        result.didHit := true;
+        exit;
+      end;
+      {also take a small step just to make sure we move onto the next cell}
+      pos += dir * (1/64);
+      result.d += (1/64);
+    end;
+    if result.d > 4 then
+      exit; // max distance
   end;
-  polyDraw.backfaceCull := true;
-  traceFace(1, s[1], s[2], s[3], s[4]);
-  traceFace(2, s[8], s[7], s[6], s[5]);
-  traceFace(3, s[4], s[8], s[5], s[1]);
-  traceFace(4, s[2], s[6], s[7], s[3]);
-  traceFace(5, s[5], s[6], s[2], s[1]);
-  traceFace(6, s[4], s[3], s[7], s[8]);
+  {out of samples!}
+  result.col := RGB(255,0,255);
 end;
 
 procedure tVoxelScene.render(const dc: tDrawContext);
+var
+  dx,dy: integer;
+  rayPos, rayDir: V3D;
+  d: single;
+  mid: tPoint;
+  vx,vy: integer;
+  hit: tRayHit;
+
 begin
-  {for the moment just draw one cell}
   dc.fillRect(dc.clip, RGB(12,12,12));
-  drawCell(dc, 7, 20);
-  drawCell(dc, 7, 18);
-  drawCell(dc, 9, 23);
+  mid.x := (dc.clip.left+dc.clip.right) div 2;
+  mid.y := (dc.clip.top+dc.clip.bottom) div 2;
+
+  vx := 30;
+  vy := 20;
+
+  for dy := -vy to vy do begin
+    for dx := -vx to vx do begin
+      rayDir := V3(dx / 20, 0.5, dy / 20).normed();
+      rayPos := (cameraPos * 0.25) + V3(0.5, 0.5, 0.5);
+      rayDir := rayDir.rotated(0, 0, -cameraAngle + (180*DEG2RAD));
+      hit := traceRay(rayPos, rayDir);
+      dc.putPixel(Point(dx+mid.x, dy+mid.y), hit.col);
+    end;
+  end;
 end;
 
 begin
