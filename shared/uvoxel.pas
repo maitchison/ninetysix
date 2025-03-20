@@ -54,6 +54,8 @@ type
     fRadius: single;
     fLog2Width,fLog2Height: byte;
   protected
+    {for progressive lighting}
+  protected
     procedure generateSDF_fast(maxDistance: integer=-1);
     function  getSDF_slow(maxDistance: integer=-1): tPage;
     procedure transferSDF(sdf: tPage);
@@ -394,7 +396,7 @@ var
     orig: V3D32;
     s: string;
   const
-    SAMPLES = 64;
+    SAMPLES = 4*1024;
   begin
     orig.x := x; orig.y := y; orig.z := z;
     norm := guessNorm();
@@ -433,10 +435,14 @@ begin
         case lightingMode of
           lmGradient: v := 1.2-sqr(z / (fDepth-1));
           lmSimple: v := 1.2-(countNeighbours()/6);
-          lmGI, lmAO: v := sqr(sampleGI());
+          lmGI, lmAO:
+            // this is the technically correct one
+            //v := power(sampleGI(), 0.4545);
+            // this look much better though
+            v := sqr(sampleGI());
         end;
         ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-          //RGB($FF000000),
+          //RGB($FF0F0F0F),
           //RGB($FFBACEEF),
           RGBA.Black,
           RGBA.White,
@@ -453,7 +459,7 @@ begin
         if (pVox^.a <> 255) then continue;
         amb := pRGBA(ambient.pixels+addr*4)^;
         if lightingMode in [lmAO] then begin
-          pVox^.r := 255; pVox^.g := 255; pVox^.b := 255;
+          pVox^.r := 200; pVox^.g := 200; pVox^.b := 200;
         end;
         pVox^ := pVox^*amb;
       end;

@@ -162,7 +162,6 @@ begin
       layer := 31;
       fill(MDR_LIGHTGRAY, 1);
       noise(0.5);
-      decimate(0.1);
     end;
     ftDirt: begin
       //bedrock
