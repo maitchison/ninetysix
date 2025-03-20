@@ -249,6 +249,7 @@ var
   timer: tTimer;
   dc: tDrawContext;
   panel: tGuiWindow;
+  importer: tMDRImporter;
 const
   RHS_DIVIDE = 280;
   LOWER_DIVIDE = 160;
@@ -257,9 +258,16 @@ begin
 
   uGui.GUI_DRAWMODE := gdmDirty;
 
-  map := tMDRMap.Create(32,32);
+  note('Importing map');
+  importer := tMDRImporter.Create();
+  importer.load('res\mdata11.mdr');
+  if assigned(map) then map.free;
+  map := importer.readMap(1);
+
   //map.load('map.dat');
   //map.setExplored(eNone);
+
+  map.setExplored(eFull);
 
   party := tMDRParty.create();
   party.pos := Point(5, 9);
@@ -297,8 +305,6 @@ begin
   fpsLabel := tGuiLabel.Create(Point(10,10));
   fpsLabel.setSize(60, 21);
   gui.append(fpsLabel);
-
-
 
   timer := tTimer.create('main');
   dc := screen.getDC();
