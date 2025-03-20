@@ -20,8 +20,6 @@ uses
 
 type
   tDungeonViewGui = class(tGuiPanel)
-  protected
-    builder: tTileBuilder;
   public
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(const dc: tDrawContext); override;
@@ -54,33 +52,36 @@ var
   c: byte;
   tile: tTile;
   walls: array[1..4] of tWall;
+  tileBuilder: tTileBuilder;
   cached: string;
 begin
   inherited Create(Rect(20, 30, 96, 124), 'View');
   voxelCell := tVoxel.Create(32,32,32);
 
-  tileBuilder := tTileBuilder.Create();
-
   cached := joinPath('res', 'tile1');
   if fileSystem.exists(cached+'.vox') then begin
     voxelCell.loadVoxFromFile(cached, 32);
   end else begin
+    tileBuilder := tTileBuilder.Create();
     tile.floor := ftStone;
     walls[1].t := wtWall;
     walls[2].t := wtWall;
     walls[3].t := wtNone;
     walls[4].t := wtNone;
     tileBuilder.composeVoxelCell(tile, walls);
-    voxelCell.generateLighting(lmGI, tileBuilder.voxelPage);
+    voxelCell := tVoxel.Create(tileBuilder.page, 32);
+    voxelCell.generateSDF(sdfFull);
+    voxelCell.generateLighting(lmGI);
     saveLC96(cached+'.vox', voxelCell.vox);
+    tileBuilder.free;
   end;
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
+
 end;
 
 destructor tDungeonViewGui.destroy();
 begin
-  tileBuilder.free;
   inherited destroy;
 end;
 

@@ -441,12 +441,13 @@ begin
   {return if we are done}
   result := (lMode = lmNone);
   {mark it for debugging}
+  {
   if not result then begin
     pVox^.r := 255;
     pVox^.g := 0;
     pVox^.b := 255;
   end;
-
+  }
 end;
 
 procedure tVoxel.applyLighting(x,y,z: integer; lightingMode: tLightingMode);
