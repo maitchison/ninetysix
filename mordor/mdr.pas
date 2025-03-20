@@ -273,7 +273,7 @@ begin
   party.pos := Point(5, 9);
   party.dir := dNorth;
 
-  encounterGui := tEncounterGui.Create();
+  encounterGui := tEncounterGui.Create(map);
 
   mapGUI := tMapGui.Create();
   mapGUI.map := map;

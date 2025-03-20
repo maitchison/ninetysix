@@ -21,7 +21,7 @@ type
     layer: integer;
     noisePage: tPage;
     dc: tDrawContext;
-    procedure noise(power: single=0.5);
+    procedure noise(power: single=0.5;border: integer=0);
     procedure decimate(p: single);
     procedure speckle(col: RGBA; p: single=0.1; border: integer=0);
     procedure fill(col: RGBA; border: integer=0);
@@ -58,9 +58,20 @@ begin
   inherited destroy();
 end;
 
-procedure tTileBuilder.noise(power: single=0.5);
+procedure tTileBuilder.noise(power: single=0.5; border: integer=0);
+var
+  x,y: integer;
+  c: RGBA;
+  v: single;
 begin
-  dc.asBlendMode(bmBlend).asTint(RGB(255,255,255,round(power*255))).drawImage(noisePage, Point(0,layer*32));
+  for x := border to 31-border do begin
+    for y := border to 31-border do begin
+      c := page.getPixel(x,y+layer*32);
+      v := 1-((rnd/255)*power);
+      c.init(round(c.r*v), round(c.g*v), round(c.b*v), c.a);
+      page.setPixel(x,y+layer*32,c);
+    end;
+  end;
 end;
 
 procedure tTileBuilder.decimate(p: single);
@@ -170,14 +181,14 @@ begin
       noise(0.25);
       //dirt
       layer := 30;
-      fill(RGB($FF160616));
+      fill(RGB($FF442C14));
       noise(0.5);
       decimate(0.1);
       //dry grass
-      speckle(MDR_GREEN*RGB(128,128,128), 0.05);
+      //speckle(MDR_GREEN*RGB(128,128,128), 0.05);
       //stones
-      layer := 29;
-      speckle(MDR_LIGHTGRAY, 0.5);
+      {layer := 29;
+      speckle(MDR_LIGHTGRAY, 0.05);}
     end;
     ftGrass: begin
       //bedrock

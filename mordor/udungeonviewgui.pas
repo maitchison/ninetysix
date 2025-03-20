@@ -21,13 +21,15 @@ uses
 
 type
   tDungeonViewGui = class(tGuiPanel)
+  protected
+    procedure buildTiles();
   public
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(const dc: tDrawContext); override;
   public
     voxelScene: tVoxelScene;
-    voxelCell: tVoxel;
-    constructor Create();
+    tiles: array[tFloorType] of tVoxel;
+    constructor Create(map: tMDRMap);
     destructor destroy(); override;
   end;
 
@@ -38,12 +40,13 @@ var
   pos, angle: V3D;
 begin
   inherited doDraw(dc);
+
+  voxelScene.render(dc);
   {
   pos := V3(bounds.width/2,bounds.height/2,0);
   angle := V3(0,0,getSec);
-  voxelCell.draw(dc, pos, angle, 1.0);
+  tiles[ftWater].draw(dc, pos, angle, 3.0);
   }
-  voxelScene.render(dc);
 end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);
@@ -51,46 +54,59 @@ begin
   isDirty := true;
 end;
 
-constructor tDungeonViewGui.Create();
+procedure tDungeonViewGui.buildTiles();
 var
-  x,y: integer;
-  c: byte;
+  ft: tFloorType;
+  tileBuilder: tTileBuilder;
   tile: tTile;
   walls: array[1..4] of tWall;
-  tileBuilder: tTileBuilder;
-  cached: string;
+  voxelCell: tVoxel;
+  tag, fileName: string;
 begin
-  inherited Create(Rect(20, 30, 96, 124), 'View');
-  voxelCell := tVoxel.Create(32,32,32);
 
-  voxelScene := tVoxelScene.Create();
+  tileBuilder := tTileBuilder.Create();
+  for ft in tFloorType do begin
 
-  cached := joinPath('res', 'tile1');
-  if fileSystem.exists(cached+'.vox') then begin
-    voxelCell.loadVoxFromFile(cached, 32);
-  end else begin
-    tileBuilder := tTileBuilder.Create();
-    tile.floor := ftStone;
-    walls[1].t := wtWall;
-    walls[2].t := wtWall;
+    tag := FLOOR_SPEC[ft].tag;
+    fileName := joinPath('tiles', tag+'_16.vox');
+
+    if fileSystem.exists(filename) then begin
+      tiles[ft] := tVoxel.Create(32,32,32);
+      tiles[ft].loadVoxFromFile(removeExtension(fileName), 32);
+      continue;
+    end;
+
+    tile.floor := ft;
+    walls[1].t := wtNone;
+    walls[2].t := wtNone;
     walls[3].t := wtNone;
     walls[4].t := wtNone;
     tileBuilder.composeVoxelCell(tile, walls);
     voxelCell := tVoxel.Create(tileBuilder.page, 32);
     voxelCell.generateSDF(sdfFull);
-    voxelCell.generateLighting(lmGI);
-    saveLC96(cached+'.vox', voxelCell.vox);
-    tileBuilder.free;
+    //voxelCell.lightingSamples := 16;
+    //voxelCell.generateLighting(lmGI);
+    tiles[ft] := voxelCell;
+    saveLC96(fileName, voxelCell.vox);
   end;
+  tileBuilder.free;
+end;
 
-  for x := 0 to 31 do begin
-    for y := 0 to 31 do begin
-      if rnd < 150 then
-        voxelScene.cells[x,y] := voxelCell
-      else
-        voxelScene.cells[x,y] := nil;
-    end;
-  end;
+constructor tDungeonViewGui.Create(map: tMDRMap);
+var
+  x,y: integer;
+begin
+  inherited Create(Rect(20, 30, 96, 124), 'View');
+
+  voxelScene := tVoxelScene.Create();
+  buildTiles();
+
+  for x := 0 to 31 do
+    for y := 0 to 31 do
+      case map.tile[x,y].floor of
+        ftNone: voxelScene.cells[x,y] := tiles[ftStone]
+        else voxelScene.cells[x,y] := tiles[map.tile[x,y].floor]
+      end;
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 
@@ -99,7 +115,6 @@ end;
 destructor tDungeonViewGui.destroy();
 begin
   voxelScene.free;
-  voxelCell.free;
   inherited destroy;
 end;
 

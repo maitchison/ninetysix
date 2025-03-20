@@ -52,7 +52,6 @@ var
     if d > 0 then result := 1-frac(p) else if d < 0 then result := frac(p) else result := 1.0;
   end;
 
-
 begin
   {ok... the super slow way for the moment...}
   {breseham is probably the way to go here}
@@ -64,7 +63,7 @@ begin
     rx := floor(pos.x);
     ry := floor(pos.y);
     rz := floor(pos.z);
-    {out of bounds?}
+    {out of bounds}
     if (dword(rx) >= 32) or (dword(ry) >= 32) then begin
       result.col := RGB(255,0,255);
       exit;
@@ -88,7 +87,7 @@ begin
       result.d += stepSize;
     end else begin
       {trace through the cell}
-      hit := vox.trace(V3(frac(32*pos.x), frac(32*pos.y), frac(32*pos.z)), dir);
+      hit := vox.trace(V3(frac(pos.x)*32, frac(pos.y)*32, frac(pos.z)*32), dir);
       pos += dir * (hit.d/32);
       result.d += (hit.d/32);
       if hit.didHit then begin
@@ -115,20 +114,23 @@ var
   mid: tPoint;
   vx,vy: integer;
   hit: tRayHit;
-
 begin
   dc.fillRect(dc.clip, RGB(12,12,12));
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;
 
-  vx := 30;
-  vy := 20;
+  vx := 40;
+  vy := 30;
+
+  rayPos :=
+    cameraPos
+    + V3(0.5, 0.5, 0.35)
+    + V3(sin(cameraAngle+180*DEG2RAD), -cos(cameraAngle+180*DEG2RAD), 0);
 
   for dy := -vy to vy do begin
     for dx := -vx to vx do begin
-      rayDir := V3(dx / 20, 0.5, dy / 20).normed();
-      rayPos := (cameraPos * 0.25) + V3(0.5, 0.5, 0.5);
-      rayDir := rayDir.rotated(0, 0, -cameraAngle + (180*DEG2RAD));
+      rayDir := V3(dx / 60, -0.75, dy / 60).normed();
+      rayDir := rayDir.rotated(0, 0, cameraAngle);
       hit := traceRay(rayPos, rayDir);
       dc.putPixel(Point(dx+mid.x, dy+mid.y), hit.col);
     end;

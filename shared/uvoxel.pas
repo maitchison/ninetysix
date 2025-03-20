@@ -229,7 +229,7 @@ begin
 
   for d := 0 to maxDistance-1 do
     for k := 0 to fDepth-1 do begin
-      if layerCount[k] = (fWidth*fHeight) then continue;
+      //if layerCount[k] = (fWidth*fHeight) then continue;
       dPtr := @depth[getAddr(0,0,k)];
       for lp := 0 to fWidth*fHeight-1 do begin
         if dPtr^ = d then

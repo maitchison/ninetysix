@@ -41,7 +41,7 @@ type
     mode: tEncounterGuiMode;
     dungeonView: tDungeonViewGui;
     monsterFrame: array[1..4] of tMonsterFrame;
-    constructor Create();
+    constructor Create(map: tMDRMap);
   end;
 
 implementation
@@ -75,7 +75,7 @@ begin
   frame.drawNineSlice(dc.asBlendMode(bmBlend), bounds);
 end;
 
-constructor tEncounterGUI.Create();
+constructor tEncounterGUI.Create(map: tMDRMap);
 var
   i: integer;
 begin
@@ -87,7 +87,7 @@ begin
   setBounds(Rect(0, 0, 500, 180));
   case mode of
     egmType1: begin
-      dungeonView := tDungeonViewGui.Create();
+      dungeonView := tDungeonViewGui.Create(map);
       self.append(dungeonView);
       for i := 1 to 4 do begin
         monsterFrame[i] := tMonsterFrame.Create();
