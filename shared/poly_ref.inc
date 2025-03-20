@@ -21,7 +21,7 @@ begin
   t3 := UVCoord(src.bottomRight) + UVCoord(-0.5,-0.5);
   t4 := UVCoord(src.bottomLeft) + UVCoord(0.5,-0.5);
   polyDraw.scanTextured(
-    dstPage,
+    dstPage.getDC(),
     p1, p2, p3, p4,
     t1, t2, t3, t4
   );

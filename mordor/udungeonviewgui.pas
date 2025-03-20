@@ -38,7 +38,7 @@ begin
   inherited doDraw(dc);
   pos := V3(bounds.width/2,bounds.height/2,0);
   angle := V3(0,0,getSec);
-  voxelCell.draw(dc, pos, angle, 2.0);
+  voxelCell.draw(dc, pos, angle, 3.0);
 end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);

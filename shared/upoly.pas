@@ -41,20 +41,17 @@ type
     backfaceCull: boolean;
     bounds: tRect;
   protected
-    procedure prepPoly(page: tPage; p1, p2, p3, p4: tPoint);
+    procedure prepPoly(const dc: tDrawContext; p1, p2, p3, p4: tPoint);
     procedure adjustLine(y, x: int32); overload;
     procedure adjustLine(y, x: int32; t: tUVCoord); overload;
   public
     constructor create();
     procedure logScan();
-    procedure scanSide(page: tPage; a, b: tPoint);
-    procedure scanSideTextured(page: tPage; a, b: tPoint; t1, t2: tUVCoord);
-    procedure scanTextured(page: tPage; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
-    procedure scanPoly(page: tPage; p1, p2, p3, p4: tPoint);
+    procedure scanSide(const dc: tDrawContext; a, b: tPoint);
+    procedure scanSideTextured(const dc: tDrawContext; a, b: tPoint; t1, t2: tUVCoord);
+    procedure scanTextured(const dc: tDrawContext; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
+    procedure scanPoly(const dc: tDrawContext; p1, p2, p3, p4: tPoint);
   end;
-
-const
-  POLY_SHOW_CORNERS: boolean = false;
 
 var
   polyDraw: tScanLines;
@@ -102,7 +99,7 @@ begin
   t3 := UVCoord(src.bottomRight) + UVCoord(-0.5,-0.5);
   t4 := UVCoord(src.bottomLeft) + UVCoord(0.5,-0.5);
   polyDraw.scanTextured(
-    dc.page,
+    dc,
     p1, p2, p3, p4,
     t1, t2, t3, t4
   );
@@ -111,8 +108,8 @@ begin
   for y := b.top to b.bottom-1 do begin
     sl := polyDraw.scanLine[y];
     tl := polyDraw.textLine[y];
-    x1 := clamp(sl.xMin, 0, dc.page.width-1);
-    x2 := clamp(sl.xMax, 0, dc.page.width-1);
+    x1 := clamp(sl.xMin, dc.clip.left, dc.clip.right-1);
+    x2 := clamp(sl.xMax, dc.clip.left, dc.clip.right-1);
     cnt := (x2-x1)+1;
     if cnt <= 0 then continue;
 
@@ -246,14 +243,14 @@ begin
 end;
 
 {scans sides of poly, returns bounding rect}
-procedure tScanLines.scanPoly(page: tPage; p1, p2, p3, p4: tPoint);
+procedure tScanLines.scanPoly(const dc: tDrawContext; p1, p2, p3, p4: tPoint);
 begin
-  prepPoly(page, p1, p2, p3, p4);
+  prepPoly(dc, p1, p2, p3, p4);
   if bounds.area = 0 then exit;
-  scanSide(page, p1, p2);
-  scanSide(page, p2, p3);
-  scanSide(page, p3, p4);
-  scanSide(page, p4, p1);
+  scanSide(dc, p1, p2);
+  scanSide(dc, p2, p3);
+  scanSide(dc, p3, p4);
+  scanSide(dc, p4, p1);
 end;
 
 {
@@ -263,17 +260,17 @@ sets up scanLines for a textured poly as follows.
  - texture coordinates mark the texture points at corners
  - most drawing functions truncate, so it is recommended to use the middle of the texel
 }
-procedure tScanLines.scanTextured(page: tPage; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
+procedure tScanLines.scanTextured(const dc: tDrawContext; p1, p2, p3, p4: tPoint; t1, t2, t3, t4: tUVCoord);
 begin
-  prepPoly(page, p1, p2, p3, p4);
+  prepPoly(dc, p1, p2, p3, p4);
   if bounds.area = 0 then exit;
-  scanSideTextured(page, p1, p2, t1, t2);
-  scanSideTextured(page, p2, p3, t2, t3);
-  scanSideTextured(page, p3, p4, t3, t4);
-  scanSideTextured(page, p4, p1, t4, t1);
+  scanSideTextured(dc, p1, p2, t1, t2);
+  scanSideTextured(dc, p2, p3, t2, t3);
+  scanSideTextured(dc, p3, p4, t3, t4);
+  scanSideTextured(dc, p4, p1, t4, t1);
 end;
 
-procedure tScanLines.prepPoly(page: tPage; p1, p2, p3, p4: tPoint);
+procedure tScanLines.prepPoly(const dc: tDrawContext; p1, p2, p3, p4: tPoint);
 var
   cross: int32;
   xMin, xMax, yMin, yMax: int32;
@@ -288,10 +285,10 @@ begin
     if cross <= 0 then exit;
   end;
 
-  xMin := max(min4(p1.x, p2.x, p3.x, p4.x), 0);
-  yMin := max(min4(p1.y, p2.y, p3.y, p4.y), 0);
-  xMax := min(max4(p1.x, p2.x, p3.x, p4.x), page.width-1);
-  yMax := min(max4(p1.y, p2.y, p3.y, p4.y), page.height-1);
+  xMin := max(min4(p1.x, p2.x, p3.x, p4.x), dc.clip.left);
+  yMin := max(min4(p1.y, p2.y, p3.y, p4.y), dc.clip.top);
+  xMax := min(max4(p1.x, p2.x, p3.x, p4.x), dc.clip.right-1);
+  yMax := min(max4(p1.y, p2.y, p3.y, p4.y), dc.clip.bottom-1);
 
   bounds.y := yMin;
   bounds.height := yMax-yMin+1;
@@ -302,21 +299,12 @@ begin
   if bounds.height <= 0 then exit;
   if bounds.width <= 0 then exit;
 
-  {debuging, show corners}
-  if POLY_SHOW_CORNERS then begin
-    c := RGB(255,0,255);
-    page.setPixel(p1.x, p1.y, c);
-    page.setPixel(p2.x, p2.y, c);
-    page.setPixel(p3.x, p3.y, c);
-    page.setPixel(p4.x, p4.y, c);
-  end;
-
   for y := yMin to yMax do
     scanLine[y].reset();
 
 end;
 
-procedure tScanLines.scanSide(page: tPage; a, b: tPoint);
+procedure tScanLines.scanSide(const dc: tDrawContext; a, b: tPoint);
 var
   tmp: tPoint;
   y: int32;
@@ -327,7 +315,7 @@ begin
   if a.y = b.y then begin
     {special case}
     y := a.y;
-    if (y >= 0) and (y < page.height) then begin
+    if (y >= dc.clip.top) and (y < dc.clip.bottom) then begin
       adjustLine(y, a.x);
       adjustLine(y, b.x);
     end;
@@ -345,7 +333,7 @@ begin
     x += deltaX * -yMin;
     yMin := 0;
   end;
-  yMax := min(b.y, page.height-1);
+  yMax := min(b.y, dc.clip.bottom-1);
   for y := yMin to yMax do begin
     adjustLine(y, round(x));
     x += deltaX;
@@ -353,7 +341,7 @@ begin
 end;
 
 {scans side of poly with given texture coordinates}
-procedure tScanLines.scanSideTextured(page: tPage; a, b: tPoint; t1, t2: tUVCoord);
+procedure tScanLines.scanSideTextured(const dc: tDrawContext; a, b: tPoint; t1, t2: tUVCoord);
 var
   tmp: tPoint;
   y: int32;
@@ -368,7 +356,7 @@ begin
   if a.y = b.y then begin
     {special case}
     y := a.y;
-    if (y < 0) or (y >= page.height) then exit;
+    if (y < dc.clip.left) or (y >= dc.clip.right) then exit;
     if a.x < b.x then begin
       scanLine[y].xMin := a.x;
       scanLine[y].xMax := b.x;
@@ -396,10 +384,10 @@ begin
   deltaT.y := (t2.y - t1.y) div height;
 
   yMin := a.y;
-  yMax := min(b.y, page.height-1);
+  yMax := min(b.y, dc.clip.bottom-1);
   t := t1;
 
-  if (yMax < 0) or (yMin >= page.height) then exit;
+  if (yMax < dc.clip.top) or (yMin >= dc.clip.bottom) then exit;
 
   if yMin < 0 then begin
     x += deltaX * -yMin;
@@ -427,11 +415,13 @@ var
   page: tPage;
   sl: tScanLine;
   tl: tTextureLine;
+  dc: tDrawContext;
 begin
   page := tPage.create(16,16);
+  dc := page.getDC();
 
   polyDraw.scanTextured(
-    page,
+    dc,
     Point(0,0), point(1,0), Point(1,1), Point(0,1),
     UVCoord(1,2), UVCoord(3,4), UVCoord(5,6), UVCoord(7,8)
   );

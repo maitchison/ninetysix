@@ -713,6 +713,7 @@ var
     value: integer;
     c1,c2,c3,c4: RGBA;
     s1,s2,s3,s4: tPoint;
+    x1,x2,clipDelta: integer;
     traceProc: tTraceScanlineProc;
   begin
 
@@ -727,7 +728,7 @@ var
     end;
 
     {scan the sides of the polygon}
-    polyDraw.scanPoly(dc.page, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
+    polyDraw.scanPoly(dc, p1.toPoint, p2.toPoint, p3.toPoint, p4.toPoint);
     polyBounds := polyDraw.bounds;
     if polyBounds.area <= 0 then exit;
 
@@ -804,9 +805,22 @@ var
       pos := rayOrigin + cameraDir * (t+0.50); {start half way in a voxel}
       pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
 
+      {apply x clipping}
+      x1 := polyDraw.scanLine[y].xMin+dc.offset.x;
+      x2 := polyDraw.scanLine[y].xMax+dc.offset.x;
+      clipDelta := (dc.clip.left-x1);
+      if clipDelta > 0 then begin
+        x1 += clipDelta;
+        pos += deltaX * clipDelta;
+      end;
+
+      clipDelta := (x2-dc.clip.right);
+      if clipDelta > 0 then
+        x2 -= clipDelta;
+
       traceProc(
         dc.page, self,
-        polyDraw.scanLine[y].xMin+dc.offset.x, polyDraw.scanLine[y].xMax+dc.offset.x, y+dc.offset.y,
+        x1, x2, y+dc.offset.y,
         pos, cameraDir, deltaX, deltaY
       );
     end;
