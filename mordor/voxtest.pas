@@ -77,7 +77,7 @@ begin
   stopTimer('TileSDF');
 
   startTimer('TileLighting');
-  result.generateLighting(lightingMode);
+  result.generateLighting(lightingMode, true);
   stopTimer('TileLighting');
 
   tileBuilder.free;
@@ -93,7 +93,7 @@ var
   tileVox: tVoxel;
   tileCanvas: tPage;
   bounds: tRect;
-
+  startTime: single;
 
 begin
   timer := startTimer('main');
@@ -113,6 +113,11 @@ begin
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
     musicUpdate();
+
+    startTime := getSec;
+    repeat
+      if tileVox.updateLighting() then break;
+    until (getSec - startTime) > 0.05;
 
     input.update();
 

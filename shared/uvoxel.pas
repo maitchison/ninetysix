@@ -52,20 +52,26 @@ type
   protected
     fWidth,fHeight,fDepth: int32;
     fRadius: single;
+    fVolume: int32;
     fLog2Width,fLog2Height: byte;
   protected
     {for progressive lighting}
+    lx,ly,lz: integer;
+    lMode: tLightingMode;
   protected
     procedure generateSDF_fast(maxDistance: integer=-1);
     function  getSDF_slow(maxDistance: integer=-1): tPage;
     procedure transferSDF(sdf: tPage);
+    procedure applyLighting(x,y,z: integer; lightingMode: tLightingMode);
+    function  calculateGI(x,y,z: integer): single;
   public
     vox: tPage;     // RGBD - baked (todo: 2 bits of D are for alpha)
     function  getDistance_L1(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): integer;
     function  getDistance_L2(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): single;
     procedure generateSDF(quality: tSDFQuality=sdfFast);
 
-    procedure generateLighting(lightingMode: tLightingMode);
+    procedure generateLighting(lightingMode: tLightingMode;defer: boolean=false);
+    function  updateLighting(maxSamples: integer=1): boolean;
 
     procedure setPage(page: tPage; height: integer);
     //procedure loadP96FromFile(filename: string; height: integer);
@@ -200,11 +206,11 @@ begin
   filldword(layerCount[0], fDepth, 0);
 
   {init distance field}
-  setLength(depth, fWidth*fHeight*fDepth);
+  setLength(depth, fVolume);
   fillchar(depth[0], length(depth), 255);
   vPtr := vox.pixels;
   dPtr := @depth[0];
-  for lp := 0 to fWidth*fHeight*fDepth-1 do begin
+  for lp := 0 to fVolume-1 do begin
     if vPtr^.a = 255 then dPtr^ := 0;
     inc(vPtr);
     inc(dPtr);
@@ -224,7 +230,7 @@ begin
   {apply back}
   vPtr := vox.pixels;
   dPtr := @depth[0];
-  for lp := 0 to (fWidth*fHeight*fDepth)-1 do begin
+  for lp := 0 to fVolume-1 do begin
     d := dPtr^;
     if d = 255 then d := maxDistance;
     vPtr^.a := clamp(255-(d*4), 0, 255);
@@ -296,6 +302,7 @@ begin
   fLog2Width := 0;
   fLog2Height := 0;
   fRadius := 0;
+  fVolume := 0;
   vox := nil;
   loadVoxFromFile(aFilename, aHeight);
 end;
@@ -311,7 +318,7 @@ begin
 
   // set very simple SDF, but treat all a<>0 pixels as solid.
   pPtr := vox.pixels;
-  for lp := 0 to (fWidth*fHeight*fDepth)-1 do begin
+  for lp := 0 to fVolume-1 do begin
     if pPtr^.a = 0 then pPtr^.a := 255-4 else pPtr^.a := 255-0;
     inc(pPtr);
   end;
@@ -329,6 +336,7 @@ begin
   fLog2Width := round(log2(aWidth));
   fLog2Height := round(log2(aDepth));
   fRadius := sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth));
+  fVolume := fWidth * fHeight * fDepth;
   vox := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
@@ -338,14 +346,98 @@ begin
   inherited destroy();
 end;
 
-procedure tVoxel.generateLighting(lightingMode: tLightingMode);
+function tVoxel.calculateGI(x,y,z: integer): single;
 var
-  emisive, ambient: tPage;
-  x,y,z: int32;
+  i: integer;
+  p,d: V3D;
+  hit: tRayHit;
+  hits: integer;
+  norm: V3D;
+  hasNorm: boolean;
+  orig: V3D32;
+  s: string;
+
+  function isSolid(x,y,z: int32): boolean; inline;
+  begin
+    if z < 0 then exit(false); {open sky}
+    if not inBounds(x,y,z) then exit(true);
+    result := vox.getPixel(x,y+z*fWidth).a = 255;
+  end;
+
+  {guess which way the voxel is 'pointing'}
+  function guessNorm(): V3D;
+  begin
+    result := V3(0,0,0);
+    if not isSolid(x-1,y,z) then result += V3(-1,0,0);
+    if not isSolid(x+1,y,z) then result += V3(+1,0,0);
+    if not isSolid(x,y-1,z) then result += V3(0,-1,0);
+    if not isSolid(x,y+1,z) then result += V3(0,+1,0);
+    if not isSolid(x,y,z-1) then result += V3(0,0,-1);
+    if not isSolid(x,y,z+1) then result += V3(0,0,+1);
+    // default to facing camera
+    if result.abs2 = 0 then result := V3(0,-1,0);
+    result := result.normed();
+  end;
+
+const
+  SAMPLES = 64;
+begin
+  orig.x := x; orig.y := y; orig.z := z;
+  norm := guessNorm();
+  hasNorm := norm.abs2 <> 0;
+  p := V3(x, y, z) + norm + V3(0.5, 0.5, 0.5);
+  hits := 0;
+  for i := 0 to SAMPLES-1 do begin
+    d := sampleShell();
+    {hemisphere sampling}
+    {todo: cosign here}
+    if hasNorm and (d.dot(norm) < 0) then d *= -1;
+    if d.z > 0 then begin
+      {hit a pretend floor plane}
+      inc(hits);
+      continue;
+    end;
+    hit := trace(p, d, orig);
+    if hit.didHit then inc(hits);
+  end;
+  result := 1-(hits/SAMPLES);
+end;
+
+function tVoxel.updateLighting(maxSamples: integer=1): boolean;
+
+  procedure nextVoxel();
+  begin
+    {move to next voxel}
+    inc(lx);
+    if lx >= fWidth then begin
+      lx := 0;
+      inc(ly);
+    end;
+    if ly >= fHeight then begin
+      ly := 0;
+      inc(lz);
+    end;
+    if lz >= fDepth then
+      lMode := lmNone;
+  end;
+begin
+  if lMode = lmNone then exit(true);
+  {find a voxel we need to shade}
+  repeat
+    nextVoxel();
+  until (lMode = lmNone) or (getVoxel(lx,ly,lz).a = 255);
+  {update the lighting for that voxel}
+  applyLighting(lx,ly,lz,lMode);
+  {return if we are done}
+  result := (lMode = lmNone);
+end;
+
+procedure tVoxel.applyLighting(x,y,z: integer; lightingMode: tLightingMode);
+var
   v: single;
-  amb,emi: RGBA;
   pVox: pRGBA;
   addr: dword;
+  amb: RGBA;
 
   {returns number of neighbours for current cell}
   function countNeighbours(): integer;
@@ -359,113 +451,45 @@ var
     if vox.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
   end;
 
-  function isSolid(x,y,z: int32): boolean;
-  begin
-    if z < 0 then exit(false); {open sky}
-    if not inBounds(x,y,z) then exit(true);
-    result := vox.getPixel(x,y+z*fWidth).a = 255;
-  end;
-
   function isOccluded(): boolean;
   begin
     result := (x<>0) and (y<>0) and (z<>0) and (x<>fWidth-1) and (y<>fHeight-1) and (z<>fDepth-1) and (countNeighbours = 6);
   end;
 
-  {guess which way the voxel is 'pointing'}
-  function guessNorm(): V3D;
-  begin
-    result := V3(0,0,0);
-    if not isSolid(x-1,y,z) then result += V3(-1,0,0);
-    if not isSolid(x+1,y,z) then result += V3(+1,0,0);
-    if not isSolid(x,y-1,z) then result += V3(0,-1,0);
-    if not isSolid(x,y+1,z) then result += V3(0,+1,0);
-    if not isSolid(x,y,z-1) then result += V3(0,0,-1);
-    if not isSolid(x,y,z+1) then result += V3(0,0,+1);
-    result := result.normed();
-  end;
-
-  {returns how much ambient light is at xyz}
-  function sampleGI(): single;
-  var
-    i: integer;
-    p,d: V3D;
-    hit: tRayHit;
-    hits: integer;
-    norm: V3D;
-    hasNorm: boolean;
-    orig: V3D32;
-    s: string;
-  const
-    SAMPLES = 4*1024;
-  begin
-    orig.x := x; orig.y := y; orig.z := z;
-    norm := guessNorm();
-    hasNorm := norm.abs2 <> 0;
-    p := V3(x, y, z) + norm + V3(0.5, 0.5, 0.5);
-    hits := 0;
-    for i := 0 to SAMPLES-1 do begin
-      d := sampleShell();
-      {hemisphere sampling}
-      if hasNorm and (d.dot(norm) < 0) then d *= -1;
-      if d.z > 0 then begin
-        {hit a pretend floor plane}
-        inc(hits);
-        continue;
-      end;
-      hit := trace(p, d, orig);
-      if hit.didHit then inc(hits);
-    end;
-    result := 1-(hits/SAMPLES);
-  end;
-
 begin
-
-  if lightingMode = lmNone then exit;
-
-  emisive := vox.clone();
-  emisive.clear();
-  ambient := vox.clone();
-  ambient.clear();
-
-  for x := 0 to fWidth-1 do
-    for y := 0 to fHeight-1 do
-      for z := 0 to fDepth-1 do begin
-        if not isSolid(x,y,z) then continue;
-        //if isOccluded then continue;
-        case lightingMode of
-          lmGradient: v := 1.2-sqr(z / (fDepth-1));
-          lmSimple: v := 1.2-(countNeighbours()/6);
-          lmGI, lmAO:
-            // this is the technically correct one
-            //v := power(sampleGI(), 0.4545);
-            // this look much better though
-            v := sqr(sampleGI());
-        end;
-        ambient.setPixel(x,y+z*fWidth, RGBA.Lerp(
-          //RGB($FF0F0F0F),
-          //RGB($FFBACEEF),
-          RGBA.Black,
-          RGBA.White,
-          v
-        ));
-      end;
-
+  if getVoxel(x,y,z).a <> 255 then exit;
+  //if isOccluded then continue; // this is a good idea.. but test it.
+  case lightingMode of
+    lmGradient: v := 1.2-sqr(z / (fDepth-1));
+    lmSimple: v := 1.2-(countNeighbours()/6);
+    lmGI, lmAO:
+      // this is the technically correct one
+      //v := power(sampleGI(), 0.4545);
+      // this look much better though
+      v := sqr(calculateGI(x,y,z));
+  end;
+  amb := RGBA.Lerp(
+    //RGB($FF0F0F0F),
+    //RGB($FFBACEEF),
+    RGBA.Black,
+    RGBA.White,
+    v
+  );
   {modulate}
-  for x := 0 to fWidth-1 do
-    for y := 0 to fHeight-1 do
-      for z := 0 to fDepth-1 do begin
-        addr := getAddr(x,y,z);
-        pVox := pRGBA(vox.pixels+addr*4);
-        if (pVox^.a <> 255) then continue;
-        amb := pRGBA(ambient.pixels+addr*4)^;
-        if lightingMode in [lmAO] then begin
-          pVox^.r := 200; pVox^.g := 200; pVox^.b := 200;
-        end;
-        pVox^ := pVox^*amb;
-      end;
+  addr := getAddr(x,y,z);
+  pVox := pRGBA(vox.pixels+addr*4);
+  if lightingMode in [lmAO] then begin
+    pVox^.r := 200; pVox^.g := 200; pVox^.b := 200;
+  end;
+  pVox^ := pVox^*amb;
+end;
 
-  emisive.free();
-  ambient.free();
+procedure tVoxel.generateLighting(lightingMode: tLightingMode;defer: boolean=false);
+begin
+  lMode := lightingMode;
+  lx := 0; ly := 0; lz := 0;
+  if not defer then
+    while lMode <> lmNone do updateLighting();
 end;
 
 // todo: remove this
