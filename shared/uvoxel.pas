@@ -58,6 +58,7 @@ type
     {for progressive lighting}
     lx,ly,lz: integer;
     lMode: tLightingMode;
+    lSamples: integer;
   protected
     procedure generateSDF_fast(maxDistance: integer=-1);
     function  getSDF_slow(maxDistance: integer=-1): tPage;
@@ -76,6 +77,8 @@ type
     procedure setPage(page: tPage; height: integer);
     //procedure loadP96FromFile(filename: string; height: integer);
     procedure loadVoxFromFile(filename: string; height: integer);
+
+    property  lightingSamples: integer read lSamples write lSamples;
 
   public
     constructor Create(aWidth, aDepth, aHeight: integer); overload;
@@ -303,6 +306,7 @@ begin
   fLog2Height := 0;
   fRadius := 0;
   fVolume := 0;
+  lSamples := 64;
   vox := nil;
   loadVoxFromFile(aFilename, aHeight);
 end;
@@ -337,6 +341,7 @@ begin
   fLog2Height := round(log2(aDepth));
   fRadius := sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth));
   fVolume := fWidth * fHeight * fDepth;
+  lSamples := 256;
   vox := tPage.Create(aWidth, aHeight*aDepth);
 end;
 
@@ -379,15 +384,13 @@ var
     result := result.normed();
   end;
 
-const
-  SAMPLES = 64;
 begin
   orig.x := x; orig.y := y; orig.z := z;
   norm := guessNorm();
   hasNorm := norm.abs2 <> 0;
   p := V3(x, y, z) + norm + V3(0.5, 0.5, 0.5);
   hits := 0;
-  for i := 0 to SAMPLES-1 do begin
+  for i := 0 to lSamples-1 do begin
     d := sampleShell();
     {hemisphere sampling}
     {todo: cosign here}
@@ -400,7 +403,7 @@ begin
     hit := trace(p, d, orig);
     if hit.didHit then inc(hits);
   end;
-  result := 1-(hits/SAMPLES);
+  result := 1-(hits/lSamples);
 end;
 
 function tVoxel.updateLighting(maxSamples: integer=1): boolean;

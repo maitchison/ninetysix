@@ -101,6 +101,7 @@ begin
   dc := screen.getDC();
 
   tileVox := generateTile(lmAO);
+  tileVox.lightingSamples := 64;
 
   tileCanvas := tPage.Create(128,128);
 
@@ -116,7 +117,11 @@ begin
 
     startTime := getSec;
     repeat
-      if tileVox.updateLighting() then break;
+      if tileVox.updateLighting() then begin
+        tileVox.lightingSamples := tileVox.lightingSamples * 4;
+        tileVox.generateLighting(lmAO, true);
+        break;
+      end;
     until (getSec - startTime) > 0.05;
 
     input.update();
