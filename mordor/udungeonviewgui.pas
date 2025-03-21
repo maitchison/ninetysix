@@ -50,7 +50,11 @@ var
   pos, angle: V3D;
   cell: tVoxel;
 begin
-  //inherited doDraw(dc);
+
+  self.backgroundCol := RGB(50,50,50);
+
+  if voxelScene.didCameraMove() then
+    inherited doDraw(dc);
 
   {todo: put in update?}
   buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 1);
@@ -151,7 +155,7 @@ var
   tile: tTile;
   walls: array[1..4] of tWall;
 begin
-  inherited Create(Rect(100, 0, 96, 96), 'View');
+  inherited Create(Rect(20, 16, 96, 112), 'View');
 
   tileCache := tStringMap<tVoxel>.Create();
 

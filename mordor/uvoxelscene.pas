@@ -40,6 +40,7 @@ type
     cameraPos: V3D;
     cameraAngle: single; {radians, 0=north}
     function  tracesPerSecond: single;
+    function  didCameraMove: boolean;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
     constructor Create(aTileSize: integer);
   end;
@@ -171,6 +172,12 @@ begin
   result.col := RGB(255,0,255);
 end;
 
+{did the camera move since our last render?}
+function tVoxelScene.didCameraMove: boolean;
+begin
+  result := (renderState.cameraPos <> cameraPos) or (renderState.cameraAngle <> cameraAngle);
+end;
+
 {render scene. With progressive render we render approximately renderTime seconds.
  first render (preview) takes as long as it takes though.
 }
@@ -202,11 +209,11 @@ begin
 
   dc := aDC.asBlendMode(bmBlit);
 
-  viewWidth := dc.page.width;
+  viewWidth := dc.page.width-8;
   viewHeight := round(dc.page.width * 0.75);
 
   {check render state}
-  if (renderState.cameraPos <> cameraPos) or (renderState.cameraAngle <> cameraAngle) then begin
+  if didCameraMove() then begin
     {reset our render}
     renderState.cameraPos := cameraPos;
     renderState.cameraAngle := cameraAngle;
@@ -215,12 +222,11 @@ begin
     renderState.width := viewWidth;
     renderState.height := viewHeight;
     renderState.quality := rqQuarter;
-    dc.fillRect(dc.clip, RGB(12,12,12));
+    //dc.fillRect(dc.clip, RGB(12,12,12));
   end;
 
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;
-
 
   rayPos :=
     renderState.cameraPos
@@ -253,13 +259,13 @@ begin
         inc(traceCount);
         col32 += hit.col * 0.25;
       end;
-      dc.putPixel(Point(renderState.pixelX, 18+renderState.pixelY), col32);
+      dc.putPixel(Point(4+renderState.pixelX, 18+renderState.pixelY), col32);
       renderState.nextPixel();
     end else begin
-      rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
+      rayDir := getRayDir(4+renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
         inc(traceCount);
-      dc.fillRect(Rect(renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
+      dc.fillRect(Rect(4+renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
       renderState.nextPixel();
     end;
   end;

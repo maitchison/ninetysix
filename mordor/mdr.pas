@@ -303,11 +303,11 @@ begin
   panel.append(encounterGui);
   gui.append(panel);
 
-  fpsLabel := tGuiLabel.Create(Point(10,10));
+  fpsLabel := tGuiLabel.Create(Point(500,10));
   fpsLabel.setSize(60, 21);
   gui.append(fpsLabel);
 
-  tpsLabel := tGuiLabel.Create(Point(500,10));
+  tpsLabel := tGuiLabel.Create(Point(600,10));
   tpsLabel.setSize(60, 21);
   gui.append(tpsLabel);
 
