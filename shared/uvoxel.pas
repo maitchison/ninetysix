@@ -611,36 +611,54 @@ dir should be normalized
 }
 function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 begin
-  result := trace_ref(pos, dir);
+  result := trace_asm(pos, dir);
 end;
 
 {not really asm, just fixed point... but will be asm}
 function tVoxel.trace_asm(aPos: V3D; aDir: V3D): tRayHit;
 var
-  pos, dir: V3D32;
+  pos, dir, dirInv: V3D32;
   maxSteps: int32;
   mask: word;
   distanceTraveled: int32;
   col: RGBA;
-  d: int32;
+  d,s: int32;
   i: integer;
   tmp: int32;
+  p: V3D;
   stepSize: integer;
 
-  function autoStep(p,d: int32): int32; inline;
+  function autoStep(p,dInv,s: int32): int32; inline;
   begin
-    if d > 0 then result := 256-(p and $ff) else if d < 0 then result := (p and $ff) else result := 256;
+
+    if dInv > 0 then
+      result := ((((1+s)*256)-(p and $ff)) * dInv) div 256
+    else if dInv < 0 then
+      result := (((-s*256)-(p and $ff)) * dInv) div 256
+    else
+      result := 99999;
+  end;
+
+  function safeInv(x: int32): int32;
+  var
+    f: single;
+  begin
+    if x = 0 then exit(0);
+    result := round((1/(x/256)) * 256);
   end;
 
 begin
   assert(abs(aDir.abs2-1.0) < 1e-6);
-  maxSteps := 10*ceil(fRadius)+1;
+  maxSteps := ceil(fRadius)+1;
 
   {todo: correct masks for each dim}
   mask := $ffff-((32*256)-1);
 
   pos := V3D32.Round(aPos * 256);
   dir := V3D32.Round(aDir * 256);
+  dirInv.x := safeInv(dir.x);
+  dirInv.y := safeInv(dir.y);
+  dirInv.z := safeInv(dir.z);
 
   distanceTraveled := 0;
 
@@ -651,6 +669,10 @@ begin
 
     {check out of bounds}
     if ((pos.x and mask) <> 0) or ((pos.y and mask) <> 0) or ((pos.z and mask) <> 0) then begin
+      {clipping}
+      {p := V3D(pos) / 256;
+      p := clipRay(pos, p, 32);
+      result.d := (pos - p).abs;}
       result.d := distanceTraveled / 256;
       exit;
     end;
@@ -672,15 +694,15 @@ begin
     end;
 
     d := (255-col.a) div 4;
+    s := d-1;
 
     {figure out distance to travel to get to next cell}
-    stepSize := autoStep(pos.x, dir.x);
-    tmp := autoStep(pos.y, dir.y);
+    stepSize := autoStep(pos.x, dirInv.x, s);
+    tmp := autoStep(pos.y, dirInv.y, s);
     if tmp < stepSize then stepSize := tmp;
-    tmp := autoStep(pos.z, dir.z);
+    tmp := autoStep(pos.z, dirInv.z, s);
     if tmp < stepSize then stepSize := tmp;
-    inc(stepSize); // move slightly into next cell
-    stepSize += (d-1)*256; // get bonus move due to empty area
+    stepSize += 16; // move slightly into next cell
 
     pos.x += (dir.x * stepSize) div 256;
     pos.y += (dir.y * stepSize) div 256;
