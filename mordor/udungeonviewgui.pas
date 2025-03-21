@@ -15,21 +15,30 @@ uses
   uFileSystem,
   uP96,
   uMDRMap,
+  uStringMap,
   uTileBuilder,
   uVoxelScene,
   uGraph32;
 
 type
+
+  tWalls = array[tDirection] of tWall;
+
   tDungeonViewGui = class(tGuiPanel)
   protected
-    procedure buildTiles();
+    map: tMDRMap;
+    function  buildTile(tile: tTile; walls: tWalls): tVoxel;
+    function  getTile(tile: tTile; walls: tWalls): tVoxel;
+    procedure buildMapTiles();
+    function  getTileKey(tile: tTile; walls: tWalls): string;
   public
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(const dc: tDrawContext); override;
   public
     voxelScene: tVoxelScene;
-    tiles: array[tFloorType] of tVoxel;
-    constructor Create(map: tMDRMap);
+    tileCache: tStringMap<tVoxel>;
+    tileBuilder: tTileBuilder;
+    constructor Create(aMap: tMDRMap);
     destructor destroy(); override;
   end;
 
@@ -54,59 +63,77 @@ begin
   isDirty := true;
 end;
 
-procedure tDungeonViewGui.buildTiles();
-var
-  ft: tFloorType;
-  tileBuilder: tTileBuilder;
-  tile: tTile;
-  walls: array[1..4] of tWall;
-  voxelCell: tVoxel;
-  tag, fileName: string;
+function tDungeonViewGui.buildTile(tile: tTile; walls: tWalls): tVoxel;
 begin
-
-  tileBuilder := tTileBuilder.Create();
-  for ft in tFloorType do begin
-
-    tag := FLOOR_SPEC[ft].tag;
-    fileName := joinPath('tiles', tag+'_16.vox');
-
-    if fileSystem.exists(filename) then begin
-      tiles[ft] := tVoxel.Create(32,32,32);
-      tiles[ft].loadVoxFromFile(removeExtension(fileName), 32);
-      continue;
-    end;
-
-    tile.floor := ft;
-    walls[1].t := wtNone;
-    walls[2].t := wtNone;
-    walls[3].t := wtNone;
-    walls[4].t := wtNone;
-    tileBuilder.composeVoxelCell(tile, walls);
-    voxelCell := tVoxel.Create(tileBuilder.page, 32);
-    voxelCell.generateSDF(sdfFull);
-    //voxelCell.lightingSamples := 16;
-    //voxelCell.generateLighting(lmGI);
-    tiles[ft] := voxelCell;
-    saveLC96(fileName, voxelCell.vox);
-  end;
-  tileBuilder.free;
+  tileBuilder.composeVoxelCell(tile, walls);
+  result := tVoxel.Create(tileBuilder.page, 32);
+  result.generateSDF(sdfFull);
+  //result.lightingSamples := 16;
+  //result.generateLighting(lmGI);
 end;
 
-constructor tDungeonViewGui.Create(map: tMDRMap);
+function tDungeonViewGui.getTileKey(tile: tTile; walls: tWalls): string;
+var
+  d: tDirection;
+begin
+  result := tile.toString;
+  for d in tDirection do result := result + '-' + walls[d].toString;
+end;
+
+{gets tile, uses tileCache, and disk cache.}
+function tDungeonViewGui.getTile(tile: tTile; walls: tWalls): tVoxel;
+var
+  key: string;
+  filename: string;
+begin
+  key := getTileKey(tile, walls);
+  if tileCache.contains(key) then
+    exit(tileCache[key]);
+
+  filename := joinPath('tiles', key+'_0.vox');
+  if filesystem.exists(filename) then begin
+    result := tVoxel.Create(32,32,32);
+    result.loadVoxFromFile(removeExtension(fileName), 32);
+  end else begin
+    result := buildTile(tile, walls);
+    saveLC96(fileName, result.vox);
+  end;
+  tileCache[key] := result;
+end;
+
+procedure tDungeonViewGui.buildMapTiles();
 var
   x,y: integer;
+  d: tDirection;
+  tile: tTile;
+  walls: tWalls;
+  vox: tVoxel;
+  tag: string;
+begin
+  for y := 0 to 31 do begin
+    for x := 0 to 31 do begin
+      tile := map.tile[x,y];
+      if (tile.floor = ftNone) then tile.floor := ftStone;
+      for d in tDirection do walls[d] := map.wall[x,y,d];
+      voxelScene.cells[x,y] := getTile(tile, walls);
+    end;
+  end;
+end;
+
+constructor tDungeonViewGui.Create(aMap: tMDRMap);
+var
+  x,y: integer;
+  tile: tTile;
+  walls: array[1..4] of tWall;
 begin
   inherited Create(Rect(20, 30, 96, 124), 'View');
 
-  voxelScene := tVoxelScene.Create();
-  buildTiles();
+  tileCache := tStringMap<tVoxel>.Create();
 
-  for x := 0 to 31 do
-    for y := 0 to 31 do
-      case map.tile[x,y].floor of
-        ftNone: voxelScene.cells[x,y] := tiles[ftStone]
-        else voxelScene.cells[x,y] := tiles[map.tile[x,y].floor]
-      end;
+  map := aMap;
+  tileBuilder := tTileBuilder.Create();
+  voxelScene := tVoxelScene.Create();
+  buildMapTiles();
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 
@@ -115,6 +142,8 @@ end;
 destructor tDungeonViewGui.destroy();
 begin
   voxelScene.free;
+  tileBuilder.free;
+  tileCache.free;
   inherited destroy;
 end;
 

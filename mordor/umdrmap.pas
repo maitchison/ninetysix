@@ -22,7 +22,22 @@ type
     spriteIdx: integer;
   end;
 
+  tWallSpec = record
+    tag: string;
+    canTransit: boolean;
+  end;
+
 const
+
+  WALL_SPEC: array[tWallType] of tWallSpec =
+  (
+    (tag: 'None';       canTransit: true),
+    (tag: 'Wall';       canTransit: false),
+    (tag: 'Door';       canTransit: true),
+    (tag: 'Secret';     canTransit: true),
+    (tag: 'LockedDoor'; canTransit: false)
+  );
+
   FLOOR_SPEC: array[tFloorType] of tFloorSpec =
    (
     (tag: 'None'; spriteIdx: -1),
@@ -66,6 +81,7 @@ type
     procedure clear();
     function asExplored(): tWall;
     function isSolid: boolean;
+    function toString(): string;
   end;
 
   {16 bytes per tile}
@@ -78,6 +94,7 @@ type
     procedure clear();
     function floorSpec: tFloorSpec;
     function asExplored(): tTile;
+    function toString(): string;
   end;
 
   pTile = ^tTile;
@@ -147,6 +164,12 @@ begin
   end;
 end;
 
+function tTile.toString(): string;
+begin
+  // medium set to none for the moment.
+  result := FLOOR_SPEC[floor].tag+'-None'
+end;
+
 {-------------------------------------------------}
 
 procedure tWall.clear();
@@ -157,6 +180,11 @@ end;
 function tWall.isSolid: boolean;
 begin
   result := t in [wtWall, wtLockedDoor];
+end;
+
+function tWall.toString(): string;
+begin
+  result := WALL_SPEC[t].tag;
 end;
 
 {returns copy of tile with exploration limited applied}
