@@ -119,17 +119,17 @@ begin
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;
 
-  vx := 40;
-  vy := 30;
+  vx := 50;
+  vy := 38;
 
   rayPos :=
     cameraPos
-    + V3(0.5, 0.5, 0.35)
+    + V3(0.5, 0.5, 0.5)
     + V3(sin(cameraAngle+180*DEG2RAD)*0.45, -cos(cameraAngle+180*DEG2RAD)*0.45, 0);
 
   for dy := -vy to vy do begin
     for dx := -vx to vx do begin
-      rayDir := V3(dx / 60, -0.75, dy / 60).normed();
+      rayDir := V3(dx / 120, -0.5, dy / 120).normed();
       rayDir := rayDir.rotated(0, 0, cameraAngle);
       hit := traceRay(rayPos, rayDir);
       dc.putPixel(Point(dx+mid.x, dy+mid.y), hit.col);

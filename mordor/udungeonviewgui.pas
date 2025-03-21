@@ -70,8 +70,6 @@ begin
   tileBuilder.composeVoxelCell(tile, walls);
   result := tVoxel.Create(tileBuilder.page, 32);
   result.generateSDF(sdfFull);
-  //result.lightingSamples := 16;
-  //result.generateLighting(lmGI);
 end;
 
 function tDungeonViewGui.getTileKey(tile: tTile; walls: tWalls): string;
@@ -92,12 +90,14 @@ begin
   if tileCache.contains(key) then
     exit(tileCache[key]);
 
-  filename := joinPath('tiles', key+'_0.vox');
+  filename := joinPath('tiles', key+'_16.vox');
   if filesystem.exists(filename) then begin
     result := tVoxel.Create(32,32,32);
     result.loadVoxFromFile(removeExtension(fileName), 32);
   end else begin
     result := buildTile(tile, walls);
+    result.lightingSamples := 16;
+    result.generateLighting(lmGI);
     saveLC96(fileName, result.vox);
   end;
   tileCache[key] := result;
