@@ -1,6 +1,6 @@
 @echo off
 
-set VERSION=01
+set VERSION=02
 set MAIN=mdr
 set BUILD_DIR=c:\dev\build\%MAIN%\%VERSION%
 set LATEST_DIR=c:\dev\build\%MAIN%\latest
@@ -50,11 +50,13 @@ mkdir %BUILD_DIR%\res
 mkdir %BUILD_DIR%\gui
 mkdir %BUILD_DIR%\sfx
 mkdir %BUILD_DIR%\music
+mkdir %BUILD_DIR%\tiles
 
 copy res\*.* %BUILD_DIR%\res
 copy gui\*.* %BUILD_DIR%\gui
 copy sfx\*.* %BUILD_DIR%\sfx
 copy music\*.* %BUILD_DIR%\music
+copy tiles\*.* %BUILD_DIR%\tiles
 
 
 goto :end

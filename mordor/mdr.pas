@@ -245,8 +245,9 @@ end;
 procedure tGameScene.run();
 var
   elapsed: single;
-  fpsLabel: tGuiLabel;
-  tpsLabel: tGuiLabel;
+  fpsLabel,
+  tpsLabel,
+  verLabel: tGuiLabel;
   timer: tTimer;
   dc: tDrawContext;
   panel: tGuiWindow;
@@ -310,6 +311,12 @@ begin
   tpsLabel := tGuiLabel.Create(Point(600,10));
   tpsLabel.setSize(60, 21);
   gui.append(tpsLabel);
+
+  verLabel := tGuiLabel.Create(Point(800-100-15,600-21-16));
+  verLabel.setSize(100, 21);
+  //verLabel.backgroundCol := RGBA.Clear;
+  verlabel.text := 'v0.2 (mode 1)';
+  gui.append(verLabel);
 
   timer := tTimer.create('main');
   dc := screen.getDC();
