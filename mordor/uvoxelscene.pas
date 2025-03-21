@@ -17,7 +17,7 @@ uses
 
 type
 
-  tRenderQuality = (rqQuarter, rqHalf, rqFull, rqDone);
+  tRenderQuality = (rqQuarter, rqHalf, rqFull, rqAA, rqDone);
 
   tRenderState = record
     cameraPos: V3D;
@@ -150,6 +150,8 @@ var
   startTime: single;
   dc: tDrawContext;
   pixelSize: integer;
+  i,j: integer;
+  col32: RGBA32;
 
   function getRayDir(px, py: single): V3D;
   begin
@@ -202,10 +204,21 @@ begin
        continue;
     end;
 
-    rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
-    hit := traceRay(rayPos, rayDir);
-    dc.fillRect(Rect(renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
-    renderState.nextPixel();
+    if renderState.quality = rqAA then begin
+      col32 := RGB(0,0,0);
+      for i := 0 to 1 do for j := 0 to 1 do begin
+        rayDir := getRayDir(renderState.pixelX+0.25+0.5*i,renderState.pixelY+0.25+0.5*j);
+        hit := traceRay(rayPos, rayDir);
+        col32 += hit.col * 0.25;
+      end;
+      dc.putPixel(Point(renderState.pixelX, 18+renderState.pixelY), col32);
+      renderState.nextPixel();
+    end else begin
+      rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
+      hit := traceRay(rayPos, rayDir);
+      dc.fillRect(Rect(renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
+      renderState.nextPixel();
+    end;
   end;
 end;
 
