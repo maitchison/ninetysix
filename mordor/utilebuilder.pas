@@ -166,11 +166,11 @@ begin
   case tile.floor of
     ftStone: begin
       //bedrock
-      layer := 30;
+      layer := 31;
       fill(MDR_DARKGRAY, 1);
       noise(0.25);
       //stone
-      layer := 31;
+      layer := 30;
       fill(MDR_LIGHTGRAY, 1);
       noise(0.5);
     end;
@@ -235,8 +235,7 @@ begin
   {todo: get trim from neighbours... ah... we do want map then...
    either that or build it into wall? yes.. wall is probably better}
   if (tile.floor in [ftStone]) then begin
-    dc.fillRect(Rect(0,0+29*32,32,32), MDR_LIGHTGRAY);
-    dc.fillRect(Rect(1,1+29*32,30,30), RGBA.Clear);
+    dc.drawRect(Rect(0,0+29*32,32,32), MDR_LIGHTGRAY);
   end;
 
 end;

@@ -51,7 +51,7 @@ begin
   //inherited doDraw(dc);
 
   {todo: put in update?}
-  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 3);
+  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 1);
   voxelScene.render(dc);
   {
   pos := V3(bounds.width/2,bounds.height/2,0);
@@ -90,13 +90,13 @@ begin
   if tileCache.contains(key) then
     exit(tileCache[key]);
 
-  filename := joinPath('tiles', key+'_16.vox');
+  filename := joinPath('tiles', key+'_1024.vox');
   if filesystem.exists(filename) then begin
     result := tVoxel.Create(32,32,32);
     result.loadVoxFromFile(removeExtension(fileName), 32);
   end else begin
     result := buildTile(tile, walls);
-    result.lightingSamples := 16;
+    result.lightingSamples := 1024;
     result.generateLighting(lmGI);
     saveLC96(fileName, result.vox);
   end;
@@ -115,7 +115,7 @@ var
 begin
   for y := 0 to 31 do begin
     for x := 0 to 31 do begin
-      if (abs(x-atX) + abs(y-atY)) > radius then continue;
+      if (abs(x-atX) > radius) or (abs(y-atY) > radius) then continue;
       tile := map.tile[x,y];
       if (tile.floor = ftNone) then tile.floor := ftStone;
       for d in tDirection do walls[d] := map.wall[x,y,d];
