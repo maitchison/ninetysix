@@ -423,7 +423,7 @@ var
 begin
   t := getVoxel(x,y,z);
   setVoxel(x,y,z, getVoxel(a,b,c));
-  setVoxel(a,b,c, t);
+  setVoxel(a,b,c,t);
 end;
 
 {rotate voxel around z by 90 degrees}
@@ -1126,8 +1126,38 @@ begin
 
 end;
 
+{-----------------------------------------}
 
-{-----------------------------------------------------}
+type
+  tVoxelTest = class(tTestSuite)
+    procedure run; override;
+  end;
 
+procedure tVoxelTest.run();
+var
+  vox: tVoxel;
+  pixelsCopy: tPage;
 begin
+
+  {make sure rotation is vauguely correct}
+  vox := tVoxel.Create(4,4,4);
+  makePageRandom(vox.vox);
+  pixelsCopy := vox.vox.clone();
+  vox.rotate();
+  vox.rotate();
+  vox.rotate();
+  vox.rotate();
+  assertEqual(vox.vox, pixelsCopy);
+
+  vox.free;
+  pixelsCopy.free;
+end;
+
+{--------------------------------------------------------}
+
+
+initialization
+  tVoxelTest.Create('Voxel');
+finalization
+
 end.
