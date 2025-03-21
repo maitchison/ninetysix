@@ -617,7 +617,7 @@ end;
 {not really asm, just fixed point... but will be asm}
 function tVoxel.trace_asm(aPos: V3D; aDir: V3D): tRayHit;
 var
-  pos, dir, dirInv, prev: V3D32;
+  pos, dir, dirInv, prev, initialPos: V3D32;
   maxSteps: int32;
   mask: word;
   distanceTraveled: int32;
@@ -647,9 +647,23 @@ var
     result := round((1/(x/256)) * 256);
   end;
 
-  {clip distance traveled to edge of cuboid}
-  function clipDistance(): int32;
+  procedure safeSet(var t: single; newT: single); inline;
   begin
+    if newT <= 0 then exit;
+    if newT < t then t := newT;
+  end;
+
+  {clip distance traveled to edge of cuboid}
+  function clipDistance(t: single): single;
+  begin
+    {todo: calculate invADir as float, then round to get invDir}
+    if dir.x > 0 then safeSet(t, (32*256-initialPos.x) / dir.x)
+    else if dir.x < 0 then safeSet(t, -initialPos.x / dir.x);
+    if dir.y > 0 then safeSet(t, (32*256-initialPos.y) / dir.y)
+    else if dir.y < 0 then safeSet(t, -initialPos.y / dir.y);
+    if dir.z > 0 then safeSet(t, (32*256-initialPos.z) / dir.z)
+    else if dir.z < 0 then safeSet(t, -initialPos.z / dir.z);
+    result := t;
   end;
 
 begin
@@ -660,6 +674,7 @@ begin
   mask := $ffff-((32*256)-1);
 
   pos := V3D32.Round(aPos * 256);
+  initialPos := pos;
   dir := V3D32.Round(aDir * 256);
   dirInv.x := safeInv(dir.x);
   dirInv.y := safeInv(dir.y);
@@ -676,8 +691,8 @@ begin
 
     {check out of bounds}
     if ((pos.x and mask) <> 0) or ((pos.y and mask) <> 0) or ((pos.z and mask) <> 0) then begin
-      {clipping... this is quite slow...}
-      result.d := clipRayToCuboid(aPos-V3(16,16,16), aDir, distanceTraveled/256, V3(16,16,16));
+      {clipping... this can be a bit slow...}
+      result.d := clipDistance(distanceTraveled / 256);
       exit;
     end;
 
