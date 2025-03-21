@@ -29,7 +29,7 @@ type
     map: tMDRMap;
     function  buildTile(tile: tTile; walls: tWalls): tVoxel;
     function  getTile(tile: tTile; walls: tWalls): tVoxel;
-    procedure buildMapTiles();
+    procedure buildMapTiles(atX, atY: integer; radius: integer);
     function  getTileKey(tile: tTile; walls: tWalls): string;
   public
     procedure doUpdate(elapsed: single); override;
@@ -50,6 +50,8 @@ var
 begin
   inherited doDraw(dc);
 
+  {todo: put in update?}
+  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 3);
   voxelScene.render(dc);
   {
   pos := V3(bounds.width/2,bounds.height/2,0);
@@ -101,7 +103,8 @@ begin
   tileCache[key] := result;
 end;
 
-procedure tDungeonViewGui.buildMapTiles();
+{builds tiles on map within radius L1 distance of (atX, atY)}
+procedure tDungeonViewGui.buildMapTiles(atX, atY: integer; radius: integer);
 var
   x,y: integer;
   d: tDirection;
@@ -112,6 +115,7 @@ var
 begin
   for y := 0 to 31 do begin
     for x := 0 to 31 do begin
+      if (abs(x-atX) + abs(y-atY)) > radius then continue;
       tile := map.tile[x,y];
       if (tile.floor = ftNone) then tile.floor := ftStone;
       for d in tDirection do walls[d] := map.wall[x,y,d];
@@ -133,7 +137,6 @@ begin
   map := aMap;
   tileBuilder := tTileBuilder.Create();
   voxelScene := tVoxelScene.Create();
-  buildMapTiles();
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 

@@ -125,7 +125,7 @@ begin
   rayPos :=
     cameraPos
     + V3(0.5, 0.5, 0.35)
-    + V3(sin(cameraAngle+180*DEG2RAD), -cos(cameraAngle+180*DEG2RAD), 0);
+    + V3(sin(cameraAngle+180*DEG2RAD)*0.45, -cos(cameraAngle+180*DEG2RAD)*0.45, 0);
 
   for dy := -vy to vy do begin
     for dx := -vx to vx do begin
