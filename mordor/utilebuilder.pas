@@ -117,12 +117,17 @@ var
   i,j: integer;
   x,y,z: integer;
   c: integer;
+  halfSize: single;
 begin
+  halfSize := (tileSize div 2) - 0.5;
   for i := -(tileSize div 2) to (tileSize div 2) do begin
     for j := 0 to height-1 do begin
-      x := round(15.5 + DX[d]*15.5) + DY[d]*i;
-      y := round(15.5 + DY[d]*15.5) + DX[d]*i;
-      z := tileSize-1-j;
+      x := round(halfSize + DX[d]*halfSize) + DY[d]*i;
+      y := round(halfSize + DY[d]*halfSize) + DX[d]*i;
+      z := (tileSize-1)-j;
+      if (x < 0) or (x >= tileSize) then continue;
+      if (y < 0) or (y >= tileSize) then continue;
+      if (z < 0) or (z >= tileSize) then continue;
       c := (rnd-128) div 8;
       if rnd >= 200 then begin
         {brick outlines}
@@ -133,6 +138,7 @@ begin
           if (i+15) and $7 = 4 then c += 16;
         end;
       end;
+      c += 32; // make wall a little lighter
       page.setPixel(x,y+z*tileSize,RGB($6f+c, $5c+c, $42+c));
     end;
   end;
@@ -203,9 +209,6 @@ begin
       layer := (tileSize-1);
       fill(MDR_BLUE);
       noise(0.3);
-      layer := (tileSize-2);
-      fill(MDR_BLUE);
-      noise(0.1);
     end;
   end;
 

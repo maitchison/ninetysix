@@ -151,8 +151,7 @@ var
   tile: tTile;
   walls: array[1..4] of tWall;
 begin
-  //stub: larger
-  inherited Create(Rect(100, 0, 200, 200), 'View');
+  inherited Create(Rect(100, 0, 96, 96), 'View');
 
   tileCache := tStringMap<tVoxel>.Create();
 
