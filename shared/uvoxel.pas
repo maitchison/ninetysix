@@ -617,7 +617,7 @@ end;
 {not really asm, just fixed point... but will be asm}
 function tVoxel.trace_asm(aPos: V3D; aDir: V3D): tRayHit;
 var
-  pos, dir, dirInv: V3D32;
+  pos, dir, dirInv, prev: V3D32;
   maxSteps: int32;
   mask: word;
   distanceTraveled: int32;
@@ -647,6 +647,11 @@ var
     result := round((1/(x/256)) * 256);
   end;
 
+  {clip distance traveled to edge of cuboid}
+  function clipDistance(): int32;
+  begin
+  end;
+
 begin
   assert(abs(aDir.abs2-1.0) < 1e-6);
   maxSteps := ceil(fRadius)+1;
@@ -665,11 +670,13 @@ begin
   result.didHit := false;
   result.col := RGBA.Clear;
 
+  prev.x := -1;
+
   for i := 0 to maxSteps-1 do begin
 
     {check out of bounds}
     if ((pos.x and mask) <> 0) or ((pos.y and mask) <> 0) or ((pos.z and mask) <> 0) then begin
-      {clipping}
+      {clipping... this is quite slow...}
       result.d := clipRayToCuboid(aPos-V3(16,16,16), aDir, distanceTraveled/256, V3(16,16,16));
       exit;
     end;
@@ -701,11 +708,25 @@ begin
     if tmp < stepSize then stepSize := tmp;
     stepSize += 16; // move slightly into next cell
 
+    prev := pos;
+
     pos.x += (dir.x * stepSize) div 256;
     pos.y += (dir.y * stepSize) div 256;
     pos.z += (dir.z * stepSize) div 256;
 
+    {same voxel detection}
+    {
+    if (((prev.x shr 8) = (pos.x shr 8)) and
+      ((prev.y shr 8) = (pos.y shr 8)) and
+      ((prev.z shr 8) = (pos.z shr 8))) then begin
+        result.didHit := true;
+        result.col := RGB(255,0,0);
+        exit;
+    end;
+    }
+
     distanceTraveled += stepSize;
+
   end;
 
   result.d := distanceTraveled / 256;

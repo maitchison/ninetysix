@@ -103,10 +103,13 @@ begin
     curr.y := floor(pos.y);
     curr.z := floor(pos.z);
 
+    {same cell detection... this shouldn't happen}
+    {
     if (curr = prev) then begin
       result.col := RGB(0,255,0);
       exit;
     end;
+    }
 
     {out of bounds}
     if (dword(curr.x) >= 32) or (dword(curr.y) >= 32) then begin
