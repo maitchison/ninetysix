@@ -77,6 +77,7 @@ type
     function  calculateGI(x,y,z: integer): single;
   protected
     function  trace_ref(pos: V3D; dir: V3D): tRayHit;
+    function  trace_asm(aPos: V3D; aDir: V3D): tRayHit;
   public
     vox: tPage;     // RGBD - baked (todo: 2 bits of D are for alpha)
     function  getDistance_L1(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): integer;
@@ -612,6 +613,85 @@ function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 begin
   result := trace_ref(pos, dir);
 end;
+
+{not really asm, just fixed point... but will be asm}
+function tVoxel.trace_asm(aPos: V3D; aDir: V3D): tRayHit;
+var
+  pos, dir: V3D32;
+  maxSteps: int32;
+  mask: word;
+  distanceTraveled: int32;
+  col: RGBA;
+  d: int32;
+  i: integer;
+  tmp: int32;
+  stepSize: integer;
+
+  function autoStep(p,d: int32): int32; inline;
+  begin
+    if d > 0 then result := 256-(p and $ff) else if d < 0 then result := (p and $ff) else result := 256;
+  end;
+
+begin
+  assert(abs(aDir.abs2-1.0) < 1e-6);
+  maxSteps := 10*ceil(fRadius)+1;
+
+  {todo: correct masks for each dim}
+  mask := $ffff-((32*256)-1);
+
+  pos := V3D32.Round(aPos * 256);
+  dir := V3D32.Round(aDir * 256);
+
+  distanceTraveled := 0;
+
+  result.didHit := false;
+  result.col := RGBA.Clear;
+
+  for i := 0 to maxSteps-1 do begin
+
+    {check out of bounds}
+    if ((pos.x and mask) <> 0) or ((pos.y and mask) <> 0) or ((pos.z and mask) <> 0) then begin
+      result.d := distanceTraveled / 256;
+      exit;
+    end;
+
+    {get voxel}
+    col := pRGBA(vox.pixels +
+      (
+      (pos.x shr 8) +
+      (pos.y shr 8 shl fLog2Width) +
+      (pos.z shr 8 shl (fLog2Width + fLog2Height))
+      ) shl 2
+    )^;
+
+    if col.a = 255 then begin
+      result.didHit := true;
+      result.col := col;
+      result.d := distanceTraveled / 256;
+      exit;
+    end;
+
+    d := (255-col.a) div 4;
+
+    {figure out distance to travel to get to next cell}
+    stepSize := autoStep(pos.x, dir.x);
+    tmp := autoStep(pos.y, dir.y);
+    if tmp < stepSize then stepSize := tmp;
+    tmp := autoStep(pos.z, dir.z);
+    if tmp < stepSize then stepSize := tmp;
+    inc(stepSize); // move slightly into next cell
+    stepSize += (d-1)*256; // get bonus move due to empty area
+
+    pos.x += (dir.x * stepSize) div 256;
+    pos.y += (dir.y * stepSize) div 256;
+    pos.z += (dir.z * stepSize) div 256;
+
+    distanceTraveled += stepSize;
+  end;
+
+  result.d := distanceTraveled / 256;
+end;
+
 
 function tVoxel.trace_ref(pos: V3D; dir: V3D): tRayHit;
 var
