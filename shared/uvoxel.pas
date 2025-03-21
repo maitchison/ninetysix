@@ -105,6 +105,8 @@ type
     function  getVoxel(x,y,z:int32): RGBA; inline; register;
     procedure setVoxel(x,y,z:int32;c: RGBA);
     function  trace(pos: V3D; dir: V3D): tRayHit;
+    procedure swapVoxels(x,y,z: integer;a,b,c: integer); inline;
+    procedure rotate();
 
     function  draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
   end;
@@ -413,6 +415,33 @@ begin
     if hit.didHit then inc(hits);
   end;
   result := 1-(hits/lSamples);
+end;
+
+procedure tVoxel.swapVoxels(x,y,z: integer;a,b,c: integer); inline;
+var
+  t: RGBA;
+begin
+  t := getVoxel(x,y,z);
+  setVoxel(x,y,z, getVoxel(a,b,c));
+  setVoxel(a,b,c, t);
+end;
+
+{rotate voxel around z by 90 degrees}
+procedure tVoxel.rotate();
+var
+  x,y,z: integer;
+begin
+  for z := 0 to fDepth-1 do
+    for y := 0 to fHeight-1 do
+      for x := y to fWidth-1 do begin
+        swapVoxels(x,y,z,y,x,z);
+      end;
+
+  for z := 0 to fDepth-1 do
+    for y := 0 to fHeight-1 do
+      for x := 0 to (fWidth div 2)-1 do begin
+        swapVoxels(x,y,z,(fWidth-1)-x,y,z);
+      end;
 end;
 
 function tVoxel.updateLighting(maxSamples: integer=1): boolean;
