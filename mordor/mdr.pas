@@ -30,6 +30,7 @@ uses
   uTileEditorGui,
   uScene,
   uEncounterGui,
+  uGUIListBox,
   uMDRImporter,
   uMDRParty,
   uMDRMap;
@@ -252,6 +253,7 @@ var
   dc: tDrawContext;
   panel: tGuiWindow;
   importer: tMDRImporter;
+  messageBox: tGUIListBox;
 const
   RHS_DIVIDE = 280;
   LOWER_DIVIDE = 160;
@@ -283,16 +285,18 @@ begin
   mapGUI.pos := Point(10,10);
 
   {create some pannels to map out what this should look like}
-  panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
+  panel := tGuiWindow.Create(Rect(800-RHS_DIVIDE, 0, RHS_DIVIDE, 600 - LOWER_DIVIDE));
   panel.text := 'CHARACTER';
   panel.imageCol := RGBF(1.00,0.22,0.12);
   gui.append(panel);
-  panel := tGuiWindow.create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
+  panel := tGuiWindow.Create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'PARTY';
   gui.append(panel);
-  panel := tGuiWindow.create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
+  panel := tGuiWindow.Create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'LOG';
   gui.append(panel);
+  messageBox := tGuiListBox.Create();
+  panel.append(messagebox);
 
   panel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
   panel.text := 'MAP';
@@ -337,6 +341,8 @@ begin
     musicUpdate();
 
     input.update();
+
+    if keyDown(key_r) then messageBox.addMessage('Hello %d', [rnd]);
 
     {update view - there should be a better place to do this}
     encounterGui.dungeonView.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);

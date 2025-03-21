@@ -58,6 +58,9 @@ copy sfx\*.* %BUILD_DIR%\sfx
 copy music\*.* %BUILD_DIR%\music
 copy tiles\*.* %BUILD_DIR%\tiles
 
+:: Copy the test program along as well
+copy voxtest.exe %BUILD_DIR%\voxtest.exe
+
 
 goto :end
 

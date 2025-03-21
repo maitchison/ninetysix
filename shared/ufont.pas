@@ -29,15 +29,17 @@ type
     {note: this means fonts should be passed by reference}
     {todo: put this and chars both on the heep}
     kerning: array[0..255, 0..255] of shortint;
+    fHeight: integer; {typical height of font}
   protected
-    function charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
+    function  charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
   public
-    constructor create();
+    constructor Create();
     class function Load(filename: string): tFont; static;
 
     procedure textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA);
     function  textExtents(s: string; p: tPoint): tRect; overload;
     function  textExtents(s: string): tRect; overload;
+    property  height: integer read fHeight;
 
   end;
 
@@ -52,7 +54,7 @@ uses
 
 {---------------------------------------------------------}
 
-function ReadAttribute(line, attributeName: string): integer;
+function readAttribute(line, attributeName: string): integer;
 var
   attributePos: integer;
   attributeStr: string;
@@ -64,7 +66,7 @@ begin
 end;
 
 
-function ParseCharLine(line: string): TChar;
+function parseCharLine(line: string): TChar;
 begin
   result.id := 0;
   result.id := readAttribute(line, 'id');
@@ -77,6 +79,7 @@ begin
   result.xadvance := readAttribute(line, 'xadvance');
 end;
 
+{todo: remove and use standard sprite drawing}
 procedure drawSubImage(page: tPage; atX, atY: integer; image: TPage; rect:TRect; col: RGBA);
 var
   x,y: integer;
@@ -96,12 +99,13 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tFont.create();
+constructor tFont.Create();
 begin
   inherited create();
   bitmap := nil;
   fillchar(chars, sizeof(chars), 0);
   fillchar(kerning, sizeof(kerning), 0);
+  fHeight := -1;
 end;
 
 class function tFont.Load(filename: string): tFont;
@@ -142,9 +146,9 @@ begin
     fatal('Error loading '+filename+'.fnt');
 
   while not Eof(TextFile) do begin
-    ReadLn(TextFile, Line);
+    readLn(TextFile, Line);
     if Pos('char id=', Line) > 0 then begin
-       char := ParseCharLine(Line);
+       char := parseCharLine(Line);
       result.chars[char.id] := char;
     end;
     if Pos('kerning first=', Line) > 0 then begin
@@ -153,6 +157,8 @@ begin
       result.kerning[a,b] := readAttribute(line, 'amount');
     end;
   end;
+
+  result.fHeight := result.chars[ord('I')].rect.height;
 end;
 
 function tFont.charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
