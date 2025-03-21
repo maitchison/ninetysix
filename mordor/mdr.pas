@@ -246,6 +246,7 @@ procedure tGameScene.run();
 var
   elapsed: single;
   fpsLabel: tGuiLabel;
+  tpsLabel: tGuiLabel;
   timer: tTimer;
   dc: tDrawContext;
   panel: tGuiWindow;
@@ -306,6 +307,10 @@ begin
   fpsLabel.setSize(60, 21);
   gui.append(fpsLabel);
 
+  tpsLabel := tGuiLabel.Create(Point(500,10));
+  tpsLabel.setSize(60, 21);
+  gui.append(tpsLabel);
+
   timer := tTimer.create('main');
   dc := screen.getDC();
 
@@ -319,6 +324,8 @@ begin
     elapsed := clamp(timer.elapsed, 0.001, 0.1);
     if timer.avElapsed > 0 then
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
+
+    tpsLabel.text := format('%.1fk', [encounterGui.dungeonView.voxelScene.tracesPerSecond/1000]);
 
     musicUpdate();
 

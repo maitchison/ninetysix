@@ -632,7 +632,7 @@ begin
       exit;
     end;
 
-    stepSize := (255-c.a) / 4;
+    stepSize := ((255-c.a)-3) / 4;
 
     result.pos += dir * stepSize;
     result.d += stepSize;

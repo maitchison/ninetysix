@@ -31,11 +31,14 @@ type
   tVoxelScene = class
   protected
     renderState: tRenderState;
+    traceCount: int32;
+    traceTime: single;
     function  traceRay(pos: V3D; dir: V3D): tRayHit;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
     cameraAngle: single; {radians, 0=north}
+    function tracesPerSecond: single;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
     constructor Create();
   end;
@@ -66,6 +69,12 @@ begin
   fillchar(cells, sizeof(cells), 0);
 end;
 
+function tVoxelScene.tracesPerSecond: single;
+begin
+  if traceTime = 0 then exit(-1);
+  result := traceCount / traceTime;
+end;
+
 {for the moment just trace through scene and return depth}
 function tVoxelScene.traceRay(pos: V3D; dir: V3D): tRayHit;
 var
@@ -74,7 +83,6 @@ var
   hit: tRayHit;
   vox: tVoxel;
   stepSize: single;
-  autoX, autoY: single;
 
   function autoStep(p,d: single): single;
   begin
@@ -82,13 +90,14 @@ var
   end;
 
 begin
+
   {ok... the super slow way for the moment...}
   {breseham is probably the way to go here}
   {although we'll be dense, so maybe it doesn't matter}
   result.col := RGBA.Clear;
   result.didHit := false;
   result.d := 0;
-  for i := 0 to 1000 do begin
+  for i := 0 to 100 do begin
     rx := floor(pos.x);
     ry := floor(pos.y);
     rz := floor(pos.z);
@@ -209,6 +218,7 @@ begin
       for i := 0 to 1 do for j := 0 to 1 do begin
         rayDir := getRayDir(renderState.pixelX+0.25+0.5*i,renderState.pixelY+0.25+0.5*j);
         hit := traceRay(rayPos, rayDir);
+        inc(traceCount);
         col32 += hit.col * 0.25;
       end;
       dc.putPixel(Point(renderState.pixelX, 18+renderState.pixelY), col32);
@@ -216,10 +226,14 @@ begin
     end else begin
       rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
+        inc(traceCount);
       dc.fillRect(Rect(renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
       renderState.nextPixel();
     end;
   end;
+
+  traceTime += (getSEc - startTime);
+
 end;
 
 begin
