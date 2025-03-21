@@ -17,18 +17,47 @@ uses
 
 type
 
+  tRenderQuality = (rqQuarter, rqHalf, rqFull, rqDone);
+
+  tRenderState = record
+    cameraPos: V3D;
+    cameraAngle: single;
+    pixelX, pixelY: integer;
+    width,height: integer;
+    quality: tRenderQuality;
+    function nextPixel(): boolean;
+  end;
+
   tVoxelScene = class
   protected
+    renderState: tRenderState;
     function  traceRay(pos: V3D; dir: V3D): tRayHit;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
     cameraAngle: single; {radians, 0=north}
-    procedure  render(const dc: tDrawContext);
+    procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
     constructor Create();
   end;
 
 implementation
+
+{returns if finished}
+function tRenderState.nextPixel(): boolean;
+begin
+  result := false;
+  if quality = rqDone then exit(true);
+  inc(pixelX);
+  if (pixelX >= width) then begin
+    pixelX := 0;
+    inc(pixelY);
+  end;
+  if (pixelY >= height) then begin
+    pixelY := 0;
+    inc(quality);
+    result := (quality = rqDone);
+  end;
+end;
 
 constructor tVoxelScene.Create();
 begin
@@ -106,34 +135,77 @@ begin
   result.col := RGB(255,0,255);
 end;
 
-procedure tVoxelScene.render(const dc: tDrawContext);
+{render scene. With progressive render we render approximately renderTime seconds.
+ first render (preview) takes as long as it takes though.
+}
+procedure tVoxelScene.render(const aDC: tDrawContext; renderTime: single=0.05);
 var
   dx,dy: integer;
   rayPos, rayDir: V3D;
   d: single;
   mid: tPoint;
-  vx,vy: integer;
+  viewWidth,viewHeight: integer;
+  px,py: integer;
   hit: tRayHit;
+  startTime: single;
+  dc: tDrawContext;
+  pixelSize: integer;
+
+  function getRayDir(px, py: single): V3D;
+  begin
+    result := V3((px-(viewWidth/2)) / (viewWidth*1.2), -0.5, (py-(viewHeight/2)) / (viewWidth*1.2));
+    result := result.rotated(0, 0, renderState.cameraAngle);
+    result := result.normed();
+  end;
+
 begin
-  dc.fillRect(dc.clip, RGB(12,12,12));
+
+  dc := aDC.asBlendMode(bmBlit);
+
+  viewWidth := dc.page.width;
+  viewHeight := round(dc.page.width * 0.75);
+
+  {check render state}
+  if (renderState.cameraPos <> cameraPos) or (renderState.cameraAngle <> cameraAngle) then begin
+    {reset our render}
+    renderState.cameraPos := cameraPos;
+    renderState.cameraAngle := cameraAngle;
+    renderState.pixelX := 0;
+    renderState.pixelY := 0;
+    renderState.width := viewWidth;
+    renderState.height := viewHeight;
+    renderState.quality := rqQuarter;
+    dc.fillRect(dc.clip, RGB(12,12,12));
+  end;
+
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;
 
-  vx := 50;
-  vy := 38;
-
   rayPos :=
-    cameraPos
+    renderState.cameraPos
     + V3(0.5, 0.5, 0.5)
-    + V3(sin(cameraAngle+180*DEG2RAD)*0.45, -cos(cameraAngle+180*DEG2RAD)*0.45, 0);
+    + V3(sin(renderState.cameraAngle+180*DEG2RAD)*0.45, -cos(renderState.cameraAngle+180*DEG2RAD)*0.45, 0);
 
-  for dy := -vy to vy do begin
-    for dx := -vx to vx do begin
-      rayDir := V3(dx / 120, -0.5, dy / 120).normed();
-      rayDir := rayDir.rotated(0, 0, cameraAngle);
-      hit := traceRay(rayPos, rayDir);
-      dc.putPixel(Point(dx+mid.x, dy+mid.y), hit.col);
+  startTime := getSec;
+
+  while getSec < (startTime + renderTime) do begin
+
+    pixelSize := 1;
+    case renderState.quality of
+      rqQuarter: pixelSize := 4;
+      rqHalf: pixelSize := 2;
     end;
+
+    if (renderState.pixelX and (pixelSize-1) <> 0) or
+       (renderState.pixelY and (pixelSize-1) <> 0) then begin
+       renderState.nextPixel();
+       continue;
+    end;
+
+    rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
+    hit := traceRay(rayPos, rayDir);
+    dc.fillRect(Rect(renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
+    renderState.nextPixel();
   end;
 end;
 

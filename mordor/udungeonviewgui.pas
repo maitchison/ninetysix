@@ -48,7 +48,7 @@ procedure tDungeonViewGui.doDraw(const dc: tDrawContext);
 var
   pos, angle: V3D;
 begin
-  inherited doDraw(dc);
+  //inherited doDraw(dc);
 
   {todo: put in update?}
   buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 3);
@@ -130,7 +130,8 @@ var
   tile: tTile;
   walls: array[1..4] of tWall;
 begin
-  inherited Create(Rect(20, 30, 96, 124), 'View');
+  //stub: larger
+  inherited Create(Rect(100, 0, 200, 200), 'View');
 
   tileCache := tStringMap<tVoxel>.Create();
 

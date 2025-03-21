@@ -53,6 +53,8 @@ type
     class operator Subtract(a, b: V3D): V3D; inline;
     class operator Multiply(a: V3D; b:single): V3D; inline;
     class operator Multiply(a: V3D; b:V3D): V3D; inline;
+    class operator equal(a,b: V3D): boolean; inline;
+
     end;
 
   {Int16 vector, useful for MMX}
@@ -298,6 +300,11 @@ begin
     result.x := a.x * b.x;
     result.y := a.y * b.y;
     result.z := a.z * b.z;
+end;
+
+class operator V3D.equal(a,b: V3D): boolean; inline;
+begin
+  result := (a.x=b.x) and (a.y=b.y) and (a.z=b.z);
 end;
 
 function V3D.toPoint: tPoint; inline;
