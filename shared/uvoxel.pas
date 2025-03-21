@@ -648,7 +648,7 @@ function tVoxel.trace_asm(aPos: V3D; aDir: V3D): tRayHit;
 var
   pos, dir, dirInv, prev, initialPos: V3D32;
   maxSteps: int32;
-  mask: word;
+  maskW, maskH, maskD: word;
   distanceTraveled: int32;
   col: RGBA;
   d,s: int32;
@@ -686,11 +686,11 @@ var
   function clipDistance(t: single): single;
   begin
     {todo: calculate invADir as float, then round to get invDir}
-    if dir.x > 0 then safeSet(t, (32*256-initialPos.x) / dir.x)
+    if dir.x > 0 then safeSet(t, (fWidth*256-initialPos.x) / dir.x)
     else if dir.x < 0 then safeSet(t, -initialPos.x / dir.x);
-    if dir.y > 0 then safeSet(t, (32*256-initialPos.y) / dir.y)
+    if dir.y > 0 then safeSet(t, (fHeight*256-initialPos.y) / dir.y)
     else if dir.y < 0 then safeSet(t, -initialPos.y / dir.y);
-    if dir.z > 0 then safeSet(t, (32*256-initialPos.z) / dir.z)
+    if dir.z > 0 then safeSet(t, (fWidth*256-initialPos.z) / dir.z)
     else if dir.z < 0 then safeSet(t, -initialPos.z / dir.z);
     result := t;
   end;
@@ -699,8 +699,9 @@ begin
   assert(abs(aDir.abs2-1.0) < 1e-6);
   maxSteps := ceil(fRadius)+1;
 
-  {todo: correct masks for each dim}
-  mask := $ffff-((32*256)-1);
+  maskW := $ffff-((fWidth*256)-1);
+  maskH := $ffff-((fHeight*256)-1);
+  maskD := $ffff-((fDepth*256)-1);
 
   pos := V3D32.Round(aPos * 256);
   initialPos := pos;
@@ -719,7 +720,7 @@ begin
   for i := 0 to maxSteps-1 do begin
 
     {check out of bounds}
-    if ((pos.x and mask) <> 0) or ((pos.y and mask) <> 0) or ((pos.z and mask) <> 0) then begin
+    if ((pos.x and maskW) <> 0) or ((pos.y and maskH) <> 0) or ((pos.z and maskD) <> 0) then begin
       {clipping... this can be a bit slow...}
       result.d := clipDistance(distanceTraveled / 256);
       exit;

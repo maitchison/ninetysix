@@ -18,6 +18,7 @@ uses
   uStringMap,
   uTileBuilder,
   uVoxelScene,
+  uKeyboard,
   uGraph32;
 
 type
@@ -47,17 +48,19 @@ implementation
 procedure tDungeonViewGui.doDraw(const dc: tDrawContext);
 var
   pos, angle: V3D;
+  cell: tVoxel;
 begin
   //inherited doDraw(dc);
 
   {todo: put in update?}
   buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 1);
   voxelScene.render(dc);
-  {
-  pos := V3(bounds.width/2,bounds.height/2,0);
-  angle := V3(0,0,getSec);
-  tiles[ftWater].draw(dc, pos, angle, 3.0);
-  }
+  if keyDown(key_z) then begin
+    pos := V3(bounds.width/2,bounds.height/2,0);
+    angle := V3(0,0,getSec);
+    cell := voxelScene.cells[trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y)];
+    cell.draw(dc, pos, angle, 5.0);
+  end;
 end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);
@@ -68,7 +71,7 @@ end;
 function tDungeonViewGui.buildTile(tile: tTile; walls: tWalls): tVoxel;
 begin
   tileBuilder.composeVoxelCell(tile, walls);
-  result := tVoxel.Create(tileBuilder.page, 32);
+  result := tVoxel.Create(tileBuilder.page, tileBuilder.tileSize);
   result.generateSDF(sdfFull);
 end;
 
@@ -100,10 +103,11 @@ begin
   for i := 0 to 3 do begin
     for j := 0 to 3 do rotatedWalls[tDirection(j)] := walls[tDirection((i+j) mod 4)];
     rotatedKey := getTileKey(tile, rotatedWalls);
-    rotatedFilename := joinPath('tiles', rotatedKey+'_1024.vox');
+    rotatedFilename := joinPath('tiles', rotatedKey+'_256.vox');
     if filesystem.exists(rotatedFilename) then begin
-      result := tVoxel.Create(32,32,32);
-      result.loadVoxFromFile(removeExtension(rotatedFileName), 32);
+      {todo: size from file}
+      result := tVoxel.Create(tileBuilder.tileSize, tileBuilder.tileSize, tileBuilder.tileSize);
+      result.loadVoxFromFile(removeExtension(rotatedFileName), tileBuilder.tileSize);
       for j := 0 to i-1 do result.rotate();
       break;
     end;
@@ -111,9 +115,9 @@ begin
 
   if not assigned(result) then begin
     key := getTileKey(tile, walls);
-    filename := joinPath('tiles', key+'_1024.vox');
+    filename := joinPath('tiles', key+'_256.vox');
     result := buildTile(tile, walls);
-    result.lightingSamples := 1024;
+    result.lightingSamples := 256;
     result.generateLighting(lmGI);
     saveLC96(fileName, result.vox);
   end;
@@ -153,8 +157,8 @@ begin
   tileCache := tStringMap<tVoxel>.Create();
 
   map := aMap;
-  tileBuilder := tTileBuilder.Create();
-  voxelScene := tVoxelScene.Create();
+  tileBuilder := tTileBuilder.Create(16);
+  voxelScene := tVoxelScene.Create(tileBuilder.tileSize);
 
   backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
 

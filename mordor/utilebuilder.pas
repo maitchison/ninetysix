@@ -19,41 +19,35 @@ type
   tTileBuilder = class
   protected
     layer: integer;
-    noisePage: tPage;
     dc: tDrawContext;
     procedure noise(power: single=0.5;border: integer=0);
     procedure decimate(p: single);
     procedure speckle(col: RGBA; p: single=0.1; border: integer=0);
     procedure fill(col: RGBA; border: integer=0);
-    procedure pillar(x,y: integer;size: integer=3; height: integer=31);
-    procedure wall(d: tDirection; height: integer=30);
+    procedure pillar(x,y: integer;size: integer; height: integer);
+    procedure wall(d: tDirection; height: integer);
   public
+    tileSize: integer;
     page: tPage;
     procedure composeVoxelCell(tile: tTile; walls: array of tWall);
-    constructor Create();
+    constructor Create(aTileSize: integer=16);
     destructor destroy; override;
   end;
 
 implementation
 
-constructor tTileBuilder.Create();
+constructor tTileBuilder.Create(aTileSize: integer=16);
 var
   x,y: integer;
   c: integer;
 begin
   inherited Create();
-  page := tPage.Create(32,32*32);
-  noisePage := tPage.Create(32,32);
-  for y := 0 to 31 do
-    for x := 0 to 31 do begin
-      c := rnd div 2 + 64;
-      noisePage.setPixel(x,y, RGB(c,c,c));
-    end;
+  tileSize := aTileSize;
+  page := tPage.Create(tileSize,tileSize*tileSize);
 end;
 
 destructor tTileBuilder.destroy;
 begin
-  noisePage.free;
   page.free;
   inherited destroy();
 end;
@@ -64,12 +58,12 @@ var
   c: RGBA;
   v: single;
 begin
-  for x := border to 31-border do begin
-    for y := border to 31-border do begin
-      c := page.getPixel(x,y+layer*32);
+  for x := border to (tileSize-1)-border do begin
+    for y := border to (tileSize-1)-border do begin
+      c := page.getPixel(x,y+layer*tileSize);
       v := 1-((rnd/255)*power);
       c.init(round(c.r*v), round(c.g*v), round(c.b*v), c.a);
-      page.setPixel(x,y+layer*32,c);
+      page.setPixel(x,y+layer*tileSize,c);
     end;
   end;
 end;
@@ -79,10 +73,10 @@ var
   x,y: integer;
   c: RGBA;
 begin
-  for x := 0 to 31 do begin
-    for y := 0 to 31 do begin
+  for x := 0 to tileSize-1 do begin
+    for y := 0 to tileSize-1 do begin
       if (random() > p) then continue;
-      page.setPixel(x,y+layer*32,RGBA.Clear);
+      page.setPixel(x,y+layer*tileSize,RGBA.Clear);
     end;
   end;
 end;
@@ -92,20 +86,20 @@ var
   x,y: integer;
   c: RGBA;
 begin
-  for x := border to 31-border do begin
-    for y := border to 31-border do begin
+  for x := border to (tileSize-1)-border do begin
+    for y := border to (tileSize-1)-border do begin
       if (random() > p) then continue;
-      page.setPixel(x,y+layer*32,col);
+      page.setPixel(x,y+layer*tileSize,col);
     end;
   end;
 end;
 
 procedure tTileBuilder.fill(col: RGBA; border: integer=0);
 begin
-  dc.fillRect(Rect(border,layer*32,32-(border*2),32-(border*2)), col);
+  dc.fillRect(Rect(border,layer*tileSize,tileSize-(border*2),tileSize-(border*2)), col);
 end;
 
-procedure tTileBuilder.pillar(x,y: integer;size: integer=3; height: integer=31);
+procedure tTileBuilder.pillar(x,y: integer;size: integer; height: integer);
 var
   i,j,k: integer;
   c: integer;
@@ -114,32 +108,32 @@ begin
     for i := 0 to size-1 do
       for j := 0 to size-1 do begin
         c := (rnd-128) div 4-20;
-        page.setPixel(i+x,(j+y)+k*32,RGB($6f+c, $5c+c, $42+c));
+        page.setPixel(i+x,(j+y)+k*tileSize,RGB($6f+c, $5c+c, $42+c));
       end;
 end;
 
-procedure tTileBuilder.wall(d: tDirection; height: integer=30);
+procedure tTileBuilder.wall(d: tDirection; height: integer);
 var
   i,j: integer;
   x,y,z: integer;
   c: integer;
 begin
-  for i := -15 to 15 do begin
+  for i := -(tileSize div 2) to (tileSize div 2) do begin
     for j := 0 to height-1 do begin
       x := round(15.5 + DX[d]*15.5) + DY[d]*i;
       y := round(15.5 + DY[d]*15.5) + DX[d]*i;
-      z := 31-j;
+      z := tileSize-1-j;
       c := (rnd-128) div 8;
       if rnd >= 200 then begin
         {brick outlines}
         if j and $3 = 0 then
-          c -= 32
+          c -= tileSize
         else begin
           if (i+15) and $7 = 3 then c -= 16;
           if (i+15) and $7 = 4 then c += 16;
         end;
       end;
-      page.setPixel(x,y+z*32,RGB($6f+c, $5c+c, $42+c));
+      page.setPixel(x,y+z*tileSize,RGB($6f+c, $5c+c, $42+c));
     end;
   end;
 end;
@@ -154,8 +148,8 @@ var
   c: integer;
 begin
   dc := page.getDC(bmBlit);
-  assertEqual(page.width, 32);
-  assertEqual(page.height, 32*32);
+  assertEqual(page.width, tileSize);
+  assertEqual(page.height, tileSize*tileSize);
   page.clear(RGBA.Clear());
   {ceiling (temp)}
   {
@@ -166,21 +160,21 @@ begin
   case tile.floor of
     ftStone: begin
       //bedrock
-      layer := 31;
+      layer := (tileSize-1);
       fill(MDR_DARKGRAY, 1);
       noise(0.25);
       //stone
-      layer := 30;
+      layer := (tileSize-2);
       fill(MDR_LIGHTGRAY, 1);
       noise(0.5);
     end;
     ftDirt: begin
       //bedrock
-      layer := 31;
+      layer := (tileSize-1);
       fill(MDR_DARKGRAY);
       noise(0.25);
       //dirt
-      layer := 30;
+      layer := (tileSize-2);
       fill(RGB($FF442C14));
       noise(0.5);
       decimate(0.1);
@@ -192,11 +186,11 @@ begin
     end;
     ftGrass: begin
       //bedrock
-      layer := 31;
+      layer := (tileSize-1);
       fill(MDR_DARKGRAY);
       noise(0.25);
       //grass
-      layer := 30;
+      layer := (tileSize-2);
       fill(MDR_GREEN*MDR_LIGHTGRAY);
       noise(0.6);
       //dry patch
@@ -206,10 +200,10 @@ begin
       //speckle(MDR_LIGHTGRAY, 0.5);
     end;
     ftWater: begin
-      layer := 31;
+      layer := (tileSize-1);
       fill(MDR_BLUE);
       noise(0.3);
-      layer := 30;
+      layer := (tileSize-2);
       fill(MDR_BLUE);
       noise(0.1);
     end;
@@ -218,24 +212,24 @@ begin
   {walls}
   for d in tDirection do begin
     if not walls[ord(d)].isSolid then continue;
-    wall(d);
+    wall(d, tileSize-2);
   end;
 
   {pillars}
   if walls[ord(dNorth)].isSolid or walls[ord(dWest)].isSolid then
-    pillar(0,0);
+    pillar(0,0,2, tileSize);
   if walls[ord(dNorth)].isSolid or walls[ord(dEast)].isSolid then
-    pillar(32-3,0);
+    pillar(tileSize-3,0,2, tileSize);
   if walls[ord(dSouth)].isSolid or walls[ord(dWest)].isSolid then
-    pillar(0,32-3);
+    pillar(0,tileSize-3,2, tileSize);
   if walls[ord(dSouth)].isSolid or walls[ord(dEast)].isSolid then
-    pillar(32-3,32-3);
+    pillar(tileSize-3,tileSize-3,2,tileSize);
 
   {trim}
   {todo: get trim from neighbours... ah... we do want map then...
    either that or build it into wall? yes.. wall is probably better}
   if (tile.floor in [ftStone]) then begin
-    dc.drawRect(Rect(0,0+29*32,32,32), MDR_LIGHTGRAY);
+    dc.drawRect(Rect(0,0+(tileSize-3)*tileSize,tileSize,tileSize), MDR_LIGHTGRAY);
   end;
 
 end;

@@ -33,14 +33,15 @@ type
     renderState: tRenderState;
     traceCount: int32;
     traceTime: single;
+    tileSize: integer;
     function  traceRay(pos: V3D; dir: V3D): tRayHit;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
     cameraAngle: single; {radians, 0=north}
-    function tracesPerSecond: single;
+    function  tracesPerSecond: single;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
-    constructor Create();
+    constructor Create(aTileSize: integer);
   end;
 
 implementation
@@ -62,10 +63,12 @@ begin
   end;
 end;
 
-constructor tVoxelScene.Create();
+constructor tVoxelScene.Create(aTileSize: integer);
 begin
+  inherited Create();
   cameraPos := V3(5, 21,0);
   cameraAngle := 0;
+  tileSize := aTileSize;
   fillchar(cells, sizeof(cells), 0);
 end;
 
@@ -112,7 +115,7 @@ begin
     }
 
     {out of bounds}
-    if (dword(curr.x) >= 32) or (dword(curr.y) >= 32) then begin
+    if (dword(curr.x) >= tileSize) or (dword(curr.y) >= tileSize) then begin
       result.col := RGB(255,0,255);
       exit;
     end;
@@ -136,9 +139,9 @@ begin
       result.d += stepSize;
     end else begin
       {trace through the cell}
-      hit := vox.trace(V3(frac(pos.x)*32, frac(pos.y)*32, frac(pos.z)*32), dir);
-      pos += dir * (hit.d/32);
-      result.d += (hit.d/32);
+      hit := vox.trace(V3(frac(pos.x)*tileSize, frac(pos.y)*tileSize, frac(pos.z)*tileSize), dir);
+      pos += dir * (hit.d/tileSize);
+      result.d += (hit.d/tileSize);
       if hit.didHit then begin
         result.col := hit.col;
         result.didHit := true;
