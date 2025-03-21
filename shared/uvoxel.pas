@@ -75,6 +75,8 @@ type
     procedure transferSDF(sdf: tPage);
     procedure applyLighting(x,y,z: integer; lightingMode: tLightingMode);
     function  calculateGI(x,y,z: integer): single;
+  protected
+    function  trace_ref(pos: V3D; dir: V3D): tRayHit;
   public
     vox: tPage;     // RGBD - baked (todo: 2 bits of D are for alpha)
     function  getDistance_L1(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): integer;
@@ -602,17 +604,31 @@ end;
 {
 Trace ray through object.
 a bit slow for the moment.
+coords are all 0..31
 (0.5,0.5 is center of voxel)
 dir should be normalized
 }
 function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
+begin
+  result := trace_ref(pos, dir);
+end;
+
+function tVoxel.trace_ref(pos: V3D; dir: V3D): tRayHit;
 var
   i: integer;
   maxSteps: integer;
+  d: integer;
   c: RGBA;
   cur: V3D32;
   stepSize: single;
+
+  function autoStep(p,d: single): single; inline;
+  begin
+    if d > 0 then result := 1-frac(p) else if d < 0 then result := frac(p) else result := 1.0;
+  end;
+
 begin
+  {todo: make this asm...}
   assert(abs(dir.abs2-1.0) < 1e-6);
   maxSteps := ceil(fRadius)+1;
   result.pos := pos;
@@ -632,7 +648,21 @@ begin
       exit;
     end;
 
-    stepSize := ((255-c.a)-3) / 4;
+    {ok, so here's how this works
+    d is the safe 'distance', we define Dx to mean "L1 distance of x" where
+      0-> this cell is solid
+      1-> a D1 neighbour may be solid
+      2-> no D1 neighbours are solid but D2 might be
+      ...
+    therefore for d=1 we can step to next cell, and for d=2 we can step twice
+    }
+
+    d := (255-c.a) div 4;
+
+    {figure out distance to travel to get to next cell}
+    stepSize := minf(autoStep(result.pos.x, dir.x), autoStep(result.pos.y, dir.y), autoStep(result.pos.z, dir.z));
+    stepSize += 0.01; // move slightly into next cell
+    stepSize += d-1; // get bonus move due to empty area
 
     result.pos += dir * stepSize;
     result.d += stepSize;

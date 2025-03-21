@@ -61,7 +61,7 @@ type
 
 function min(a,b: int32): int32; overload;
 function minf(a,b: single): single; overload;
-function minf(a,b,c: single): single; overload;
+function minf(a,b,c: single): single; inline; overload;
 function max(a,b: int32): int32; inline; overload;
 function max(a,b: dword): dword; inline; overload;
 function maxf(a,b: single): single; inline; overload;
@@ -221,7 +221,7 @@ begin
   exit(b);
 end;
 
-function minf(a,b,c: single): single; overload;
+function minf(a,b,c: single): single; inline; overload;
 begin
   if (a < b) and (a < c) then exit(a);
   if (b < a) and (b < c) then exit(b);
