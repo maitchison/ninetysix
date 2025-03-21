@@ -120,10 +120,29 @@ function V3(x,y,z: single): V3D;
 
 function sampleShell(): V3D;
 function sampleCosine(norm,tangent,bitangent: V3D): V3D;
+function clipRayToCuboid(p, dir: V3D; t: single; size: V3D): single;
 
 implementation
 
 {-----------------------------------------}
+
+{p is assumed to be inside cuboid}
+function clipRayToCuboid(p, dir: V3D; t: single; size: V3D): single;
+begin;
+  if dir.x > 0 then
+    t := minf(t, (size.x - p.x) / dir.x)
+  else if dir.x < 0 then
+    t := minf(t, (-size.x - p.x) / dir.x);
+  if dir.y > 0 then
+    t := minf(t, (size.y - p.y) / dir.y)
+  else if dir.y < 0 then
+    t := minf(t, (-size.y - p.y) / dir.y);
+  if dir.z > 0 then
+    t := minf(t, (size.z - p.z) / dir.z)
+  else if dir.z < 0 then
+    t := minf(t, (-size.z - p.z) / dir.z);
+  result := t;
+end;
 
 {returns a vector sampled from a shell of unit radius}
 function sampleShell(): V3D;

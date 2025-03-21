@@ -79,14 +79,14 @@ end;
 function tVoxelScene.traceRay(pos: V3D; dir: V3D): tRayHit;
 var
   i: integer;
-  rx,ry,rz: integer;
   hit: tRayHit;
   vox: tVoxel;
   stepSize: single;
+  curr, prev: V3D32;
 
   function autoStep(p,d: single): single;
   begin
-    if d > 0 then result := 1-frac(p) else if d < 0 then result := frac(p) else result := 1.0;
+    if d > 0 then result := (1-frac(p))/d else if d < 0 then result := -frac(p)/d else result := 1.0;
   end;
 
 begin
@@ -97,30 +97,38 @@ begin
   result.col := RGBA.Clear;
   result.didHit := false;
   result.d := 0;
+  prev.x := -1; prev.y := -1; prev.z := -1;
   for i := 0 to 100 do begin
-    rx := floor(pos.x);
-    ry := floor(pos.y);
-    rz := floor(pos.z);
+    curr.x := floor(pos.x);
+    curr.y := floor(pos.y);
+    curr.z := floor(pos.z);
+
+    if (curr = prev) then begin
+      result.col := RGB(0,255,0);
+      exit;
+    end;
+
     {out of bounds}
-    if (dword(rx) >= 32) or (dword(ry) >= 32) then begin
+    if (dword(curr.x) >= 32) or (dword(curr.y) >= 32) then begin
       result.col := RGB(255,0,255);
       exit;
     end;
-    if (rz < 0) then begin
+    if (curr.z < 0) then begin
       result.col := RGB(128,0,0); // floor
       result.didHit := true;
       exit;
     end;
-    if (rz >= 1) then begin
+    if (curr.z >= 1) then begin
       result.col := RGB(0,0,128); // sky
       result.didHit := true;
       exit;
     end;
 
-    vox := cells[rx,ry];
+    vox := cells[curr.x,curr.y];
     if not assigned(vox) then begin
       {work out a good step size}
-      stepSize := minf(autoStep(pos.x, dir.x), autoStep(pos.y, dir.y)) + 0.01;
+      stepSize := minf(autoStep(pos.x, dir.x), autoStep(pos.y, dir.y), autoStep(pos.z, dir.z));
+      stepSize += (1/128);
       pos += dir * stepSize;
       result.d += stepSize;
     end else begin
@@ -139,6 +147,7 @@ begin
     end;
     if result.d > 4 then
       exit; // max distance
+    prev := curr;
   end;
   {out of samples!}
   result.col := RGB(255,0,255);

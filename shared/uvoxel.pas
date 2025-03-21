@@ -670,10 +670,7 @@ begin
     {check out of bounds}
     if ((pos.x and mask) <> 0) or ((pos.y and mask) <> 0) or ((pos.z and mask) <> 0) then begin
       {clipping}
-      {p := V3D(pos) / 256;
-      p := clipRay(pos, p, 32);
-      result.d := (pos - p).abs;}
-      result.d := distanceTraveled / 256;
+      result.d := clipRayToCuboid(aPos-V3(16,16,16), aDir, distanceTraveled/256, V3(16,16,16));
       exit;
     end;
 
