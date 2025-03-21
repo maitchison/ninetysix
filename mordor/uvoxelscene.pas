@@ -86,6 +86,7 @@ var
   vox: tVoxel;
   stepSize: single;
   curr, prev: V3D32;
+  t: single;
 
   function autoStep(p,d: single): single;
   begin
@@ -100,6 +101,17 @@ begin
   result.col := RGBA.Clear;
   result.didHit := false;
   result.d := 0;
+
+  {if ray starts too high then project it down}
+  if (pos.z < 0) then begin
+    if dir.z > 0 then begin
+      t := -pos.z / dir.z;
+      t += 0.01;
+      pos += dir * t;
+      result.d := t;
+    end;
+  end;
+
   prev.x := -1; prev.y := -1; prev.z := -1;
   for i := 0 to 100 do begin
     curr.x := floor(pos.x);
@@ -180,7 +192,9 @@ var
   function getRayDir(px, py: single): V3D;
   begin
     result := V3((px-(viewWidth/2)) / (viewWidth*1.2), -0.5, (py-(viewHeight/2)) / (viewWidth*1.2));
+    //result := result.rotated(-60*DEG2RAD, 0 , 0); {flying camera}
     result := result.rotated(0, 0, renderState.cameraAngle);
+
     result := result.normed();
   end;
 
@@ -207,10 +221,13 @@ begin
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;
 
+
   rayPos :=
     renderState.cameraPos
     + V3(0.5, 0.5, 0.5)
-    + V3(sin(renderState.cameraAngle+180*DEG2RAD)*0.45, -cos(renderState.cameraAngle+180*DEG2RAD)*0.45, 0);
+    + V3(sin(renderState.cameraAngle+180*DEG2RAD)*0.35, -cos(renderState.cameraAngle+180*DEG2RAD)*0.35, 0);
+  {flying camera..}
+  // rayPos += V3(0,0,-1.0);
 
   startTime := getSec;
 
