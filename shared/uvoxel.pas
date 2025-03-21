@@ -700,17 +700,36 @@ var
   d: integer;
   c: RGBA;
   cur: V3D32;
+  dirInv: V3D;
   stepSize: single;
+  s: integer;
 
-  function autoStep(p,d: single): single; inline;
+  {s here is the number of 'save' L1 moves}
+  function autoStep(p,dInv: single; s: integer): single; inline;
   begin
-    if d > 0 then result := 1-frac(p) else if d < 0 then result := frac(p) else result := 1.0;
+    if dInv > 0 then result := ((1+s)-frac(p))*dInv else if dInv < 0 then result := ((-s)-frac(p))*dInv else result := 99.0;
+  end;
+
+  function isCloseToEdge(x: single): boolean;
+  begin
+    result := (frac(x) < 0.1) or (frac(x) > 0.9);
+  end;
+
+  function safeInv(x: single): single;
+  begin
+    if x = 0 then exit(0);
+    result := 1/x;
   end;
 
 begin
   {todo: make this asm...}
   assert(abs(dir.abs2-1.0) < 1e-6);
   maxSteps := ceil(fRadius)+1;
+
+  dirInv.x := safeInv(dir.x);
+  dirInv.y := safeInv(dir.y);
+  dirInv.z := safeInv(dir.z);
+
   result.pos := pos;
   result.d := 0;
   result.col := RGBA.Clear;
@@ -738,14 +757,25 @@ begin
     }
 
     d := (255-c.a) div 4;
+    s := d-1; {number of safe moves}
 
     {figure out distance to travel to get to next cell}
-    stepSize := minf(autoStep(result.pos.x, dir.x), autoStep(result.pos.y, dir.y), autoStep(result.pos.z, dir.z));
-    stepSize += 0.01; // move slightly into next cell
-    stepSize += d-1; // get bonus move due to empty area
+    stepSize := minf(
+      autoStep(result.pos.x, dirInv.x, s),
+      autoStep(result.pos.y, dirInv.y, s),
+      autoStep(result.pos.z, dirInv.z, s)
+    );
+    stepSize += 0.001; // move slightly into next cell
 
     result.pos += dir * stepSize;
     result.d += stepSize;
+
+    {make sure it worked...}
+    {
+    if not (isCloseToEdge(pos.x) or isCloseToEdge(pos.y) or isCloseToEdge(pos.z)) then begin
+      note('%s -> %s step:%f.3', [(result.pos-dir*stepSize).toString, result.pos.toString, stepSize]);
+    end;
+    }
   end;
 
   result.didHit := false;
