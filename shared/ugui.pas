@@ -165,6 +165,7 @@ type
   protected
     elements: array of tGuiComponent;
     procedure fireMessage(aMsg: string; args: array of const); override;
+    procedure onKeyPress(code: word); override;
   public
     constructor Create();
     destructor destroy; override;
@@ -333,6 +334,13 @@ begin
   for gc in elements do if gc.isEnabled then gc.fireMessage(aMsg, args);
 end;
 
+procedure tGuiContainer.onKeyPress(code: word);
+var
+  gc: tGuiComponent;
+begin
+  inherited onKeyPress(code);
+  for gc in elements do if gc.isEnabled then gc.onKeyPress(code);
+end;
 
 {--------------------------------------------------------}
 
@@ -347,11 +355,7 @@ begin
   if handlesInput then while true do begin
     code := dosGetKey.code;
     if code = 0 then break;
-    self.fireMessage(ON_KEYPRESS, [code]);
-    for gc in elements do begin
-      gc.fireMessage(ON_KEYPRESS, [code]);
-      gc.onKeyPress(code);
-    end;
+    self.onKeyPress(code);
   end;
 
   inherited update(elapsed);

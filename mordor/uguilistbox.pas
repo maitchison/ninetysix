@@ -72,6 +72,7 @@ end;
 procedure tGUIListBox.scroll(offset: integer);
 begin
   scrollOffset += offset;
+  if scrollOffset > length(fMessages)-maxRows then scrollOffset := length(fMessages)-maxRows;
   if scrollOffset < 0 then scrollOffset := 0;
   isDirty := true;
 end;
@@ -89,8 +90,9 @@ begin
 
   {display messages}
   for row := 0 to maxRows-1 do begin
-    messageIdx := length(fMessages)-1-row+scrollOffset;
-    if messageIdx < 0 then break;
+    messageIdx := length(fMessages)-1-row-scrollOffset;
+    if messageIdx < 0 then continue;
+    if messageIdx >= length(fMessages) then continue;
     font.textOut(dc, 1+pad, pad+row*rowHeight, fMessages[messageIdx], RGBA.White);
 
   end;

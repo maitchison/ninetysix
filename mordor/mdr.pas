@@ -261,6 +261,7 @@ const
 begin
 
   uGui.GUI_DRAWMODE := gdmDirty;
+  gui.handlesInput := true;
 
   note('Importing map');
   importer := tMDRImporter.Create();
