@@ -26,7 +26,8 @@ uses
 const
   ON_MOUSE_CLICK = 'mouseclick';
   ON_MOUSE_DOWN = 'mousedown';
-  ON_KEYPRESS = 'keypress';
+  ON_KEYPRESS = 'onkeypress';
+  ON_RESIZE = 'onresize';
 
 type
 
@@ -37,6 +38,8 @@ type
     centered: boolean;
     procedure setDefault();
   end;
+
+  tGuiAlign = (gaNone, gaFull);
 
   tGuiStyle = class
     padding: tBorder;       // how far to inset objects
@@ -77,6 +80,7 @@ type
     prevState: tGuiState;
   protected
     {position relative to parent}
+    fAlign: tGuiAlign;
     fPos: tPoint;
     fWidth, fHeight: integer;
     parent: tGuiContainer;
@@ -113,11 +117,13 @@ type
     procedure fireMessage(aMsg: string; args: array of const); virtual; overload;
     procedure fireMessage(aMsg: string); overload;
     procedure defaultBackgroundDraw(const dc: tDrawContext);
+    procedure updateAlignment; virtual;
     function  bounds: tRect;
     function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
     procedure setBounds(aRect: tRect);
     procedure setIsDirty(value: boolean);
+    procedure setAlign(aAlign: tGuiAlign);
     {style}
     procedure setGuiStyle(aStyle: tGuiStyle);
     function  getBackgroundSprite(): tSprite;
@@ -137,12 +143,13 @@ type
     function  screenBounds(): tRect;
     procedure addHook(aMsg: string; aProc: tHookProc);
     procedure invalidate(); virtual;
-    procedure setSize(aWidth, aHeight: integer);
+    procedure setSize(aWidth, aHeight: integer); virtual;
   public
     procedure onKeyPress(code: word); virtual;
   public
     property text: string read fText write setText;
     property pos: tPoint read fPos write fPos;
+    property align: tGuiAlign read fAlign write setAlign;
     {style helpers}
     property font: tFont read fontStyle.font write fontStyle.font;
     property textColor: RGBA read fontStyle.col write fontStyle.col;
@@ -166,6 +173,7 @@ type
     elements: array of tGuiComponent;
     procedure fireMessage(aMsg: string; args: array of const); override;
     procedure onKeyPress(code: word); override;
+    procedure setSize(aWidth, aHeight: integer); override;
   public
     constructor Create();
     destructor destroy; override;
@@ -293,6 +301,16 @@ begin
   inherited destroy;
 end;
 
+procedure tGuiContainer.setSize(aWidth, aHeight: integer);
+var
+  gc: tGuiComponent;
+begin
+  inherited setSize(aWidth, aHeight);
+  {update any aligned children}
+  for gc in elements do if gc.isEnabled then
+    gc.UpdateAlignment();
+end;
+
 procedure tGuiContainer.append(x: tGuiComponent);
 begin
   setLength(elements, length(elements)+1);
@@ -300,6 +318,7 @@ begin
   x.parent := self;
   if GUI_DOUBLEBUFFER and (x.doubleBufferMode <> dbmOff) then
     x.enableDoubleBuffered();
+  x.updateAlignment();
 end;
 
 procedure tGuiContainer.draw(const dc: tDrawContext);
@@ -331,6 +350,7 @@ var
   gc: tGuiComponent;
 begin
   inherited fireMessage(aMsg, args);
+  {todo: should all messages get passed down?}
   for gc in elements do if gc.isEnabled then gc.fireMessage(aMsg, args);
 end;
 
@@ -356,6 +376,7 @@ begin
     code := dosGetKey.code;
     if code = 0 then break;
     self.onKeyPress(code);
+    self.fireMessage(ON_KEYPRESS, [code]);
   end;
 
   inherited update(elapsed);
@@ -369,6 +390,12 @@ var
 begin
   if not fGuiStyle.sounds.contains(sfxName) then exit;
   mixer.play(fGuiStyle.sounds[sfxName]);
+end;
+
+procedure tGuiComponent.setAlign(aAlign: tGuiAlign);
+begin
+  fAlign := aAlign;
+  updateAlignment();
 end;
 
 procedure tGuiComponent.setIsDirty(value: boolean);
@@ -416,6 +443,7 @@ procedure tGuiComponent.fireMessage(aMsg: string; args: array of const);
 var
   i: integer;
 begin
+  {fire hooks}
   aMsg := aMsg.toLower();
   for i := 0 to length(fHookKey)-1 do begin
     if fHookKey[i] = aMsg then fHookProc[i](self, aMsg, args);
@@ -458,6 +486,7 @@ begin
   fPos := Point(0, 0);
   fWidth := 16;
   fHeight := 16;
+  fAlign := gaNone;
   text := '';
   fTint := RGBA.White;
   fScale := V2(1.0,1.0);
@@ -665,6 +694,16 @@ begin
   prevState := state;
 end;
 
+procedure tGuiComponent.updateAlignment();
+begin
+  case fAlign of
+    gaNone: ;
+    gaFull: if assigned(parent) then
+      {todo: why do we need to subtract 1 here?}
+      setBounds(Rect(0,0,parent.innerBounds.width-1,parent.innerBounds.height-1));
+  end;
+end;
+
 procedure tGuiComponent.onKeyPress(code: word);
 begin
   // nothing
@@ -686,6 +725,7 @@ begin
     {this just renables it with correct size}
     enableDoubleBuffered();
   isDirty := true;
+  fireMessage(ON_RESIZE, [aWidth, aHeight]);
 end;
 
 {-----------------------}

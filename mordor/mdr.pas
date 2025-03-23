@@ -297,6 +297,7 @@ begin
   panel.text := 'LOG';
   gui.append(panel);
   messageBox := tGuiListBox.Create();
+  messageBox.align := gaFull;
   panel.append(messagebox);
 
   panel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
