@@ -83,18 +83,13 @@ var
   row: integer;
   fontHeight: integer;
 begin
-  inherited doDraw(dc);
-
-  dc.fillRect(bounds, RGBA.Black);
-  dc.drawRect(bounds, RGB(rnd,rnd,rnd));
-
+  dc.asBlendMode(bmBlit).fillRect(bounds, RGBA.Clear);
   {display messages}
   for row := 0 to maxRows-1 do begin
     messageIdx := length(fMessages)-1-row-scrollOffset;
     if messageIdx < 0 then continue;
     if messageIdx >= length(fMessages) then continue;
     font.textOut(dc, 1+pad, pad+row*rowHeight, fMessages[messageIdx], RGBA.White);
-
   end;
 end;
 

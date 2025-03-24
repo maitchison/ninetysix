@@ -254,6 +254,7 @@ var
   panel: tGuiWindow;
   importer: tMDRImporter;
   messageBox: tGUIListBox;
+  logWindow: tGuiWindow;
 const
   RHS_DIVIDE = 280;
   LOWER_DIVIDE = 160;
@@ -293,12 +294,14 @@ begin
   panel := tGuiWindow.Create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'PARTY';
   gui.append(panel);
-  panel := tGuiWindow.Create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
-  panel.text := 'LOG';
-  gui.append(panel);
+
+  logWindow := tGuiWindow.Create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
+  gui.append(logWindow);
   messageBox := tGuiListBox.Create();
+  messageBox.doubleBufferMode := dbmBlend;
   messageBox.align := gaFull;
-  panel.append(messagebox);
+  logWindow.hasTransparientChildren := true;
+  logWindow.append(messagebox);
 
   panel := tGuiWindow.create(Rect(0, UPPER_DIVIDE, 800-RHS_DIVIDE, 600-LOWER_DIVIDE-UPPER_DIVIDE));
   panel.text := 'MAP';

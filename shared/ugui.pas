@@ -62,9 +62,11 @@ type
   tGuiState = (gsNormal, gsDisabled, gsHighlighted, gsPressed, gsSelected);
 
   tDoubleBufferMode = (
-    // buffer is blended during composition (but only outed edge)
+    // buffer is blended during composition (but only outter edge)
+    dbmEdge,
+    // buffer is blended during composition (a bit slow)
     dbmBlend,
-    // buffer is blitted
+    // parent is fully redraw as needed (very slow)
     dbmBlit,
     // force double buffering off
     dbmOff
@@ -96,8 +98,9 @@ type
     {buffering}
     canvas: tPage;
     fIsDirty: boolean;
-    doubleBufferMode: tDoubleBufferMode;
-    doubleBufferEdge: integer; {only this many pixels are blended when using double buffering}
+    fDoubleBufferMode: tDoubleBufferMode;
+    fHasTransparientChildren: boolean;     // if true makes the component redraw if any children redraw
+    doubleBufferEdge: integer;             // only this many pixels are blended when using double buffering}
     {global drawing}
     fTint: RGBA; {only works with double buffering}
     fScale: V2D; {only works with double buffering (blit only)}
@@ -121,6 +124,7 @@ type
     function  bounds: tRect;
     function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
+    function  needsCompose: boolean; virtual;
     procedure setBounds(aRect: tRect);
     procedure setIsDirty(value: boolean);
     procedure setAlign(aAlign: tGuiAlign);
@@ -138,6 +142,7 @@ type
     constructor Create();
     procedure draw(const dc: tDrawContext); virtual;
     procedure update(elapsed: single); virtual;
+    function  getCanvas: tPage; {stub: remove}
     function  state: tGuiState;
     function  screenPos(): tPoint;
     function  screenBounds(): tRect;
@@ -165,7 +170,8 @@ type
     {}
     property guiStyle: tGuiStyle read fGuiStyle write setGuiStyle;
     property isDirty: boolean read fIsDirty write setIsDirty;
-
+    property doubleBufferMode: tDoubleBufferMode read fDoubleBufferMode write fDoubleBufferMode;
+    property hasTransparientChildren: boolean read fHasTransparientChildren write fHasTransparientChildren;
   end;
 
   tGuiContainer = class(tGuiComponent)
@@ -174,6 +180,8 @@ type
     procedure fireMessage(aMsg: string; args: array of const); override;
     procedure onKeyPress(code: word); override;
     procedure setSize(aWidth, aHeight: integer); override;
+    function  needsCompose: boolean; override;
+    function  isChildDirty: boolean;
   public
     constructor Create();
     destructor destroy; override;
@@ -301,6 +309,22 @@ begin
   inherited destroy;
 end;
 
+function tGuiContainer.isChildDirty: boolean;
+var
+  gc: tGuiComponent;
+begin
+  result := false;
+  for gc in elements do if gc.isEnabled and gc.isVisible then begin
+    if gc.isDirty then exit(true);
+    if gc is (tGuiContainer) and tGuiContainer(gc).isChildDirty then exit(true);
+  end;
+end;
+
+function tGuiContainer.needsCompose: boolean;
+begin
+  result := isDirty or (hasTransparientChildren and isChildDirty());
+end;
+
 procedure tGuiContainer.setSize(aWidth, aHeight: integer);
 var
   gc: tGuiComponent;
@@ -326,14 +350,17 @@ var
   gc: tGuiComponent;
   childDC: tDrawContext;
 begin
+
   {draw ourselves}
-  inherited draw(dc);
+  if (GUI_DRAWMODE <> gdmDirty) or (needsCompose) then
+    inherited draw(dc);
 
   childDC := dc;
   childDC.offset += innerBounds.pos + fPos;
   childDC.clip := self.innerBounds;
   childDC.clip.pos += screenPos;
 
+  {draw children}
   for gc in elements do if gc.fVisible then gc.draw(childDC);
 end;
 
@@ -493,7 +520,7 @@ begin
   fontStyle.setDefault();
   fGuiStyle := DEFAULT_GUI_SKIN.styles['default'];
   isDirty := true;
-  doubleBufferMode := dbmBlend;
+  doubleBufferMode := dbmEdge;
   doubleBufferEdge := 8;
   fBackgroundCol := RGBA.White;
   {image}
@@ -617,22 +644,27 @@ begin
       font.textOut(dc, drawX+1, drawY+1, text, RGB(0,0,0,fontStyle.col.a*3 div 4));
     font.textOut(dc, drawX, drawY, text, fontStyle.col);
   end;
-
 end;
 
+function tGuiComponent.needsCompose: boolean;
+begin
+  result := isDirty;
+end;
+
+{compose the component onto the screen}
 procedure tGuiComponent.draw(const dc: tDrawContext);
 var
   canvasDC: tDrawContext;
   drawDC: tDrawContext;
 begin
+
+  if (GUI_DRAWMODE = gdmDirty) and (not needsCompose) then exit;
+
   {todo: check clipping bounds}
   drawDC := dc;
 
-  {draw component directly to dc}
-  if (GUI_DRAWMODE = gdmDirty) and (not fIsDirty) then exit;
-
+  {check if we need to repaint the canvas}
   if isDoubleBuffered then begin
-    {draw component to canvas, then write this to dc}
     if isDirty then begin
       canvasDC := canvas.getDC();
       if GUI_HQ then canvasDC.textureFilter := tfLinear;
@@ -642,8 +674,10 @@ begin
     drawDC.tint := self.tint;
     drawDC.offset += fPos;
     case doubleBufferMode of
-      dbmBlend:
+      dbmEdge:
         drawDC.asBlendMode(bmBlend).inOutDraw(canvas, bounds.pos, doubleBufferEdge, bmBlit, bmBlend);
+      dbmBlend:
+        drawDC.asBlendMode(bmBlend).drawImage(canvas, bounds.pos);
       dbmBlit:
         if not fScale.isUnity then begin
           if GUI_HQ then drawDC.textureFilter := tfLinear;
@@ -651,14 +685,19 @@ begin
         end else
           drawDC.asBlendMode(bmBlit).drawImage(canvas, bounds.pos);
     end;
-    exit;
+  end else begin
+    {paint directly onto canvas}
+    if GUI_HQ then drawDC.textureFilter := tfLinear;
+    drawDC.tint := self.tint;
+    drawDC.offset += fPos;
+    doDraw(drawDC);
+    isDirty := false;
   end;
+end;
 
-  if GUI_HQ then drawDC.textureFilter := tfLinear;
-  drawDC.tint := self.tint;
-  drawDC.offset += fPos;
-  doDraw(drawDC);
-  fIsDirty := false;
+function tGuiComponent.getCanvas: tPage;
+begin
+  result := canvas;
 end;
 
 procedure tGuiComponent.update(elapsed: single);
