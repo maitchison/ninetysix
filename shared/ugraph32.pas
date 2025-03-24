@@ -59,6 +59,8 @@ type
     function  hasTint: boolean; inline;
     procedure markRegion(const rect: tRect); inline;
     function  isNull: boolean;
+    function  width: integer; inline;
+    function  height: integer; inline;
     {modifiers}
     function  asBlendMode(aBlendMode: tBlendMode): tDrawContext;
     function  asTint(aTint: RGBA): tDrawContext;
@@ -723,6 +725,16 @@ end;
 function tDrawContext.isNull: boolean;
 begin
   result := not assigned(page);
+end;
+
+function tDrawContext.width: integer;
+begin
+  result := clip.width;
+end;
+
+function tDrawContext.height: integer;
+begin
+  result := clip.height;
 end;
 
 procedure tDrawContext.markRegion(const rect: tRect); inline;

@@ -39,7 +39,7 @@ type
     procedure setDefault();
   end;
 
-  tGuiAlign = (gaNone, gaFull);
+  tGuiAlign = (gaNone, gaFull, gaCenter);
 
   tGuiStyle = class
     padding: tBorder;       // how far to inset objects
@@ -109,9 +109,11 @@ type
     fBackgroundCol: RGBA;
     {image}
     fImage: tPage;
+    fImageAlign: tGuiAlign;
     fImageCol: RGBA;
   public
     property isVisible: boolean read fVisible write fVisible;
+    function  innerBounds: tRect;
   protected
     procedure playSFX(sfxName: string);
     procedure doDraw(const dc: tDrawContext); virtual;
@@ -122,7 +124,6 @@ type
     procedure defaultBackgroundDraw(const dc: tDrawContext);
     procedure updateAlignment; virtual;
     function  bounds: tRect;
-    function  innerBounds: tRect;
     procedure sizeToContent(); virtual;
     function  needsCompose: boolean; virtual;
     procedure setBounds(aRect: tRect);
@@ -525,6 +526,7 @@ begin
   fBackgroundCol := RGBA.White;
   {image}
   fImage := nil;
+  fImageAlign := gaFull;
   fImageCol := RGBA.White;
 end;
 
@@ -636,8 +638,13 @@ begin
   end;
 
   {stretched image}
-  if assigned(fImage) then
-    dc.asTint(fImageCol).stretchImage(fImage, innerBounds);
+  if assigned(fImage) then case fImageAlign of
+    gaNone: dc.asTint(fImageCol).drawImage(fImage, innerBounds.topLeft);
+    gaFull: dc.asTint(fImageCol).stretchImage(fImage, innerBounds);
+    gaCenter: dc.asTint(fImageCol).drawImage(fImage,
+      Point((innerBounds.width-fImage.width) div 2, (innerBounds.height-fImage.height) div 2)
+    );
+  end;
 
   if text <> '' then begin
     if fontStyle.shadow then
@@ -737,6 +744,7 @@ procedure tGuiComponent.updateAlignment();
 begin
   case fAlign of
     gaNone: ;
+    {todo: gaCenter}
     gaFull: if assigned(parent) then
       {todo: why do we need to subtract 1 here?}
       setBounds(Rect(0,0,parent.innerBounds.width-1,parent.innerBounds.height-1));

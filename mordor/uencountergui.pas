@@ -24,7 +24,7 @@ uses
 
 type
 
-  tEncounterGuiMode = (egmType1);
+  tEncounterGuiMode = (egmType1, egmType3);
 
   tMonsterFrame = class(tGuiComponent)
   protected
@@ -41,6 +41,7 @@ type
     mode: tEncounterGuiMode;
     dungeonView: tDungeonViewGui;
     monsterFrame: array[1..4] of tMonsterFrame;
+    procedure  doDraw(const dc: tDrawContext); override;
     constructor Create(map: tMDRMap);
   end;
 
@@ -82,9 +83,10 @@ begin
   inherited Create();
   background := nil;
   backgroundCol := RGB(0,0,0,0);
-  image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
+  image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow128', nil);
   imageCol := RGBA.White;
   setBounds(Rect(0, 0, 500, 180));
+  mode := egmType3;
   case mode of
     egmType1: begin
       dungeonView := tDungeonViewGui.Create(map);
@@ -96,7 +98,23 @@ begin
         self.append(monsterFrame[i]);
       end;
     end;
+    egmType3: begin
+      fImageCol := RGBA.White;
+    end;
   end;
+end;
+
+procedure tEncounterGUI.doDraw(const dc: tDrawContext);
+var
+  envImage: tPage;
+  xPadding: integer;
+begin
+  inherited doDraw(dc);
+  envImage := gfx['bg1_hq'];
+  xPadding := (dc.width - envImage.width) div 2;
+  dc.asTint(RGB(255,255,255,220)).drawImage(envImage, Point(xPadding, 0));
+  dc.fillRect(Rect(0,0,xPadding, dc.height), RGB(0,0,0,220));
+  dc.fillRect(Rect(dc.width-xPadding,0,xPadding, dc.height), RGB(0,0,0,220));
 end;
 
 begin

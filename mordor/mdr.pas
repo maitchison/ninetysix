@@ -341,7 +341,9 @@ begin
     if timer.avElapsed > 0 then
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
-    tpsLabel.text := format('%.1fk', [encounterGui.dungeonView.voxelScene.tracesPerSecond/1000]);
+    if assigned(encounterGui.dungeonView) then begin
+      tpsLabel.text := format('%.1fk', [encounterGui.dungeonView.voxelScene.tracesPerSecond/1000]);
+    end;
 
     musicUpdate();
 
@@ -350,8 +352,10 @@ begin
     if keyDown(key_r) then messageBox.addMessage('<shadow>Hello <rgb(%d,%d,%d)>fish</rgb> and <bold>chips</bold>.</shadow>', [rnd,rnd,rnd]);
 
     {update view - there should be a better place to do this}
-    encounterGui.dungeonView.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
-    encounterGui.dungeonView.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
+    if assigned(encounterGui.dungeonView) then begin
+      encounterGui.dungeonView.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
+      encounterGui.dungeonView.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
+    end;
 
     gui.update(elapsed);
     gui.draw(dc);
