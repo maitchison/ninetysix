@@ -347,7 +347,7 @@ begin
 
     input.update();
 
-    if keyDown(key_r) then messageBox.addMessage('Hello %d', [rnd]);
+    if keyDown(key_r) then messageBox.addMessage('<shadow>Hello <rgb(%d,%d,%d)>fish</rgb> and <bold>chips</bold>.</shadow>', [rnd,rnd,rnd]);
 
     {update view - there should be a better place to do this}
     encounterGui.dungeonView.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);

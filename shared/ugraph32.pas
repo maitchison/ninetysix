@@ -58,6 +58,7 @@ type
     function  smartBM(col: RGBA): tBlendMode;
     function  hasTint: boolean; inline;
     procedure markRegion(const rect: tRect); inline;
+    function  isNull: boolean;
     {modifiers}
     function  asBlendMode(aBlendMode: tBlendMode): tDrawContext;
     function  asTint(aTint: RGBA): tDrawContext;
@@ -717,6 +718,11 @@ end;
 function tDrawContext.hasTint: boolean; inline;
 begin
   result := int32(tint) <> -1;
+end;
+
+function tDrawContext.isNull: boolean;
+begin
+  result := not assigned(page);
 end;
 
 procedure tDrawContext.markRegion(const rect: tRect); inline;

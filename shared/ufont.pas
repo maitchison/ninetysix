@@ -9,6 +9,7 @@ uses
   uRect,
   uGraph32,
   uUtils,
+  uList,
   uP96;
 
 type
@@ -36,7 +37,7 @@ type
     constructor Create();
     class function Load(filename: string): tFont; static;
 
-    procedure textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA);
+    function  textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA): tRect;
     function  textExtents(s: string; p: tPoint): tRect; overload;
     function  textExtents(s: string): tRect; overload;
     property  height: integer read fHeight;
@@ -165,44 +166,140 @@ function tFont.charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGB
 var
   char: tChar;
 begin
-
   atX += kerning[ord(prevc), ord(c)];
-
   char := chars[ord(c)];
-  dc.asTint(col).drawSubImage(bitmap, Point(atX+char.xoffset, atY+char.yoffset), char.rect);
+  if not dc.isNull then
+    dc.asTint(col).drawSubImage(bitmap, Point(atX+char.xoffset, atY+char.yoffset), char.rect);
   atX += char.xadvance;
   result := atX;
 end;
 
-procedure tFont.textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA);
+{output text, return bounds rect. If DC is null then does not draw but still returns extents}
+function tFont.textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA): tRect;
 var
-  i: integer;
-  prevChar: char;
+  pos: integer;
+  c, prevC: char;
+  tag: string;
+
+  {our current font state}
+  currentColor: RGBA;
+  currentShadow: boolean;
+  currentBold: boolean;
+
+  inEscape: boolean;
+  inBrackets: boolean;
+
+  values: tIntList;
+
+  procedure outputChar();
+  begin
+    if currentShadow then begin
+      charOut(dc, atX+1, atY+1, c, RGB(0,0,0,currentColor.a * 3 div 4), prevC);
+      if currentBold then
+        charOut(dc, atX+2, atY+1, c, RGB(0,0,0,currentColor.a * 3 div 4), prevC);
+    end;
+    if currentBold then begin
+      charOut(dc, atX, atY, c, currentColor, prevC);
+      inc(atX);
+    end;
+    atX := charOut(dc, atX, atY, c, currentColor, prevC);
+    prevC := c;
+  end;
+
+  function readTag(): string;
+  begin
+    result := '';
+    while pos <= length(s) do begin
+      if (s[pos] = '>') then exit;
+      result += s[pos];
+      inc(pos);
+    end;
+    raise ValueError('Text "%s" missing closing bracket at position %d (%s)', [s,pos,tag]);
+  end;
+
 begin
   if not assigned(self) then exit;
-  prevChar := #0;
-  for i := 1 to length(s) do begin
-    atX := charOut(dc, atX, atY, s[i], col, prevChar);
-    prevChar := s[i];
+
+  prevC := #0;
+
+  inBrackets := false;
+  inEscape := false;
+  currentColor := col;
+  currentShadow := false;
+  currentBold := false;
+
+  result.x := atX;
+  result.y := atY;
+
+  pos := 1;
+
+  while pos <= length(s) do begin
+
+    if inBrackets then begin
+      tag := readTag().toLower();
+      //note('Tag:>%s<', [tag]);
+      if tag.startsWith('rgb(') then begin
+        values.loadS('['+copy(tag, 5, length(tag)-5)+']');
+        if (not values.len in [3,4]) then raise ValueError('Invalid format for RGB');
+        currentColor.r := values[0];
+        currentColor.g := values[1];
+        currentColor.b := values[2];
+        if values.len = 4 then
+          currentColor.a := values[3]
+        else
+          currentColor.a := 255;
+      end else if tag = 'shadow' then begin
+        currentShadow := true;
+      end else if tag = '/rgb' then begin
+        currentColor := col;
+      end else if tag = '/shadow' then begin
+        currentShadow := false;
+      end else if tag = 'bold' then begin
+        currentBold := true;
+      end else if tag = '/bold' then begin
+        currentBold := false;
+      end;
+      inBrackets := false;
+      if s[pos] <> '>' then raise ValueError('Missing "<"');
+      inc(pos);
+      continue;
+    end;
+
+    {consume next token}
+    c := s[pos];
+    inc(pos);
+
+    if inEscape then begin
+      outputChar();
+      inEscape := false;
+      continue;
+    end;
+
+    case c of
+      '<': begin
+        if inBrackets then raise ValueError('Invalid character "<"');
+        inBrackets := true;
+        {todo: process all brackets here}
+      end;
+      '>': begin
+        if not inBrackets then raise ValueError('Invalid character ">"');
+        inBrackets := false;
+        end;
+      '\': inEscape := true;
+      else outputChar();
+    end;
   end;
+
+  // guess on height...
+  result.bottomRight := Point(atX, atY+self.height);
 end;
 
 function tFont.textExtents(s: string; p: tPoint): tRect;
 var
-  i: integer;
-  c: TChar;
+  nullDC: tDrawContext;
 begin
-  if not assigned(self) then exit(Rect(0,0));
-  {note: note quite right for characters that have offsets?}
-  result.x := p.x;
-  result.y := p.y;
-  result.width := 0;
-  result.height := 16;
-  for i := 1 to length(s) do begin
-    result.width += chars[ord(s[i])].xadvance;
-    if i > 1 then
-      result.width += kerning[ord(s[i-1]), ord(s[i])];
-  end;
+  nullDC.page := nil;
+  result := textOut(nullDC, p.x, p.y, s, RGBA.White);
 end;
 
 function tFont.textExtents(s: string): tRect;
