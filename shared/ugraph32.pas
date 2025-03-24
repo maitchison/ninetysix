@@ -23,7 +23,8 @@ type
   tBlendMode = (
     bmNone,   // skip
     bmBlit,   // src
-    bmBlend   // alpha*src + (1-alpha)*dst
+    bmBlend,  // alpha*src + (1-alpha)*dst
+    bmMul     // not very well supported yet
   );
 
   tTextureFilter = (

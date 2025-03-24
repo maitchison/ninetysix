@@ -64,6 +64,12 @@ var
   callCode: int32;
 begin
 
+  {we don't support mul yet}
+  if blendMode = bmMul then begin
+    drawImage_REF(dstPage, srcPage, dstX, dstY, srcRect, tint, blendMode);
+    exit;
+  end;
+
   callCode := getCallCode(blendMode, tint);
   if callCode < 0 then exit;
 

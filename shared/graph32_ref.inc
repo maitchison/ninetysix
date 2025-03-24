@@ -55,6 +55,14 @@ begin
           inc(srcPtr);
           inc(dstPtr);
         end;
+      bmMul:
+        for i := 0 to srcRect.width-1 do begin
+          src := srcPtr^;
+          if needsTint then src := src * tint;
+          dstPtr^ := dstPtr^ * src;
+          inc(srcPtr);
+          inc(dstPtr);
+        end;
     end;
   end;
 end;

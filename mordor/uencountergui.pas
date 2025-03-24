@@ -83,7 +83,7 @@ begin
   inherited Create();
   background := nil;
   backgroundCol := RGB(0,0,0,0);
-  image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow128', nil);
+  image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
   imageCol := RGBA.White;
   setBounds(Rect(0, 0, 500, 180));
   mode := egmType3;
@@ -112,7 +112,7 @@ begin
   inherited doDraw(dc);
   envImage := gfx['bg1_hq'];
   xPadding := (dc.width - envImage.width) div 2;
-  dc.asTint(RGB(255,255,255,220)).drawImage(envImage, Point(xPadding, 0));
+  dc.asBlendMode(bmBlit).drawImage(envImage, Point(xPadding, 0));
   dc.fillRect(Rect(0,0,xPadding, dc.height), RGB(0,0,0,220));
   dc.fillRect(Rect(dc.width-xPadding,0,xPadding, dc.height), RGB(0,0,0,220));
 end;
