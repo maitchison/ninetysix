@@ -28,6 +28,7 @@ uses
   {game stuff}
   uMDRRes,
   uMapGui,
+  uTexture3D,
   uTileEditorGui,
   uScene,
   uEncounterGui,

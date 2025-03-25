@@ -20,12 +20,17 @@ type
     fRadius: single;
     fVolume: int32;
     fLog2Width,fLog2Height: byte;
+  protected
+    procedure setDims(aWidth, aHeight, aDepth: integer);
   public
     function inBounds(x,y,z: integer): boolean; inline;
     function getAddr(x,y,z: integer): dword; inline;
     function getPixel(x,y,z: integer): RGBA; virtual;
     function getValue(x,y,z: integer): byte; virtual;
-    constructor Create(aWidth, aDepth, aHeight: integer);
+    constructor Create(aWidth, aHeight, aDepth: integer);
+    property width: integer read fWidth;
+    property height: integer read fHeight;
+    property depth: integer read fDepth;
   end;
 
   tTexture3D = class(tTexture3DBase)
@@ -34,7 +39,7 @@ type
   public
     function getPixel(x,y,z: integer): RGBA; override;
     function getValue(x,y,z: integer): byte; override;
-    constructor Create(aWidth, aDepth, aHeight: integer);
+    constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
   tTexture3D8 = class(tTexture3DBase)
@@ -44,16 +49,32 @@ type
     function getAddr(x,y,z: integer): dword; inline;
     function getPixel(x,y,z: integer): RGBA; override;
     function getValue(x,y,z: integer): byte; override;
-    constructor Create(aWidth, aDepth, aHeight: integer);
+    constructor Create(aWidth, aHeight, aDepth: integer);
+  end;
+
+  tSparseTexture3D = class(tTexture3DBase)
+  protected
+    rowOfs: array of word;
+    colOfs: array of byte;
+    pData: array of RGBA;
+  public
+    function getPixel(x,y,z: integer): RGBA; override;
+    function getValue(x,y,z: integer): byte; override;
+    constructor Create(aPage: tPage; aDepth: integer); overload;
   end;
 
 implementation
 
 {-------------------------------------------------------}
 
-constructor tTexture3DBase.Create(aWidth, aDepth, aHeight: integer);
+constructor tTexture3DBase.Create(aWidth, aHeight, aDepth: integer);
 begin
   inherited Create();
+  setDims(aWidth, aHeight, aDepth);
+end;
+
+procedure tTexture3DBase.setDims(aWidth, aHeight, aDepth: integer);
+begin
   assert(isPowerOfTwo(aWidth));
   assert(isPowerOfTwo(aDepth));
   assert(isPowerOfTwo(aHeight));
@@ -81,7 +102,7 @@ end;
 
 {-------------------------------------------------------}
 
-constructor tTexture3D.Create(aWidth, aDepth, aHeight: integer);
+constructor tTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
   inherited Create(aWidth, aHeight, aDepth);
   page := tPage32.Create(aWidth, aDepth*aHeight);
@@ -99,7 +120,7 @@ end;
 
 {-------------------------------------------------------}
 
-constructor tTexture3D8.Create(aWidth, aDepth, aHeight: integer);
+constructor tTexture3D8.Create(aWidth, aHeight, aDepth: integer);
 begin
   inherited Create(aWidth, aHeight, aDepth);
   page := tPage8.Create(aWidth, aDepth*aHeight);
@@ -116,6 +137,68 @@ end;
 function tTexture3D8.getValue(x,y,z: integer): byte;
 begin
   result := (page.pixels + getAddr(x,y,z))^.a;
+end;
+
+{-------------------------------------------------------}
+
+function tSparseTexture3D.getPixel(x,y,z: integer): RGBA;
+var
+  p: pointer;
+begin
+
+end;
+
+function tSparseTexture3D.getValue(x,y,z: integer): byte;
+begin
+  result := getPixel(x,y,z).a;
+end;
+
+constructor tSparseTexture3D.Create(aPage: tPage; aDepth: integer);
+begin
+  inherited Create(aPage.width, aPage.height*aDepth);
+  fromPage(aPage, aDepth);
+end;
+
+function tSparseTexture3D.fromPage(aPage: tPage; aDepth: integer);
+var
+  row: integer;
+  col: integer;
+  numRows: integer;
+  usedRows: integer;
+  pixels: pRGBA;
+  allEmpty: boolean;
+
+begin
+  assert(aPage.width = 16);
+  setDims(aPage.width, aPage.height div aDepth, aDepth);
+
+  {add zero column}
+  numRows := height * depth
+
+  setLength(rowOfs, numRows);
+  setLength(colOfs, (8 * numRows)+1);
+  setLength(pData, numRows+8);
+
+  {create an empty row}
+  fillchar(rowOfs[0], length(rowOfs)*2, 0);
+  fillchar(colOfs[0], length(colOfs)*1, 0);
+  fillchar(pData[0], length(pData)*4, 0);
+
+  pixels := @aPage.pixels^[0];
+
+  for row := 0 to numRows-1 do begin
+    {check if all zeros}
+    allEmpty := true;
+    for col := 0 to 15 do
+      if pixels^.a <> 0 then begin
+        allEmpty := false;
+        break;
+      end;
+  end;
+
+  rowOfs: pWord;
+  colOfs: pByte;
+  pData: pointer;
 end;
 
 begin
