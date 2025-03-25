@@ -22,12 +22,15 @@ type
   tJobSystem = class
   protected
     jobIdx: integer;
-  public
     jobs: tJobs;
     procedure cleanUpJobs();
-    procedure startJob(aJob: tJob);
+    procedure addJob(aJob: tJob);
+  public
     procedure update(timeSlice: single=0.005);
   end;
+
+var
+  jobs: tJobSystem;
 
 implementation
 
@@ -35,41 +38,49 @@ implementation
 
 procedure tJob.update(timeSlice: single);
 begin
+  // decendant should override
 end;
 
 procedure tJob.start();
 begin
+  state := jsActive;
+  jobs.addJob(self);
 end;
 
 procedure tJob.stop();
 begin
+  state := jsDone;
 end;
 
 {-----------------------------------------}
 
 procedure tJobSystem.cleanUpJobs();
 var
-  activeJobs: integer;
+  currentJobCount: integer;
   newJobs: tJobs;
   job: tJob;
   i: integer;
 begin
   {clean up}
-  activeJobs := 0;
-  for job in jobs do if job.state = jsActive then inc(activeJobs);
-  if activeJobs <> length(jobs) then begin
-    setLength(newJobs, activeJobs);
+  currentJobCount := 0;
+  for job in jobs do if job.state <> jsDone then inc(currentJobCount);
+  if currentJobCount <> length(jobs) then begin
+    setLength(newJobs, currentJobCount);
     i := 0;
-    for job in jobs do if job.state = jsActive then begin
-      newJobs[i] := job;
-      inc(i);
+    for job in jobs do begin
+      if job.state = jsDone then begin
+        job.free;
+      end else begin
+        newJobs[i] := job;
+        inc(i);
+      end;
     end;
+    jobs := newJobs;
   end;
 end;
 
-procedure tJobSystem.startJob(aJob: tJob);
+procedure tJobSystem.addJob(aJob: tJob);
 begin
-  aJob.state := jsActive;
   setLength(jobs, length(jobs)+1);
   jobs[length(jobs)-1] := aJob;
 end;
@@ -106,5 +117,9 @@ begin
 
 end;
 
-begin
+initialization
+  jobs := tJobSystem.Create();
+finalization
+  {todo: shut down jobs properly}
+  jobs.free;
 end.

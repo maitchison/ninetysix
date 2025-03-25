@@ -143,7 +143,7 @@ begin
   image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
   imageCol := RGBA.White;
   setBounds(Rect(0, 0, 500, 180));
-  mode := egmType3;
+  mode := egmType1;
   case mode of
     egmType1: begin
       dungeonView := tDungeonViewGui.Create(map);

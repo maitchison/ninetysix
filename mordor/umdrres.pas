@@ -34,13 +34,11 @@ type
 
     gfx: tGFXLibrary;
     sfx: tSFXLibrary;
-    jobs: tJobSystem;
     mapSprites: tSpriteSheet;
     monsterSprites: tSpriteSheet;
 
     messageLog: tStringList;
 
-    constructor Create();
     procedure loadResources();
     procedure addMessage(s: string); overload;
     procedure addMessage(s: string; args: array of const); overload;
@@ -60,11 +58,6 @@ end;
 procedure tMordor.addMessage(s: string; args: array of const); overload;
 begin
   addMessage(format(s, args));
-end;
-
-constructor tMordor.Create();
-begin
-  jobs := tJobSystem.Create();
 end;
 
 procedure tMordor.loadResources();

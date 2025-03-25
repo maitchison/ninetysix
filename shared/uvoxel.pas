@@ -17,6 +17,7 @@ uses
   uInfo,
   uVGADriver,
   uVertex,
+  uJob,
   uP96;
 
 var
@@ -444,6 +445,7 @@ begin
       end;
 end;
 
+{returns true if finished}
 function tVoxel.updateLighting(maxSamples: integer=1): boolean;
 var
   pVox: pRGBA;

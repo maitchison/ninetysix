@@ -346,7 +346,7 @@ begin
   gui.addHook(ON_KEYPRESS, self.onKeyPress);
   moveParty(0,0);
 
-  mdr.jobs.startJob(tMusicJob.Create());
+  tMusicJob.Create().start();
 
   repeat
 
@@ -360,7 +360,7 @@ begin
       tpsLabel.text := format('%.1fk', [encounterGui.dungeonView.voxelScene.tracesPerSecond/1000]);
     end;
 
-    mdr.jobs.update();
+    jobs.update();
 
     input.update();
 

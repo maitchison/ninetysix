@@ -14,6 +14,7 @@ uses
   uColor,
   uFileSystem,
   uP96,
+  uJob,
   uMDRMap,
   uStringMap,
   uTileBuilder,
@@ -44,6 +45,42 @@ type
   end;
 
 implementation
+
+type
+  tVoxelRenderJob = class(tJob)
+    target: tVoxel;
+    outputFilename: string;
+    procedure update(timeSlice: single); override;
+    constructor Create(aTarget: tVoxel;aOutputFilename: string='');
+  end;
+
+{-------------------------------------------------}
+
+constructor tVoxelRenderJob.Create(aTarget: tVoxel;aOutputFilename: string='');
+begin
+  inherited Create();
+  target := aTarget;
+  outputFilename := aOutputFilename;
+  mdr.addMessage('Starting job '+aOutputFilename);
+end;
+
+procedure tVoxelRenderJob.update(timeSlice: single);
+var
+  startTime: single;
+begin
+  startTime := getSec;
+  while getSec < startTime + timeSlice do
+    if target.updateLighting() then begin
+      {pitty we can't also to a job for this..}
+      if (outputFilename <> '') then
+        saveLC96(outputFileName, target.vox);
+      mdr.addMessage('Completed job '+outputFilename);
+      state := jsDone;
+      break;
+    end;
+end;
+
+{-------------------------------------------------}
 
 procedure tDungeonViewGui.doDraw(const dc: tDrawContext);
 var
@@ -96,6 +133,7 @@ var
   rotatedWalls: tWalls;
   rotatedFilename: string;
   i,j: integer;
+  job: tVoxelRenderJob;
 begin
 
   key := getTileKey(tile, walls);
@@ -122,8 +160,9 @@ begin
     filename := joinPath('tiles', key+'_256.vox');
     result := buildTile(tile, walls);
     result.lightingSamples := 256;
-    result.generateLighting(lmGI);
-    saveLC96(fileName, result.vox);
+    result.generateLighting(lmGI, true);
+    job := tVoxelRenderJob.Create(result, filename);
+    job.start();
   end;
   tileCache[key] := result;
 end;

@@ -511,7 +511,6 @@ begin
       maxNewFrames := 2;
   end;
 
-
   framesProcessed := 0;
   musicTimer.start();
   while (framesProcessed < maxNewFrames) and (getMusicStats().bufferFramesFree > 0) do begin
