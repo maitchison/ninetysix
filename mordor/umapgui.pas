@@ -137,11 +137,11 @@ begin
 
   {floor}
   id := tile.floorSpec.spriteIdx;
-  if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
+  if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {medium}
   id := MEDIUM_SPRITE[tile.medium];
-  if id >= 0 then mapSprites.sprites[id].draw(dc, pos.x, pos.y);
+  if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {walls}
   for d in tDirection do begin
@@ -151,7 +151,7 @@ begin
     dx := WALL_DX[d];
     dy := WALL_DY[d];
     if dy <> 0 then inc(id); // rotated varient
-    mapSprites.sprites[id].draw(dc, pos.x+dx, pos.y+dy);
+    mdr.mapSprites.sprites[id].draw(dc, pos.x+dx, pos.y+dy);
   end;
 
   {cursor}
@@ -189,12 +189,12 @@ procedure tMapGui.drawCursor(dc: tDrawContext);
 begin
   case mode of
     mmView: ;
-    mmEdit: mapSprites.sprites[CURSOR_SPRITE].draw(
+    mmEdit: mdr.mapSprites.sprites[CURSOR_SPRITE].draw(
       dc,
       tilePos(cursorPos.x,cursorPos.y).x,
       tilePos(cursorPos.x,cursorPos.y).y
       );
-    mmParty: mapSprites.sprites[PARTY_SPRITE+ord(cursorDir)].draw(
+    mmParty: mdr.mapSprites.sprites[PARTY_SPRITE+ord(cursorDir)].draw(
       dc,
       tilePos(cursorPos.x,cursorPos.y).x,
       tilePos(cursorPos.x,cursorPos.y).y

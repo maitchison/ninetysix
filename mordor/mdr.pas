@@ -85,14 +85,14 @@ begin
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
 
-  loadResources();
+  mdr.loadResources();
 end;
 
 {-------------------------------------------------------}
 
 procedure titleScreen();
 begin
-  screen.background := gfx['title800.p96'];
+  screen.background := mdr.gfx['title800.p96'];
   screen.pageClear();
   screen.pageFlip();
 
@@ -300,7 +300,7 @@ begin
   messageBox := tGuiListBox.Create();
   messageBox.doubleBufferMode := dbmBlend;
   messageBox.align := gaFull;
-  messageBox.fontStyle.font := FONT_MEDIUM;
+  messageBox.fontStyle.font := mdr.FONT_MEDIUM;
   logWindow.hasTransparientChildren := true;
   logWindow.append(messagebox);
 
@@ -417,7 +417,7 @@ begin
 
   map := tMDRMap.create(32,32);
 
-  screen.background := gfx['title800'];
+  screen.background := mdr.gfx['title800'];
   screen.pageClear();
   screen.pageFlip();
 

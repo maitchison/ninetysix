@@ -167,17 +167,17 @@ begin
     ftStone: begin
       //bedrock
       layer := (tileSize-1);
-      fill(MDR_DARKGRAY, 1);
+      fill(mdr.DARKGRAY, 1);
       noise(0.25);
       //stone
       layer := (tileSize-2);
-      fill(MDR_LIGHTGRAY, 1);
+      fill(mdr.LIGHTGRAY, 1);
       noise(0.5);
     end;
     ftDirt: begin
       //bedrock
       layer := (tileSize-1);
-      fill(MDR_DARKGRAY);
+      fill(mdr.DARKGRAY);
       noise(0.25);
       //dirt
       layer := (tileSize-2);
@@ -193,21 +193,21 @@ begin
     ftGrass: begin
       //bedrock
       layer := (tileSize-1);
-      fill(MDR_DARKGRAY);
+      fill(mdr.DARKGRAY);
       noise(0.25);
       //grass
       layer := (tileSize-2);
-      fill(MDR_GREEN*MDR_LIGHTGRAY);
+      fill(mdr.GREEN*mdr.LIGHTGRAY);
       noise(0.6);
       //dry patch
-      speckle(RGBA.Lerp(RGB($FF160616), MDR_GREEN, 0.5), 0.15);
+      speckle(RGBA.Lerp(RGB($FF160616), mdr.GREEN, 0.5), 0.15);
       //stones
       //layer := 29;
       //speckle(MDR_LIGHTGRAY, 0.5);
     end;
     ftWater: begin
       layer := (tileSize-1);
-      fill(MDR_BLUE);
+      fill(mdr.BLUE);
       noise(0.3);
     end;
   end;
@@ -232,7 +232,7 @@ begin
   {todo: get trim from neighbours... ah... we do want map then...
    either that or build it into wall? yes.. wall is probably better}
   if (tile.floor in [ftStone]) then begin
-    dc.drawRect(Rect(0,0+(tileSize-3)*tileSize,tileSize,tileSize), MDR_LIGHTGRAY);
+    dc.drawRect(Rect(0,0+(tileSize-3)*tileSize,tileSize,tileSize), mdr.LIGHTGRAY);
   end;
 
 end;

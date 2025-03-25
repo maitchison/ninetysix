@@ -14,32 +14,36 @@ uses
   uFont,
   uGraph32;
 
-var
-  gfx: tGFXLibrary;
-  sfx: tSFXLibrary;
-  mapSprites: tSpriteSheet;
-  monsterSprites: tSpriteSheet;
+type
+  {global space}
+  tMordor = class
+  const
+    LIGHTGRAY: RGBA = (b:$a5; g:$9C; r:$95; a:$ff);
+    DARKGRAY: RGBA  = (b:$46; g:$43; r:$40; a:$ff);
+    FOURNINES: RGBA = (b:230; g:230; r:230; a:230);
+    BLUE: RGBA      = (b:round(255*0.62);g:round(255*0.42); r:round(255*0.40); a:$ff);
+    {still working on these colors}
+    GREEN: RGBA     = (b:$39; g:$b7; r:$60; a:$ff);
+  var
+    FONT_TINY,
+    FONT_SMALL,
+    FONT_MEDIUM: tFont;
 
-procedure loadResources();
+    gfx: tGFXLibrary;
+    sfx: tSFXLibrary;
+    mapSprites: tSpriteSheet;
+    monsterSprites: tSpriteSheet;
 
-{global colors}
-const
-  MDR_LIGHTGRAY: RGBA = (b:$a5; g:$9C; r:$95; a:$ff);
-  MDR_DARKGRAY: RGBA  = (b:$46; g:$43; r:$40; a:$ff);
-  MDR_FOURNINES: RGBA = (b:230; g:230; r:230; a:230);
-  MDR_BLUE: RGBA      = (b:round(255*0.62);g:round(255*0.42); r:round(255*0.40); a:$ff);
-  {still working on these colors}
-  MDR_GREEN: RGBA = (b:$39; g:$b7; r:$60; a:$ff);
+    procedure loadResources();
+  end;
+
 var
-  FONT_TINY,
-  FONT_SMALL,
-  FONT_MEDIUM: tFont;
+ mdr: tMordor;
 
 implementation
 
-procedure loadResources();
+procedure tMordor.loadResources();
 begin
-
   {additional fonts}
   FONT_TINY := loadNetFont(joinPath('res', 'netfont2.p96'));
   FONT_SMALL := tFont.LOAD(joinPath('res', 'fontin12'));
@@ -56,8 +60,10 @@ begin
 
   monsterSprites := tSpriteSheet.Create(gfx['monsters']);
   monsterSprites.grid(16,24);
-
 end;
 
-begin
+initialization
+  mdr := tMordor.Create();
+finalization
+  mdr.free();
 end.

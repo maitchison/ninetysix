@@ -29,7 +29,7 @@ begin
   inherited Create();
   guiStyle := DEFAULT_GUI_SKIN.styles['box'].clone();
   fImage := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
-  fImageCol := MDR_BLUE;
+  fImageCol := mdr.BLUE;
   fontStyle.centered := true;
   fontStyle.shadow := true;
   setBounds(aRect);

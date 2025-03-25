@@ -96,7 +96,7 @@ begin
   inherited doUpdate(elapsed);
   animationFrame := (round(id*12.37+getSec*1.5) mod 2)*19;
   oldImage := monsterImage;
-  monsterImage := monsterSprites.byIndex(11+(4*19)+animationFrame);
+  monsterImage := mdr.monsterSprites.byIndex(11+(4*19)+animationFrame);
   if monsterImage <> oldImage then
     isDirty := true;
 end;
@@ -110,9 +110,9 @@ begin
   doubleBufferMode := dbmBlit;
   scale := V2(0.75, 0.75);
   setBounds(Rect(0,0, 96+8, 128+38));
-  frame := tSprite.Create(gfx['frame']);
+  frame := tSprite.Create(mdr.gfx['frame']);
   frame.border := Border(15,15,15,15);
-  monsterImage:= tSprite.Create(gfx['wolf96']);
+  monsterImage:= tSprite.Create(mdr.gfx['wolf96']);
 end;
 
 procedure tMonsterFrame.doDraw(const dc: tDrawContext);
@@ -120,11 +120,11 @@ begin
   {portrait}
   monsterImage.draw(dc.asBlendMode(bmBlit), 4, 15);
   {header}
-  dc.fillRect(Rect(0,0,bounds.width,25), MDR_LIGHTGRAY);
+  dc.fillRect(Rect(0,0,bounds.width,25), mdr.LIGHTGRAY);
   dc.drawRect(Rect(0,0,bounds.width,25), RGB(0,0,0,128));
   font.textOut(dc, 39,7, 'Wolf', RGBF(0,0,0,0.9));
   {footer}
-  dc.fillRect(Rect(0,bounds.height-25,bounds.width,25), RGBA.Lerp(MDR_DARKGRAY, RGBA.Black, 0.5));
+  dc.fillRect(Rect(0,bounds.height-25,bounds.width,25), RGBA.Lerp(mdr.DARKGRAY, RGBA.Black, 0.5));
   dc.drawRect(Rect(0,bounds.height-25,bounds.width,25), RGB(0,0,0,128));
   {frame}
   frame.drawNineSlice(dc.asBlendMode(bmBlend), bounds);
@@ -186,11 +186,11 @@ var
 begin
   inherited doDraw(dc);
   {
-  envImage := gfx['bg1'];
+  envImage := mdr.gfx['bg1'];
   dc.asBlendMode(bmBlit).asFilter(tfNearest).stretchImage(envImage, Rect((dc.clip.width-(82*5)) div 2,0,82*5, 42*5));
   }
 
-  envImage := gfx['bg1_hq'];
+  envImage := mdr.gfx['bg1_hq'];
   xPadding := (dc.width - envImage.width) div 2;
   dc.asBlendMode(bmBlit).drawImage(envImage, Point(xPadding, 0));
   dc.fillRect(Rect(0,0,xPadding, dc.height), RGB(0,0,0,220));

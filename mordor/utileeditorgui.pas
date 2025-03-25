@@ -81,9 +81,9 @@ begin
     i := ord(ft);
     fs := FLOOR_SPEC[ft];
     if fs.spriteIdx >= 0 then
-      mapSprites.sprites[fs.spriteIdx].draw(dc, bounds.x+i*16, bounds.y);
+      mdr.mapSprites.sprites[fs.spriteIdx].draw(dc, bounds.x+i*16, bounds.y);
     if ft = floorType then begin
-      mapSprites.sprites[CURSOR_SPRITE].draw(dc, bounds.x+i*16, bounds.y);
+      mdr.mapSprites.sprites[CURSOR_SPRITE].draw(dc, bounds.x+i*16, bounds.y);
       DEFAULT_FONT.textOut(dc, bounds.x+1, bounds.y+15, fs.tag, RGB(255,255,255));
     end;
   end;

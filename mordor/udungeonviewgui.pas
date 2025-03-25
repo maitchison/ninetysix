@@ -163,7 +163,7 @@ begin
   tileBuilder := tTileBuilder.Create(16);
   voxelScene := tVoxelScene.Create(tileBuilder.tileSize);
 
-  backgroundCol := RGBA.Lerp(MDR_LIGHTGRAY, RGBA.Black, 0.5);
+  backgroundCol := RGBA.Lerp(mdr.LIGHTGRAY, RGBA.Black, 0.5);
 
 end;
 
