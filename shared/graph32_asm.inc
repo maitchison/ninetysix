@@ -19,8 +19,8 @@ var
   srcPtr, dstPtr: pointer;
   srcStride, dstStride: dword;
 begin
-  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
-  dstPtr := dstPage.getAddress(dstX, dstY);
+  srcPtr := srcPage.getAddr(srcRect.x, srcRect.y);
+  dstPtr := dstPage.getAddr(dstX, dstY);
   srcStride := (srcPage.width - srcRect.width) * 4;
   dstStride := (dstPage.width - srcRect.width) * 4;
 

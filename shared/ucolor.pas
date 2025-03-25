@@ -43,6 +43,9 @@ type
   end;
 
   pRGBA = ^RGBA;
+  RGBAs = array[0..64*1024*1024-1] of RGBA;
+  pRGBAs = ^RGBAs;
+
 
   {32 Bit Float}
   RGBA32 = packed record

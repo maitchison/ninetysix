@@ -113,8 +113,8 @@ begin
 
   SetLength(LineData, LineWidth);
 
-  result.Pixels := getMem(InfoHeader.PixelCount * 4);
-  fillchar(result.pixels^, InfoHeader.PixelCount * 4, 255);
+  result.pData := getMem(InfoHeader.PixelCount * 4);
+  fillchar(result.pData^, InfoHeader.PixelCount * 4, 255);
 
   for y := result.Height-1 downto 0 do begin
     BlockRead(F, LineData[0], LineWidth, BytesRead);

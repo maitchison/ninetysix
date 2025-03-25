@@ -126,8 +126,8 @@ begin
     texDeltaX := trunc(lerp(tl.t1.x, tl.t2.x, f)) - texX;
     texDeltaY := trunc(lerp(tl.t1.y, tl.t2.y, f)) - texY;
 
-    screenPtr := dc.page.pixels + (x1 + (y * dc.page.width)) * 4;
-    texturePtr := srcPage.pixels;
+    screenPtr := dc.page.getAddr(x1, y);
+    texturePtr := srcPage.pData;
     textureWidth := srcPage.width;
     textureSize := srcPage.width * srcPage.height;
 

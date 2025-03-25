@@ -225,7 +225,7 @@ begin
   {init distance field}
   setLength(depth, fVolume);
   fillchar(depth[0], length(depth), 255);
-  vPtr := vox.pixels;
+  vPtr := vox.pData;
   dPtr := @depth[0];
   for lp := 0 to fVolume-1 do begin
     if vPtr^.a = 255 then dPtr^ := 0;
@@ -245,7 +245,7 @@ begin
     end;
 
   {apply back}
-  vPtr := vox.pixels;
+  vPtr := vox.pData;
   dPtr := @depth[0];
   for lp := 0 to fVolume-1 do begin
     d := dPtr^;
@@ -335,7 +335,7 @@ begin
   vox.getDC(bmBlit).drawImage(aPage, Point(0,0));
 
   // set very simple SDF, but treat all a<>0 pixels as solid.
-  pPtr := vox.pixels;
+  pPtr := vox.pData;
   for lp := 0 to fVolume-1 do begin
     if pPtr^.a = 0 then pPtr^.a := 255-4 else pPtr^.a := 255-0;
     inc(pPtr);
@@ -475,7 +475,7 @@ begin
   {find next voxel to}
   repeat
     nextVoxel();
-    pVox := pRGBA(vox.pixels + getAddr(lx,ly,lz)*4);
+    pVox := @vox.pixel^[getAddr(lx,ly,lz)];
   until (lMode = lmNone) or (pVox^.a = 255);
 
   {return if we are done}
@@ -535,7 +535,7 @@ begin
   );
   {modulate}
   addr := getAddr(x,y,z);
-  pVox := pRGBA(vox.pixels+addr*4);
+  pVox := @vox.pixel^[addr];
   if lightingMode in [lmAO] then begin
     pVox^.r := 200; pVox^.g := 200; pVox^.b := 200;
   end;
@@ -630,7 +630,7 @@ begin
   {todo: fast asm}
   result.r := 255; result.g := 0; result.b := 255; result.a := 255;
   if not inBounds(x,y,z) then exit;
-  result := pRGBA(vox.pixels + getAddr(x,y,z)*4)^;
+  result := vox.pixel^[getAddr(x,y,z)];
 end;
 
 {
@@ -729,13 +729,11 @@ begin
     end;
 
     {get voxel}
-    col := pRGBA(vox.pixels +
-      (
+    col := vox.pixel^[
       (pos.x shr 8) +
       (pos.y shr 8 shl fLog2Width) +
       (pos.z shr 8 shl (fLog2Width + fLog2Height))
-      ) shl 2
-    )^;
+    ];
 
     if col.a = 255 then begin
       result.didHit := true;

@@ -15,7 +15,7 @@ type
   {page stored as 8bit lumance}
   tPage8 = class(tResource)
     width, height: word;
-    pixels: pointer;
+    pixels: pByte;
     constructor Create(); overload;
     destructor  destroy(); override;
     constructor create(aWidth, aHeight: word); overload;
@@ -27,12 +27,21 @@ type
 
 implementation
 
-constructor tPage8.create();
+constructor tPage8.Create();
 begin
   inherited create();
   self.width := 0;
   self.height := 0;
   self.pixels := nil;
+end;
+
+constructor tPage8.Create(aWidth, aHeight: word);
+begin
+  Create();
+  self.width := aWidth;
+  self.height := aHeight;
+  self.pixels := getMem(aWidth * aHeight);
+  fillchar(self.pixels^, aWidth * aHeight, 0);
 end;
 
 destructor tPage8.destroy();
@@ -42,15 +51,6 @@ begin
     self.pixels := nil;
   end;
   inherited destroy();
-end;
-
-constructor tPage8.create(aWidth, aHeight: word);
-begin
-  create();
-  self.width := aWidth;
-  self.height := aHeight;
-  self.pixels := getMem(aWidth * aHeight);
-  fillchar(self.pixels^, aWidth * aHeight, 0);
 end;
 
 procedure tPage8.putValue(x, y: integer;v: byte);

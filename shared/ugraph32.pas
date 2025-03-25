@@ -90,7 +90,7 @@ type
   tPage = class(tResource)
     width, height: word;
     isRef: boolean;
-    pixels: pointer;
+    pData: pointer;
     defaultColor: RGBA;
     colorSpace: tColorSpace;
 
@@ -100,7 +100,7 @@ type
     constructor createAsReference(aWidth, aHeight: word;pixelData: Pointer);
 
     function  getDC(blendMode: tBlendMode = bmBlend): tDrawContext;
-    function  getAddress(x, y: integer): pointer; inline;
+    function  getAddr(x, y: integer): pointer; inline;
     function  getPixel(x, y: integer): RGBA; inline;
     function  getPixelF(fx,fy: single): RGBA;
     function  getPixelArea(aRect: tRect): RGBA;
@@ -123,7 +123,12 @@ type
     function  detectBPP: byte;
 
     class function Load(filename: string): tPage;
+
+    function pixel: pRGBAs; inline;
+
   end;
+
+  tPage32 = tPage;
 
   tImageLoaderProc = function(filename: string): tPage;
 
@@ -191,7 +196,7 @@ begin
   inherited create();
   self.width := 0;
   self.height := 0;
-  self.pixels := nil;
+  self.pData := nil;
   self.defaultColor := ERR_COL;
   self.isRef := false;
   self.colorSpace := csRGB;
@@ -202,7 +207,7 @@ begin
   Create();
   self.width := AWidth;
   self.height := AHeight;
-  self.pixels := getMem(dword(aWidth) * aHeight * 4);
+  self.pData := getMem(dword(aWidth) * aHeight * 4);
   self.clear();
 end;
 
@@ -210,17 +215,17 @@ constructor tPage.CreateAsReference(aWidth, aHeight: word;pixelData: Pointer);
 {todo: support logical width}
 begin
   Create();
-  self.width := AWidth;
-  self.height := AHeight;
-  self.pixels := PixelData;
+  self.width := aWidth;
+  self.height := aHeight;
+  self.pData := pixelData;
   self.isRef := true;
 end;
 
 destructor tPage.destroy();
 begin
-  if (not self.isRef) and assigned(self.pixels) then
-    freeMem(self.pixels, width*height*4);
-  self.pixels := nil;
+  if (not self.isRef) and assigned(self.pData) then
+    freeMem(self.pData, width*height*4);
+  self.pData := nil;
   self.width := 0;
   self.height := 0;
   self.isRef := false;
@@ -244,23 +249,28 @@ begin
   result.clearFlags := 0;
 end;
 
-{returns address in memory of given pixel. If out of bounds, returns nil}
-function tPage.getAddress(x, y: integer): pointer; inline;
+function tPage.pixel: pRGBAs; inline;
 begin
-  if (x < 0) or (y < 0) or (x >= self.width) or (y >= self.height) then
+  result := pRGBAs(pData);
+end;
+
+{returns address in memory of given pixel. If out of bounds, returns nil}
+function tPage.getAddr(x, y: integer): pointer; inline;
+begin
+  if (dword(x) >= self.width) or (dword(y) >= self.height) then
     exit(nil);
-  result := pixels + ((y * width + x) shl 2);
+  result := pData+(((y * width) + x)*4);
 end;
 
 {todo: this could be much faster...}
-function tPage.getPixel(x, y: Integer): RGBA; inline;
+function tPage.getPixel(x, y: integer): RGBA; inline;
 var
   address: dword;
   col: RGBA;
 begin
   if (x < 0) or (y < 0) or (x >= self.width) or (y >= self.height) then
     exit(self.defaultColor);
-  address := dword(pixels) + (y * Width + x) shl 2;
+  address := dword(pData) + ((y * width + x) shl 2);
   asm
     push edi
     push eax
@@ -303,7 +313,7 @@ begin
   invFracX := 255-fracX;
   invFracY := 255-fracY;
 
-  pData := getAddress(x, y);
+  pData := getAddr(x, y);
   c1 := pRGBA(pData)^;
   c2 := pRGBA(pData+4)^;
   c3 := pRGBA(pData+width*4)^;
@@ -323,7 +333,7 @@ end;
 
 procedure tPage.clear(c: RGBA);
 begin
-  filldword(pixels^, width*height, c.to32);
+  filldword(pData^, width*height, c.to32);
 end;
 
 procedure tPage.clear();
@@ -387,7 +397,7 @@ asm
 
     shl edi, 2
 
-    add edi, [esi].[Pixels]
+    add edi, [esi].[pData]
 
     {check for alpha channel}
     mov eax, c
@@ -468,7 +478,7 @@ asm
 
     shl edi, 2
 
-    add edi, [esi].[Pixels]
+    add edi, [esi].[pData]
 
     mov eax, c
     mov dword ptr [edi], eax
@@ -486,11 +496,11 @@ begin
   result := tPage.create();
   result.width := self.width;
   result.height := self.height;
-  result.pixels := getMem(self.width*self.height*4);
+  result.pData := getMem(self.width*self.height*4);
   result.isRef := false;
   result.defaultColor := self.defaultColor;
   result.colorSpace := self.colorSpace;
-  move(self.pixels^, result.pixels^, self.width*self.height*4);
+  move(self.pData^, result.pData^, self.width*self.height*4);
 end;
 
 {make a copy of page using RGBA}
@@ -498,7 +508,7 @@ function tPage.asBytes: tBytes;
 begin
   result := nil;
   setLength(result, width*height*4);
-  move(pixels^, result[0], width*height*4);
+  move(pData^, result[0], width*height*4);
 end;
 
 {make a copy of page using RGB}
@@ -509,9 +519,9 @@ begin
   result := nil;
   setLength(result, width*height*3);
   for i := 0 to width*height-1 do begin
-    result[i*3+0] := pRGBA(pixels+i*4)^.r;
-    result[i*3+1] := pRGBA(pixels+i*4)^.g;
-    result[i*3+2] := pRGBA(pixels+i*4)^.b;
+    result[i*3+0] := pixel^[i].r;
+    result[i*3+1] := pixel^[i].g;
+    result[i*3+2] := pixel^[i].b;
   end;
 end;
 
@@ -555,8 +565,8 @@ begin
   tmp := self.clone();
   self.width := aWidth;
   self.height := aHeight;
-  freeMem(self.pixels);
-  getMem(self.pixels, aWidth*aHeight*4);
+  freeMem(self.pdata);
+  getMem(self.pdata, aWidth*aHeight*4);
   getDC(bmBlit).drawImage(tmp, Point(0, 0));
   tmp.free;
 end;
@@ -590,7 +600,7 @@ var
   i: integer;
   c: RGBA;
 begin
-  pixelsPtr := page.pixels;
+  pixelsPtr := page.pdata;
   for i := 0 to page.width*page.height-1 do begin
     c := pixelsPtr^;
     c.g := byte(c.g+c.r);
@@ -606,7 +616,7 @@ var
   i: integer;
   c: RGBA;
 begin
-  pixelsPtr := page.pixels;
+  pixelsPtr := page.pData;
   for i := 0 to page.width*page.height-1 do begin
     c := pixelsPtr^;
     c.g := byte(c.g-c.r);
@@ -794,7 +804,6 @@ end;
 procedure tDrawContext.fillRect(dstRect: tRect; col: RGBA);
 var
   y: integer;
-  pixels: pointer;
   stride: dword;
   len: dword;
 begin

@@ -37,7 +37,7 @@ begin
   sy := clamp(sy, 0, size.y*256-1);
   sz := clamp(sz, 0, size.z*256-1);
 
-  voxPtr := voxSprite.vox.pixels;
+  voxPtr := voxSprite.vox.pData;
 
   for k := 0 to MAX_SAMPLES-1 do begin
 

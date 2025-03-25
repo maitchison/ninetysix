@@ -47,8 +47,8 @@ begin
 
   shiftCode := voxSprite.fLog2Height + voxSprite.fLog2Width * 256;
 
-  pagePtr := canvas.pixels + ((y * canvas.width) + xMin) * 4;
-  voxPtr := voxSprite.vox.pixels;
+  pagePtr := canvas.getAddr(xMin, y);
+  voxPtr := voxSprite.vox.pData;
 
   xCounter := (xMax-xMin); // exlusive of final pixel
   if xCounter <= 0 then exit;

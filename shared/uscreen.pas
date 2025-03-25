@@ -122,7 +122,7 @@ begin
   {only 32bit supported right now}
   lfb_seg := videoDriver.LFB_SEG;
   dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*4;
-  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  srcOffset := dword(canvas.getAddr(srcX, srcY));
   mask1 := $ff shr shift1;
   mask1 := mask1 + (mask1 shl 8) + (mask1 shl 16) + (mask1 shl 24);
   mask2 := $ff shr shift2;
@@ -180,7 +180,7 @@ begin
   {only 32bit supported right now}
   lfb_seg := videoDriver.LFB_SEG;
   dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*4;
-  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  srcOffset := dword(canvas.getAddr(srcX, srcY));
   noisePtr := dword(@NOISE_BUFFER);
   noiseOffset := rnd;
   asm
@@ -248,7 +248,7 @@ begin
   {only 32bit supported right now}
   lfb_seg := videoDriver.LFB_SEG;
   dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*4;
-  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  srcOffset := dword(canvas.getAddr(srcX, srcY));
   noisePtr := dword(@NOISE_BUFFER);
   noiseOffset := rnd;
   colorMask := $ff3f003f;
@@ -325,7 +325,7 @@ begin
   bitsPerPixel := videoDriver.bitsPerPixel;
   bytesPerPixel := (videoDriver.bitsPerPixel+7) div 8;
   dstOffset := (dstX+(dstY * videoDriver.logicalWidth))*bytesPerPixel;
-  srcOffset := dword(canvas.pixels) + ((srcX + srcY * canvas.width) * 4);
+  srcOffset := dword(canvas.getAddr(srcX, srcY));
   asm
     cli
     pushad
@@ -596,7 +596,7 @@ begin
   x1 := max(0, x1);
   x2 := min(canvas.width-1, x2);
 
-  pixelsPtr := canvas.pixels;
+  pixelsPtr := canvas.pData;
   ofs := (x1 + (y * canvas.width))*4;
   len := x2-x1; {todo: check this is right}
   if len <= 0 then exit;
@@ -638,8 +638,8 @@ begin
   x1 := max(0, x1);
   x2 := min(canvas.width-1, x2);
 
-  canvasPixels := canvas.pixels;
-  backgroundPixels := background.pixels;
+  canvasPixels := canvas.pData;
+  backgroundPixels := background.pData;
   ofs := (x1 + (y * canvas.width))*4;
   len := (x2-x1)+1;
   if len <= 0 then exit;

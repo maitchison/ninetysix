@@ -145,7 +145,7 @@ begin
 
   for x := xMin to xMax-1 do begin
 
-    col := trace_ASM(voxSprite.vox.pixels, p16, v16, s16, voxSprite.fLog2Width, voxSprite.fLog2Height);
+    col := trace_ASM(voxSprite.vox.pData, p16, v16, s16, voxSprite.fLog2Width, voxSprite.fLog2Height);
 
     {show trace count}
     if VX_GHOST_MODE then

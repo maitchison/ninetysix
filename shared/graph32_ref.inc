@@ -11,7 +11,7 @@ var
 begin
 
   for j := 0 to aRect.height-1 do begin
-    dstPtr := dstPage.getAddress(aRect.x, aRect.y+j);
+    dstPtr := dstPage.getAddr(aRect.x, aRect.y+j);
     case blendMode of
       bmNone: ;
       bmBlit: filldword(dstPtr^, aRect.width, dword(col));
@@ -35,8 +35,8 @@ begin
   needsTint := int32(tint) <> -1;
 
   for j := 0 to srcRect.height-1 do begin
-    srcPtr := srcPage.getAddress(srcRect.x, srcRect.y+j);
-    dstPtr := dstPage.getAddress(dstX, dstY+j);
+    srcPtr := srcPage.getAddr(srcRect.x, srcRect.y+j);
+    dstPtr := dstPage.getAddr(dstX, dstY+j);
     case blendMode of
       bmNone: ;
       bmBlit:
@@ -80,7 +80,7 @@ begin
   needsTint := int32(tint) <> -1;
   ty := srcY;
   for j := 0 to dstRect.height-1 do begin
-    dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
+    dstPtr := dstPage.getAddr(dstRect.x, dstRect.y+j);
     tx := srcX;
     for i := 0 to dstRect.width-1 do begin
       case filter of

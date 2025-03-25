@@ -330,7 +330,7 @@ begin
 
   s.readSegment(deltaBytes, gDeltaCodes);
 
-  pixelsPtr := page.pixels;
+  pixelsPtr := page.pData;
   ppLeft := pixelsPtr - 4;
   ppAbove := pixelsPtr - lineBytes;
   ofs := (atX + (dword(atY)*page.width)) * 4;

@@ -28,7 +28,7 @@ begin
   callCode := getCallCode(blendMode, RGBA.White);
   if callCode < 0 then exit;
 
-  dstPtr := dstPage.getAddress(aRect.pos.x, aRect.pos.y);
+  dstPtr := dstPage.getAddr(aRect.pos.x, aRect.pos.y);
   dstStride := (dstPage.width - aRect.width) * 4;
 
   asm
@@ -73,8 +73,8 @@ begin
   callCode := getCallCode(blendMode, tint);
   if callCode < 0 then exit;
 
-  srcPtr := srcPage.getAddress(srcRect.x, srcRect.y);
-  dstPtr := dstPage.getAddress(dstX, dstY);
+  srcPtr := srcPage.getAddr(srcRect.x, srcRect.y);
+  dstPtr := dstPage.getAddr(dstX, dstY);
   srcStride := (srcPage.width - srcRect.width) * 4;
   dstStride := (dstPage.width - srcRect.width) * 4;
 
@@ -158,9 +158,9 @@ begin
   ctx := clamp(tx, 0, 65536*(srcPage.width-1)-1);
 
   for j := 0 to dstRect.height-1 do begin
-    dstPtr := dstPage.getAddress(dstRect.x, dstRect.y+j);
+    dstPtr := dstPage.getAddr(dstRect.x, dstRect.y+j);
     cty := clamp(ty, 0, (65536*maxY)-1);
-    linePtr := srcPage.getAddress(0, cty div 65536);
+    linePtr := srcPage.getAddr(0, cty div 65536);
 
     {for linear filtering}
     yCode := (cty div 256) and $ff;
