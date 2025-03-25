@@ -28,11 +28,19 @@ type
 
   tMonsterFrame = class(tGuiComponent)
   protected
+    id: integer;
     monster: pointer;
     frame: tSprite;
-    monsterImage: tPage;
+    monsterImage: tSprite;
   public
     procedure  doDraw(const dc: tDrawContext); override;
+    constructor Create();
+  end;
+
+  tSimpleMonsterFrame = class(tMonsterFrame)
+  public
+    procedure  doDraw(const dc: tDrawContext); override;
+    procedure  doUpdate(elapsed: single); override;
     constructor Create();
   end;
 
@@ -41,11 +49,44 @@ type
     mode: tEncounterGuiMode;
     dungeonView: tDungeonViewGui;
     monsterFrame: array[1..4] of tMonsterFrame;
+    procedure  doUpdate(elapsed: single); override;
     procedure  doDraw(const dc: tDrawContext); override;
     constructor Create(map: tMDRMap);
   end;
 
 implementation
+
+{-------------------------------------------------------}
+
+constructor tSimpleMonsterFrame.Create();
+begin
+  inherited Create();
+  doubleBufferMode := dbmBlend;
+end;
+
+procedure tSimpleMonsterFrame.doDraw(const dc: tDrawContext);
+begin
+  {todo: why no dc.clear?? }
+  dc.asBlendMode(bmBlit).fillRect(Rect(0,0,dc.width, dc.height), RGBA.Clear);
+  //monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGBA.White).asBlendMode(bmBlend), 20+0, 30+0, 3);
+  monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGB(0,0,0,200)).asBlendMode(bmBlend), 20+2, 30+2, 3);
+  monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGB($ff9e720c)).asBlendMode(bmBlend), 20+1, 30+1, 3);
+
+
+end;
+
+procedure tSimpleMonsterFrame.doUpdate(elapsed: single);
+var
+  animationFrame: integer;
+  oldImage: tSprite;
+begin
+  inherited doUpdate(elapsed);
+  animationFrame := (round(id*12.37+getSec*1.5) mod 2)*19;
+  oldImage := monsterImage;
+  monsterImage := monsterSprites.byIndex(11+(4*19)+animationFrame);
+  if monsterImage <> oldImage then
+    isDirty := true;
+end;
 
 {-------------------------------------------------------}
 
@@ -58,13 +99,13 @@ begin
   setBounds(Rect(0,0, 96+8, 128+38));
   frame := tSprite.Create(gfx['frame']);
   frame.border := Border(15,15,15,15);
-  monsterImage:= gfx['wolf96'];
+  monsterImage:= tSprite.Create(gfx['wolf96']);
 end;
 
 procedure tMonsterFrame.doDraw(const dc: tDrawContext);
 begin
   {portrait}
-  dc.asBlendMode(bmBlit).drawImage(monsterImage, Point(4,15));
+  monsterImage.draw(dc.asBlendMode(bmBlit), 4, 15);
   {header}
   dc.fillRect(Rect(0,0,bounds.width,25), MDR_LIGHTGRAY);
   dc.drawRect(Rect(0,0,bounds.width,25), RGB(0,0,0,128));
@@ -76,11 +117,14 @@ begin
   frame.drawNineSlice(dc.asBlendMode(bmBlend), bounds);
 end;
 
+{-------------------------------------------------------}
+
 constructor tEncounterGUI.Create(map: tMDRMap);
 var
   i: integer;
 begin
   inherited Create();
+  fHasTransparientChildren := true;
   background := nil;
   backgroundCol := RGB(0,0,0,0);
   image := DEFAULT_GUI_SKIN.gfx.getWithDefault('innerwindow', nil);
@@ -99,9 +143,27 @@ begin
       end;
     end;
     egmType3: begin
-      fImageCol := RGBA.White;
+      for i := 1 to 4 do begin
+        monsterFrame[i] := tSimpleMonsterFrame.Create();
+        monsterFrame[i].id := i;
+        monsterFrame[i].pos := Point(10+(90*i), round(95+sin(i*2)*10));
+        monsterFrame[i].text := 'Monster';
+        self.append(monsterFrame[i]);
+      end;
     end;
   end;
+end;
+
+procedure tEncounterGUI.doUpdate(elapsed: single);
+var
+  i: integer;
+  anyDirty: boolean;
+begin
+  {big stub...}
+  anyDirty := false;
+  for i := 1 to 4 do if monsterFrame[i].isDirty then anyDirty := true;
+  for i := 1 to 4 do monsterFrame[i].isDirty := anyDirty;
+  inherited doUpdate(elapsed);
 end;
 
 procedure tEncounterGUI.doDraw(const dc: tDrawContext);
@@ -110,11 +172,17 @@ var
   xPadding: integer;
 begin
   inherited doDraw(dc);
+  {
+  envImage := gfx['bg1'];
+  dc.asBlendMode(bmBlit).asFilter(tfNearest).stretchImage(envImage, Rect((dc.clip.width-(82*5)) div 2,0,82*5, 42*5));
+  }
+
   envImage := gfx['bg1_hq'];
   xPadding := (dc.width - envImage.width) div 2;
   dc.asBlendMode(bmBlit).drawImage(envImage, Point(xPadding, 0));
   dc.fillRect(Rect(0,0,xPadding, dc.height), RGB(0,0,0,220));
   dc.fillRect(Rect(dc.width-xPadding,0,xPadding, dc.height), RGB(0,0,0,220));
+
 end;
 
 begin

@@ -28,7 +28,7 @@ section .text
 ; eax: draw code [destroyed]
 ; ebx: varies
 ; ecx: pixel count [0]
-; edx: varies 
+; edx: varies
 
 GLOBAL _ColLine_MMX
 GLOBAL _DrawLine_MMX
@@ -49,14 +49,14 @@ GLOBAL _yFactor
 ; -------------------------------------------------
 
 %macro DRAW_SAMPLE 0
-  .xloop:    
+  .xloop:
     movd      src, [esi]
     add       esi, 4
     punpcklbw src, zer
 %endmacro
 
 %macro STRETCH_SAMPLE 0
-  .xloop:    
+  .xloop:
     mov       eax, ebx
     shr       eax, 16
     movd      src, [esi+eax*4]
@@ -78,13 +78,13 @@ GLOBAL _yFactor
     ;textureStride = source stride (passed via global)
 
     mov       [_tdx], edx
-  
-  .xloop:    
+
+  .xloop:
     mov       edx, ebx
     shr       edx, 16
 
     ; mm1 <- acc (set to bias)
-    movq      src, b25    
+    movq      src, b25
 
     ; mm5 <- [(255-x), x, (255-x), x]
     xor       eax, eax
@@ -94,7 +94,7 @@ GLOBAL _yFactor
     punpcklwd mm6, mm6
     punpckldq mm6, mm6    ; mm4 <- x (x4)
     movq      mm5, b25
-    psubw     mm5, mm6    ; mm5 <- (255-x) (x4)    
+    psubw     mm5, mm6    ; mm5 <- (255-x) (x4)
     punpcklwd mm5, mm6
 
     ; mm5 <- weights for each corner
@@ -102,9 +102,9 @@ GLOBAL _yFactor
     pmullw    mm5, mm6
     paddusw   mm5, b25
     psrlw     mm5, 8
-  
-  .ReadPixel1and2:    
-    movq      mm6, [esi+edx*4]  
+
+  .ReadPixel1and2:
+    movq      mm6, [esi+edx*4]
     movq      mm7, mm6
     punpcklbw mm6, zer
     punpckhbw mm7, zer
@@ -119,13 +119,13 @@ GLOBAL _yFactor
     movq      mm4, mm5
     psrlq     mm4, 48
     punpcklwd mm4, mm4
-    punpckldq mm4, mm4    
+    punpckldq mm4, mm4
     pmullw    mm7, mm4
     paddusw   src, mm7
 
-  .ReadPixel3and4:  
+  .ReadPixel3and4:
     add       edx, [_textureStride]
-    movq      mm6, [esi+edx*4] 
+    movq      mm6, [esi+edx*4]
     movq      mm7, mm6
     punpcklbw mm6, zer
     punpckhbw mm7, zer
@@ -140,9 +140,9 @@ GLOBAL _yFactor
     movq      mm4, mm5
     psrlq     mm4, 16
     punpcklwd mm4, mm4
-    punpckldq mm4, mm4    
+    punpckldq mm4, mm4
     pmullw    mm7, mm4
-    paddusw   src, mm7  
+    paddusw   src, mm7
 
     psrlw     src, 8
 
@@ -164,7 +164,7 @@ GLOBAL _yFactor
     je        .skip
     cmp       al, 255
     je        .blit
-    
+
     movd      mm6, [edi]
     punpcklbw mm6, zer
 
@@ -189,8 +189,8 @@ GLOBAL _yFactor
 %endmacro
 
 %macro DRAW_END 0
-  .skip:    
-    add edi, 4    
+  .skip:
+    add edi, 4
     dec ecx
     jnz .xloop
 %endmacro
@@ -216,22 +216,22 @@ DrawLine_MMX:
   jnz .xloop
 .final:
   pop ecx
-  and ecx, 3  
+  and ecx, 3
   rep movsd
   ret
 
 DrawLine_Tint_MMX:
-  DRAW_SAMPLE  
-  DRAW_TINT 
-  DRAW_BLIT  
-  DRAW_END  
+  DRAW_SAMPLE
+  DRAW_TINT
+  DRAW_BLIT
+  DRAW_END
   ret
 
 DrawLine_Blend_MMX:
   DRAW_SAMPLE
   DRAW_BLEND
-  DRAW_BLIT    
-  DRAW_END  
+  DRAW_BLIT
+  DRAW_END
   ret
 
 DrawLine_Tint_Blend_MMX:
@@ -249,7 +249,7 @@ draw_jump_table:
   dd DrawLine_Tint_Blend_MMX
 
 _DrawLine_MMX:
-  and eax, $3  
+  and eax, $3
   mov eax, [draw_jump_table + eax * 4]
   call eax
   ret
@@ -267,7 +267,7 @@ ColLine_MMX:
   shr  ecx, 2
   test ecx, ecx
   jz .final
-  
+
   movd mm1, eax
   punpckldq mm1, mm1
 .xloop:
@@ -278,7 +278,7 @@ ColLine_MMX:
   jnz .xloop
 .final:
   pop  ecx
-  and  ecx, 3  
+  and  ecx, 3
   rep  stosd
   ret
 
@@ -340,23 +340,23 @@ StretchLineNearest_MMX:
   mov       eax, [esi+eax*4]
   add       ebx, edx
   mov       [edi], eax
-  add edi, 4    
+  add edi, 4
   dec ecx
   jnz .xloop
   ret
 
 StretchLineNearest_Blend_MMX:
   STRETCH_SAMPLE
-  DRAW_BLEND  
+  DRAW_BLEND
   DRAW_BLIT
-  DRAW_END  
+  DRAW_END
   ret
 
 StretchLineNearest_Tint_MMX:
   STRETCH_SAMPLE
   DRAW_TINT
   DRAW_BLIT
-  DRAW_END  
+  DRAW_END
   ret
 
 StretchLineNearest_Tint_Blend_MMX:
@@ -374,7 +374,7 @@ stretch_jump_table:
   dd StretchLineNearest_Tint_Blend_MMX
 
 _StretchLineNearest_MMX:
-  and eax, $3  
+  and eax, $3
   mov eax, [stretch_jump_table + eax * 4]
   call eax
   ret
@@ -393,21 +393,21 @@ _StretchLineNearest_MMX:
 StretchLineLinear_MMX:
   LINEAR_SAMPLE
   DRAW_BLIT
-  DRAW_END  
+  DRAW_END
   ret
 
 StretchLineLinear_Blend_MMX:
   LINEAR_SAMPLE
-  DRAW_BLEND  
+  DRAW_BLEND
   DRAW_BLIT
-  DRAW_END  
+  DRAW_END
   ret
 
 StretchLineLinear_Tint_MMX:
   LINEAR_SAMPLE
   DRAW_TINT
   DRAW_BLIT
-  DRAW_END  
+  DRAW_END
   ret
 
 StretchLineLinear_Tint_Blend_MMX:
@@ -425,7 +425,7 @@ stretchLinear_jump_table:
   dd StretchLineLinear_Tint_Blend_MMX
 
 _StretchLineLinear_MMX:
-  and eax, $3  
+  and eax, $3
   mov eax, [stretchLinear_jump_table + eax * 4]
   call eax
-  ret  
+  ret

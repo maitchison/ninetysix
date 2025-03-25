@@ -65,6 +65,7 @@ type
     {modifiers}
     function  asBlendMode(aBlendMode: tBlendMode): tDrawContext;
     function  asTint(aTint: RGBA): tDrawContext;
+    function  asFilter(aFilter: tTextureFilter): tDrawContext;
     {dispatch}
     procedure doDrawRect(dstPage: tPage;aRect: tRect;col: RGBA;blendmode: tBlendMode);
     procedure doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
@@ -658,6 +659,12 @@ function tDrawContext.asTint(aTint: RGBA): tDrawContext;
 begin
   result := self;
   result.tint := aTint;
+end;
+
+function tDrawContext.asFilter(aFilter: tTextureFilter): tDrawContext;
+begin
+  result := self;
+  result.textureFilter := aFilter;
 end;
 
 { dispatch}

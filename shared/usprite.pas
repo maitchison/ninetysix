@@ -58,6 +58,7 @@ type
     procedure draw(const dc: tDrawContext; atX, atY: int32);
     procedure drawFlipped(const dc: tDrawContext; atX, atY: int32);
     procedure drawStretched(const dc: tDrawContext; dstRect: tRect);
+    procedure drawScaled(const dc: tDrawContext; atX, atY: int32; scale: single);
     procedure drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
     procedure drawTransformed(const dc: tDrawContext; pos: V3D;transform: tMatrix4x4);
     procedure drawNineSlice(const dc: tDrawContext; dstRect: tRect);
@@ -70,18 +71,18 @@ type
 
   tSpriteSheet = class
   protected
-    function getByVar(tag: variant): tSprite;
-    function getByTag(tag: string): tSprite;
-    function getByIndex(idx: integer): tSprite;
+    function byVar(tag: variant): tSprite;
   public
     page: tPage;
     sprites: array of tSprite;
+    function byTag(tag: string): tSprite;
+    function byIndex(idx: integer): tSprite;
   public
-    constructor create(aPage: tPage);
+    constructor Create(aPage: tPage);
     procedure append(sprite: tSprite);
     procedure load(filename: string);
     procedure grid(cellWidth, cellHeight: word;centered: boolean=false);
-    property items[tag: Variant]: tSprite read getByVar; default;
+    property items[tag: Variant]: tSprite read byVar; default;
   end;
 
 function Border(aLeft, aTop, aRight, aBottom: Integer): tBorder;
@@ -268,6 +269,11 @@ begin
   dc.stretchSubImage(page, dstRect, srcRect);
 end;
 
+procedure tSprite.drawScaled(const dc: tDrawContext; atX, atY: int32; scale: single);
+begin
+  self.drawStretched(dc, Rect(atX, atY, round(width*scale), round(height*scale)));
+end;
+
 procedure tSprite.drawRotated(const dc: tDrawContext; atPos: tPoint;zAngle: single; scale: single=1.0);
 var
   transform: tMatrix4x4;
@@ -404,7 +410,7 @@ end;
 
 {-----------------------------------------------------}
 
-constructor tSpriteSheet.create(aPage: tPage);
+constructor tSpriteSheet.Create(aPage: tPage);
 begin
   setLength(sprites, 0);
   page := aPage;
@@ -450,20 +456,22 @@ begin
       append(sprite);
     end;
   end;
+  note('Loaded %d sprites from %s',[length(sprites), page.tag]);
 end;
 
 {---------------}
 
-function tSpriteSheet.getByVar(tag: variant): tSprite;
+function tSpriteSheet.byVar(tag: Variant): tSprite;
 begin
   case tVarData(tag).vType of
-    vtInteger: result := getByIndex(tag.VInteger);
-    vtString: result := getByTag(tag.VString);
+    vtInteger: result := byIndex(tag.VInteger);
+    vtInt64: result := byIndex(tag.VInt64);
+    vtString: result := byTag(tag.VString);
+    else raise ValueError('Invalid index type');
   end;
-  raise ValueError('Invalid index type');
 end;
 
-function tSpriteSheet.getByTag(tag: string): tSprite;
+function tSpriteSheet.byTag(tag: string): tSprite;
 var
   sprite: tSprite;
 begin
@@ -473,7 +481,7 @@ begin
   fatal('Sprite sheet contains no sprite named "'+tag+'"');
 end;
 
-function tSpriteSheet.getByIndex(idx: integer): tSprite;
+function tSpriteSheet.byIndex(idx: integer): tSprite;
 begin
   result := sprites[idx];
 end;

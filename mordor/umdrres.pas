@@ -16,6 +16,7 @@ var
   gfx: tGFXLibrary;
   sfx: tSFXLibrary;
   mapSprites: tSpriteSheet;
+  monsterSprites: tSpriteSheet;
 
 procedure loadResources();
 
@@ -28,8 +29,6 @@ const
   {still working on these colors}
   MDR_GREEN: RGBA = (b:$39; g:$b7; r:$60; a:$ff);
 
-
-
 implementation
 
 procedure loadResources();
@@ -40,8 +39,11 @@ begin
   sfx := tSFXLibrary.Create(true);
   sfx.loadFromFolder('res', '*.a96');
 
-  mapSprites := tSpriteSheet.create(gfx['map']);
+  mapSprites := tSpriteSheet.Create(gfx['map']);
   mapSprites.grid(16,16);
+
+  monsterSprites := tSpriteSheet.Create(gfx['monsters']);
+  monsterSprites.grid(16,24);
 
 end;
 
