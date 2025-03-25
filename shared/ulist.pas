@@ -88,6 +88,9 @@ type
 
   end;
 
+type
+  pStringList = ^tStringList;
+
 
 implementation
 

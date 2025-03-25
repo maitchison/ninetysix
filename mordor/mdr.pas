@@ -301,6 +301,7 @@ begin
   messageBox.doubleBufferMode := dbmBlend;
   messageBox.align := gaFull;
   messageBox.fontStyle.font := mdr.FONT_MEDIUM;
+  messageBox.source := @mdr.messageLog;
   logWindow.hasTransparientChildren := true;
   logWindow.append(messagebox);
 
@@ -350,7 +351,7 @@ begin
 
     input.update();
 
-    if keyDown(key_r) then messageBox.addMessage('<shadow>Hello <rgb(%d,%d,%d)>fish</rgb> and <bold>chips</bold>.</shadow>', [rnd,rnd,rnd]);
+    if keyDown(key_r) then mdr.addMessage('<shadow>Hello <rgb(%d,%d,%d)>fish</rgb> and <bold>chips</bold>.</shadow>', [rnd,rnd,rnd]);
 
     {update view - there should be a better place to do this}
     if assigned(encounterGui.dungeonView) then begin

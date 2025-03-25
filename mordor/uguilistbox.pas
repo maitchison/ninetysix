@@ -24,31 +24,34 @@ type
   const
     pad = 3;
   protected
-    fMessages: tStrings;
+    fMessages: pStringList;
     scrollOffset: integer;
+    prevSourceLength: int32;
   protected
     procedure  onKeyPress(code: word); override;
+    procedure  doUpdate(elapsed: single); override;
     function   rowHeight(): integer;
     function   maxRows(): integer;
   public
     procedure  scroll(offset: integer);
-    procedure  addMessage(s: string); overload;
-    procedure  addMessage(s: string; args: array of const); overload;
     procedure  doDraw(const dc: tDrawContext); override;
     constructor Create();
+    property   source: pStringList read fMessages write fMessages;
   end;
 
 implementation
 
-procedure tGUIListBox.addMessage(s: string); overload;
+procedure tGUIListBox.doUpdate(elapsed: single);
 begin
-  fMessages.append(s);
+  inherited doUpdate(elapsed);
+  {for the moment just trigger on length change, which will work for
+   append only message logs. In the future have a 'onListChanged' for
+   a tStringList}
+  if assigned(fMessages) and (fMessages^.len <> prevSourceLength) then begin
+    isDirty := true;
+    prevSourceLength := fMessages^.len;
+  end;
   isDirty := true;
-end;
-
-procedure tGUIListBox.addMessage(s: string; args: array of const); overload;
-begin
-  addMessage(format(s, args));
 end;
 
 procedure tGUIListBox.onKeyPress(code: word);
@@ -72,7 +75,7 @@ end;
 procedure tGUIListBox.scroll(offset: integer);
 begin
   scrollOffset += offset;
-  if scrollOffset > length(fMessages)-maxRows then scrollOffset := length(fMessages)-maxRows;
+  if scrollOffset > fMessages^.len-maxRows then scrollOffset := fMessages^.len-maxRows;
   if scrollOffset < 0 then scrollOffset := 0;
   isDirty := true;
 end;
@@ -86,10 +89,10 @@ begin
   dc.asBlendMode(bmBlit).fillRect(bounds, RGBA.Clear);
   {display messages}
   for row := 0 to maxRows-1 do begin
-    messageIdx := length(fMessages)-1-row-scrollOffset;
+    messageIdx := fMessages^.len-1-row-scrollOffset;
     if messageIdx < 0 then continue;
-    if messageIdx >= length(fMessages) then continue;
-    font.textOut(dc.asBlendMode(bmBlit), 1+pad, pad+row*rowHeight, fMessages[messageIdx], RGBA.White);
+    if messageIdx >= fMessages^.len then continue;
+    font.textOut(dc.asBlendMode(bmBlit), 1+pad, pad+row*rowHeight, fMessages^[messageIdx], RGBA.White);
   end;
 end;
 
@@ -98,6 +101,7 @@ begin
   inherited Create();
   backgroundCol := RGBA.Clear;
   setBounds(Rect(0, 0, 200, 100));
+  prevSourceLength := -1;
 end;
 
 

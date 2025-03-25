@@ -10,8 +10,10 @@ uses
   uSound,
   uColor,
   uUtils,
+  uList,
   uVoxel,
   uFont,
+  uTypes,
   uGraph32;
 
 type
@@ -34,13 +36,28 @@ type
     mapSprites: tSpriteSheet;
     monsterSprites: tSpriteSheet;
 
+    messageLog: tStringList;
+
     procedure loadResources();
+    procedure addMessage(s: string); overload;
+    procedure addMessage(s: string; args: array of const); overload;
   end;
 
 var
  mdr: tMordor;
 
 implementation
+
+{logs a game message}
+procedure tMordor.addMessage(s: string);
+begin
+  messageLog.append(s);
+end;
+
+procedure tMordor.addMessage(s: string; args: array of const); overload;
+begin
+  addMessage(format(s, args));
+end;
 
 procedure tMordor.loadResources();
 begin
