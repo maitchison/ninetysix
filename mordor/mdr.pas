@@ -23,6 +23,7 @@ uses
   uResource,
   uColor,
   uMath,
+  uJob,
   {$i gui.inc}
   {game stuff}
   uMDRRes,
@@ -66,6 +67,16 @@ type
 var
   screen: tScreen;
   scene: tScene;
+
+type
+  tMusicJob = class(tJob)
+    procedure update(timeSlice: single); override;
+  end;
+
+procedure tMusicJob.update(timeSlice: single);
+begin
+  musicUpdate();
+end;
 
 {-------------------------------------------------------}
 
@@ -335,6 +346,8 @@ begin
   gui.addHook(ON_KEYPRESS, self.onKeyPress);
   moveParty(0,0);
 
+  mdr.jobs.startJob(tMusicJob.Create());
+
   repeat
 
     timer.start();
@@ -347,7 +360,7 @@ begin
       tpsLabel.text := format('%.1fk', [encounterGui.dungeonView.voxelScene.tracesPerSecond/1000]);
     end;
 
-    musicUpdate();
+    mdr.jobs.update();
 
     input.update();
 

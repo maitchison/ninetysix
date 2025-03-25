@@ -51,7 +51,6 @@ begin
     isDirty := true;
     prevSourceLength := fMessages^.len;
   end;
-  isDirty := true;
 end;
 
 procedure tGUIListBox.onKeyPress(code: word);
