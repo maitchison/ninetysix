@@ -3,6 +3,7 @@ unit uMDRRes;
 interface
 
 uses
+  netFont,
   uDebug,
   uTest,
   uSprite,
@@ -10,6 +11,7 @@ uses
   uColor,
   uUtils,
   uVoxel,
+  uFont,
   uGraph32;
 
 var
@@ -28,11 +30,21 @@ const
   MDR_BLUE: RGBA      = (b:round(255*0.62);g:round(255*0.42); r:round(255*0.40); a:$ff);
   {still working on these colors}
   MDR_GREEN: RGBA = (b:$39; g:$b7; r:$60; a:$ff);
+var
+  FONT_TINY,
+  FONT_SMALL,
+  FONT_MEDIUM: tFont;
 
 implementation
 
 procedure loadResources();
 begin
+
+  {additional fonts}
+  FONT_TINY := loadNetFont(joinPath('res', 'netfont2.p96'));
+  FONT_SMALL := tFont.LOAD(joinPath('res', 'fontin12'));
+  FONT_MEDIUM := tFont.LOAD(joinPath('res', 'fontin18'));
+
   gfx := tGFXLibrary.Create(true);
   gfx.loadFromFolder('res', '*.p96');
 

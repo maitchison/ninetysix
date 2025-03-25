@@ -68,11 +68,19 @@ procedure tSimpleMonsterFrame.doDraw(const dc: tDrawContext);
 var
   atX, atY: integer;
   ambiance, monsterCol: RGBA;
+  midX, midY: integer;
+const
+  SAMPLE_SIZE = 6;
 begin
   dc.clear(RGBA.Clear);
   atX := 20; atY := 30;
+  midX := (16*3 div 2);
+  midY := (24*3 div 2);
   if assigned(parent) and assigned(parent.getCanvas()) then begin
-    ambiance := parent.getCanvas().getPixelArea(Rect(fPos.x+atX+(16*3 div 2)-4, fPos.y+atY+(24*3 div 2)-4, 8, 8));
+    ambiance := parent.getCanvas().getPixelArea(Rect(
+      fPos.x+atX+midX-(SAMPLE_SIZE div 2),
+      fPos.y+atY+midY-(SAMPLE_SIZE div 2),
+      SAMPLE_SIZE, SAMPLE_SIZE));
   end else
     ambiance := RGBA.White;
   monsterCol := RGBA.Blend(ambiance, RGB($ff9e720c), 96);

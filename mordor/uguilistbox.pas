@@ -89,7 +89,7 @@ begin
     messageIdx := length(fMessages)-1-row-scrollOffset;
     if messageIdx < 0 then continue;
     if messageIdx >= length(fMessages) then continue;
-    font.textOut(dc, 1+pad, pad+row*rowHeight, fMessages[messageIdx], RGBA.White);
+    font.textOut(dc.asBlendMode(bmBlit), 1+pad, pad+row*rowHeight, fMessages[messageIdx], RGBA.White);
   end;
 end;
 

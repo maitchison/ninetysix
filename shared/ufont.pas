@@ -16,7 +16,7 @@ type
 
   tChar = record
     {todo support custom kerning}
-    id: byte;
+    id: dword;
     rect: tRect;
     xoffset, yoffset: integer;
     xadvance: integer;
@@ -35,12 +35,12 @@ type
     function  charOut(const dc: tDrawContext;atX, atY: integer;c: char;col: RGBA; prevC: char): integer;
   public
     constructor Create();
-    class function Load(filename: string): tFont; static;
+    class function Load(filename: string;gammaConvert: boolean=false): tFont; static;
 
     function  textOut(const dc: tDrawContext; atX, atY: integer; s: string;col: RGBA): tRect;
     function  textExtents(s: string; p: tPoint): tRect; overload;
     function  textExtents(s: string): tRect; overload;
-    property  height: integer read fHeight;
+    property  height: integer read fHeight write fHeight;
 
   end;
 
@@ -109,7 +109,7 @@ begin
   fHeight := -1;
 end;
 
-class function tFont.Load(filename: string): tFont;
+class function tFont.Load(filename: string;gammaConvert: boolean=false): tFont;
 var
   TextFile: Text;
   Line: String;
@@ -133,6 +133,8 @@ begin
   for y := 0 to bitmap.height-1 do
     for x := 0 to bitmap.width-1 do begin
       c := bitmap.getPixel(x,y);
+      {some fonts seem to be in linear space...}
+      if gammaConvert then c.r := round(sqrt(c.r/255)*255);
       bitmap.setPixel(x,y,RGB(255,255,255,c.r));
     end;
 
@@ -149,8 +151,10 @@ begin
   while not Eof(TextFile) do begin
     readLn(TextFile, Line);
     if Pos('char id=', Line) > 0 then begin
-       char := parseCharLine(Line);
-      result.chars[char.id] := char;
+      char := parseCharLine(Line);
+      if char.id <= 255 then
+        {ignore non-ascii for the moment}
+        result.chars[char.id] := char;
     end;
     if Pos('kerning first=', Line) > 0 then begin
       a := readAttribute(line, 'first');

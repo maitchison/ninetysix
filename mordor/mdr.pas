@@ -300,6 +300,7 @@ begin
   messageBox := tGuiListBox.Create();
   messageBox.doubleBufferMode := dbmBlend;
   messageBox.align := gaFull;
+  messageBox.fontStyle.font := FONT_MEDIUM;
   logWindow.hasTransparientChildren := true;
   logWindow.append(messagebox);
 
