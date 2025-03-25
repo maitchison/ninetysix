@@ -65,14 +65,19 @@ begin
 end;
 
 procedure tSimpleMonsterFrame.doDraw(const dc: tDrawContext);
+var
+  atX, atY: integer;
+  ambiance, monsterCol: RGBA;
 begin
-  {todo: why no dc.clear?? }
-  dc.asBlendMode(bmBlit).fillRect(Rect(0,0,dc.width, dc.height), RGBA.Clear);
-  //monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGBA.White).asBlendMode(bmBlend), 20+0, 30+0, 3);
-  monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGB(0,0,0,200)).asBlendMode(bmBlend), 20+2, 30+2, 3);
-  monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGB($ff9e720c)).asBlendMode(bmBlend), 20+1, 30+1, 3);
-
-
+  dc.clear(RGBA.Clear);
+  atX := 20; atY := 30;
+  if assigned(parent) and assigned(parent.getCanvas()) then begin
+    ambiance := parent.getCanvas().getPixelArea(Rect(fPos.x+atX+(16*3 div 2)-4, fPos.y+atY+(24*3 div 2)-4, 8, 8));
+  end else
+    ambiance := RGBA.White;
+  monsterCol := RGBA.Blend(ambiance, RGB($ff9e720c), 96);
+  monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(RGB(0,0,0,200)).asBlendMode(bmBlend), atX+2, atY+2, 3);
+  monsterImage.drawScaled(dc.asFilter(tfNearest).asTint(monsterCol).asBlendMode(bmBlend), atX+1, atY+1, 3);
 end;
 
 procedure tSimpleMonsterFrame.doUpdate(elapsed: single);

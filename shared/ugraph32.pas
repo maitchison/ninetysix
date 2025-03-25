@@ -78,6 +78,7 @@ type
     procedure stretchSubImage(src: tPage; pos: tPoint; scaleX, scaleY: single; srcRect: tRect); overload;
     procedure stretchSubImage(src: tPage; dstRect: tRect; srcRect: tRect); overload;
     {constructed}
+    procedure clear(col: RGBA);
     procedure drawImage(src: tPage; pos: tPoint);
     procedure inOutDraw(src: tPage; pos: tPoint; border: integer; innerBlendMode, outerBlendMode: tBlendMode);
     procedure fillRect(dstRect: tRect; col: RGBA);
@@ -102,6 +103,7 @@ type
     function  getAddress(x, y: integer): pointer; inline;
     function  getPixel(x, y: integer): RGBA; inline;
     function  getPixelF(fx,fy: single): RGBA;
+    function  getPixelArea(aRect: tRect): RGBA;
     procedure putPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure setPixel(atX, atY: int16;c: RGBA); inline; assembler; register;
     procedure clear(c: RGBA); overload;
@@ -614,6 +616,27 @@ begin
   end;
 end;
 
+{samples pixels in region and returns average}
+function tPage.getPixelArea(aRect: tRect): RGBA;
+var
+  x,y: integer;
+  r,g,b,a: int32;
+  c: RGBA;
+  invArea: single;
+begin
+  r := 0; g := 0; b := 0; a := 0;
+  for y := aRect.top to aRect.bottom-1 do
+    for x := aRect.left to aRect.right-1 do begin
+      c := getPixel(x,y);
+      r += c.r;
+      g += c.g;
+      b += c.b;
+      a += c.a;
+    end;
+  invArea := 1/aRect.area;
+  result.init(round(r*invArea), round(g*invArea), round(b*invArea), round(a*invArea));
+end;
+
 procedure tPage.convertColorSpace(aNewColorSpace: tColorSpace);
 var
   x,y: integer;
@@ -676,6 +699,11 @@ begin
     dbASM: drawRect_REF(dstPage, aRect, col, blendMode);
     dbMMX: drawRect_MMX(dstPage, aRect, col, blendMode);
   end;
+end;
+
+procedure tDrawContext.clear(col: RGBA);
+begin
+  self.asBlendMode(bmBlit).fillRect(Rect(0, 0, self.width, self.height), col);
 end;
 
 procedure tDrawContext.doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
