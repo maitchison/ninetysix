@@ -18,7 +18,7 @@ uses
   uGraph32;
 
 type
-  tTexture3DBase = class
+  tTexture3D = class
   protected
     fWidth,fHeight,fDepth: int32;
     maskH, maskW, maskD: dword;
@@ -33,18 +33,20 @@ type
     function  getPixel(x,y,z: integer): RGBA; virtual; abstract;
     procedure setPixel(x,y,z: integer; c: RGBA); virtual; abstract;
     function  getValue(x,y,z: integer): byte; virtual;
+    procedure clear(); virtual; abstract;
     constructor Create(aWidth, aHeight, aDepth: integer);
     property  width: integer read fWidth;
     property  height: integer read fHeight;
     property  depth: integer read fDepth;
   end;
 
-  tTexture3D = class(tTexture3DBase)
+  tDenseTexture3D = class(tTexture3D)
   protected
     page: tPage32;
   public
     function getPixel(x,y,z: integer): RGBA; override;
     procedure setPixel(x,y,z: integer; c: RGBA); override;
+    procedure clear(); override;
     constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
@@ -59,7 +61,7 @@ type
 
   pSVOCell = ^tSVOCell;
 
-  tSparseTexture3D = class(tTexture3DBase)
+  tSparseTexture3D = class(tTexture3D)
   protected
     cells: array of tSVOCell;
     pixels: array of RGBA;
@@ -68,6 +70,7 @@ type
   public
     function  getPixel(x,y,z: integer): RGBA; override;
     procedure setPixel(x,y,z: integer; c: RGBA); override;
+    procedure clear(); override;
     constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
@@ -75,13 +78,24 @@ implementation
 
 {-------------------------------------------------------}
 
-constructor tTexture3DBase.Create(aWidth, aHeight, aDepth: integer);
+{todo: do this with a lookup table}
+function countBits(b: byte): byte; inline;
+var
+  i: integer;
+begin
+  result := 0;
+  for i := 0 to 7 do result += ((b shr i) and 1);
+end;
+
+{-------------------------------------------------------}
+
+constructor tTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
   inherited Create();
   setDims(aWidth, aHeight, aDepth);
 end;
 
-procedure tTexture3DBase.setDims(aWidth, aHeight, aDepth: integer);
+procedure tTexture3D.setDims(aWidth, aHeight, aDepth: integer);
 begin
   assert(isPowerOfTwo(aWidth));
   assert(isPowerOfTwo(aDepth));
@@ -99,36 +113,41 @@ begin
   maskD := dword(-1) xor (aDepth-1);
 end;
 
-function tTexture3DBase.inBounds(x,y,z: integer): boolean;
+function tTexture3D.inBounds(x,y,z: integer): boolean;
 begin
   result := ((x and maskW) or (y and maskH) or (z and maskD)) = 0;
 end;
 
-function tTexture3DBase.getAddr(x,y,z: integer): dword; inline;
+function tTexture3D.getAddr(x,y,z: integer): dword; inline;
 begin
   result := (x + (y + (z shl flog2Height)) shl fLog2Width);
 end;
 
-function tTexture3DBase.getValue(x,y,z: integer): byte;
+function tTexture3D.getValue(x,y,z: integer): byte;
 begin
   result := getPixel(x,y,z).a;
 end;
 
 {-------------------------------------------------------}
 
-constructor tTexture3D.Create(aWidth, aHeight, aDepth: integer);
+constructor tDenseTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
   inherited Create(aWidth, aHeight, aDepth);
   page := tPage32.Create(aWidth, aDepth*aHeight);
+  clear();
+end;
+
+procedure tDenseTexture3D.clear();
+begin
   page.clear(RGBA.Clear);
 end;
 
-function tTexture3D.getPixel(x,y,z: integer): RGBA;
+function tDenseTexture3D.getPixel(x,y,z: integer): RGBA;
 begin
   result := page.pixel^[getAddr(x,y,z)];
 end;
 
-procedure tTexture3D.setPixel(x,y,z: integer; c: RGBA);
+procedure tDenseTexture3D.setPixel(x,y,z: integer; c: RGBA);
 begin
   page.pixel^[getAddr(x,y,z)] := c;
 end;
@@ -165,18 +184,15 @@ end;
 
 constructor tSparseTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
-  {make sure we are a cube}
   inherited Create(aWidth, aHeight, aDepth);
-  addCell();
 end;
 
-{todo: do this with a lookup table}
-function countBits(b: byte): byte; inline;
-var
-  i: integer;
+procedure tSparseTexture3D.clear();
 begin
-  result := 0;
-  for i := 0 to 7 do result += ((b shr i) and 1);
+  {todo: support for non-cubes}
+  setLength(cells,0);
+  setLength(pixels,0);
+  addCell();
 end;
 
 function tSparseTexture3D.getPixel(x,y,z: integer): RGBA;
@@ -323,38 +339,42 @@ type
 
 procedure tTexture3DTest.run();
 var
-  T3D: tTexture3D;
-  i,j: integer;
-  p1,p2,p3: V3D16;
-  p: V3D16;
-  x,y,z: integer;
-begin
+  t: tTexture3D;
 
-  for i := 1 to 10 do begin
-    T3D := tTexture3D.Create(8,8,8);
-    p1 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
-    p2 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
-    p3 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
-    T3D.setPixel(p1.x, p1.y, p1.z, RGB(255,0,0));
-    T3D.setPixel(p2.x, p2.y, p2.z, RGB(0,255,0));
-    T3D.setPixel(p3.x, p3.y, p3.z, RGB(0,0,255));
-    assertEqual(T3D.getPixel(p1.x, p1.y, p1.z), RGB(255,0,0));
-    assertEqual(T3D.getPixel(p2.x, p2.y, p2.z), RGB(0,255,0));
-    assertEqual(T3D.getPixel(p3.x, p3.y, p3.z), RGB(0,0,255));
-    for j := 0 to 15 do begin
-      p := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
-      if (p = p1) or (p=p2) or (p=p3) then continue;
-      assertEqual(T3D.getPixel(p.x, p.y, p.z), RGBA.Clear);
+  procedure runRandomVoxelTest(t3d: tTexture3D);
+  var
+    i,j: integer;
+    p1,p2,p3: V3D16;
+    p: V3D16;
+    x,y,z: integer;
+
+  begin
+    for i := 1 to 10 do begin
+      t3d.clear();
+      p1 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+      p2 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+      p3 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+      T3D.setPixel(p1.x, p1.y, p1.z, RGB(255,0,0));
+      T3D.setPixel(p2.x, p2.y, p2.z, RGB(0,255,0));
+      T3D.setPixel(p3.x, p3.y, p3.z, RGB(0,0,255));
+      assertEqual(T3D.getPixel(p1.x, p1.y, p1.z), RGB(255,0,0));
+      assertEqual(T3D.getPixel(p2.x, p2.y, p2.z), RGB(0,255,0));
+      assertEqual(T3D.getPixel(p3.x, p3.y, p3.z), RGB(0,0,255));
+      for j := 0 to 15 do begin
+        p := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+        if (p = p1) or (p=p2) or (p=p3) then continue;
+        assertEqual(T3D.getPixel(p.x, p.y, p.z), RGBA.Clear);
+      end;
     end;
-    T3D.free();
   end;
 
+begin
+  t := tDenseTexture3D.Create(8,8,8);
+  runRandomVoxelTest(t);
+  t.free;
 end;
 
 {--------------------------------------------------------}
-
-var
-  i: integer;
 
 initialization
   tTexture3DTest.create('Texture3D');
