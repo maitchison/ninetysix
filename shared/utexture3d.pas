@@ -9,7 +9,12 @@ unit uTexture3D;
 interface
 
 uses
+  uTest,
+  uDebug,
+  uVertex,
+  uUtils,
   uColor,
+  uGraph8,
   uGraph32;
 
 type
@@ -19,14 +24,14 @@ type
     maskH, maskW, maskD: dword;
     fRadius: single;
     fVolume: int32;
-    fLog2Width,fLog2Height: byte;
+    fLog2Width,fLog2Height,fLog2Depth: byte;
   protected
     procedure setDims(aWidth, aHeight, aDepth: integer);
   public
     function  inBounds(x,y,z: integer): boolean; inline;
     function  getAddr(x,y,z: integer): dword; inline;
-    function  getPixel(x,y,z: integer): RGBA; virtual;
-    procedure setPixel(x,y,z: integer; c: RGBA); virtual;
+    function  getPixel(x,y,z: integer): RGBA; virtual; abstract;
+    procedure setPixel(x,y,z: integer; c: RGBA); virtual; abstract;
     function  getValue(x,y,z: integer): byte; virtual;
     constructor Create(aWidth, aHeight, aDepth: integer);
     property  width: integer read fWidth;
@@ -39,39 +44,30 @@ type
     page: tPage32;
   public
     function getPixel(x,y,z: integer): RGBA; override;
-    function getValue(x,y,z: integer): byte; override;
-    constructor Create(aWidth, aHeight, aDepth: integer);
-  end;
-
-  tTexture3D8 = class(tTexture3DBase)
-  protected
-    page: tPage8;
-  public
-    function getAddr(x,y,z: integer): dword; inline;
-    function getPixel(x,y,z: integer): RGBA; override;
-    function getValue(x,y,z: integer): byte; override;
+    procedure setPixel(x,y,z: integer; c: RGBA); override;
     constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
   tSVOCell = record
-    mask: byte;
-    padding: byte;
-    baseAddr: word;
-    function isDead: boolean; inline;
+    data: dword;
+    function  isReserved: boolean; inline;
+    function  baseOffset: dword; inline; {24bit}
+    function  mask: byte; inline;
+    procedure setBaseOffset(aBaseOffset: dword); inline;
+    procedure setMask(aMask: dword); inline;
   end;
 
   pSVOCell = ^tSVOCell;
 
   tSparseTexture3D = class(tTexture3DBase)
   protected
-    function addCell(): integer;
-    function addPixels(): integer;
-    cData: array of tSVOCell;
-    pData: array of RGBA;
+    cells: array of tSVOCell;
+    pixels: array of RGBA;
+    function  addCell(): integer;
+    function  addPixels(): integer;
   public
-    function getPixel(x,y,z: integer): RGBA; override;
-    function getValue(x,y,z: integer): byte; override;
-    class function FromPage(aPage: tPage; aDepth: integer): tPage;
+    function  getPixel(x,y,z: integer): RGBA; override;
+    procedure setPixel(x,y,z: integer; c: RGBA); override;
     constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
@@ -94,12 +90,13 @@ begin
   fHeight := aHeight;
   fDepth := aDepth;
   fLog2Width := round(log2(aWidth));
-  fLog2Height := round(log2(aDepth));
+  fLog2Height := round(log2(aHeight));
+  fLog2Depth := round(log2(aDepth));
   fRadius := sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth));
   fVolume := fWidth * fHeight * fDepth;
-  maskW := not (aWidth-1);
-  maskH := not (aHeight-1);
-  maskD := not (aDepth-1);
+  maskW := dword(-1) xor (aWidth-1);
+  maskH := dword(-1) xor (aHeight-1);
+  maskD := dword(-1) xor (aDepth-1);
 end;
 
 function tTexture3DBase.inBounds(x,y,z: integer): boolean;
@@ -112,66 +109,64 @@ begin
   result := (x + (y + (z shl flog2Height)) shl fLog2Width);
 end;
 
+function tTexture3DBase.getValue(x,y,z: integer): byte;
+begin
+  result := getPixel(x,y,z).a;
+end;
+
 {-------------------------------------------------------}
 
 constructor tTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
   inherited Create(aWidth, aHeight, aDepth);
   page := tPage32.Create(aWidth, aDepth*aHeight);
+  page.clear(RGBA.Clear);
 end;
 
 function tTexture3D.getPixel(x,y,z: integer): RGBA;
 begin
-  result := (page.pixels + getAddr(x,y,z))^;
+  result := page.pixel^[getAddr(x,y,z)];
 end;
 
-function tTexture3D.getValue(x,y,z: integer): byte;
+procedure tTexture3D.setPixel(x,y,z: integer; c: RGBA);
 begin
-  result := (page.pixels + getAddr(x,y,z))^.a;
-end;
-
-{-------------------------------------------------------}
-
-constructor tTexture3D8.Create(aWidth, aHeight, aDepth: integer);
-begin
-  inherited Create(aWidth, aHeight, aDepth);
-  page := tPage8.Create(aWidth, aDepth*aHeight);
-end;
-
-function tTexture3D8.getPixel(x,y,z: integer): RGBA;
-var
-  v: byte;
-begin
-  v := (page.pixels + getAddr(x,y,z))^;
-  result.r := v; result.g := v; result.b := v; result.a := 255;
-end;
-
-function tTexture3D8.getValue(x,y,z: integer): byte;
-begin
-  result := (page.pixels + getAddr(x,y,z))^.a;
+  page.pixel^[getAddr(x,y,z)] := c;
 end;
 
 {-------------------------------------------------------}
 
 {dead cells are reserved spaced. This allows for editing}
-function tSVOCell.isDead: boolean; inline;
+function tSVOCell.isReserved: boolean; inline;
 begin
-  result := baseAddress = 0;
+  result := baseOffset = 0;
+end;
+
+function tSVOCell.baseOffset: dword; inline;
+begin
+  result := data shr 8;
+end;
+
+function tSVOCell.mask: byte; inline;
+begin
+  result := data and $ff;
+end;
+
+procedure tSVOCell.setBaseOffset(aBaseOffset: dword); inline;
+begin
+  data := (aBaseOffset shl 8) + mask;
+end;
+
+procedure tSVOCell.setMask(aMask: dword); inline;
+begin
+  data := (baseOffset shr 8) + aMask;
 end;
 
 {-------------------------------------------------------}
 
-function tSparseTexture3D.getValue(x,y,z: integer): byte;
-begin
-  result := getPixel(x,y,z).a;
-end;
-
 constructor tSparseTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
   {make sure we are a cube}
-  assert(aPage.aWidth = aPage.Depth);
-  assert(aPage.aHeight = aPage.Depth*aPage.Depth);
-  inherited Create(aPage.width, aPage.height*aDepth);
+  inherited Create(aWidth, aHeight, aDepth);
   addCell();
 end;
 
@@ -180,7 +175,7 @@ function countBits(b: byte): byte; inline;
 var
   i: integer;
 begin
-  result := 0
+  result := 0;
   for i := 0 to 7 do result += ((b shr i) and 1);
 end;
 
@@ -189,24 +184,25 @@ var
   d: integer;
   px,py,pz: integer; {current topleftupper}
   size: integer; {current cell size}
-  cell: pCell;
+  cell: pSVOCell;
   maskPosition: byte;
 begin
   d := 0;
   px := 0;
   py := 0;
   pz := 0;
-  sx := width;
-  sy := height;
-  sz := depth;
 
-  cell := @cData[0];
+  // todo: set this to root size
+  size := width;
+
+  cell := @cells[0];
 
   result := RGBA.Clear;
 
   while true do begin
-    maskPosition := 0;
+
     size := size shr 1;
+    maskPosition := 0;
     if x < px+size then begin
       px += size;
       maskPosition += 1;
@@ -215,19 +211,19 @@ begin
       py += size;
       maskPosition += 2;
     end;
-    if z < py+sz then begin
+    if z < py+size then begin
       pz += size;
       maskPosition += 4;
     end;
 
-    if (parent^.mask shr maskPosition) and $1 = $0 then exit;
+    if (cell^.mask shr maskPosition) and $1 = $0 then exit;
 
     if size = 1 then
       {fetch the payload}
-      exit(pData[cell.baseOffset+maskPosition]);
+      exit(pixels[cell.baseOffset+maskPosition]);
 
     {otherwise expand the next cell}
-    cell := @cData[cell.baseOffset+maskPosition];
+    cell := @cells[cell.baseOffset+maskPosition];
   end;
 end;
 
@@ -237,17 +233,17 @@ function tSparseTexture3D.addCell(): integer;
 var
   i: integer;
   reservedCell: tSVOCell;
-  cell: tSVOCell);
+  cell: tSVOCell;
 begin
   fillchar(cell, sizeof(cell), 0);
-  setLength(cData, length(cData)+1);
-  cData(length(cData)-1] = cell;
-  cell.baseOffset := length(pCell);
+  setLength(cells, length(cells)+1);
+  cells[length(cells)-1] := cell;
+  cell.setBaseOffset(length(cells));
   {reserve space for children - this allows for editing}
-  fillchar(deadCell, sizeof(deadCell), 0);
-  setLength(pCell, length(pCell)+8);
+  fillchar(reservedCell, sizeof(reservedCell), 0);
+  setLength(cells, length(cells)+8);
   for i := 0 to 7 do
-    pCell[cell.baseOffset+i] := reservedCell;
+    cells[cell.baseOffset+i] := reservedCell;
   result := cell.baseOffset;
 end;
 
@@ -256,30 +252,28 @@ function tSparseTexture3D.addPixels(): integer;
 var
   i: integer;
 begin
-  result := length(pData);
-  setLength(pData, length(pCell)+1);
-  fillchar(pData[result], 8*4, 0);
+  result := length(pixels);
+  setLength(pixels, length(pixels)+8);
+  fillchar(pixels[result], 8*4, 0);
 end;
 
-function tSparseTexture3D.setPixel(x,y,z: integer): RGBA;
+procedure tSparseTexture3D.setPixel(x,y,z: integer;c: RGBA);
 var
   d: integer;
   px,py,pz: integer; {current topleftupper}
   size: integer; {current cell size}
-  parent, cell: pCell;
+  cell: pSVOCell;
   maskPosition: byte;
 begin
   d := 0;
   px := 0;
   py := 0;
   pz := 0;
-  sx := width;
-  sy := height;
-  sz := depth;
 
-  cell := @cData[0];
+  // todo: set this correctly to initial size
+  size := width;
 
-  result := RGBA.Clear;
+  cell := @cells[0];
 
   while true do begin
     maskPosition := 0;
@@ -292,34 +286,79 @@ begin
       py += size;
       maskPosition += 2;
     end;
-    if z < py+sz then begin
+    if z < py+size then begin
       pz += size;
       maskPosition += 4;
     end;
 
     if size = 1 then begin
       {set the payload}
-      pData[cell.baseOffset+localOffset] := c;
+      pixels[cell.baseOffset+maskPosition] := c;
       exit;
     end;
 
-    if (parent^.mask shr maskPosition) and $1 = $0 then begin
+    if (cell^.mask shr maskPosition) and $1 = $0 then begin
       {cell is empty, create a new cell}
-      parent.mask := parent^.mask or (1 shl maskPosition);
+      cell.setMask(cell^.mask or (1 shl maskPosition));
       if size = 2 then begin
         {create pixel data}
-        cell.localOffset := addPixels();
+        cell.setBaseOffset(addPixels());
       end else
         {create a cell}
-        cell.localOffset := addCell();
+        cell.setBaseOffset(addCell());
     end else begin
       {otherwise move to next cell}
-      parent := cell;
-      cell := @cData[cell.baseOffset+localOffset];
+      cell := @cells[cell.baseOffset+maskPosition];
     end;
   end;
 end;
 
 
+{--------------------------------------------------------}
+
+type
+  tTexture3DTest = class(tTestSuite)
+    procedure run; override;
+  end;
+
+procedure tTexture3DTest.run();
+var
+  T3D: tTexture3D;
+  i,j: integer;
+  p1,p2,p3: V3D16;
+  p: V3D16;
+  x,y,z: integer;
 begin
+
+  for i := 1 to 10 do begin
+    T3D := tTexture3D.Create(8,8,8);
+    p1 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+    p2 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+    p3 := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+    T3D.setPixel(p1.x, p1.y, p1.z, RGB(255,0,0));
+    T3D.setPixel(p2.x, p2.y, p2.z, RGB(0,255,0));
+    T3D.setPixel(p3.x, p3.y, p3.z, RGB(0,0,255));
+    assertEqual(T3D.getPixel(p1.x, p1.y, p1.z), RGB(255,0,0));
+    assertEqual(T3D.getPixel(p2.x, p2.y, p2.z), RGB(0,255,0));
+    assertEqual(T3D.getPixel(p3.x, p3.y, p3.z), RGB(0,0,255));
+    for j := 0 to 15 do begin
+      p := V3D16.make(rnd mod 8, rnd mod 8, rnd mod 8);
+      if (p = p1) or (p=p2) or (p=p3) then continue;
+      assertEqual(T3D.getPixel(p.x, p.y, p.z), RGBA.Clear);
+    end;
+    T3D.free();
+  end;
+
+end;
+
+{--------------------------------------------------------}
+
+var
+  i: integer;
+
+initialization
+  tTexture3DTest.create('Texture3D');
+
+finalization
+
 end.

@@ -352,7 +352,7 @@ begin
   fHeight := aHeight;
   fDepth := aDepth;
   fLog2Width := round(log2(aWidth));
-  fLog2Height := round(log2(aDepth));
+  fLog2Height := round(log2(aHeight));
   fRadius := sqrt(sqr(fWidth)+sqr(fHeight)+sqr(fDepth));
   fVolume := fWidth * fHeight * fDepth;
   lSamples := 64;

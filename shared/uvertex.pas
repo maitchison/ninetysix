@@ -67,6 +67,7 @@ type
     class function make(x, y, z: int16): V3D16; static; inline; overload;
     class function round(a: V3D): V3D16; static; inline;
     class function trunc(a: V3D): V3D16; static; inline;
+    class operator equal(a,b: V3D16): boolean; inline;
     end;
 
   {Int32 vector}
@@ -639,6 +640,12 @@ begin
   result.z := z;
   result.w := 0;
 end;
+
+class operator V3D16.equal(a,b: V3D16): boolean; inline;
+begin
+  result := (a.x=b.x) and (a.y=b.y) and (a.z=b.z);
+end;
+
 
 class function V3D16.round(a: V3D): V3D16; static; inline;
 begin
