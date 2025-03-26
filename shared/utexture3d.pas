@@ -23,14 +23,15 @@ type
   protected
     procedure setDims(aWidth, aHeight, aDepth: integer);
   public
-    function inBounds(x,y,z: integer): boolean; inline;
-    function getAddr(x,y,z: integer): dword; inline;
-    function getPixel(x,y,z: integer): RGBA; virtual;
-    function getValue(x,y,z: integer): byte; virtual;
+    function  inBounds(x,y,z: integer): boolean; inline;
+    function  getAddr(x,y,z: integer): dword; inline;
+    function  getPixel(x,y,z: integer): RGBA; virtual;
+    procedure setPixel(x,y,z: integer; c: RGBA); virtual;
+    function  getValue(x,y,z: integer): byte; virtual;
     constructor Create(aWidth, aHeight, aDepth: integer);
-    property width: integer read fWidth;
-    property height: integer read fHeight;
-    property depth: integer read fDepth;
+    property  width: integer read fWidth;
+    property  height: integer read fHeight;
+    property  depth: integer read fDepth;
   end;
 
   tTexture3D = class(tTexture3DBase)
@@ -52,15 +53,26 @@ type
     constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
+  tSVOCell = record
+    mask: byte;
+    padding: byte;
+    baseAddr: word;
+    function isDead: boolean; inline;
+  end;
+
+  pSVOCell = ^tSVOCell;
+
   tSparseTexture3D = class(tTexture3DBase)
   protected
-    rowOfs: array of word;
-    colOfs: array of byte;
+    function addCell(): integer;
+    function addPixels(): integer;
+    cData: array of tSVOCell;
     pData: array of RGBA;
   public
     function getPixel(x,y,z: integer): RGBA; override;
     function getValue(x,y,z: integer): byte; override;
-    constructor Create(aPage: tPage; aDepth: integer); overload;
+    class function FromPage(aPage: tPage; aDepth: integer): tPage;
+    constructor Create(aWidth, aHeight, aDepth: integer);
   end;
 
 implementation
@@ -141,65 +153,173 @@ end;
 
 {-------------------------------------------------------}
 
-function tSparseTexture3D.getPixel(x,y,z: integer): RGBA;
-var
-  p: pointer;
+{dead cells are reserved spaced. This allows for editing}
+function tSVOCell.isDead: boolean; inline;
 begin
-
+  result := baseAddress = 0;
 end;
+
+{-------------------------------------------------------}
 
 function tSparseTexture3D.getValue(x,y,z: integer): byte;
 begin
   result := getPixel(x,y,z).a;
 end;
 
-constructor tSparseTexture3D.Create(aPage: tPage; aDepth: integer);
+constructor tSparseTexture3D.Create(aWidth, aHeight, aDepth: integer);
 begin
+  {make sure we are a cube}
+  assert(aPage.aWidth = aPage.Depth);
+  assert(aPage.aHeight = aPage.Depth*aPage.Depth);
   inherited Create(aPage.width, aPage.height*aDepth);
-  fromPage(aPage, aDepth);
+  addCell();
 end;
 
-function tSparseTexture3D.fromPage(aPage: tPage; aDepth: integer);
+{todo: do this with a lookup table}
+function countBits(b: byte): byte; inline;
 var
-  row: integer;
-  col: integer;
-  numRows: integer;
-  usedRows: integer;
-  pixels: pRGBA;
-  allEmpty: boolean;
-
+  i: integer;
 begin
-  assert(aPage.width = 16);
-  setDims(aPage.width, aPage.height div aDepth, aDepth);
-
-  {add zero column}
-  numRows := height * depth
-
-  setLength(rowOfs, numRows);
-  setLength(colOfs, (8 * numRows)+1);
-  setLength(pData, numRows+8);
-
-  {create an empty row}
-  fillchar(rowOfs[0], length(rowOfs)*2, 0);
-  fillchar(colOfs[0], length(colOfs)*1, 0);
-  fillchar(pData[0], length(pData)*4, 0);
-
-  pixels := @aPage.pixels^[0];
-
-  for row := 0 to numRows-1 do begin
-    {check if all zeros}
-    allEmpty := true;
-    for col := 0 to 15 do
-      if pixels^.a <> 0 then begin
-        allEmpty := false;
-        break;
-      end;
-  end;
-
-  rowOfs: pWord;
-  colOfs: pByte;
-  pData: pointer;
+  result := 0
+  for i := 0 to 7 do result += ((b shr i) and 1);
 end;
+
+function tSparseTexture3D.getPixel(x,y,z: integer): RGBA;
+var
+  d: integer;
+  px,py,pz: integer; {current topleftupper}
+  size: integer; {current cell size}
+  cell: pCell;
+  maskPosition: byte;
+begin
+  d := 0;
+  px := 0;
+  py := 0;
+  pz := 0;
+  sx := width;
+  sy := height;
+  sz := depth;
+
+  cell := @cData[0];
+
+  result := RGBA.Clear;
+
+  while true do begin
+    maskPosition := 0;
+    size := size shr 1;
+    if x < px+size then begin
+      px += size;
+      maskPosition += 1;
+    end;
+    if y < py+size then begin
+      py += size;
+      maskPosition += 2;
+    end;
+    if z < py+sz then begin
+      pz += size;
+      maskPosition += 4;
+    end;
+
+    if (parent^.mask shr maskPosition) and $1 = $0 then exit;
+
+    if size = 1 then
+      {fetch the payload}
+      exit(pData[cell.baseOffset+maskPosition]);
+
+    {otherwise expand the next cell}
+    cell := @cData[cell.baseOffset+maskPosition];
+  end;
+end;
+
+{add a new empty cell, as well as reserve space for 8 children.
+ returns based address for cell added}
+function tSparseTexture3D.addCell(): integer;
+var
+  i: integer;
+  reservedCell: tSVOCell;
+  cell: tSVOCell);
+begin
+  fillchar(cell, sizeof(cell), 0);
+  setLength(cData, length(cData)+1);
+  cData(length(cData)-1] = cell;
+  cell.baseOffset := length(pCell);
+  {reserve space for children - this allows for editing}
+  fillchar(deadCell, sizeof(deadCell), 0);
+  setLength(pCell, length(pCell)+8);
+  for i := 0 to 7 do
+    pCell[cell.baseOffset+i] := reservedCell;
+  result := cell.baseOffset;
+end;
+
+{adds 8 new pixels and returns offset}
+function tSparseTexture3D.addPixels(): integer;
+var
+  i: integer;
+begin
+  result := length(pData);
+  setLength(pData, length(pCell)+1);
+  fillchar(pData[result], 8*4, 0);
+end;
+
+function tSparseTexture3D.setPixel(x,y,z: integer): RGBA;
+var
+  d: integer;
+  px,py,pz: integer; {current topleftupper}
+  size: integer; {current cell size}
+  parent, cell: pCell;
+  maskPosition: byte;
+begin
+  d := 0;
+  px := 0;
+  py := 0;
+  pz := 0;
+  sx := width;
+  sy := height;
+  sz := depth;
+
+  cell := @cData[0];
+
+  result := RGBA.Clear;
+
+  while true do begin
+    maskPosition := 0;
+    size := size shr 1;
+    if x < px+size then begin
+      px += size;
+      maskPosition += 1;
+    end;
+    if y < py+size then begin
+      py += size;
+      maskPosition += 2;
+    end;
+    if z < py+sz then begin
+      pz += size;
+      maskPosition += 4;
+    end;
+
+    if size = 1 then begin
+      {set the payload}
+      pData[cell.baseOffset+localOffset] := c;
+      exit;
+    end;
+
+    if (parent^.mask shr maskPosition) and $1 = $0 then begin
+      {cell is empty, create a new cell}
+      parent.mask := parent^.mask or (1 shl maskPosition);
+      if size = 2 then begin
+        {create pixel data}
+        cell.localOffset := addPixels();
+      end else
+        {create a cell}
+        cell.localOffset := addCell();
+    end else begin
+      {otherwise move to next cell}
+      parent := cell;
+      cell := @cData[cell.baseOffset+localOffset];
+    end;
+  end;
+end;
+
 
 begin
 end.
