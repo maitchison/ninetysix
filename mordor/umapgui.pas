@@ -43,7 +43,7 @@ type
     constructor Create();
     destructor destroy(); override;
     procedure onKeyPress(code: word); override;
-    procedure renderTile(dc: tDrawContext; x,y: integer);
+    procedure renderTile(aDC: tDrawContext; x,y: integer);
     procedure moveCursor(dx,dy: integer);
     procedure setCursorPos(aPos: tPoint);
     procedure setCursorDir(d: tDirection);
@@ -117,7 +117,7 @@ begin
 end;
 
 {renders a single map tile}
-procedure tMapGUI.renderTile(dc: tDrawContext; x, y: integer);
+procedure tMapGUI.renderTile(aDC: tDrawContext; x, y: integer);
 var
   tile: tTile;
   wall: tWall;
@@ -126,33 +126,56 @@ var
   id: integer;
   d: tDirection;
   padding : integer;
+  dc: tDrawContext;
 begin
 
   tile := map.tile[x,y].asExplored;
+  dc := aDC;
 
   pos := tilePos(x,y);
 
-  {todo: support background}
-  dc.fillRect(Rect(pos.x, pos.y, TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+  // todo: set clipping to make sure we don't draw on other tiles}
+  // dc.clip := Rect(pos.x+dc.offset.x, pos.y+dc.offset.y, TILE_SIZE, TILE_SIZE);
+
+  {clear background for this tile}
+  {todo: support image background}
+  dc.offset.x += pos.x;
+  dc.offset.y += pos.y;
+
+  if (x+y) mod 2 = 0 then
+    {show tile boundaries}
+    dc.fillRect(Rect(0,0,TILE_SIZE, TILE_SIZE), RGB(255,0,255,128));
+
+  //dc.fillRect(Rect(0,0,TILE_SIZE, TILE_SIZE), RGB(0,0,0));
 
   {floor}
   id := tile.floorSpec.spriteIdx;
-  if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, pos.x, pos.y);
+  if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, 0, 0);
 
   {medium}
   id := tile.mediumSpec.spriteIdx;
-  if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, pos.x, pos.y);
+  if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, 0, 0);
 
   {walls}
   for d in tDirection do begin
-    wall := map.wall[x,y,d].asExplored;
+    wall := map.wall[x, y, d].asExplored;
     id := wall.spec.spriteIdx;
     if id < 0 then continue;
-    dx := WALL_DX[d];
-    dy := WALL_DY[d];
-    if dy <> 0 then inc(id); // rotated varient
-    mdr.mapSprites.sprites[id].draw(dc, pos.x+dx, pos.y+dy);
+    {offset to align walls}
+    dx := 0;
+    dy := 0;
+
+    case ord(d) of
+      0: dy := -1;
+      1: dx := 1;
+      2: dy := 1;
+      3: dx := -1;
+    end;
+    mdr.mapSprites.sprites[id].drawRot90(dc, Point(dx, dy), ord(d)-1);
   end;
+
+  {auto shadow}
+  {todo:}
 
   {cursor}
   if (x = cursorPos.x) and (y = cursorPos.y) then

@@ -56,6 +56,7 @@ type
     procedure trim();
 
     procedure draw(const dc: tDrawContext; atX, atY: int32);
+    procedure drawRot90(const dc: tDrawContext; pos: tPoint; numRotations: integer);
     procedure drawFlipped(const dc: tDrawContext; atX, atY: int32);
     procedure drawStretched(const dc: tDrawContext; dstRect: tRect);
     procedure drawScaled(const dc: tDrawContext; atX, atY: int32; scale: single);
@@ -81,7 +82,7 @@ type
     constructor Create(aPage: tPage);
     procedure append(sprite: tSprite);
     procedure load(filename: string);
-    procedure grid(cellWidth, cellHeight: word;centered: boolean=false);
+    procedure grid(cellWidth, cellHeight: word;centered: boolean=false;trim: boolean=true);
     property items[tag: Variant]: tSprite read byVar; default;
   end;
 
@@ -241,12 +242,38 @@ begin
   result := page.getPixel(atX+srcRect.x, atY+srcRect.y);
 end;
 
-{Draw sprite to screen at given location, with alpha etc. Returns bounds drawn}
+{Draw sprite at given location.}
 procedure tSprite.draw(const dc: tDrawContext; atX, atY: integer);
 begin
   atX -= pivot2x.x div 2;
   atY -= pivot2x.y div 2;
   dc.drawSubImage(page, Point(atX, atY), srcRect);
+end;
+
+{Draw sprite rotated around topleft by multiples of 90 degrees}
+procedure tSprite.drawRot90(const dc: tDrawContext; pos: tPoint; numRotations: integer);
+var
+  x,y: integer;
+  dx,dy: integer;
+  c: RGBA;
+begin
+  assert(pivot2x.x = 0);
+  assert(pivot2x.y = 0);
+  numRotations := (numRotations + 4) mod 4;
+  if numRotations = 0 then begin draw(dc, pos.x, pos.y); exit; end;
+  {slow for the moment}
+  for y := 0 to height-1 do
+    for x := 0 to width-1 do begin
+      c := getPixel(x,y);
+      if (c.a = 0) and (dc.blendMode <> bmBlit) then continue;
+      case numRotations of
+        0: begin dx := x; dy := y; end;
+        1: begin dx := height-y-1; dy := x; end;
+        2: begin dx := width-x-1; dy := height-y-1; end;
+        3: begin dx := y; dy := width-x-1; end;
+      end;
+      dc.putPixel(Point(pos.x+dx, pos.y+dy), c);
+    end;
 end;
 
 {Draws sprite flipped on x-axis}
@@ -439,7 +466,7 @@ begin
 end;
 
 {create sprites using a grid}
-procedure tSpriteSheet.grid(cellWidth,cellHeight: word;centered: boolean=false);
+procedure tSpriteSheet.grid(cellWidth,cellHeight: word;centered: boolean=false;trim: boolean=true);
 var
   sprite: tSprite;
   x, y: integer;
@@ -452,7 +479,7 @@ begin
         sprite.pivot2x.x := cellWidth;
         sprite.pivot2x.y := cellHeight;
       end;
-      sprite.trim();
+      if trim then sprite.trim();
       append(sprite);
     end;
   end;

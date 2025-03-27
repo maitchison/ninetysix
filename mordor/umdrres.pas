@@ -74,7 +74,8 @@ begin
   sfx.loadFromFolder('res', '*.a96');
 
   mapSprites := tSpriteSheet.Create(gfx['newmap']);
-  mapSprites.grid(16,16);
+  {todo: allow trimming on these sprite}
+  mapSprites.grid(16,16, false, false);
 
   monsterSprites := tSpriteSheet.Create(gfx['monsters']);
   monsterSprites.grid(16,24);
