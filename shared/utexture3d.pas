@@ -64,11 +64,11 @@ type
 
   tSparseTexture3D = class(tTexture3D)
   protected
-    cells: array of tSVOCell;
-    pixels: array of RGBA;
+    data: array of dword;
     procedure addCellChildren(var cell: tSVOCell);
     procedure addPixels(var cell: tSVOCell);
   public
+    function  byteCount: int32;
     function  getPixel(x,y,z: integer): RGBA; override;
     procedure setPixel(x,y,z: integer; c: RGBA); override;
     function  toString: string; override;
@@ -201,19 +201,21 @@ var
   i: integer;
 begin
   result := 'T3D:';
-  for i := 0 to length(cells)-1 do
-    result += format(' %d:%d', [i, cells[i].data]);
-  for i := 0 to length(pixels)-1 do
-    result += format(' %d:%s', [i, pixels[i].toString]);
+  for i := 0 to length(data)-1 do
+    result += format(' %d:%d', [i, data[i]]);
 end;
 
 procedure tSparseTexture3D.clear();
 begin
   {todo: support for non-cubes}
-  setLength(cells,1);
-  {start with 8 blank pixels, this is so we never use address 0}
-  setLength(pixels,8);
-  addCellChildren(cells[0]);
+  setLength(data,1);
+  addCellChildren(tSVOCell(data[0]));
+end;
+
+{number of bytes required to store this 3d texture}
+function tSparseTexture3D.byteCount: int32;
+begin
+  result := length(data)*4;
 end;
 
 function tSparseTexture3D.getPixel(x,y,z: integer): RGBA;
@@ -232,7 +234,7 @@ begin
   // todo: set this to root size
   size := width;
 
-  cell := @cells[0];
+  cell := @data[0];
 
   result := RGBA.Clear;
 
@@ -257,10 +259,10 @@ begin
 
     if size = 1 then
       {fetch the payload}
-      exit(pixels[cell.baseOffset+maskPosition]);
+      exit(RGBA(data[cell.baseOffset+maskPosition]));
 
     {otherwise expand the next cell}
-    cell := @cells[cell.baseOffset+maskPosition];
+    cell := @data[cell.baseOffset+maskPosition];
   end;
 end;
 
@@ -269,15 +271,13 @@ end;
 procedure tSparseTexture3D.addCellChildren(var cell: tSVOCell);
 var
   i: integer;
-  reservedCell: tSVOCell;
 begin
   assert(cell.data = 0);
-  cell.setBaseOffset(length(cells));
+  cell.setBaseOffset(length(data));
   {reserve space for children - this allows for editing}
-  reservedCell.data := 0;
-  setLength(cells, length(cells)+8);
+  setLength(data, length(data)+8);
   for i := 0 to 7 do
-    cells[cell.baseOffset+i] := reservedCell;
+    data[cell.baseOffset+i] := 0;
 end;
 
 {adds 8 new pixels and returns offset}
@@ -286,9 +286,9 @@ var
   i: integer;
 begin
   assert(cell.data = 0);
-  cell.setBaseOffset(length(pixels));
-  setLength(pixels, length(pixels)+8);
-  filldword(pixels[cell.baseOffset], 8, 0);
+  cell.setBaseOffset(length(data));
+  setLength(data, length(data)+8);
+  filldword(data[cell.baseOffset], 8, 0);
 end;
 
 procedure tSparseTexture3D.setPixel(x,y,z: integer;c: RGBA);
@@ -307,7 +307,7 @@ begin
   // todo: set this correctly to initial size
   size := width;
 
-  cell := @cells[0];
+  cell := @data[0];
 
   while true do begin
     maskPosition := 0;
@@ -327,11 +327,11 @@ begin
 
     if size = 1 then begin
       {set the payload}
-      pixels[cell.baseOffset+maskPosition] := c;
+      data[cell.baseOffset+maskPosition] := dword(c);
       exit;
     end;
 
-    cell := @cells[cell.baseOffset+maskPosition];
+    cell := @data[cell.baseOffset+maskPosition];
 
     if (cell^.data = 0) then begin
       {cell is empty, create a new cell}
