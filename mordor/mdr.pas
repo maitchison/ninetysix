@@ -32,6 +32,7 @@ uses
   uTileEditorGui,
   uScene,
   uEncounterGui,
+  uDungeonViewGui,
   uGUIListBox,
   uMDRImporter,
   uMDRParty,
@@ -80,6 +81,7 @@ begin
 end;
 
 {-------------------------------------------------------}
+
 
 procedure setup();
 begin
@@ -241,7 +243,6 @@ var
 begin
   code := args[0].VInteger;
   shift := keyDown(key_leftshift) or keyDown(key_rightshift);
-
   case code of
     0: ;
     key_right: if shift then moveParty(1, 1) else moveParty(1, 0);
@@ -267,6 +268,7 @@ var
   importer: tMDRImporter;
   messageBox: tGUIListBox;
   logWindow: tGuiWindow;
+  dvg: tDungeonViewGui;
 const
   RHS_DIVIDE = 280;
   LOWER_DIVIDE = 160;
@@ -303,8 +305,12 @@ begin
   panel.text := 'CHARACTER';
   panel.imageCol := RGBF(1.00,0.22,0.12);
   gui.append(panel);
+
   panel := tGuiWindow.Create(Rect(800-RHS_DIVIDE, 600 - LOWER_DIVIDE, RHS_DIVIDE, LOWER_DIVIDE));
   panel.text := 'PARTY';
+  dvg := tDungeonViewGui.Create(map);
+  dvg.align := gaFull;
+  panel.append(dvg);
   gui.append(panel);
 
   logWindow := tGuiWindow.Create(Rect(0, 600 - LOWER_DIVIDE, 800-RHS_DIVIDE, LOWER_DIVIDE));
@@ -357,8 +363,8 @@ begin
     if timer.avElapsed > 0 then
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
-    if assigned(encounterGui.dungeonView) then begin
-      tpsLabel.text := format('%.1fk', [encounterGui.dungeonView.voxelScene.tracesPerSecond/1000]);
+    if assigned(dvg) then begin
+      tpsLabel.text := format('%.1fk', [dvg.voxelScene.tracesPerSecond/1000]);
     end;
 
     jobs.update();
@@ -368,9 +374,9 @@ begin
     if keyDown(key_r) then mdr.addMessage('<shadow>Hello <rgb(%d,%d,%d)>fish</rgb> and <bold>chips</bold>.</shadow>', [rnd,rnd,rnd]);
 
     {update view - there should be a better place to do this}
-    if assigned(encounterGui.dungeonView) then begin
-      encounterGui.dungeonView.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
-      encounterGui.dungeonView.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
+    if assigned(dvg) then begin
+      dvg.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
+      dvg.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
     end;
 
     gui.update(elapsed);

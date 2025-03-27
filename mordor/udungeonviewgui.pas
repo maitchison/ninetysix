@@ -34,12 +34,11 @@ type
     procedure buildMapTiles(atX, atY: integer; radius: integer);
     function  getTileKey(tile: tTile; walls: tWalls): string;
   public
-    procedure doUpdate(elapsed: single); override;
-    procedure doDraw(const dc: tDrawContext); override;
-  public
     voxelScene: tVoxelScene;
     tileCache: tStringMap<tVoxel>;
     tileBuilder: tTileBuilder;
+    procedure doUpdate(elapsed: single); override;
+    procedure doDraw(const dc: tDrawContext); override;
     constructor Create(aMap: tMDRMap);
     destructor destroy(); override;
   end;
@@ -93,9 +92,10 @@ begin
   if voxelScene.didCameraMove() then
     inherited doDraw(dc);
 
-  {todo: put in update?}
-  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 1);
-  voxelScene.render(dc);
+  {todo: move render to a job}
+  voxelScene.render(dc, 0.002);
+
+  {debug key: show current tile}
   if keyDown(key_z) then begin
     pos := V3(bounds.width/2,bounds.height/2,0);
     angle := V3(0,0,getSec);
@@ -106,6 +106,8 @@ end;
 
 procedure tDungeonViewGui.doUpdate(elapsed: single);
 begin
+  inherited doUpdate(elapsed);
+  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 1);
   isDirty := true;
 end;
 

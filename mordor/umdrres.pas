@@ -27,7 +27,7 @@ type
     BLUE: RGBA      = (b:round(255*0.62);g:round(255*0.42); r:round(255*0.40); a:$ff);
     {still working on these colors}
     GREEN: RGBA     = (b:$39; g:$b7; r:$60; a:$ff);
-  var
+  public
     FONT_TINY,
     FONT_SMALL,
     FONT_MEDIUM: tFont;

@@ -39,8 +39,8 @@ type
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
     cameraAngle: single; {radians, 0=north}
-    function  tracesPerSecond: single;
-    function  didCameraMove: boolean;
+    function   tracesPerSecond: single;
+    function   didCameraMove: boolean;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
     constructor Create(aTileSize: integer);
   end;
