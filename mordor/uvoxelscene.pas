@@ -164,7 +164,7 @@ begin
       pos += dir * (1/64);
       result.d += (1/64);
     end;
-    if result.d > 4 then
+    if result.d > 8 then
       exit; // max distance
     prev := curr;
   end;
@@ -255,13 +255,13 @@ begin
         inc(traceCount);
         col32 += hit.col * 0.25;
       end;
-      dc.putPixel(Point(4+renderState.pixelX, 18+renderState.pixelY), col32);
+      dc.putPixel(Point(4+renderState.pixelX, 4+renderState.pixelY), col32);
       renderState.nextPixel();
     end else begin
-      rayDir := getRayDir(4+renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
+      rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
         inc(traceCount);
-      dc.fillRect(Rect(4+renderState.pixelX, 18+renderState.pixelY, pixelSize, pixelSize), hit.col);
+      dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), hit.col);
       renderState.nextPixel();
     end;
   end;
