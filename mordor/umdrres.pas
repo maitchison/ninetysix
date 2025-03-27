@@ -73,7 +73,7 @@ begin
   sfx := tSFXLibrary.Create(true);
   sfx.loadFromFolder('res', '*.a96');
 
-  mapSprites := tSpriteSheet.Create(gfx['map']);
+  mapSprites := tSpriteSheet.Create(gfx['newmap']);
   mapSprites.grid(16,16);
 
   monsterSprites := tSpriteSheet.Create(gfx['monsters']);

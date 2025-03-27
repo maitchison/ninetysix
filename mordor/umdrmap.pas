@@ -12,9 +12,10 @@ uses
 
 type
 
-  tWallType = (wtNone, wtWall, wtDoor, wtSecret, wtLockedDoor);
+  tWallType = (wtNone, wtWall, wtDoor, wtSecret, wtArch, ftWindow);
   tFloorType = (ftNone, ftStone, ftWater, ftDirt, ftGrass);
-  tMediumType = (mtNone, mtFog, mtRock);
+  tMediumType = (mtNone, mtFog, mtRock, mtLight);
+  tCeilingType = (ctNone, ctRock, ctGrate);
   tDirection = (dNorth, dEast, dSouth, dWest);
 
   tFloorSpec = record
@@ -22,8 +23,20 @@ type
     spriteIdx: integer;
   end;
 
+  tMediumSpec = record
+    tag: string;
+    spriteIdx: integer;
+    canTransit: boolean;
+  end;
+
+  tCeilingSpec = record
+    tag: string;
+    spriteIdx: integer;
+  end;
+
   tWallSpec = record
     tag: string;
+    spriteIdx: integer;
     canTransit: boolean;
   end;
 
@@ -31,31 +44,40 @@ const
 
   WALL_SPEC: array[tWallType] of tWallSpec =
   (
-    (tag: 'None';       canTransit: true),
-    (tag: 'Wall';       canTransit: false),
-    (tag: 'Door';       canTransit: true),
-    (tag: 'Secret';     canTransit: true),
-    (tag: 'LockedDoor'; canTransit: false)
+    (tag: 'None';       spriteIdx:-1; canTransit: true),
+    (tag: 'Wall';       spriteIdx: 0; canTransit: false),
+    (tag: 'Door';       spriteIdx: 1; canTransit: true),
+    (tag: 'Secret';     spriteIdx: 2; canTransit: true),
+    (tag: 'Arch';       spriteIdx: 3; canTransit: true),
+    (tag: 'Window';     spriteIdx: 4; canTransit: true)
   );
 
   FLOOR_SPEC: array[tFloorType] of tFloorSpec =
    (
-    (tag: 'None'; spriteIdx: -1),
-    (tag: 'Stone'; spriteIdx: -1),
-    (tag: 'Water'; spriteIdx: 15),
-    (tag: 'Dirt'; spriteIdx: 16),
-    (tag: 'Grass'; spriteIdx: 26)
+    (tag: 'None';       spriteIdx: -1),
+    (tag: 'Stone';      spriteIdx: -1),
+    (tag: 'Water';      spriteIdx: -1),
+    (tag: 'Dirt';       spriteIdx: -1),
+    (tag: 'Grass';      spriteIdx: -1)
    );
 
-  MEDIUM_SPRITE: array[tMediumType] of integer =
-    (-1, 20, 19);
+  MEDIUM_SPEC: array[tMediumType] of tMediumSpec =
+   (
+    (tag: 'None';       spriteIdx: -1),
+    (tag: 'Fog';        spriteIdx: -1),
+    (tag: 'Rock';       spriteIdx: -1),
+    (tag: 'Light';      spriteIdx: -1)
+   );
 
-  {+1 for rotated varient}
-  WALL_SPRITE: array[tWallType] of integer =
-    (-1, 0, 2, 4, 32+4);
+  CEILING_SPEC: array[tCeilingType] of tCeilingSpec =
+   (
+    (tag: 'None';       spriteIdx: -1),
+    (tag: 'Rock';        spriteIdx: -1),
+    (tag: 'Grate';       spriteIdx: -1)
+   );
 
-  CURSOR_SPRITE = 19+32;
-  PARTY_SPRITE = 6;
+  CURSOR_SPRITE = 19+(32*3);
+  PARTY_SPRITE = 0+(32*3);
 
   WALL_DX: array[tDirection] of integer = (0,+8,0,-7);
   WALL_DY: array[tDirection] of integer = (-7,0,+8,0);
@@ -79,6 +101,7 @@ type
     status: tVisionStatus;
     padding: array[1..5] of byte;
     procedure clear();
+    function spec: tWallSpec;
     function asExplored(): tWall;
     function isSolid: boolean;
     function toString(): string;
@@ -87,12 +110,15 @@ type
   {16 bytes per tile}
   tTile = packed record
     attributes: bitpacked array[0..31] of boolean;  {4 bytes}
+    status: tVisionStatus;                          {1 byte}
     floor: tFloorType;                              {1 byte}
     medium: tMediumType;                            {1 byte}
-    status: tVisionStatus;                          {1 byte}
-    padding: array[1..9] of byte;                   {9 bytes}
+    ceiling: tCeilingType;                          {1 byte}
+    padding: array[1..8] of byte;                   {8 bytes}
     procedure clear();
     function floorSpec: tFloorSpec;
+    function mediumSpec: tMediumSpec;
+    function ceilingSpec: tCeilingSpec;
     function asExplored(): tTile;
     function toString(): string;
   end;
@@ -150,6 +176,16 @@ begin
   result := FLOOR_SPEC[floor];
 end;
 
+function tTile.mediumSpec: tMediumSpec;
+begin
+  result := MEDIUM_SPEC[medium];
+end;
+
+function tTile.ceilingSpec: tCeilingSpec;
+begin
+  result := CEILING_SPEC[ceiling];
+end;
+
 {returns copy of tile with exploration limited applied}
 function tTile.asExplored(): tTile;
 begin
@@ -158,6 +194,7 @@ begin
     eNone: begin
       result.floor := ftNone;
       result.medium := mtNone;
+      result.ceiling := ctNone;
     end;
     ePartial:;
     eFull: ;
@@ -177,9 +214,14 @@ begin
   fillchar(self, sizeof(self), 0);
 end;
 
+function tWall.spec: tWallSpec;
+begin
+  result := WALL_SPEC[t];
+end;
+
 function tWall.isSolid: boolean;
 begin
-  result := t in [wtWall, wtLockedDoor];
+  result := spec.canTransit;
 end;
 
 function tWall.toString(): string;

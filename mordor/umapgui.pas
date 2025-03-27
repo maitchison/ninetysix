@@ -140,13 +140,13 @@ begin
   if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {medium}
-  id := MEDIUM_SPRITE[tile.medium];
+  id := tile.mediumSpec.spriteIdx;
   if id >= 0 then mdr.mapSprites.sprites[id].draw(dc, pos.x, pos.y);
 
   {walls}
   for d in tDirection do begin
     wall := map.wall[x,y,d].asExplored;
-    id := WALL_SPRITE[wall.t];
+    id := wall.spec.spriteIdx;
     if id < 0 then continue;
     dx := WALL_DX[d];
     dy := WALL_DY[d];
