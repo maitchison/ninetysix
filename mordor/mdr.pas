@@ -70,6 +70,9 @@ var
   screen: tScreen;
   scene: tScene;
 
+const
+  CAMERA_SPEED = 1.0;
+
 type
   tMusicJob = class(tJob)
     procedure update(timeSlice: single); override;
@@ -375,8 +378,20 @@ begin
 
     {update view - there should be a better place to do this}
     if assigned(dvg) then begin
-      dvg.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
-      dvg.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
+      if keydown(key_p) then begin
+        dvg.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
+        dvg.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
+      end;
+      if keydown(key_leftshift) then begin
+      end else begin
+        if keydown(key_a) then dvg.voxelScene.cameraPos.x -= elapsed * CAMERA_SPEED;
+        if keydown(key_d) then dvg.voxelScene.cameraPos.x += elapsed * CAMERA_SPEED;
+        if keydown(key_w) then dvg.voxelScene.cameraPos.y -= elapsed * CAMERA_SPEED;
+        if keydown(key_s) then dvg.voxelScene.cameraPos.y += elapsed * CAMERA_SPEED;
+        if keydown(key_q) then dvg.voxelScene.cameraPos.z -= elapsed * CAMERA_SPEED;
+        if keydown(key_e) then dvg.voxelScene.cameraPos.z += elapsed * CAMERA_SPEED;
+      end;
+
     end;
 
     gui.update(elapsed);

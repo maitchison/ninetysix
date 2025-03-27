@@ -17,7 +17,7 @@ uses
 
 type
 
-  tRenderQuality = (rqQuarter, rqHalf, rqFull, rqAA, rqDone);
+  tRenderQuality = (rqPreview, rqQuarter, rqHalf, rqFull, rqAA, rqDone);
 
   tRenderState = record
     cameraPos: V3D;
@@ -223,7 +223,7 @@ begin
     renderState.pixelY := 0;
     renderState.width := viewWidth;
     renderState.height := viewHeight;
-    renderState.quality := rqQuarter;
+    renderState.quality := rqPreview;
     //dc.fillRect(dc.clip, RGB(12,12,12));
   end;
 
@@ -239,10 +239,11 @@ begin
 
   startTime := getSec;
 
-  while getSec < (startTime + renderTime) do begin
+  while (getSec < (startTime + renderTime)) or (renderState.quality = rqPreview) do begin
 
     pixelSize := 1;
     case renderState.quality of
+      rqPreview: pixelSize := 8;
       rqQuarter: pixelSize := 4;
       rqHalf: pixelSize := 2;
     end;

@@ -93,7 +93,10 @@ begin
     inherited doDraw(dc);
 
   {todo: move render to a job}
-  voxelScene.render(dc, 0.002);
+  if anyKeyDown then
+    voxelScene.render(dc, 0.010)
+  else
+    voxelScene.render(dc);
 
   {debug key: show current tile}
   if keyDown(key_x) then begin
