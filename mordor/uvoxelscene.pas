@@ -195,6 +195,7 @@ var
   pixelSize: integer;
   i,j: integer;
   col32: RGBA32;
+  aspect: single;
 
   function getRayDir(px, py: single): V3D;
   begin
@@ -210,7 +211,8 @@ begin
   dc := aDC.asBlendMode(bmBlit);
 
   viewWidth := dc.page.width-8;
-  viewHeight := round(dc.page.width * 0.75);
+  viewHeight := dc.page.height-8;
+  aspect := viewWidth / viewHeight;
 
   {check render state}
   if didCameraMove() then begin

@@ -96,7 +96,7 @@ begin
   voxelScene.render(dc, 0.002);
 
   {debug key: show current tile}
-  if keyDown(key_z) then begin
+  if keyDown(key_x) then begin
     pos := V3(bounds.width/2,bounds.height/2,0);
     angle := V3(0,0,getSec);
     cell := voxelScene.cells[trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y)];
