@@ -8,43 +8,71 @@ uses
 type
 
   tJobState = (jsActive, jsIdle, jsDone);
+  tJobPriority = (jpHigh, jpMedium, jpLow);
 
   tJob = class
   public
     state: tJobState;
+    priority: tJobPriority;
+    constructor Create();
     procedure update(timeSlice: single); virtual;
-    procedure start; virtual;
+    procedure start(aPriority: tJobPriority); overload;
+    procedure start(); overload;
     procedure stop; virtual;
   end;
 
   tJobs = array of tJob;
 
-  tJobSystem = class
+  tJobQueue = class
   protected
     jobIdx: integer;
     jobs: tJobs;
     procedure cleanUpJobs();
     procedure addJob(aJob: tJob);
+    function  activeJobs: integer;
+    procedure wakeAll();
   public
+    procedure update(timeSlice: single=0.001);
+  end;
+
+  tJobSystem = class
+  protected
+    jobQueue: array[tJobPriority] of tJobQueue;
+    procedure addJob(aJob: tJob);
+  public
+    constructor Create();
     procedure update(timeSlice: single=0.005);
   end;
 
 var
-  jobs: tJobSystem;
+  {job queues for each of our job priorities}
+  js: tJobSystem;
 
 implementation
 
 {-----------------------------------------}
+
+constructor tJob.Create();
+begin
+  priority := jpMedium;
+end;
 
 procedure tJob.update(timeSlice: single);
 begin
   // decendant should override
 end;
 
-procedure tJob.start();
+procedure tJob.start(aPriority: tJobPriority); overload;
 begin
   state := jsActive;
-  jobs.addJob(self);
+  priority := aPriority;
+  js.addJob(self);
+end;
+
+procedure tJob.start(); overload;
+begin
+  state := jsActive;
+  js.addJob(self);
 end;
 
 procedure tJob.stop();
@@ -54,7 +82,7 @@ end;
 
 {-----------------------------------------}
 
-procedure tJobSystem.cleanUpJobs();
+procedure tJobQueue.cleanUpJobs();
 var
   currentJobCount: integer;
   newJobs: tJobs;
@@ -79,13 +107,28 @@ begin
   end;
 end;
 
-procedure tJobSystem.addJob(aJob: tJob);
+procedure tJobQueue.addJob(aJob: tJob);
 begin
   setLength(jobs, length(jobs)+1);
   jobs[length(jobs)-1] := aJob;
 end;
 
-procedure tJobSystem.update(timeSlice: single=0.005);
+procedure tJobQueue.wakeAll();
+var
+  job: tJob;
+begin
+  for job in jobs do if job.state = jsIdle then job.state := jsActive;
+end;
+
+function tJobQueue.activeJobs: integer;
+var
+  job: tJob;
+begin
+  result := 0;
+  for job in jobs do if job.state = jsActive then inc(result);
+end;
+
+procedure tJobQueue.update(timeSlice: single=0.001);
 var
   startTime: double;
   job: tJob;
@@ -95,31 +138,69 @@ const
   TIME_SLICE = 0.001;
   MAX_SLICES = 100;
 begin
-
-  {wake everyone up}
-  for job in jobs do if job.state = jsIdle then job.state := jsActive;
-
+  if length(jobs) = 0 then exit;
   {round robin}
   startTime := getSec;
   slices:= 0;
   while (getSec < (startTime + timeSlice)) and (slices < MAX_SLICES) do begin
-    if length(jobs) = 0 then exit;
     case jobs[jobIdx].state of
       jsActive: jobs[jobIdx].update(TIME_SLICE);
     end;
     inc(jobIdx);
     if jobIdx >= length(jobs) then
       jobIdx := 0;
-    inc(slices)
+    inc(slices);
+    {only allow one round}
+    if (slices >= length(jobs)) then break;
   end;
-
   cleanUpJobs();
-
 end;
 
+{-----------------------------------------}
+
+procedure tJobSystem.addJob(aJob: tJob);
+begin
+  jobQueue[aJob.priority].addJob(aJob);
+end;
+
+procedure tJobSystem.update(timeSlice: single=0.005);
+var
+  priority: tJobPriority;
+  remainingTime: single;
+  startTime: single;
+  totalActiveJobs: integer;
+begin
+  startTime := getSec;
+
+  for priority in tJobPriority do jobQueue[priority].wakeAll;
+
+  while true do begin
+
+    totalActiveJobs := 0;
+    for priority in tJobPriority do begin
+      remainingTime := timeSlice - (getSec - startTime);
+      if remainingTime <= 0 then exit;
+      jobQueue[priority].update(remainingTime);
+      totalActiveJobs += jobQueue[priority].activeJobs;
+    end;
+
+    if totalActiveJobs = 0 then exit;
+  end;
+end;
+
+constructor tJobSystem.Create();
+var
+  priority: tJobPriority;
+begin
+  inherited Create();
+  for priority in tJobPriority do jobQueue[priority] := tJobQueue.Create();
+end;
+
+{-----------------------------------------}
+
 initialization
-  jobs := tJobSystem.Create();
+  js := tJobSystem.Create();
 finalization
   {todo: shut down jobs properly}
-  jobs.free;
+  js.free;
 end.

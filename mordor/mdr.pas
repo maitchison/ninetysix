@@ -363,7 +363,7 @@ begin
   gui.addHook(ON_KEYPRESS, self.onKeyPress);
   moveParty(0,0);
 
-  tMusicJob.Create().start();
+  tMusicJob.Create().start(jpHigh);
 
   syncCameraPos(party, dvg);
 
@@ -379,7 +379,7 @@ begin
       tpsLabel.text := format('%.1fk', [dvg.voxelScene.tracesPerSecond/1000]);
     end;
 
-    jobs.update();
+    js.update();
 
     input.update();
 
