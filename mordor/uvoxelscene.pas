@@ -21,7 +21,7 @@ type
 
   tRenderState = record
     cameraPos: V3D;
-    cameraAngle: single;
+    cameraAngle: V3D;
     pixelX, pixelY: integer;
     width,height: integer;
     quality: tRenderQuality;
@@ -38,7 +38,7 @@ type
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
-    cameraAngle: single; {radians, 0=north}
+    cameraAngle: V3D; {radians, 0=north}
     function   tracesPerSecond: single;
     function   didCameraMove: boolean;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
@@ -68,7 +68,7 @@ constructor tVoxelScene.Create(aTileSize: integer);
 begin
   inherited Create();
   cameraPos := V3(5, 21,0);
-  cameraAngle := 0;
+  cameraAngle := V3(0,0,0);
   tileSize := aTileSize;
   fillchar(cells, sizeof(cells), 0);
 end;
@@ -200,9 +200,7 @@ var
   function getRayDir(px, py: single): V3D;
   begin
     result := V3((px-(viewWidth/2)) / (viewWidth*1.2), -0.5, (py-(viewHeight/2)) / (viewWidth*1.2));
-    //result := result.rotated(-60*DEG2RAD, 0 , 0); {flying camera}
-    result := result.rotated(0, 0, renderState.cameraAngle);
-
+    result := result.rotated(renderState.cameraAngle.x, renderState.cameraAngle.y, renderState.cameraAngle.z);
     result := result.normed();
   end;
 
@@ -230,12 +228,7 @@ begin
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;
 
-  rayPos :=
-    renderState.cameraPos
-    + V3(0.5, 0.5, 0.5)
-    + V3(sin(renderState.cameraAngle+180*DEG2RAD)*0.35, -cos(renderState.cameraAngle+180*DEG2RAD)*0.35, 0);
-  {flying camera..}
-  // rayPos += V3(0,0,-1.0);
+  rayPos := renderState.cameraPos;
 
   startTime := getSec;
 

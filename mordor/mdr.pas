@@ -259,6 +259,13 @@ begin
   end;
 end;
 
+procedure syncCameraPos(party: tMDRParty; dvg: tDungeonViewGui);
+begin
+  if not assigned(dvg) then exit;
+  dvg.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0) + V3(0.5, 0.5, 0.5);
+  dvg.voxelScene.cameraAngle := V3(0, 0 , 90 * ord(party.dir) * DEG2RAD);
+end;
+
 procedure tGameScene.run();
 var
   elapsed: single;
@@ -358,6 +365,8 @@ begin
 
   tMusicJob.Create().start();
 
+  syncCameraPos(party, dvg);
+
   repeat
 
     timer.start();
@@ -378,11 +387,20 @@ begin
 
     {update view - there should be a better place to do this}
     if assigned(dvg) then begin
-      if keydown(key_p) then begin
-        dvg.voxelScene.cameraPos := V3(party.pos.x, party.pos.y, 0);
-        dvg.voxelScene.cameraAngle := 90 * ord(party.dir) * DEG2RAD;
+
+      if keydown(key_p) then syncCameraPos(party, dvg);
+      if keydown(key_o) then begin
+        dvg.voxelScene.cameraAngle.x := 0;
+        dvg.voxelScene.cameraAngle.y := 0;
       end;
+
       if keydown(key_leftshift) then begin
+        if keydown(key_w) then dvg.voxelScene.cameraAngle.x -= elapsed * CAMERA_SPEED;
+        if keydown(key_s) then dvg.voxelScene.cameraAngle.x += elapsed * CAMERA_SPEED;
+        if keydown(key_q) then dvg.voxelScene.cameraAngle.y -= elapsed * CAMERA_SPEED;
+        if keydown(key_e) then dvg.voxelScene.cameraAngle.y += elapsed * CAMERA_SPEED;
+        if keydown(key_a) then dvg.voxelScene.cameraAngle.z -= elapsed * CAMERA_SPEED;
+        if keydown(key_d) then dvg.voxelScene.cameraAngle.z += elapsed * CAMERA_SPEED;
       end else begin
         if keydown(key_a) then dvg.voxelScene.cameraPos.x -= elapsed * CAMERA_SPEED;
         if keydown(key_d) then dvg.voxelScene.cameraPos.x += elapsed * CAMERA_SPEED;
@@ -391,7 +409,6 @@ begin
         if keydown(key_q) then dvg.voxelScene.cameraPos.z -= elapsed * CAMERA_SPEED;
         if keydown(key_e) then dvg.voxelScene.cameraPos.z += elapsed * CAMERA_SPEED;
       end;
-
     end;
 
     gui.update(elapsed);
