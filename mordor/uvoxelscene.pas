@@ -40,6 +40,7 @@ type
     cameraPos: V3D;
     cameraAngle: V3D; {radians, 0=north}
     function   tracesPerSecond: single;
+    function   isDone: boolean;
     function   didCameraMove: boolean;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
     constructor Create(aTileSize: integer);
@@ -176,6 +177,11 @@ end;
 function tVoxelScene.didCameraMove: boolean;
 begin
   result := (renderState.cameraPos <> cameraPos) or (renderState.cameraAngle <> cameraAngle);
+end;
+
+function tVoxelScene.isDone: boolean;
+begin
+  result := renderState.quality = rqDone;
 end;
 
 {render scene. With progressive render we render approximately renderTime seconds.

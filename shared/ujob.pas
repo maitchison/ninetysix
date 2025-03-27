@@ -10,6 +10,9 @@ type
   tJobState = (jsActive, jsIdle, jsDone);
   tJobPriority = (jpHigh, jpMedium, jpLow);
 
+  {returns if job is finished}
+  tClassMethod = function: boolean of object;
+
   tJob = class
   public
     state: tJobState;
@@ -19,6 +22,12 @@ type
     procedure start(aPriority: tJobPriority); overload;
     procedure start(); overload;
     procedure stop; virtual;
+  end;
+
+  tJobProc = class(tJob)
+    proc: tClassMethod;
+    constructor Create(aProc: tClassMethod);
+    procedure update(timeSlice: single); override;
   end;
 
   tJobs = array of tJob;
@@ -49,6 +58,19 @@ var
   js: tJobSystem;
 
 implementation
+
+{-----------------------------------------}
+
+constructor tJobProc.Create(aProc: tClassMethod);
+begin
+  inherited Create();
+  proc := aProc;
+end;
+
+procedure tJobProc.update(timeSlice: single);
+begin
+  if proc() then self.state := jsIdle;
+end;
 
 {-----------------------------------------}
 

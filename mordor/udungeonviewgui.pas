@@ -29,6 +29,7 @@ type
   tDungeonViewGui = class(tGuiPanel)
   protected
     map: tMDRMap;
+    renderJob: tJobProc;
     function  buildTile(tile: tTile; walls: tWalls): tVoxel;
     function  getTile(tile: tTile; walls: tWalls): tVoxel;
     procedure buildMapTiles(atX, atY: integer; radius: integer);
@@ -37,6 +38,7 @@ type
     voxelScene: tVoxelScene;
     tileCache: tStringMap<tVoxel>;
     tileBuilder: tTileBuilder;
+    function  updateRender(): boolean;
     procedure doUpdate(elapsed: single); override;
     procedure doDraw(const dc: tDrawContext); override;
     constructor Create(aMap: tMDRMap);
@@ -89,14 +91,11 @@ begin
 
   self.backgroundCol := RGB(50,50,50);
 
-  if voxelScene.didCameraMove() then
+  if voxelScene.didCameraMove() then begin
     inherited doDraw(dc);
-
-  {todo: move render to a job}
-  if anyKeyDown then
-    voxelScene.render(dc, 0.010)
-  else
+    {initial preview render}
     voxelScene.render(dc);
+  end;
 
   {debug key: show current tile}
   if keyDown(key_x) then begin
@@ -193,6 +192,13 @@ begin
   end;
 end;
 
+function tDungeonViewGui.updateRender(): boolean;
+begin
+  voxelScene.render(canvas.getDC, 0.001);
+  {turn off once we are done}
+  result := voxelScene.isDone;
+end;
+
 constructor tDungeonViewGui.Create(aMap: tMDRMap);
 var
   x,y: integer;
@@ -209,10 +215,14 @@ begin
 
   backgroundCol := RGBA.Lerp(mdr.LIGHTGRAY, RGBA.Black, 0.5);
 
+  renderJob := tJobProc.Create(self.updateRender);
+  renderJob.start();
 end;
 
 destructor tDungeonViewGui.destroy();
 begin
+  renderJob.stop();
+  renderJob.free;
   voxelScene.free;
   tileBuilder.free;
   tileCache.free;
