@@ -57,6 +57,11 @@ type
 
 implementation
 
+type
+  tBackgroundMode = (BM_NONE, BM_GRAY, BM_BLACK, BM_CHECKER, BM_IMAGE);
+
+const BACKGROUND_MODE: tBackgroundMode = BM_IMAGE;
+
 {-------------------------------------------------------}
 
 constructor tMapGUI.Create();
@@ -66,7 +71,7 @@ begin
   mode := mmView;
   cursorPos.x := 0;
   cursorPos.y := 0;
-  //background := tSprite.create(gfx['darkmap']);
+  background := tSprite.create(mdr.gfx['bgdark']);
   tileBuffer := tPage.create(TILE_SIZE+1, TILE_SIZE+1);
   setSize(512, 512);
   tileEditor := nil;
@@ -201,9 +206,8 @@ var
   icd: tIntercardinalDirection;
   padding : integer;
   dc: tDrawContext;
+  prevClip: tRect;
 begin
-
-  startTimer('tile_render');
 
   tile := map.tile[x,y].asExplored;
 
@@ -227,8 +231,13 @@ begin
 
   }
 
-  // todo: set clipping to make sure we don't draw on other tiles}
-  // dc.clip := Rect(pos.x+dc.offset.x, pos.y+dc.offset.y, TILE_SIZE, TILE_SIZE);
+  // make sure we only draw on our tile
+  prevClip := aDC.clip;
+  aDC.clip := Rect(pos.x+aDC.offset.x, pos.y+aDC.offset.y, TILE_SIZE, TILE_SIZE);
+  aDC.clip.clipTo(prevClip);
+  if aDC.clip.area <= 0 then exit;
+
+  startTimer('tile_render');
 
   {clear background for this tile}
   {todo: support image background}
@@ -285,15 +294,28 @@ begin
   {composite:}
 
   {1. background}
-  if (x+y) mod 2 = 0 then
-    {show tile boundaries}
-    aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(255,0,255,128));
-  aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(100,100, 100));
+  case BACKGROUND_MODE of
+    BM_CHECKER:
+      if (x+y) mod 2 = 0 then
+        aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(200,50,200))
+      else
+        aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+    BM_GRAY:
+      aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(100,100, 100));
+    BM_BLACK:
+      aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+    BM_IMAGE: begin
+      aDC.drawImage(background.page, Point(0,0));
+      // also show cells
+      aDC.fillRect(Rect(pos.x,pos.y+1, 1, TILE_SIZE-1), RGB(0,0,0,32));
+      aDC.fillRect(Rect(pos.x,pos.y, TILE_SIZE, 1), RGB(0,0,0,32));
+    end;
+  end;
 
-  {2. tile}
+  {2. overlay the tile}
   aDC.drawImage(tileBuffer, pos);
 
-  {3. cursor}
+  {3. overlay the cursor (if any)}
   {if (x = cursorPos.x) and (y = cursorPos.y) then
     drawCursor(aDC);}
 
