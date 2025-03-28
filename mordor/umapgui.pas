@@ -316,8 +316,8 @@ begin
   aDC.drawImage(tileBuffer, pos);
 
   {3. overlay the cursor (if any)}
-  {if (x = cursorPos.x) and (y = cursorPos.y) then
-    drawCursor(aDC);}
+  if (x = cursorPos.x) and (y = cursorPos.y) then
+    drawCursor(aDC);
 
   isTileDirty[x,y] := false;
 
