@@ -14,6 +14,7 @@ uses
   uColor,
   uKeyboard,
   uFont,
+  uTimer,
   {game stuff}
   uMDRRes,
   uTileEditorGui,
@@ -26,6 +27,7 @@ type
   tMapGUI = class(tGuiComponent)
   protected
     background: tSprite;
+    tileBuffer: tPage;
     cursorPos: tPoint;
     cursorDir: tDirection;
     // todo: make this sizeable
@@ -34,6 +36,7 @@ type
     function  tilePos(x,y: integer): tPoint;
     procedure drawCursor(dc: tDrawContext);
     procedure invalidateTile(x,y: integer);
+    procedure renderTileBufferShadow();
   const
     TILE_SIZE = 15;
   public
@@ -64,6 +67,7 @@ begin
   cursorPos.x := 0;
   cursorPos.y := 0;
   //background := tSprite.create(gfx['darkmap']);
+  tileBuffer := tPage.create(TILE_SIZE+1, TILE_SIZE+1);
   setSize(512, 512);
   tileEditor := nil;
   doubleBufferMode := dbmOff;
@@ -116,6 +120,75 @@ begin
   end;
 end;
 
+procedure renderTileBufferShadow_REF(page: tPage);
+var
+  x,y: integer;
+  c: RGBA;
+  v: byte;
+  offset: dword;
+  pixelPtr: pRGBA;
+  dc: tDrawContext;
+begin
+  assert(page.width=16);
+  assert(page.height=16);
+  dc := page.getDC(bmBlit);
+  for y := 0 to 15 do begin
+    for x := 0 to 15 do begin
+      v := 0;
+      if dc.getPixel(Point(x, y)).a = 255 then continue;
+      if dc.getPixel(Point(x-1, y-1)).a = 255 then v := 1;
+      if dc.getPixel(Point(x-1, y)).a = 255 then v := 2;
+      if dc.getPixel(Point(x, y-1)).a = 255 then v := 2;
+      case v of
+        1: dc.putPixel(Point(x, y), RGB(0,0,0,96));
+        2: dc.putPixel(Point(x, y), RGB(0,0,0,128));
+      end;
+    end;
+  end;
+end;
+
+{auto shadows for given tile}
+procedure renderTileBufferShadow_ASM(page: tPage);
+var
+  x,y: integer;
+  c: RGBA;
+  v: byte;
+  pixelPtr: pRGBA;
+  upOfs,leftOfs: int32;
+  shadow1, shadow2: RGBA;
+begin
+  {not really asm, but it's pointer stuff..}
+  assert(page.width=16);
+  assert(page.height=16);
+  upOfs := 16*4;
+  leftOfs := 4;
+  shadow1 := RGB(0,0,0,96);
+  shadow2 := RGB(0,0,0,128);
+  for y := 0 to 15 do begin
+    pixelPtr := page.getAddr(0,y);
+    for x := 0 to 15 do begin
+      if pixelPtr^.a = 255 then begin
+        inc(pixelPtr);
+        continue;
+      end;
+      v := 0;
+      if (x > 0) and (y > 0) and (pRGBA(pointer(pixelPtr) - upOfs - leftOfs)^.a = 255) then v := 1;
+      if (x > 0) and (pRGBA(pointer(pixelPtr) - leftOfs)^.a = 255) then v := 2;
+      if (y > 0) and (pRGBA(pointer(pixelPtr) - upOfs)^.a = 255) then v := 2;
+      case v of
+        1: pixelPtr^ := shadow1;
+        2: pixelPtr^ := shadow2;
+      end;
+      inc(pixelPtr);
+    end;
+  end;
+end;
+
+procedure tMapGUI.renderTileBufferShadow();
+begin
+  renderTileBufferShadow_ASM(tileBuffer);
+end;
+
 {renders a single map tile}
 procedure tMapGUI.renderTile(aDC: tDrawContext; x, y: integer);
 var
@@ -125,28 +198,51 @@ var
   dx,dy: integer;
   id: integer;
   d: tDirection;
+  icd: tIntercardinalDirection;
   padding : integer;
   dc: tDrawContext;
 begin
 
+  startTimer('tile_render');
+
   tile := map.tile[x,y].asExplored;
-  dc := aDC;
 
   pos := tilePos(x,y);
+
+  {
+  The rules are as follows
+
+  The 'inner' part of the tile is 15x15 (TILE_SIZE).
+  However the tiles are 16x16, as follows
+
+  col0 our west wall
+  row0 our north wall
+  col15 our east wall
+  row15 our south wall
+
+  Therefore.. if we want to quickly draw, we can draw 15x15 tiles where we
+  render only our north and west walls. However a full redraw requires
+  rendering all four walls (as they might overlap our cell) as well as
+  the walls from the diagonal tiles... (due to corners)
+
+  }
 
   // todo: set clipping to make sure we don't draw on other tiles}
   // dc.clip := Rect(pos.x+dc.offset.x, pos.y+dc.offset.y, TILE_SIZE, TILE_SIZE);
 
   {clear background for this tile}
   {todo: support image background}
-  dc.offset.x += pos.x;
-  dc.offset.y += pos.y;
+  dc := tileBuffer.getDC();
 
+  tileBuffer.clear(RGBA.Clear);
+
+  (*
   if (x+y) mod 2 = 0 then
     {show tile boundaries}
     dc.fillRect(Rect(0,0,TILE_SIZE, TILE_SIZE), RGB(255,0,255,128));
 
   //dc.fillRect(Rect(0,0,TILE_SIZE, TILE_SIZE), RGB(0,0,0));
+  *)
 
   {floor}
   id := tile.floorSpec.spriteIdx;
@@ -174,14 +270,36 @@ begin
     mdr.mapSprites.sprites[id].drawRot90(dc, Point(dx, dy), ord(d)-1);
   end;
 
-  {auto shadow}
-  {todo:}
+  {don't forget the corners}
+  for icd in tIntercardinalDirection do
+    if map.hasCorner(x, y, icd) then begin
+      dx := IDX[icd]; dy := IDY[icd];
+      dc.putPixel(Point(8+dx*8, 8+dy*8), RGB($ffe6dcc2));
+    end;
 
-  {cursor}
-  if (x = cursorPos.x) and (y = cursorPos.y) then
-    drawCursor(dc);
+  {auto shadow}
+  startTimer('tile_shadow');
+  renderTileBufferShadow();
+  stopTimer('tile_shadow');
+
+  {composite:}
+
+  {1. background}
+  if (x+y) mod 2 = 0 then
+    {show tile boundaries}
+    aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(255,0,255,128));
+  aDC.fillRect(Rect(pos.x,pos.y,TILE_SIZE, TILE_SIZE), RGB(100,100, 100));
+
+  {2. tile}
+  aDC.drawImage(tileBuffer, pos);
+
+  {3. cursor}
+  {if (x = cursorPos.x) and (y = cursorPos.y) then
+    drawCursor(aDC);}
 
   isTileDirty[x,y] := false;
+
+  stopTimer('tile_render');
 end;
 
 procedure tMapGUI.doUpdate(elapsed: single);

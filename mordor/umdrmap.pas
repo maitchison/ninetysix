@@ -17,6 +17,7 @@ type
   tMediumType = (mtNone, mtFog, mtRock, mtLight);
   tCeilingType = (ctNone, ctRock, ctGrate);
   tDirection = (dNorth, dEast, dSouth, dWest);
+  tIntercardinalDirection = (dNorthEast, dNorthWest, dSouthWest, dSouthEast);
 
   tFloorSpec = record
     tag: string;
@@ -26,7 +27,6 @@ type
   tMediumSpec = record
     tag: string;
     spriteIdx: integer;
-    canTransit: boolean;
   end;
 
   tCeilingSpec = record
@@ -85,6 +85,9 @@ const
   DX: array[tDirection] of integer = (0,+1,0,-1);
   DY: array[tDirection] of integer = (-1,0,+1,0);
 
+  IDX: array[tIntercardinalDirection] of integer = (+1,-1,-1,+1);
+  IDY: array[tIntercardinalDirection] of integer = (-1,-1,+1,+1);
+
 type
 
   tExplorationStatus = (eNone, ePartial, eFull);
@@ -134,6 +137,7 @@ type
     function  getTile(x,y: integer): tTile;
     function  getWall(x,y: integer; d: tDirection): tWall;
     procedure setTile(x,y: integer; aTile: tTile);
+    function  inBounds(x,y: int32): boolean;
     procedure setWall(x,y: integer; d: tDirection;aWall: tWall);
     function  getWallIdx(x,y: integer;d: tDirection): integer;
     function  getTileIdx(x,y: integer): integer;
@@ -141,15 +145,17 @@ type
   public
     constructor Create(aWidth, aHeight: word);
     destructor destroy(); override;
-    procedure  save(filename: string);
-    procedure  load(filename: string);
-    procedure  clear();
-    procedure  setExplored(aExplored: tExplorationStatus);
+    procedure save(filename: string);
+    procedure load(filename: string);
+    procedure clear();
+    procedure setExplored(aExplored: tExplorationStatus);
+    function  hasCorner(x,y: integer;d: tIntercardinalDirection): boolean;
   public
     property width: integer read fWidth;
     property height: integer read fHeight;
     property tile[x,y: integer]: tTile read getTile write setTile;
     property wall[x,y: integer;d: tDirection]: tWall read getWall write setWall;
+
   end;
 
 implementation
@@ -221,7 +227,7 @@ end;
 
 function tWall.isSolid: boolean;
 begin
-  result := spec.canTransit;
+  result := not spec.canTransit;
 end;
 
 function tWall.toString(): string;
@@ -280,15 +286,20 @@ begin
   fTile[getTileIdx(x,y)] := aTile;
 end;
 
+function tMDRMap.inBounds(x,y: int32): boolean;
+begin
+  result := (dword(x) < width) and (dword(y) < height);
+end;
+
 function tMDRMap.getTileIdx(x,y: integer): integer;
 begin
-  if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
+  if not inBounds(x,y) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
   result := x+y*fWidth;
 end;
 
 function tMDRMap.getWallIdx(x,y: integer;d: tDirection): integer;
 begin
-  if (word(x) >= width) or (word(y) >= height) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
+  if not inBounds(x,y) then raise ValueError('Out of bounds tile co-ords (%d,%d)', [x, y]);
   case d of
     dNorth: result := 2*(x+y*(fWidth+1));
     dWest:  result := 2*(x+y*(fWidth+1))+1;
@@ -353,6 +364,22 @@ var
 begin
   for i := 0 to length(fTile)-1 do fTile[i].status.explored := aExplored;
   for i := 0 to length(fWall)-1 do fWall[i].status.explored := aExplored;
+end;
+
+{returns true if corner pixel should be set, directions are to the left}
+function tMDRMap.hasCorner(x,y: integer;d: tIntercardinalDirection): boolean;
+var
+  tx,ty: integer;
+begin
+  tx := x + IDX[d];
+  ty := y + IDY[d];
+  if not inBounds(tx,ty) then exit(false);
+  case d of
+    dNorthEast: result := (wall[tx, ty, dWest].isSolid or wall[tx, ty, dSouth].isSolid);
+    dNorthWest: result := (wall[tx, ty, dEast].isSolid or wall[tx, ty, dSouth].isSolid);
+    dSouthEast: result := (wall[tx, ty, dWest].isSolid or wall[tx, ty, dNorth].isSolid);
+    dSouthWest: result := (wall[tx, ty, dEast].isSolid or wall[tx, ty, dNorth].isSolid);
+  end;
 end;
 
 procedure tMDRMap.clear();

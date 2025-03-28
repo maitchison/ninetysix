@@ -71,6 +71,7 @@ type
     procedure doDrawImage(dstPixels, srcPixels: pointer; dstX, dstY: int32; srcRect: tRect; tint: RGBA; blendMode: tBlendMode);
     procedure doStretchImage(dstPage, srcPage: tPage; dstRect: tRect; srcX, srcY, srcDx, srcDy: single; tint: RGBA; filter: tTextureFilter; blendMode: tBlendMode);
     {basic drawing API}
+    function  getPixel(pos: tPoint): RGBA;
     procedure putPixel(pos: tPoint; col: RGBA);
     procedure hLine(pos: tPoint;len: int32;col: RGBA);
     procedure vLine(pos: tPoint;len: int32;col: RGBA);
@@ -799,6 +800,14 @@ begin
     bmBlend: page.putPixel(pos.x, pos.y, col);
   end;
   markRegion(Rect(pos.x, pos.y, 1, 1));
+end;
+
+function tDrawContext.getPixel(pos: tPoint): RGBA;
+begin
+  result := RGBA.Clear();
+  applyTransform(pos);
+  if not clip.isInside(pos.x, pos.y) then exit;
+  result := page.getPixel(pos.x, pos.y);
 end;
 
 procedure tDrawContext.fillRect(dstRect: tRect; col: RGBA);
