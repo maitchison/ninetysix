@@ -99,6 +99,7 @@ var
   stepSize: single;
   curr, prev: V3D32;
   t: single;
+  didHaveProblem: boolean;
 
   function autoStep(p,d: single): single;
   begin
@@ -127,6 +128,9 @@ begin
   end;
 
   prev.x := -1; prev.y := -1; prev.z := -1;
+  didHaveProblem := false;
+
+
   for i := 0 to 100 do begin
 
     inc(cellCount);
@@ -138,8 +142,8 @@ begin
     {same cell detection... this shouldn't happen}
 
     if (curr = prev) then begin
-      result.col := RGB(0,255,0);
-      exit;
+      //result.col := RGB(0,255,0);
+      //exit;
     end;
 
     {out of bounds}

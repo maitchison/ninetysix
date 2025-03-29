@@ -646,7 +646,7 @@ function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 begin
   VX_LAST_STEP_COUNT := 0;
   inc(VX_TRACE_COUNT);
-  result := trace_fast(self, pos, dir);
+  result := trace_auto(self, pos, dir);
 end;
 
 

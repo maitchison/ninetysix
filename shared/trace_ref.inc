@@ -4,6 +4,12 @@ begin
   result := 1/x;
 end;
 
+procedure safeSet(var t: single; newT: single); inline;
+begin
+  if newT <= 0 then exit;
+  if newT < t then t := newT;
+end;
+
 function sign(x: single): integer; inline;
 begin
   result := 0;
@@ -20,11 +26,9 @@ end;
 
 function getVoxel(vox: tVoxel; x,y,z: integer): RGBA; inline;
 begin
-  result := vox.vox.pixel^[
-    (x) +
-    (y shl vox.fLog2Width) +
-    (z shl (vox.fLog2Width + vox.fLog2Height))
-  ];
+  result := pRGBA(
+    vox.vox.pData + (((((z shl vox.fLog2Height) + y) shl vox.fLog2Width) + x) shl 2)
+  )^;
 end;
 
 function autoStep(p,dInv,s: int32): int32; inline;
@@ -136,6 +140,299 @@ begin
 
 end;
 
+{-------------------------------------------------------------}
+{
+  simple fixed-point DDA tracing
+  has some precision issuese but can be quite fast.
+}
+
+function trace_dda(vox: tVoxel; pos: V3D;dir: V3D): tRayHit;
+var
+  k: integer;
+  c: RGBA;
+  d: int32;
+  x,y,z: int32;
+  dx,dy,dz: int32;
+  sx,sy,sz: int32;
+  voxPtr: pointer;
+  maxSamples: integer;
+
+  {clip distance traveled to edge of cuboid}
+  function clipDistanceF(t: single): single;
+  begin
+
+    {todo: calculate invADir as float, then round to get invDir}
+    if dir.x > 0 then safeSet(t, (vox.width-pos.x) / dir.x)
+    else if dir.x < 0 then safeSet(t, -pos.x / dir.x);
+
+    if dir.y > 0 then safeSet(t, (vox.height-pos.y) / dir.y)
+    else if dir.y < 0 then safeSet(t, -pos.y / dir.y);
+
+    if dir.z > 0 then safeSet(t, (vox.depth-pos.z) / dir.z)
+    else if dir.z < 0 then safeSet(t, -pos.z / dir.z);
+
+    result := t;
+  end;
+
+begin
+
+  sx := trunc(256*pos.x);
+  sy := trunc(256*pos.y);
+  sz := trunc(256*pos.z);
+
+  c := getVoxel(vox, sx div 256, sy div 256, sz div 256);
+  if c.a = 255 then begin
+    result.d := 0;
+    result.col := c;
+    result.didHit := true;
+    exit;
+  end;
+
+  dx := round(256*dir.x);
+  dy := round(256*dir.y);
+  dz := round(256*dir.z);
+
+  {clamping sucks, but lets do it}
+  {this is needed due either bugs in my tracer, or precision issues}
+  sx := clamp(sx, 0, vox.width*256-1);
+  sy := clamp(sy, 0, vox.height*256-1);
+  sz := clamp(sz, 0, vox.depth*256-1);
+
+  voxPtr := vox.vox.pData;
+
+  maxSamples := ceil(vox.fRadius);
+
+  result.d := 0;
+  result.col := RGBA.Clear;
+  result.didHit := false;
+
+  for k := 0 to maxSamples-1 do begin
+
+    inc(VX_STEP_COUNT);
+    inc(VX_LAST_STEP_COUNT);
+
+    x := sx div 256;
+    y := sy div 256;
+    z := sz div 256;
+
+    if (dword(x) >= vox.width) then begin
+      result.d := clipDistanceF(result.d);
+      exit;
+    end;
+    if (dword(y) >= vox.height) then begin
+      result.d := clipDistanceF(result.d);
+      exit;
+    end;
+    if (dword(z) >= vox.depth) then begin
+      result.d := clipDistanceF(result.d);
+      exit;
+    end;
+
+    c := getVoxel(vox, x, y, z);
+
+    if c.a = 255 then begin
+      result.didHit := true;
+      result.col := c;
+      exit;
+    end;
+
+    d := (255-c.a)-2;
+
+    {d is distance * 4}
+    sx := sx + ((dx * d) div 4);
+    sy := sy + ((dy * d) div 4);
+    sz := sz + ((dz * d) div 4);
+    result.d += (d/4);
+  end;
+
+  {color used when we ran out of samples}
+  result.col := RGB(255,0,255); {purple}
+  result.didHit := false;
+
+end;
+
+
+{-------------------------------------------------------------}
+{
+  simple fixed-point DDA tracing
+  mmx optimized version
+  has some precision issuese but can be quite fast.
+  will probably use this for lighting
+}
+
+function trace_dda_mmx(vox: tVoxel; pos: V3D;dir: V3D): tRayHit;
+var
+  k: integer;
+  c: RGBA;
+  d: int32;
+  x,y,z: int32;
+  delta: V3D16;
+  scaledPos: V3D16;
+  voxPtr: pointer;
+  maxSamples: integer;
+  clipMask32: dword;
+  res_d4: integer;
+  res_didHit: byte;
+  res_col: RGBA;
+
+  {clip distance traveled to edge of cuboid}
+  function clipDistanceF(t: single): single;
+  begin
+
+    {todo: calculate invADir as float, then round to get invDir}
+    if dir.x > 0 then safeSet(t, (vox.width-pos.x) / dir.x)
+    else if dir.x < 0 then safeSet(t, -pos.x / dir.x);
+
+    if dir.y > 0 then safeSet(t, (vox.height-pos.y) / dir.y)
+    else if dir.y < 0 then safeSet(t, -pos.y / dir.y);
+
+    if dir.z > 0 then safeSet(t, (vox.depth-pos.z) / dir.z)
+    else if dir.z < 0 then safeSet(t, -pos.z / dir.z);
+
+    result := t;
+  end;
+
+begin
+
+  {easy to remove this requirement}
+  assert(vox.width = 16);
+  assert(vox.height = 16);
+  assert(vox.depth = 16);
+
+  {todo: this could be faster...}
+  scaledPos.x := trunc(256*pos.x);
+  scaledPos.y := trunc(256*pos.y);
+  scaledPos.z := trunc(256*pos.z);
+
+  {clamping sucks, but lets do it}
+  {this is needed due either bugs in my tracer, or precision issues}
+  scaledPos.x := clamp(scaledPos.x, 0, vox.width*256-1);
+  scaledPos.y := clamp(scaledPos.y, 0, vox.height*256-1);
+  scaledPos.z := clamp(scaledPos.z, 0, vox.depth*256-1);
+  scaledPos.w := 0;
+
+  c := getVoxel(vox, scaledPos.x div 256, scaledPos.y div 256, scaledPos.z div 256);
+  if c.a = 255 then begin
+    result.d := 0;
+    result.col := c;
+    result.didHit := true;
+    exit;
+  end;
+
+  delta.x := round(256*dir.x);
+  delta.y := round(256*dir.y);
+  delta.z := round(256*dir.z);
+  delta.w := 0;
+
+  {stub: locked to size 16 for the moment}
+  clipMask32 := $f0f0f0f0;
+
+  voxPtr := vox.vox.pData;
+
+  maxSamples := ceil(vox.fRadius);
+
+  result.d := 0;
+  result.col := RGBA.Clear;
+  result.didHit := false;
+  res_d4 := 0;
+  res_didHit := 0;
+  asm
+
+    pushad
+
+    mov ecx, maxSamples
+    mov edi, voxPtr
+    mov ebx, clipMask32
+
+    {mm0 <- 0}
+    pxor mm0,mm0
+    {mm1 <- scaledPos}
+    movq mm1, scaledPos
+    {mm2 <- delta}
+    movq mm2, delta
+
+  @PIXELLOOP:
+
+    inc VX_STEP_COUNT
+    inc VX_LAST_STEP_COUNT
+
+    {bounds check}
+    movq  mm5, mm1
+    psrlw mm5, 8
+    packuswb mm5, mm5
+    movd  eax, mm5    // eax=0xyz
+    mov   edx, eax
+    and   edx, ebx
+    jnz  @OUTOFBOUNDS
+
+    {sample}
+    push ebx
+    mov ebx, eax          // ax = yz
+    shr ebx, 16           // bx = 0x
+
+    mov cx, 4+(4*256)
+    xor edx, edx
+    or dl, bl
+    shl edx, cl
+    shr cx, 8
+    or dl, ah
+    shl edx, cl
+    or dl, al
+    pop ebx
+
+    mov eax, [edi+edx*4]
+
+    {check for hit}
+    cmp eax, $ff000000
+    jae @HIT
+
+  @MOVE:
+    shr eax, 24
+    not al
+    sub al, 2   // half steps
+    add res_d4, eax
+
+    mov dx, ax
+    shl eax, 16
+    mov ax, dx            // eax = 0d|0d
+    movd      mm6, eax    // 00|00|0d|0d
+    punpckldq mm6, mm6    // 0d|0d|0d|0d
+    movq      mm5, mm2
+    pmullw    mm5, mm6    // v *= d
+    psraw     mm5, 2
+    paddsw    mm1, mm5    // p += v * (d/4)
+
+    dec ecx
+    jnz @PIXELLOOP
+
+    jmp @DONE
+
+  @HIT:
+    mov res_col, eax
+    mov res_didHit, 1
+    jmp @DONE
+
+  @OUTOFBOUNDS:
+    mov res_didHit, 2
+    jmp @DONE
+
+  @DONE:
+    popad
+    emms
+  end;
+
+  result.col := res_col;
+  result.d := res_d4/4;
+  case res_didHit of
+    0: result.didHit := false;
+    1: result.didHit := true;
+    2: begin
+      result.didHit := false;
+      result.d := clipDistanceF(result.d);
+    end;
+  end;
+end;
+
 {---------------------------------------------------------}
 {
  besenham voxel tracing
@@ -164,12 +461,6 @@ var
   begin
     if x = 0 then exit(0);
     result := round((1/(x/256)) * 256);
-  end;
-
-  procedure safeSet(var t: single; newT: single); inline;
-  begin
-    if newT <= 0 then exit;
-    if newT < t then t := newT;
   end;
 
   {clip distance traveled to edge of cuboid}
@@ -267,15 +558,11 @@ end;
 
 {---------------------------------------------------------}
 {
- dda voxel tracing.
- we move in fixed step sizes based on the L1 SDF.
- typically minimum movement is 0.25 voxels.
- will miss corners of voxels sometimes
- gets around 18k traces/second in a large world.
+  auto stepping method...
 }
 {---------------------------------------------------------}
 
-function trace_dda(vox: tVoxel;pos: V3D; dir: V3D): tRayHit;
+function trace_auto(vox: tVoxel;pos: V3D; dir: V3D): tRayHit;
 var
   i: integer;
   maxSteps: integer;
@@ -407,6 +694,15 @@ var
     result := (edge - p) * dInv;
   end;
 
+const
+  {minimum safe skip size before we start using the skipping system.
+   this involves resetting the trace from a new position, which is slow
+   so only use it for largeish skips
+   set to 0 to disable.
+   }
+  {unfortunately this does not help}
+  MIN_SKIP_SIZE = 0;
+
 begin
   assert(abs(dir.abs2-1.0) < 1e-6);
 
@@ -452,38 +748,38 @@ begin
     inc(VX_STEP_COUNT);
     inc(VX_LAST_STEP_COUNT);
 
-    {this doesn't actually help... WEIRD}
-    (*
-    d := ((255-col.a) div 4);
-    s := d-1;
+    if MIN_SKIP_SIZE > 0 then begin
+      d := ((255-col.a) div 4);
+      s := d-1;
 
-    if s >= 8 then begin
-      {perform a leap by intersecting a larger cube}
-      pos := initialPos + (dir * result.d);
-      if (pos.x < 0) or (pos.x >= vox.width) then exit;
-      if (pos.y < 0) or (pos.y >= vox.height) then exit;
-      if (pos.z < 0) or (pos.z >= vox.depth) then exit;
-      xJump := autoStep(pos.x, dInv.x, s, vox.width);
-      yJump := autoStep(pos.y, dInv.y, s, vox.height);
-      zJump := autoStep(pos.z, dInv.z, s, vox.depth);
-      safeJump := minf(xJump, yJump, zJump);
-      result.d += safeJump + 0.01;
-      pos := initialPos + (dir * result.d);
-      if (pos.x < 0) or (pos.x >= vox.width) then exit;
-      if (pos.y < 0) or (pos.y >= vox.height) then exit;
-      if (pos.z < 0) or (pos.z >= vox.depth) then exit;
-      {inline the init}
-      x := trunc(pos.x);
-      y := trunc(pos.y);
-      z := trunc(pos.z);
-      tMaxX := fracs(pos.x, stepX) * tDeltaX;
-      tMaxY := fracs(pos.y, stepY) * tDeltaY;
-      tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
-      oldT := 0;
-      col := getVoxel(vox, x,y,z);
-      continue;
+      if s >= MIN_SKIP_SIZE then begin
+        {perform a leap by intersecting a larger cube}
+        pos := initialPos + (dir * result.d);
+        if (pos.x < 0) or (pos.x >= vox.width) then exit;
+        if (pos.y < 0) or (pos.y >= vox.height) then exit;
+        if (pos.z < 0) or (pos.z >= vox.depth) then exit;
+        xJump := autoStep(pos.x, dInv.x, s, vox.width);
+        yJump := autoStep(pos.y, dInv.y, s, vox.height);
+        zJump := autoStep(pos.z, dInv.z, s, vox.depth);
+        safeJump := minf(xJump, yJump, zJump);
+        result.d += safeJump + 0.01;
+        pos := initialPos + (dir * result.d);
+        if (pos.x < 0) or (pos.x >= vox.width) then exit;
+        if (pos.y < 0) or (pos.y >= vox.height) then exit;
+        if (pos.z < 0) or (pos.z >= vox.depth) then exit;
+        {inline the init}
+        x := trunc(pos.x);
+        y := trunc(pos.y);
+        z := trunc(pos.z);
+        tMaxX := fracs(pos.x, stepX) * tDeltaX;
+        tMaxY := fracs(pos.y, stepY) * tDeltaY;
+        tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
+        oldT := 0;
+        col := getVoxel(vox, x,y,z);
+        continue;
+      end;
     end;
-    *)
+
 
     if tMaxX < tMaxY then begin
       if tMaxX < tMaxZ then begin
@@ -603,6 +899,8 @@ begin
 
     mov ecx, MAXSTEPS
     mov edi, VOXPTR
+
+    {note: we could put these into MMX registers... might be faster?}
 
   @TraceLoop:
     {book keeping}
