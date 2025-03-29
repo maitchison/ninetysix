@@ -136,7 +136,7 @@ begin
     @ZLOOP:
 
       {house keeping}
-      inc VX_TRACE_COUNT
+      inc VX_STEP_COUNT
 
       {check bounds}
       movq      mm0, mm1

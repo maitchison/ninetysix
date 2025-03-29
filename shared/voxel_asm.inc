@@ -31,7 +31,7 @@ begin
   @LOOP:
 
     {house keeping}
-    inc VX_TRACE_COUNT
+    inc VX_STEP_COUNT
 
     {convert scaled, and check bounds}
     cmp bh,  byte ptr [size.x]
@@ -126,7 +126,7 @@ begin
     popad
   end;
 
-  LAST_TRACE_COUNT := depth;
+  VX_LAST_STEP_COUNT := depth;
   result := col;
 
 end;
@@ -149,7 +149,7 @@ begin
 
     {show trace count}
     if VX_GHOST_MODE then
-       col.init(LAST_TRACE_COUNT,LAST_TRACE_COUNT*4, LAST_TRACE_COUNT*16);
+       col.init(VX_LAST_STEP_COUNT,VX_LAST_STEP_COUNT*4, VX_LAST_STEP_COUNT*16);
 
     {$R-}
     p16.x += d16.x;

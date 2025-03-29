@@ -22,7 +22,8 @@ uses
 
 var
   {debugging stuff}
-  VX_TRACE_COUNT: int32 = 0;
+  VX_STEP_COUNT: int32 = 0;
+  VX_RAY_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
   VX_GHOST_MODE: boolean = false;
   VX_USE_SDF: boolean = true;
@@ -76,8 +77,6 @@ type
     procedure transferSDF(sdf: tPage);
     procedure applyLighting(x,y,z: integer; lightingMode: tLightingMode);
     function  calculateGI(x,y,z: integer): single;
-  protected
-    function  trace_ref(pos: V3D; dir: V3D): tRayHit;
   public
     vox: tPage;     // RGBD - baked (todo: 2 bits of D are for alpha)
     function  getDistance_L1(x,y,z: integer;minDistance: integer=-1; maxDistance: integer=-1): integer;
@@ -109,6 +108,10 @@ type
     procedure rotate();
 
     function  draw(const dc: tDrawContext;atPos, angle: V3D; scale: single=1;asShadow:boolean=false): tRect;
+    property  width: integer read fWidth;
+    property  height: integer read fHeight;
+    property  depth: integer read fDepth;
+    property  radius: single read fRadius;
   end;
 
 implementation
@@ -121,9 +124,9 @@ const
   MAX_SAMPLES = 128;
 
 var
-  LAST_TRACE_COUNT: dword = 0;
+  VX_LAST_STEP_COUNT: dword = 0;
 
-
+{$I trace_ref.inc}
 {$I voxel_ref.inc}
 {$I voxel_asm.inc}
 {$I voxel_mmx.inc}
@@ -641,190 +644,11 @@ dir should be normalized
 }
 function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 begin
-  result := trace_ref(pos, dir);
+  VX_LAST_STEP_COUNT := 0;
+  inc(VX_RAY_COUNT);
+  result := trace_fast(self, pos, dir);
 end;
 
-{not really asm, just fixed point... but will be asm}
-function tVoxel.trace_ref(pos: V3D; dir: V3D): tRayHit;
-var
-  maxSteps: int32;
-  col: RGBA;
-  i: integer;
-  s,d: integer;
-
-  initialPos: V3D;
-  dInv: V3D;
-  x,y,z: integer;
-  stepX,stepY,stepZ: integer;
-  tDeltaX, tDeltaY, tDeltaZ: single;
-  tMaxX, tMaxY, tMaxZ: single;
-  oldT,newT: single;
-  xJump,yJump,zJump: single;
-  safeJump: single;
-  bound: integer;
-  edge: integer;
-
-  function safeInv(x: single): single; inline;
-  begin
-    if x = 0 then exit(99999999);
-    result := 1/x;
-  end;
-
-  function sign(x: single): integer; inline;
-  begin
-    result := 0;
-    if x < 0 then exit(-1) else if x > 0 then exit(1);
-  end;
-
-  function fracs(x: single;s: integer): single; inline;
-  begin
-    if s > 0 then
-      result := 1 - frac(x)
-    else
-      result := frac(x);
-  end;
-
-  function getVoxel(): RGBA; inline;
-  begin
-    result := vox.pixel^[
-      (x) +
-      (y shl fLog2Width) +
-      (z shl (fLog2Width + fLog2Height))
-    ];
-  end;
-
-  procedure init(); inline;
-  begin
-    {clamping is not be best strategy... but works for small errors}
-    x := clamp(floor(pos.x), 0, fWidth-1);
-    y := clamp(floor(pos.y), 0, fHeight-1);
-    z := clamp(floor(pos.z), 0, fDepth-1);
-    tMaxX := fracs(pos.x, stepX) * tDeltaX;
-    tMaxY := fracs(pos.y, stepY) * tDeltaY;
-    tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
-    oldT := 0;
-  end;
-
-  function autoStep(p, dInv: single; size: integer;limit: integer): single; inline;
-  begin
-    if dInv > 0 then begin
-      edge := floor(p)+1+size;
-      if edge > limit then edge := limit;
-    end else if dInv < 0 then begin
-      edge := floor(p)-size;
-      if edge < 0 then edge := 0;
-    end else
-      exit(9999);
-    //note('%.3f %.3f %d %d', [p,dInv,size,edge]);
-    result := (edge - p) * dInv;
-  end;
-
-begin
-  assert(abs(dir.abs2-1.0) < 1e-6);
-
-  maxSteps := fWidth+fHeight+fDepth;
-
-  stepX := sign(dir.x);
-  stepY := sign(dir.y);
-  stepZ := sign(dir.z);
-
-  dInv.x := safeInv(dir.x);
-  dInv.y := safeInv(dir.y);
-  dInv.z := safeInv(dir.z);
-  tDeltaX := abs(dInv.x);
-  tDeltaY := abs(dInv.y);
-  tDeltaZ := abs(dInv.z);
-
-  initialPos := pos;
-  init();
-
-  result.d := 0;
-  result.didHit := false;
-  result.col := RGBA.Clear;
-
-  {check if we start inside a voxel}
-  col := getVoxel();
-  if col.a = 255 then begin
-    result.didHit := true;
-    result.col := col;
-    exit();
-  end;
-
-  for i := 0 to maxSteps-1 do begin
-
-    (*
-    {this roughly doubles the speed}
-    d := ((255-col.a) div 4);
-    s := d-1;
-
-    if s >= 2 then begin
-      {perform a leap by intersecting a larger cube}
-      pos := initialPos + (dir * result.d);
-      if (pos.x < 0) or (pos.x >= fWidth) then exit;
-      if (pos.y < 0) or (pos.y >= fHeight) then exit;
-      if (pos.z < 0) or (pos.z >= fDepth) then exit;
-      xJump := autoStep(pos.x, dInv.x, s, fWidth);
-      yJump := autoStep(pos.y, dInv.y, s, fHeight);
-      zJump := autoStep(pos.z, dInv.z, s, fDepth);
-      safeJump := minf(xJump, yJump, zJump);
-      result.d += safeJump + 0.01;
-      pos := initialPos + (dir * result.d);
-      if (pos.x < 0) or (pos.x >= fWidth) then exit;
-      if (pos.y < 0) or (pos.y >= fHeight) then exit;
-      if (pos.z < 0) or (pos.z >= fDepth) then exit;
-      {inline the init}
-      x := trunc(pos.x);
-      y := trunc(pos.y);
-      z := trunc(pos.z);
-      tMaxX := fracs(pos.x, stepX) * tDeltaX;
-      tMaxY := fracs(pos.y, stepY) * tDeltaY;
-      tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
-      oldT := 0;
-      col := getVoxel();
-      continue;
-    end;
-    *)
-
-    if tMaxX < tMaxY then begin
-      if tMaxX < tMaxZ then begin
-        newT:= tMaxX;
-        x += stepX;
-        tMaxX += tDeltaX;
-        if dword(X) >= fWidth then exit;
-      end else begin
-        newT:= tMaxZ;
-        z += stepZ;
-        tMaxZ += tDeltaZ;
-        if dword(Z) >= fDepth then exit;
-      end;
-    end else begin
-      if tMaxY < tMaxZ then begin
-        newT:= tMaxY;
-        y += stepY;
-        tMaxY += tDeltaY;
-        if dword(Y) >= fHeight then exit;
-      end else begin
-        newT:= tMaxZ;
-        z += stepZ;
-        tMaxZ += tDeltaZ;
-        if dword(Z) >= fDepth then exit;
-      end;
-    end;
-
-    result.d += (newT - oldT);
-    oldT := newT;
-
-    {get voxel}
-    col := getVoxel();
-
-    if col.a = 255 then begin
-      result.didHit := true;
-      result.col := col;
-      exit;
-    end;
-
-  end;
-end;
 
 procedure tVoxel.setVoxel(x,y,z:int32;c: RGBA);
 begin
@@ -955,7 +779,6 @@ var
     deltaX := cameraX + cameraDir*txDelta;
     deltaY := cameraY + cameraDir*tyDelta;
 
-    //stub:
     if cpuInfo.hasMMX then
       traceProc := traceScanline_MMX
     else
@@ -1015,7 +838,7 @@ begin
 
   if not assigned(self) then fatal('Tried to call draw on an assigned vox.');
 
-  VX_TRACE_COUNT := 0;
+  VX_STEP_COUNT := 0;
   if scale = 0 then exit;
 
   {note:
