@@ -52,8 +52,8 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 type
 
   tRayHit = record
-    col: RGBA;
-    d: single;
+    col: RGBA; {4 bytes}
+    d: single; {4 bytes}
     function didHit: boolean;
   end;
 

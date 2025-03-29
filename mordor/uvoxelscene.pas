@@ -36,15 +36,16 @@ type
     traceTime: single;
     tileSize: integer;
     function  traceRay(pos: V3D; dir: V3D): tRayHit;
+    function calculateShading(pos: V3D): RGBA;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
     cameraAngle: V3D; {radians, 0=north}
-    function   tracesPerSecond: single;
-    function   cellsPerTrace: single;
-    function   isDone: boolean;
-    function   didCameraMove: boolean;
-    procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
+    function  tracesPerSecond: single;
+    function  cellsPerTrace: single;
+    function  isDone: boolean;
+    function  didCameraMove: boolean;
+    procedure render(const aDC: tDrawContext;renderTime: single=0.05);
     constructor Create(aTileSize: integer);
   end;
 
@@ -99,7 +100,6 @@ var
   stepSize: single;
   curr, prev: V3D32;
   t: single;
-  didHaveProblem: boolean;
 
   function autoStep(p,d: single): single;
   begin
@@ -127,8 +127,6 @@ begin
   end;
 
   prev.x := -1; prev.y := -1; prev.z := -1;
-  didHaveProblem := false;
-
 
   for i := 0 to 100 do begin
 
@@ -139,10 +137,9 @@ begin
     curr.z := floor(pos.z);
 
     {same cell detection... this shouldn't happen}
-
     if (curr = prev) then begin
-      //result.col := RGB(0,255,0);
-      //exit;
+      result.col := RGB(0,255,0);
+      exit;
     end;
 
     {out of bounds}
@@ -179,8 +176,7 @@ begin
       pos += dir * (1/64);
       result.d += (1/64);
     end;
-    if result.d > 8 then
-      exit; // max distance
+    if result.d > 5 then exit; // max distance
     prev := curr;
   end;
   {out of samples!}
@@ -196,6 +192,45 @@ end;
 function tVoxelScene.isDone: boolean;
 begin
   result := renderState.quality = rqDone;
+end;
+
+{position is in scene space...}
+function tVoxelScene.calculateShading(pos: V3D): RGBA;
+var
+  vx,vy,vz: integer; {position within voxel}
+  vox: tVoxel;
+  cameraDir: V3D;
+  d: single; {distance from the camera plane}
+begin
+  result := RGB(0,0,128);
+  if (pos.x < 0) or (pos.x >= 32) then exit;
+  if (pos.y < 0) or (pos.y >= 32) then exit;
+  if (pos.z < 0) or (pos.z >= 1) then exit;
+
+  {get our voxel...}
+  vox := cells[trunc(pos.x), trunc(pos.y)];
+  if not assigned(vox) then exit;
+
+  vx := trunc(frac(pos.x)*32);
+  vy := trunc(frac(pos.y)*32);
+  vz := trunc(frac(pos.z)*32);
+
+  {calculate distance to camera}
+  {todo: cache camera dir}
+  cameraDir := V3(0,-1,0).rotated(cameraAngle.x, cameraAngle.y, cameraAngle.z);
+  d := cameraDir.dot(pos - cameraPos);
+
+  {calculate the face normal}
+
+  {gather lighting...}
+  result := vox.getVoxel(vx, vy, vz);
+
+  result.r := 255-clamp(round(d*64), 0, 255);
+  result.g := 255-clamp(round(d*64), 0, 255);
+  result.b := 255-clamp(round(d*64), 0, 255);
+
+  {output color}
+
 end;
 
 {render scene. With progressive render we render approximately renderTime seconds.
@@ -216,6 +251,7 @@ var
   i,j: integer;
   col32: RGBA32;
   aspect: single;
+  col: RGBA;
 
   function getRayDir(px, py: single): V3D;
   begin
@@ -281,7 +317,11 @@ begin
     end else begin
       rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
-      dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), hit.col);
+      if hit.didHit then
+        col := calculateShading(rayPos + (rayDir * hit.d))
+      else
+        col := RGB(0,128,0); { not sure what to do here..}
+      dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), col);
       renderState.nextPixel();
     end;
   end;
