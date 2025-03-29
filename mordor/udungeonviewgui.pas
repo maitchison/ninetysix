@@ -109,7 +109,7 @@ end;
 procedure tDungeonViewGui.doUpdate(elapsed: single);
 begin
   inherited doUpdate(elapsed);
-  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 1);
+  buildMapTiles(trunc(voxelScene.cameraPos.x), trunc(voxelScene.cameraPos.y), 5);
   isDirty := true;
 end;
 

@@ -60,7 +60,7 @@ type
 { Math replacements}
 
 function min(a,b: int32): int32; overload;
-function minf(a,b: single): single; overload;
+function minf(a,b: single): single; inline; overload;
 function minf(a,b,c: single): single; inline; overload;
 function max(a,b: int32): int32; inline; overload;
 function max(a,b: dword): dword; inline; overload;

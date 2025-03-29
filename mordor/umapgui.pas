@@ -307,8 +307,8 @@ begin
     BM_IMAGE: begin
       aDC.drawImage(background.page, Point(0,0));
       // also show cells
-      aDC.fillRect(Rect(pos.x,pos.y+1, 1, TILE_SIZE-1), RGB(0,0,0,32));
-      aDC.fillRect(Rect(pos.x,pos.y, TILE_SIZE, 1), RGB(0,0,0,32));
+      //aDC.fillRect(Rect(pos.x,pos.y+1, 1, TILE_SIZE-1), RGB(0,0,0,32));
+      //aDC.fillRect(Rect(pos.x,pos.y, TILE_SIZE, 1), RGB(0,0,0,32));
     end;
   end;
 
