@@ -649,7 +649,6 @@ begin
   result := trace_auto(self, pos, dir);
 end;
 
-
 procedure tVoxel.setVoxel(x,y,z:int32;c: RGBA);
 begin
   {todo: fast asm}

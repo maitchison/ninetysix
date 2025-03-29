@@ -33,7 +33,6 @@ end;
 
 function autoStep(p,dInv,s: int32): int32; inline;
 begin
-
   if dInv > 0 then
     result := ((((1+s)*256)-(p and $ff)) * dInv) div 256
   else if dInv < 0 then
@@ -42,6 +41,40 @@ begin
     result := 99999;
 end;
 
+(*
+{this is no faster...}
+function autoStep(p,dInv,s: int32): int32; assembler; inline;
+asm
+  cmp edx, 0
+  je @ISZERO
+  jg @ISPOS
+
+@ISNEG:
+  neg ecx
+  shl ecx,8
+  and eax,$ff
+  sub ecx,eax
+  mov eax,ecx
+  imul edx
+  shrd eax, edx, 8
+  sar edx, 8
+  jmp @DONE
+
+@ISPOS:
+  inc ecx
+  shl ecx,8
+  and eax, $ff
+  sub ecx, eax
+  mov eax, ecx
+  imul edx
+  shrd eax, edx, 8
+  sar edx, 8
+  jmp @DONE
+@ISZERO:
+  mov eax, 99999
+@DONE:
+end;
+*)
 
 {---------------------------------------------------------}
 {
@@ -160,17 +193,13 @@ var
   {clip distance traveled to edge of cuboid}
   function clipDistanceF(t: single): single;
   begin
-
     {todo: calculate invADir as float, then round to get invDir}
     if dir.x > 0 then safeSet(t, (vox.width-pos.x) / dir.x)
     else if dir.x < 0 then safeSet(t, -pos.x / dir.x);
-
     if dir.y > 0 then safeSet(t, (vox.height-pos.y) / dir.y)
     else if dir.y < 0 then safeSet(t, -pos.y / dir.y);
-
     if dir.z > 0 then safeSet(t, (vox.depth-pos.z) / dir.z)
     else if dir.z < 0 then safeSet(t, -pos.z / dir.z);
-
     result := t;
   end;
 
@@ -435,14 +464,14 @@ end;
 
 {---------------------------------------------------------}
 {
- besenham voxel tracing
+ besenham style voxel tracing
  we work out which edge is closest and then traverse to that.
  we can take advantage of L1 SDF to safely skip over empty areas
  gets around 12k traces/second in a large world.
 }
 {---------------------------------------------------------}
 
-function trace_bres(vox: tVoxel; pos: V3D; dir: V3D): tRayHit;
+function trace_auto(vox: tVoxel; pos: V3D; dir: V3D): tRayHit;
 var
   pos32, dir32, dirInv32, prev32, initialPos32: V3D32;
   maxSteps: int32;
@@ -464,15 +493,15 @@ var
   end;
 
   {clip distance traveled to edge of cuboid}
-  function clipDistance(t: single): single;
+  function clipDistanceF(t: single): single;
   begin
     {todo: calculate invADir as float, then round to get invDir}
-    if dir32.x > 0 then safeSet(t, (vox.width*256-initialPos32.x) / dir32.x)
-    else if dir32.x < 0 then safeSet(t, -initialPos32.x / dir.x);
-    if dir32.y > 0 then safeSet(t, (vox.height*256-initialPos32.y) / dir32.y)
-    else if dir32.y < 0 then safeSet(t, -initialPos32.y / dir.y);
-    if dir32.z > 0 then safeSet(t, (vox.depth*256-initialPos32.z) / dir32.z)
-    else if dir32.z < 0 then safeSet(t, -initialPos32.z / dir.z);
+    if dir.x > 0 then safeSet(t, (vox.width-pos.x) / dir.x)
+    else if dir.x < 0 then safeSet(t, -pos.x / dir.x);
+    if dir.y > 0 then safeSet(t, (vox.height-pos.y) / dir.y)
+    else if dir.y < 0 then safeSet(t, -pos.y / dir.y);
+    if dir.z > 0 then safeSet(t, (vox.depth-pos.z) / dir.z)
+    else if dir.z < 0 then safeSet(t, -pos.z / dir.z);
     result := t;
   end;
 
@@ -493,6 +522,7 @@ begin
 
   distanceTraveled := 0;
 
+  result.d := 0;
   result.didHit := false;
   result.col := RGBA.Clear;
 
@@ -500,10 +530,13 @@ begin
 
   for i := 0 to maxSteps-1 do begin
 
+    inc(VX_STEP_COUNT);
+    inc(VX_LAST_STEP_COUNT);
+
     {check out of bounds}
     if ((pos32.x and maskW) <> 0) or ((pos32.y and maskH) <> 0) or ((pos32.z and maskD) <> 0) then begin
       {clipping... this can be a bit slow...}
-      result.d := clipDistance(distanceTraveled / 256);
+      result.d := clipDistanceF(distanceTraveled / 256);
       exit;
     end;
 
@@ -538,117 +571,9 @@ begin
     pos32.y += (dir32.y * stepSize) div 256;
     pos32.z += (dir32.z * stepSize) div 256;
 
-    {same voxel detection}
-    {
-    if (((prev.x shr 8) = (pos.x shr 8)) and
-      ((prev.y shr 8) = (pos.y shr 8)) and
-      ((prev.z shr 8) = (pos.z shr 8))) then begin
-        result.didHit := true;
-        result.col := RGB(255,0,0);
-        exit;
-    end;
-    }
-
     distanceTraveled += stepSize;
-
   end;
-
   result.d := distanceTraveled / 256;
-end;
-
-{---------------------------------------------------------}
-{
-  auto stepping method...
-}
-{---------------------------------------------------------}
-
-function trace_auto(vox: tVoxel;pos: V3D; dir: V3D): tRayHit;
-var
-  i: integer;
-  maxSteps: integer;
-  d: integer;
-  c: RGBA;
-  cur: V3D32;
-  dirInv: V3D;
-  stepSize: single;
-  s: integer;
-
-  {s here is the number of 'save' L1 moves}
-  function autoStep(p,dInv: single; s: integer): single; inline;
-  begin
-    if dInv > 0 then result := ((1+s)-frac(p))*dInv else if dInv < 0 then result := ((-s)-frac(p))*dInv else result := 99.0;
-  end;
-
-  function isCloseToEdge(x: single): boolean;
-  begin
-    result := (frac(x) < 0.1) or (frac(x) > 0.9);
-  end;
-
-  function safeInv(x: single): single;
-  begin
-    if x = 0 then exit(0);
-    result := 1/x;
-  end;
-
-begin
-  {todo: make this asm...}
-  assert(abs(dir.abs2-1.0) < 1e-6);
-  maxSteps := ceil(vox.fRadius);
-
-  dirInv.x := safeInv(dir.x);
-  dirInv.y := safeInv(dir.y);
-  dirInv.z := safeInv(dir.z);
-
-  result.pos := pos;
-  result.d := 0;
-  result.col := RGBA.Clear;
-  for i := 0 to maxSteps-1 do begin
-    cur := V3D32.Floor(result.pos);
-    if not vox.inBounds(cur.x, cur.y, cur.z) then begin
-      result.didHit := false;
-      exit;
-    end;
-
-    c := vox.getVoxel(cur.x, cur.y, cur.z);
-    if c.a = 255 then begin
-      result.didHit := true;
-      result.col := c;
-      exit;
-    end;
-
-    {ok, so here's how this works
-    d is the safe 'distance', we define Dx to mean "L1 distance of x" where
-      0-> this cell is solid
-      1-> a D1 neighbour may be solid
-      2-> no D1 neighbours are solid but D2 might be
-      ...
-    therefore for d=1 we can step to next cell, and for d=2 we can step twice
-    }
-
-    d := (255-c.a) div 4;
-    s := d-1; {number of safe moves}
-
-    {figure out distance to travel to get to next cell}
-    stepSize := minf(
-      autoStep(result.pos.x, dirInv.x, s),
-      autoStep(result.pos.y, dirInv.y, s),
-      autoStep(result.pos.z, dirInv.z, s)
-    );
-    stepSize += 0.001; // move slightly into next cell
-
-    result.pos += dir * stepSize;
-    result.d += stepSize;
-
-    {make sure it worked...}
-    {
-    if not (isCloseToEdge(pos.x) or isCloseToEdge(pos.y) or isCloseToEdge(pos.z)) then begin
-      note('%s -> %s step:%f.3', [(result.pos-dir*stepSize).toString, result.pos.toString, stepSize]);
-    end;
-    }
-  end;
-
-  result.didHit := false;
-
 end;
 
 {---------------------------------------------------------}
@@ -779,7 +704,6 @@ begin
         continue;
       end;
     end;
-
 
     if tMaxX < tMaxY then begin
       if tMaxX < tMaxZ then begin
