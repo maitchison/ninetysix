@@ -114,7 +114,6 @@ begin
   {breseham is probably the way to go here}
   {although we'll be dense, so maybe it doesn't matter}
   result.col := RGBA.Clear;
-  result.didHit := false;
   result.d := 0;
 
   {if ray starts too high then project it down}
@@ -153,12 +152,10 @@ begin
     end;
     if (curr.z < 0) then begin
       result.col := RGB(128,0,0); // floor
-      result.didHit := true;
       exit;
     end;
     if (curr.z >= 1) then begin
       result.col := RGB(0,0,128); // sky
-      result.didHit := true;
       exit;
     end;
 
@@ -176,7 +173,6 @@ begin
       result.d += (hit.d/tileSize);
       if hit.didHit then begin
         result.col := hit.col;
-        result.didHit := true;
         exit;
       end;
       {also take a small step just to make sure we move onto the next cell}

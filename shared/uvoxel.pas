@@ -52,10 +52,9 @@ Y*Z <= 32*1024 (could be chnaged to 64*1024 if needed)
 type
 
   tRayHit = record
-    pos: V3D;
     col: RGBA;
     d: single;
-    didHit: boolean;
+    function didHit: boolean;
   end;
 
   tSDFQuality = (sdfNone, sdfFast, sdfFull);
@@ -130,6 +129,13 @@ var
 {$I voxel_ref.inc}
 {$I voxel_asm.inc}
 {$I voxel_mmx.inc}
+
+{-----------------------------------------------------}
+
+function tRayHit.didHit: boolean;
+begin
+  result := col.a <> 0;
+end;
 
 {-----------------------------------------------------}
 { Signed distance calculations }

@@ -117,7 +117,6 @@ begin
 
   result.d := 0;
   result.col := RGBA.Clear;
-  result.didHit := false;
 
   for k := 0 to MAX_SAMPLES-1 do begin
 
@@ -147,7 +146,6 @@ begin
     c := vox.getVoxel(x, y, z);
 
     if c.a = 255 then begin
-      result.didHit := true;
       result.col := c;
       exit;
     end;
@@ -169,8 +167,6 @@ begin
 
   {color used when we ran out of samples}
   result.col := RGB(255,0,255); {purple}
-  result.didHit := false;
-
 end;
 
 {-------------------------------------------------------------}
@@ -213,7 +209,6 @@ begin
   if c.a = 255 then begin
     result.d := 0;
     result.col := c;
-    result.didHit := true;
     exit;
   end;
 
@@ -233,7 +228,6 @@ begin
 
   result.d := 0;
   result.col := RGBA.Clear;
-  result.didHit := false;
 
   for k := 0 to maxSamples-1 do begin
 
@@ -260,7 +254,6 @@ begin
     c := getVoxel(vox, x, y, z);
 
     if c.a = 255 then begin
-      result.didHit := true;
       result.col := c;
       exit;
     end;
@@ -276,8 +269,6 @@ begin
 
   {color used when we ran out of samples}
   result.col := RGB(255,0,255); {purple}
-  result.didHit := false;
-
 end;
 
 
@@ -344,7 +335,6 @@ begin
   if c.a = 255 then begin
     result.d := 0;
     result.col := c;
-    result.didHit := true;
     exit;
   end;
 
@@ -362,7 +352,6 @@ begin
 
   result.d := 0;
   result.col := RGBA.Clear;
-  result.didHit := false;
   res_d4 := 0;
   res_didHit := 0;
   asm
@@ -452,11 +441,12 @@ begin
 
   result.col := res_col;
   result.d := res_d4/4;
+  {this is a bit weird...}
   case res_didHit of
-    0: result.didHit := false;
-    1: result.didHit := true;
+    0: result.col.a := 0;
+    1: result.col.a := 255;
     2: begin
-      result.didHit := false;
+      result.col.a := 0;
       result.d := clipDistanceF(result.d);
     end;
   end;
@@ -523,7 +513,6 @@ begin
   distanceTraveled := 0;
 
   result.d := 0;
-  result.didHit := false;
   result.col := RGBA.Clear;
 
   prev32.x := -1;
@@ -548,7 +537,6 @@ begin
     ];
 
     if col.a = 255 then begin
-      result.didHit := true;
       result.col := col;
       result.d := distanceTraveled / 256;
       exit;
@@ -639,7 +627,6 @@ begin
   {check if we start inside a voxel}
   col := getVoxel(vox, x,y,z);
   if col.a = 255 then begin
-    result.didHit := true;
     result.col := col;
     exit();
   end;
@@ -665,7 +652,6 @@ begin
   oldT := 0;
 
   result.d := 0;
-  result.didHit := false;
   result.col := RGBA.Clear;
 
   for i := 0 to maxSteps-1 do begin
@@ -741,7 +727,6 @@ begin
     col := vox.vox.pixel^[(x) + (y shl vox.fLog2Width) + (z shl (vox.fLog2Width + vox.fLog2Height))];
 
     if col.a = 255 then begin
-      result.didHit := true;
       result.col := col;
       exit;
     end;
@@ -787,7 +772,6 @@ begin
   {check if we start inside a voxel}
   col := vox.getVoxel(x,y,z);
   if col.a = 255 then begin
-    result.didHit := true;
     result.col := col;
     exit();
   end;
@@ -815,7 +799,6 @@ begin
   voxPtr := vox.vox.getAddr(0,0);
 
   res_d32 := 0;
-  res_didHit := false;
   res_col := RGBA.Clear;
 
   asm
@@ -919,7 +902,6 @@ begin
 
   end;
 
-  result.didHit := res_didhit;
   result.col := res_col;
   result.d := res_d32/256;
 
