@@ -1,3 +1,44 @@
+function safeInv(x: single): single; inline;
+begin
+  if x = 0 then exit(99999999);
+  result := 1/x;
+end;
+
+function sign(x: single): integer; inline;
+begin
+  result := 0;
+  if x < 0 then exit(-1) else if x > 0 then exit(1);
+end;
+
+function fracs(x: single;s: integer): single; inline;
+begin
+  if s > 0 then
+    result := 1 - frac(x)
+  else
+    result := frac(x);
+end;
+
+function getVoxel(vox: tVoxel; x,y,z: integer): RGBA; inline;
+begin
+  result := vox.vox.pixel^[
+    (x) +
+    (y shl vox.fLog2Width) +
+    (z shl (vox.fLog2Width + vox.fLog2Height))
+  ];
+end;
+
+function autoStep(p,dInv,s: int32): int32; inline;
+begin
+
+  if dInv > 0 then
+    result := ((((1+s)*256)-(p and $ff)) * dInv) div 256
+  else if dInv < 0 then
+    result := (((-s*256)-(p and $ff)) * dInv) div 256
+  else
+    result := 99999;
+end;
+
+
 {---------------------------------------------------------}
 {
  my original tracer
@@ -116,17 +157,6 @@ var
   tmp: int32;
   p: V3D;
   stepSize: integer;
-
-  function autoStep(p,dInv,s: int32): int32; inline;
-  begin
-
-    if dInv > 0 then
-      result := ((((1+s)*256)-(p and $ff)) * dInv) div 256
-    else if dInv < 0 then
-      result := (((-s*256)-(p and $ff)) * dInv) div 256
-    else
-      result := 99999;
-  end;
 
   function safeInv(x: int32): int32;
   var
@@ -455,8 +485,6 @@ begin
     inc(VX_STEP_COUNT);
     inc(VX_LAST_STEP_COUNT);
 
-
-
     {this roughly doubles the speed}
     d := ((255-col.a) div 4);
     s := d-1;
@@ -528,4 +556,175 @@ begin
     end;
 
   end;
+end;
+
+
+{---------------------------------------------------------}
+{
+  this is the same speed as the non-asm one.
+  tps: 6.0
+  spt: 5.3
+}
+{---------------------------------------------------------}
+
+function trace_fast_asm(vox: tVoxel; pos: V3D; dir: V3D): tRayHit;
+var
+  x,y,z: integer;
+  voxPtr: pointer;
+  maxSteps: int32;
+  stepX,stepY,stepZ: integer;
+  tDeltaX, tDeltaY, tDeltaZ: single;
+  tMaxX, tMaxY, tMaxZ: single;
+  oldT,newT: single;
+  col: RGBA;
+
+  res_d: single;
+  res_col: RGBA;
+  res_didhit: boolean;
+
+begin
+  assert(abs(dir.abs2-1.0) < 1e-6);
+
+  maxSteps := vox.width+vox.height+vox.depth;
+
+  stepX := sign(dir.x);
+  stepY := sign(dir.y);
+  stepZ := sign(dir.z);
+
+  tDeltaX := abs(safeInv(dir.x));
+  tDeltaY := abs(safeInv(dir.y));
+  tDeltaZ := abs(safeInv(dir.z));
+
+  {clamping is not be best strategy... but works for small errors}
+  x := clamp(floor(pos.x), 0, vox.width-1);
+  y := clamp(floor(pos.y), 0, vox.height-1);
+  z := clamp(floor(pos.z), 0, vox.depth-1);
+  tMaxX := fracs(pos.x, stepX) * tDeltaX;
+  tMaxY := fracs(pos.y, stepY) * tDeltaY;
+  tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
+  oldT := 0;
+
+  {check if we start inside a voxel}
+  col := vox.getVoxel(x,y,z);
+  if col.a = 255 then begin
+    result.didHit := true;
+    result.col := col;
+    exit();
+  end;
+
+  voxPtr := vox.vox.getAddr(0,0);
+
+  res_d := 0;
+  res_didHit := false;
+  res_col := RGBA.Clear;
+
+  asm
+    pushad
+
+    mov ecx, MAXSTEPS
+    mov edi, VOXPTR
+
+  @TraceLoop:
+    {book keeping}
+    inc VX_STEP_COUNT
+    inc VX_LAST_STEP_COUNT
+
+    {checks}
+    fld  tMaxX
+    fcomp tMaxY
+    fnstsw ax
+    sahf
+    jnb @CompareYZ
+
+  @CompareXZ:
+    fld  tMaxX
+    fcomp tMaxZ
+    fnstsw ax
+    sahf
+    jnb @UpdateZ
+    jmp @UpdateX
+
+  @CompareYZ:
+    fld tMaxY
+    fcomp tMaxZ
+    fnstsw ax
+    sahf
+    jnb @UpdateZ
+    jmp @UpdateY
+
+  @UpdateX:
+    fld  tMaxX
+    fstp newT
+    mov  eax, STEPX
+    add  X, eax
+    fld  tMaxX
+    fadd tDeltaX
+    fstp tMaxX
+    mov  edx, X
+    cmp  edx, 16 {todo: vox.width}
+    jae  @Done
+    jmp  @Common
+  @UpdateY:
+    fld  tMaxY
+    fstp newT
+    mov  eax, STEPY
+    add  Y, eax
+    fld  tMaxY
+    fadd tDeltaY
+    fstp tMaxY
+    mov  edx, Y
+    cmp  edx, 16 {todo: vox.height}
+    jae  @Done
+    jmp  @Common
+  @UpdateZ:
+    fld  tMaxZ
+    fstp newT
+    mov  eax, STEPZ
+    add  Z, eax
+    fld  tMaxZ
+    fadd tDeltaZ
+    fstp tMaxZ
+    mov  edx, Z
+    cmp  edx, 16 {todo: vox.depth}
+    jae  @Done
+    jmp  @Common
+  @Common:
+    fld  res_d
+    fld  newT
+    fsub oldT
+    faddp st(1), st(0)
+    fstp res_d
+    fld  newT
+    fstp oldT
+  @Sample:
+    mov eax, Z
+    shl eax, 4
+    add eax, Y
+    shl eax, 4
+    add eax, X
+    shl eax, 2
+    mov eax, [edi+eax]
+
+    mov ebx, eax
+    shr ebx, 24
+    cmp bl, 255
+    jne @NoHit
+
+    mov res_didhit, 1
+    mov res_col, eax
+    jmp @Done
+
+  @NoHit:
+    dec ecx
+    jnz @TraceLoop
+
+  @Done:
+    popad
+
+  end;
+
+  result.didHit := res_didhit;
+  result.col := res_col;
+  result.d := res_d;
+
 end;
