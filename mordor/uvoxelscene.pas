@@ -65,7 +65,7 @@ begin
     pixelY := 0;
     inc(quality);
     //stub: finish after half
-    if quality > rqHalf then quality := rqDone;
+    //if quality > rqHalf then quality := rqDone;
     result := (quality = rqDone);
   end;
 end;
@@ -196,21 +196,57 @@ end;
 
 type
   tRenderMode = (
-    rmFace,     { show face }
+    rmNormal,   { show normals }
     rmBaked,    { get color form voxel... quite fast }
     rmDepth     { show depth }
   );
+
+{this is a bit noisy... better to trace toward the camera and see
+ what we intersect. Also maybe the tRayHit can record exact location
+ we landed.}
+function getFaceNormal(d: V3D): V3D;
+var
+  t: single;
+  normal: V3D;
+
+  procedure setAndCheck(newT: single;v:V3D);
+  begin
+    if (newT > 0) and (newT < t) then begin
+      t := newT;
+      normal := v;
+    end;
+  end;
+
+begin
+  t := 999;
+  normal := V3(0,0,0); // degenerate case}
+  if d.x > 0 then
+    setAndCheck(0.5/d.x, V3(1,0,0))
+  else if d.x < 0 then
+    setAndCheck(-0.5/d.x, V3(-1,0,0));
+  if d.y > 0 then
+    setAndCheck(0.5/d.y, V3(0,1,0))
+  else if d.y < 0 then
+    setAndCheck(-0.5/d.y, V3(0,-1,0));
+  if d.z > 0 then
+    setAndCheck(0.5/d.z, V3(0,0,1))
+  else if d.z < 0 then
+    setAndCheck(-0.5/d.z, V3(0,0,-1));
+  result := normal;
+end;
 
 {position is in scene space...}
 function tVoxelScene.calculateShading(pos: V3D): RGBA;
 var
   vx,vy,vz: integer; {position within voxel}
+  subPos: V3D; {sub position within voxel}
   vox: tVoxel;
   cameraDir: V3D;
   d: single; {distance from the camera plane}
   voxCol: RGBA;
+  faceNormal: V3D;
 const
-  renderMode = rmBaked;
+  renderMode = rmNormal;
 begin
   result := RGB(0,0,128);
   if (pos.x < 0) or (pos.x >= 32) then exit;
@@ -225,8 +261,15 @@ begin
   vy := trunc(frac(pos.y)*16);
   vz := trunc(frac(pos.z)*16);
 
+  subPos.x := (frac(pos.x)*16) - vx;
+  subPos.y := (frac(pos.y)*16) - vy;
+  subPos.z := (frac(pos.z)*16) - vz;
+
   { fetch voxel colors }
   voxCol := vox.getVoxel(vx, vy, vz);
+
+  { get face }
+  faceNormal := getFaceNormal(subPos - V3(0.50, 0.50, 0.50));
 
   {calculate distance to camera}
   {todo: cache camera dir}
@@ -242,6 +285,14 @@ begin
   case renderMode of
     rmBaked: begin
       result := voxCol;
+      exit;
+    end;
+    rmNormal: begin
+      result := RGB(
+        round(faceNormal.x*128+128),
+        round(faceNormal.y*128+128),
+        round(faceNormal.z*128+128)
+      );
       exit;
     end;
     rmDepth: begin
@@ -333,7 +384,11 @@ begin
       for i := 0 to 1 do for j := 0 to 1 do begin
         rayDir := getRayDir(renderState.pixelX+0.25+0.5*i,renderState.pixelY+0.25+0.5*j);
         hit := traceRay(rayPos, rayDir);
-        col32 += hit.col * 0.25;
+        if hit.didHit then
+          col := calculateShading(rayPos + (rayDir * hit.d))
+        else
+          col := RGB(0,128,0); { not sure what to do here.}
+        col32 += col * 0.25;
       end;
       dc.putPixel(Point(4+renderState.pixelX, 4+renderState.pixelY), col32);
       renderState.nextPixel();
