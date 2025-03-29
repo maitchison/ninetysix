@@ -61,6 +61,8 @@ begin
   if (pixelY >= height) then begin
     pixelY := 0;
     inc(quality);
+    //stub: finish after half
+    if quality > rqHalf then quality := rqDone;
     result := (quality = rqDone);
   end;
 end;
@@ -230,6 +232,8 @@ begin
     renderState.quality := rqPreview;
     //dc.fillRect(dc.clip, RGB(12,12,12));
   end;
+
+  if renderState.quality = rqDone then exit;
 
   mid.x := (dc.clip.left+dc.clip.right) div 2;
   mid.y := (dc.clip.top+dc.clip.bottom) div 2;

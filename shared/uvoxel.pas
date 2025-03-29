@@ -23,7 +23,7 @@ uses
 var
   {debugging stuff}
   VX_STEP_COUNT: int32 = 0;
-  VX_RAY_COUNT: int32 = 0;
+  VX_TRACE_COUNT: int32 = 0;
   VX_SHOW_TRACE_EXITS: boolean = false;
   VX_GHOST_MODE: boolean = false;
   VX_USE_SDF: boolean = true;
@@ -645,7 +645,7 @@ dir should be normalized
 function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 begin
   VX_LAST_STEP_COUNT := 0;
-  inc(VX_RAY_COUNT);
+  inc(VX_TRACE_COUNT);
   result := trace_fast(self, pos, dir);
 end;
 

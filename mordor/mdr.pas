@@ -24,6 +24,7 @@ uses
   uColor,
   uMath,
   uJob,
+  uVoxel,
   {$i gui.inc}
   {game stuff}
   uMDRRes,
@@ -34,6 +35,7 @@ uses
   uEncounterGui,
   uDungeonViewGui,
   uGUIListBox,
+  uVoxelScene,
   uMDRImporter,
   uMDRParty,
   uMDRMap;
@@ -266,6 +268,22 @@ begin
   dvg.voxelScene.cameraAngle := V3(0, 0 , 90 * ord(party.dir) * DEG2RAD);
 end;
 
+function getTraceCountsString(vs: tVoxelScene): string;
+var
+  stepsPerTrace: single;
+begin
+  if VX_TRACE_COUNT > 1 then
+    stepsPerTrace := VX_STEP_COUNT / VX_TRACE_COUNT
+  else
+    stepsPerTrace := -1;
+  result := format('TPS:%.1fk SPT:%f',
+    [
+      vs.tracesPerSecond/1000,
+      stepsPerTrace
+    ]
+  );
+end;
+
 procedure tGameScene.run();
 var
   elapsed: single;
@@ -348,7 +366,7 @@ begin
   gui.append(fpsLabel);
 
   tpsLabel := tGuiLabel.Create(Point(600,10));
-  tpsLabel.setSize(60, 21);
+  tpsLabel.setSize(160, 21);
   gui.append(tpsLabel);
 
   verLabel := tGuiLabel.Create(Point(800-100-15,600-21-16));
@@ -375,9 +393,8 @@ begin
     if timer.avElapsed > 0 then
       fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
 
-    if assigned(dvg) then begin
-      tpsLabel.text := format('%.1fk', [dvg.voxelScene.tracesPerSecond/1000]);
-    end;
+    if assigned(dvg) then
+      tpsLabel.text := getTraceCountsString(dvg.voxelScene);
 
     js.update();
 

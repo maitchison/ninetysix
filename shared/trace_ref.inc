@@ -456,7 +456,7 @@ begin
     inc(VX_LAST_STEP_COUNT);
 
 
-    (*
+
     {this roughly doubles the speed}
     d := ((255-col.a) div 4);
     s := d-1;
@@ -464,18 +464,18 @@ begin
     if s >= 2 then begin
       {perform a leap by intersecting a larger cube}
       pos := initialPos + (dir * result.d);
-      if (pos.x < 0) or (pos.x >= fWidth) then exit;
-      if (pos.y < 0) or (pos.y >= fHeight) then exit;
-      if (pos.z < 0) or (pos.z >= fDepth) then exit;
-      xJump := autoStep(pos.x, dInv.x, s, fWidth);
-      yJump := autoStep(pos.y, dInv.y, s, fHeight);
-      zJump := autoStep(pos.z, dInv.z, s, fDepth);
+      if (pos.x < 0) or (pos.x >= vox.width) then exit;
+      if (pos.y < 0) or (pos.y >= vox.height) then exit;
+      if (pos.z < 0) or (pos.z >= vox.depth) then exit;
+      xJump := autoStep(pos.x, dInv.x, s, vox.width);
+      yJump := autoStep(pos.y, dInv.y, s, vox.height);
+      zJump := autoStep(pos.z, dInv.z, s, vox.depth);
       safeJump := minf(xJump, yJump, zJump);
       result.d += safeJump + 0.01;
       pos := initialPos + (dir * result.d);
-      if (pos.x < 0) or (pos.x >= fWidth) then exit;
-      if (pos.y < 0) or (pos.y >= fHeight) then exit;
-      if (pos.z < 0) or (pos.z >= fDepth) then exit;
+      if (pos.x < 0) or (pos.x >= vox.width) then exit;
+      if (pos.y < 0) or (pos.y >= vox.height) then exit;
+      if (pos.z < 0) or (pos.z >= vox.depth) then exit;
       {inline the init}
       x := trunc(pos.x);
       y := trunc(pos.y);
@@ -487,7 +487,7 @@ begin
       col := getVoxel();
       continue;
     end;
-    *)
+
 
     if tMaxX < tMaxY then begin
       if tMaxX < tMaxZ then begin
