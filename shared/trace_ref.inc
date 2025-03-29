@@ -370,7 +370,7 @@ this is based on the fast voxel tracing algorithm
 it's unforuntaly not too fast.
 we can optionally take advantage of SDF to skip areas, but it's a bit clunky
 speed is
-  5k normal
+  10k normal
   10k with SDF skipping
 }
 {---------------------------------------------------------}
@@ -394,47 +394,6 @@ var
   bound: integer;
   edge: integer;
 
-  function safeInv(x: single): single; inline;
-  begin
-    if x = 0 then exit(99999999);
-    result := 1/x;
-  end;
-
-  function sign(x: single): integer; inline;
-  begin
-    result := 0;
-    if x < 0 then exit(-1) else if x > 0 then exit(1);
-  end;
-
-  function fracs(x: single;s: integer): single; inline;
-  begin
-    if s > 0 then
-      result := 1 - frac(x)
-    else
-      result := frac(x);
-  end;
-
-  function getVoxel(): RGBA; inline;
-  begin
-    result := vox.vox.pixel^[
-      (x) +
-      (y shl vox.fLog2Width) +
-      (z shl (vox.fLog2Width + vox.fLog2Height))
-    ];
-  end;
-
-  procedure init(); inline;
-  begin
-    {clamping is not be best strategy... but works for small errors}
-    x := clamp(floor(pos.x), 0, vox.width-1);
-    y := clamp(floor(pos.y), 0, vox.height-1);
-    z := clamp(floor(pos.z), 0, vox.depth-1);
-    tMaxX := fracs(pos.x, stepX) * tDeltaX;
-    tMaxY := fracs(pos.y, stepY) * tDeltaY;
-    tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
-    oldT := 0;
-  end;
-
   function autoStep(p, dInv: single; size: integer;limit: integer): single; inline;
   begin
     if dInv > 0 then begin
@@ -445,12 +404,24 @@ var
       if edge < 0 then edge := 0;
     end else
       exit(9999);
-    //note('%.3f %.3f %d %d', [p,dInv,size,edge]);
     result := (edge - p) * dInv;
   end;
 
 begin
   assert(abs(dir.abs2-1.0) < 1e-6);
+
+  {clamping is not be best strategy... but works for small errors}
+  x := clamp(floor(pos.x), 0, vox.width-1);
+  y := clamp(floor(pos.y), 0, vox.height-1);
+  z := clamp(floor(pos.z), 0, vox.depth-1);
+
+  {check if we start inside a voxel}
+  col := getVoxel(vox, x,y,z);
+  if col.a = 255 then begin
+    result.didHit := true;
+    result.col := col;
+    exit();
+  end;
 
   maxSteps := vox.width+vox.height+vox.depth;
 
@@ -466,30 +437,27 @@ begin
   tDeltaZ := abs(dInv.z);
 
   initialPos := pos;
-  init();
+
+  tMaxX := fracs(pos.x, stepX) * tDeltaX;
+  tMaxY := fracs(pos.y, stepY) * tDeltaY;
+  tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
+  oldT := 0;
 
   result.d := 0;
   result.didHit := false;
   result.col := RGBA.Clear;
-
-  {check if we start inside a voxel}
-  col := getVoxel();
-  if col.a = 255 then begin
-    result.didHit := true;
-    result.col := col;
-    exit();
-  end;
 
   for i := 0 to maxSteps-1 do begin
 
     inc(VX_STEP_COUNT);
     inc(VX_LAST_STEP_COUNT);
 
-    {this roughly doubles the speed}
+    {this doesn't actually help... WEIRD}
+    (*
     d := ((255-col.a) div 4);
     s := d-1;
 
-    if s >= 2 then begin
+    if s >= 8 then begin
       {perform a leap by intersecting a larger cube}
       pos := initialPos + (dir * result.d);
       if (pos.x < 0) or (pos.x >= vox.width) then exit;
@@ -512,21 +480,23 @@ begin
       tMaxY := fracs(pos.y, stepY) * tDeltaY;
       tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
       oldT := 0;
-      col := getVoxel();
+      col := getVoxel(vox, x,y,z);
       continue;
     end;
-
+    *)
 
     if tMaxX < tMaxY then begin
       if tMaxX < tMaxZ then begin
         newT:= tMaxX;
         x += stepX;
         tMaxX += tDeltaX;
+        result.d += (newT - oldT);
         if dword(X) >= vox.width then exit;
       end else begin
         newT:= tMaxZ;
         z += stepZ;
         tMaxZ += tDeltaZ;
+        result.d += (newT - oldT);
         if dword(Z) >= vox.depth then exit;
       end;
     end else begin
@@ -534,20 +504,21 @@ begin
         newT:= tMaxY;
         y += stepY;
         tMaxY += tDeltaY;
+        result.d += (newT - oldT);
         if dword(Y) >= vox.height then exit;
       end else begin
         newT:= tMaxZ;
         z += stepZ;
         tMaxZ += tDeltaZ;
+        result.d += (newT - oldT);
         if dword(Z) >= vox.depth then exit;
       end;
     end;
 
-    result.d += (newT - oldT);
     oldT := newT;
 
     {get voxel}
-    col := getVoxel();
+    col := vox.vox.pixel^[(x) + (y shl vox.fLog2Width) + (z shl (vox.fLog2Width + vox.fLog2Height))];
 
     if col.a = 255 then begin
       result.didHit := true;
@@ -561,6 +532,7 @@ end;
 
 {---------------------------------------------------------}
 {
+  fixed point bresenham
   this is the same speed as the non-asm one.
   tps: 6.0
   spt: 5.3
@@ -573,36 +545,24 @@ var
   voxPtr: pointer;
   maxSteps: int32;
   stepX,stepY,stepZ: integer;
-  tDeltaX, tDeltaY, tDeltaZ: single;
-  tMaxX, tMaxY, tMaxZ: single;
-  oldT,newT: single;
+  tDeltaX32, tDeltaY32, tDeltaZ32: integer;
+  tMaxX32, tMaxY32, tMaxZ32: integer;
+  oldT32,newT32: integer;
   col: RGBA;
+  invDir: V3D;
 
-  res_d: single;
+  res_d32: integer;
   res_col: RGBA;
   res_didhit: boolean;
 
 begin
+
   assert(abs(dir.abs2-1.0) < 1e-6);
-
-  maxSteps := vox.width+vox.height+vox.depth;
-
-  stepX := sign(dir.x);
-  stepY := sign(dir.y);
-  stepZ := sign(dir.z);
-
-  tDeltaX := abs(safeInv(dir.x));
-  tDeltaY := abs(safeInv(dir.y));
-  tDeltaZ := abs(safeInv(dir.z));
 
   {clamping is not be best strategy... but works for small errors}
   x := clamp(floor(pos.x), 0, vox.width-1);
   y := clamp(floor(pos.y), 0, vox.height-1);
   z := clamp(floor(pos.z), 0, vox.depth-1);
-  tMaxX := fracs(pos.x, stepX) * tDeltaX;
-  tMaxY := fracs(pos.y, stepY) * tDeltaY;
-  tMaxZ := fracs(pos.z, stepZ) * tDeltaZ;
-  oldT := 0;
 
   {check if we start inside a voxel}
   col := vox.getVoxel(x,y,z);
@@ -612,9 +572,29 @@ begin
     exit();
   end;
 
+  maxSteps := vox.width+vox.height+vox.depth;
+
+  stepX := sign(dir.x);
+  stepY := sign(dir.y);
+  stepZ := sign(dir.z);
+
+  invDir.x := abs(safeInv(dir.x));
+  invDir.y := abs(safeInv(dir.y));
+  invDir.z := abs(safeInv(dir.z));
+
+  tDeltaX32 := round(256*invDir.x);
+  tDeltaY32 := round(256*invDir.y);
+  tDeltaZ32 := round(256*invDir.z);
+
+  tMaxX32 := round(256*(fracs(pos.x, stepX) * invDir.x));
+  tMaxY32 := round(256*(fracs(pos.y, stepY) * invDir.y));
+  tMaxZ32 := round(256*(fracs(pos.z, stepZ) * invDir.z));
+
+  oldT32 := 0;
+
   voxPtr := vox.vox.getAddr(0,0);
 
-  res_d := 0;
+  res_d32 := 0;
   res_didHit := false;
   res_col := RGBA.Clear;
 
@@ -630,80 +610,74 @@ begin
     inc VX_LAST_STEP_COUNT
 
     {checks}
-    fld  tMaxX
-    fcomp tMaxY
-    fnstsw ax
-    sahf
+    mov eax, tMaxX32
+    cmp eax, tMaxY32
     jnb @CompareYZ
 
   @CompareXZ:
-    fld  tMaxX
-    fcomp tMaxZ
-    fnstsw ax
-    sahf
+    mov eax, tMaxX32
+    cmp eax, tMaxZ32
     jnb @UpdateZ
     jmp @UpdateX
 
   @CompareYZ:
-    fld tMaxY
-    fcomp tMaxZ
-    fnstsw ax
-    sahf
+    mov eax, tMaxY32
+    cmp eax, tMaxZ32
     jnb @UpdateZ
     jmp @UpdateY
 
   @UpdateX:
-    fld  tMaxX
-    fstp newT
-    mov  eax, STEPX
-    add  X, eax
-    fld  tMaxX
-    fadd tDeltaX
-    fstp tMaxX
+    mov  eax, tMaxX32
+    mov  newT32, eax
+    sub  eax, oldT32
+    add  res_d32, eax
+    mov  ebx, STEPX
+    add  X, ebx
+    mov  eax, tMaxX32
+    add  eax, tDeltaX32
+    mov  tMaxX32, eax
     mov  edx, X
     cmp  edx, 16 {todo: vox.width}
     jae  @Done
     jmp  @Common
   @UpdateY:
-    fld  tMaxY
-    fstp newT
-    mov  eax, STEPY
-    add  Y, eax
-    fld  tMaxY
-    fadd tDeltaY
-    fstp tMaxY
+    mov  eax, tMaxY32
+    mov  newT32, eax
+    sub  eax, oldT32
+    add  res_d32, eax
+    mov  ebx, STEPY
+    add  Y, ebx
+    mov  eax, tMaxY32
+    add  eax, tDeltaY32
+    mov  tMaxY32, eax
     mov  edx, Y
-    cmp  edx, 16 {todo: vox.height}
+    cmp  edx, 16 {todo: vox.width}
     jae  @Done
     jmp  @Common
   @UpdateZ:
-    fld  tMaxZ
-    fstp newT
-    mov  eax, STEPZ
-    add  Z, eax
-    fld  tMaxZ
-    fadd tDeltaZ
-    fstp tMaxZ
+    mov  eax, tMaxZ32
+    mov  newT32, eax
+    sub  eax, oldT32
+    add  res_d32, eax
+    mov  ebx, STEPZ
+    add  Z, ebx
+    mov  eax, tMaxZ32
+    add  eax, tDeltaZ32
+    mov  tMaxZ32, eax
     mov  edx, Z
-    cmp  edx, 16 {todo: vox.depth}
+    cmp  edx, 16 {todo: vox.width}
     jae  @Done
     jmp  @Common
   @Common:
-    fld  res_d
-    fld  newT
-    fsub oldT
-    faddp st(1), st(0)
-    fstp res_d
-    fld  newT
-    fstp oldT
+    mov eax, newT32
+    mov oldT32, eax
   @Sample:
     mov eax, Z
     shl eax, 4
     add eax, Y
     shl eax, 4
     add eax, X
-    shl eax, 2
-    mov eax, [edi+eax]
+    mov eax, [edi+eax*4]
 
     mov ebx, eax
     shr ebx, 24
@@ -725,6 +699,6 @@ begin
 
   result.didHit := res_didhit;
   result.col := res_col;
-  result.d := res_d;
+  result.d := res_d32/256;
 
 end;

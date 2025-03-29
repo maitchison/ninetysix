@@ -276,10 +276,11 @@ begin
     stepsPerTrace := VX_STEP_COUNT / VX_TRACE_COUNT
   else
     stepsPerTrace := -1;
-  result := format('TPS:%.1fk SPT:%f',
+  result := format('TPS:%.1fk SPT:%f CPT:%f',
     [
       vs.tracesPerSecond/1000,
-      stepsPerTrace
+      stepsPerTrace,
+      vs.cellsPerTrace
     ]
   );
 end;
@@ -366,7 +367,7 @@ begin
   gui.append(fpsLabel);
 
   tpsLabel := tGuiLabel.Create(Point(600,10));
-  tpsLabel.setSize(160, 21);
+  tpsLabel.setSize(220, 21);
   gui.append(tpsLabel);
 
   verLabel := tGuiLabel.Create(Point(800-100-15,600-21-16));

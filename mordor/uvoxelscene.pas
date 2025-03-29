@@ -32,6 +32,7 @@ type
   protected
     renderState: tRenderState;
     traceCount: int32;
+    cellCount: int32;
     traceTime: single;
     tileSize: integer;
     function  traceRay(pos: V3D; dir: V3D): tRayHit;
@@ -40,6 +41,7 @@ type
     cameraPos: V3D;
     cameraAngle: V3D; {radians, 0=north}
     function   tracesPerSecond: single;
+    function   cellsPerTrace: single;
     function   isDone: boolean;
     function   didCameraMove: boolean;
     procedure  render(const aDC: tDrawContext;renderTime: single=0.05);
@@ -82,6 +84,12 @@ begin
   result := traceCount / traceTime;
 end;
 
+function tVoxelScene.cellsPerTrace: single;
+begin
+  if traceCount = 0 then exit(-1);
+  result := cellCount / traceCount;
+end;
+
 {for the moment just trace through scene and return depth}
 function tVoxelScene.traceRay(pos: V3D; dir: V3D): tRayHit;
 var
@@ -98,6 +106,8 @@ var
   end;
 
 begin
+
+  inc(traceCount);
 
   {ok... the super slow way for the moment...}
   {breseham is probably the way to go here}
@@ -118,17 +128,19 @@ begin
 
   prev.x := -1; prev.y := -1; prev.z := -1;
   for i := 0 to 100 do begin
+
+    inc(cellCount);
+
     curr.x := floor(pos.x);
     curr.y := floor(pos.y);
     curr.z := floor(pos.z);
 
     {same cell detection... this shouldn't happen}
-    {
+
     if (curr = prev) then begin
       result.col := RGB(0,255,0);
       exit;
     end;
-    }
 
     {out of bounds}
     if (dword(curr.x) >= tileSize) or (dword(curr.y) >= tileSize) then begin
@@ -262,7 +274,6 @@ begin
       for i := 0 to 1 do for j := 0 to 1 do begin
         rayDir := getRayDir(renderState.pixelX+0.25+0.5*i,renderState.pixelY+0.25+0.5*j);
         hit := traceRay(rayPos, rayDir);
-        inc(traceCount);
         col32 += hit.col * 0.25;
       end;
       dc.putPixel(Point(4+renderState.pixelX, 4+renderState.pixelY), col32);
@@ -270,7 +281,6 @@ begin
     end else begin
       rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
-        inc(traceCount);
       dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), hit.col);
       renderState.nextPixel();
     end;
