@@ -36,7 +36,8 @@ type
     traceTime: single;
     tileSize: integer;
     function  traceRay(pos: V3D; dir: V3D): tRayHit;
-    function calculateShading(pos: V3D): RGBA;
+    function  calculateShading(pos: V3D): RGBA;
+    function  gatherLighting(p, norm: V3D;nSamples: integer=128): single;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
@@ -138,8 +139,8 @@ begin
 
     {same cell detection... this shouldn't happen}
     if (curr = prev) then begin
-      result.col := RGB(0,255,0);
-      exit;
+      {result.col := RGB(0,255,0);
+      exit;}
     end;
 
     {out of bounds}
@@ -148,11 +149,11 @@ begin
       exit;
     end;
     if (curr.z < 0) then begin
-      result.col := RGB(128,0,0); // floor
+      result.col := RGB(0,0,0,0); // floor
       exit;
     end;
     if (curr.z >= 1) then begin
-      result.col := RGB(0,0,128); // sky
+      result.col := RGB(0,0,0,0); // sky
       exit;
     end;
 
@@ -198,7 +199,8 @@ type
   tRenderMode = (
     rmNormal,   { show normals }
     rmBaked,    { get color form voxel... quite fast }
-    rmDepth     { show depth }
+    rmDepth,    { show depth }
+    rmGI        { show GI only }
   );
 
 {this is a bit noisy... better to trace toward the camera and see
@@ -235,6 +237,26 @@ begin
   result := normal;
 end;
 
+function tVoxelScene.gatherLighting(p, norm: V3D;nSamples: integer=128): single;
+var
+  hits: integer;
+  tangent, bitangent: V3D;
+  d: V3D;
+  i: integer;
+  hit: tRayHit;
+begin
+  norm.getBasis(tangent, bitangent);
+
+  hits := 0;
+
+  for i := 0 to nSamples-1 do begin
+    d := sampleCosine(norm, tangent, bitangent);
+    hit := traceRay(p, d);
+    if hit.didHit then inc(hits);
+  end;
+  result := 1-(hits/nSamples);
+end;
+
 {position is in scene space...}
 function tVoxelScene.calculateShading(pos: V3D): RGBA;
 var
@@ -245,8 +267,9 @@ var
   d: single; {distance from the camera plane}
   voxCol: RGBA;
   faceNormal: V3D;
+  gi: single;
 const
-  renderMode = rmNormal;
+  renderMode = rmGI;
 begin
   result := RGB(0,0,128);
   if (pos.x < 0) or (pos.x >= 32) then exit;
@@ -269,7 +292,7 @@ begin
   voxCol := vox.getVoxel(vx, vy, vz);
 
   { get face }
-  faceNormal := getFaceNormal(subPos - V3(0.50, 0.50, 0.50));
+  faceNormal := getFaceNormal(subPos - V3(0.5, 0.5, 0.5));
 
   {calculate distance to camera}
   {todo: cache camera dir}
@@ -277,6 +300,8 @@ begin
   d := cameraDir.dot(pos - cameraPos);
 
   {calculate the face normal}
+  {bias the gather point a little}
+  gi := gatherLighting(pos+(faceNormal*0.01), faceNormal, 128);
 
   {gather lighting...}
 
@@ -292,6 +317,14 @@ begin
         round(faceNormal.x*128+128),
         round(faceNormal.y*128+128),
         round(faceNormal.z*128+128)
+      );
+      exit;
+    end;
+    rmGI: begin
+      result := RGB(
+        round(gi*64),
+        round(gi*256),
+        round(gi*1024)
       );
       exit;
     end;
@@ -387,7 +420,7 @@ begin
         if hit.didHit then
           col := calculateShading(rayPos + (rayDir * hit.d))
         else
-          col := RGB(0,128,0); { not sure what to do here.}
+          col := RGB(0,0,0); { not sure what to do here.}
         col32 += col * 0.25;
       end;
       dc.putPixel(Point(4+renderState.pixelX, 4+renderState.pixelY), col32);
@@ -398,7 +431,7 @@ begin
       if hit.didHit then
         col := calculateShading(rayPos + (rayDir * hit.d))
       else
-        col := RGB(0,128,0); { not sure what to do here..}
+        col := RGB(0,0,0); { not sure what to do here..}
       dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), col);
       renderState.nextPixel();
     end;
