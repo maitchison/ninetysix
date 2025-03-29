@@ -194,6 +194,13 @@ begin
   result := renderState.quality = rqDone;
 end;
 
+type
+  tRenderMode = (
+    rmFace,     { show face }
+    rmBaked,    { get color form voxel... quite fast }
+    rmDepth     { show depth }
+  );
+
 {position is in scene space...}
 function tVoxelScene.calculateShading(pos: V3D): RGBA;
 var
@@ -201,19 +208,25 @@ var
   vox: tVoxel;
   cameraDir: V3D;
   d: single; {distance from the camera plane}
+  voxCol: RGBA;
+const
+  renderMode = rmBaked;
 begin
   result := RGB(0,0,128);
   if (pos.x < 0) or (pos.x >= 32) then exit;
   if (pos.y < 0) or (pos.y >= 32) then exit;
   if (pos.z < 0) or (pos.z >= 1) then exit;
 
-  {get our voxel...}
+  { get our voxel... }
   vox := cells[trunc(pos.x), trunc(pos.y)];
   if not assigned(vox) then exit;
 
-  vx := trunc(frac(pos.x)*32);
-  vy := trunc(frac(pos.y)*32);
-  vz := trunc(frac(pos.z)*32);
+  vx := trunc(frac(pos.x)*16);
+  vy := trunc(frac(pos.y)*16);
+  vz := trunc(frac(pos.z)*16);
+
+  { fetch voxel colors }
+  voxCol := vox.getVoxel(vx, vy, vz);
 
   {calculate distance to camera}
   {todo: cache camera dir}
@@ -223,13 +236,23 @@ begin
   {calculate the face normal}
 
   {gather lighting...}
-  result := vox.getVoxel(vx, vy, vz);
-
-  result.r := 255-clamp(round(d*64), 0, 255);
-  result.g := 255-clamp(round(d*64), 0, 255);
-  result.b := 255-clamp(round(d*64), 0, 255);
 
   {output color}
+
+  case renderMode of
+    rmBaked: begin
+      result := voxCol;
+      exit;
+    end;
+    rmDepth: begin
+      result.r := 255-clamp(round(d*64), 0, 255);
+      result.g := 255-clamp(round(d*64), 0, 255);
+      result.b := 255-clamp(round(d*64), 0, 255);
+      result.a := 255;
+      exit;
+    end;
+  end;
+
 
 end;
 
