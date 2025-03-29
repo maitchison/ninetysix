@@ -16,7 +16,7 @@ begin
 
   for x := xMin to xMax-1 do begin
 
-    col := trace_old(voxSprite, pos, dir);
+    col := trace_old(voxSprite, pos, dir).col;
 
     if (VX_GHOST_MODE or keyDown(key_f4)) then
        col.init(VX_LAST_STEP_COUNT,VX_LAST_STEP_COUNT*4, VX_LAST_STEP_COUNT*16);
@@ -42,7 +42,7 @@ begin
           center pixel}
           dx := ((i * 2) - 1) * 0.25;
           dy := ((i * 2) - 1) * 0.25;
-          col := trace_old(voxSprite, pos+(deltaX*dx)+(deltaY*dy), dir);
+          col := trace_old(voxSprite, pos+(deltaX*dx)+(deltaY*dy), dir).col;
           if col.a > 0 then begin
             col16.r += col.r; col16.g += col.g; col16.b += col.b; col16.a += col.a;
             inc(goodSamples)

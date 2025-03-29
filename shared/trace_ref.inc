@@ -8,7 +8,7 @@
 }
 {---------------------------------------------------------}
 
-function trace_old(vox: tVoxel; pos: V3D;dir: V3D): RGBA;
+function trace_old(vox: tVoxel; pos: V3D;dir: V3D): tRayHit;
 var
   k: integer;
   c: RGBA;
@@ -20,15 +20,9 @@ var
   voxPtr: pointer;
 begin
 
-  {color used when initial sample is out of of bounds}
-  {this shouldn't happen, but might due to rounding error or bug}
-  result.init(255,0,0,255);
-
   sx := trunc(256*pos.x);
   sy := trunc(256*pos.y);
   sz := trunc(256*pos.z);
-
-  result.init(255,0,255,0); {color used when out of bounds}
 
   depth := 0;
   dx := round(256*dir.x);
@@ -43,6 +37,10 @@ begin
 
   voxPtr := vox.vox.pData;
 
+  result.d := 0;
+  result.col := RGBA.Clear;
+  result.didHit := false;
+
   for k := 0 to MAX_SAMPLES-1 do begin
 
     inc(VX_STEP_COUNT);
@@ -54,20 +52,27 @@ begin
 
     if (dword(x) >= vox.width) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGB(255,0,0));
+      result.col := RGB(255,0,0);
+      exit;
     end;
     if (dword(y) >= vox.height) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGB(0,255,0));
+      result.col := RGB(0,255,0);
+      exit;
     end;
     if (dword(z) >= vox.depth) then begin
       if not VX_SHOW_TRACE_EXITS then exit;
-      exit(RGB(0,0,255));
+      result.col := RGB(0,0,255);
+      exit;
     end;
 
     c := vox.getVoxel(x, y, z);
 
-    if c.a = 255 then exit(c);
+    if c.a = 255 then begin
+      result.didHit := true;
+      result.col := c;
+      exit;
+    end;
 
     if VX_USE_SDF then begin
       {move to next voxel}
@@ -81,10 +86,12 @@ begin
     sy := sy + ((dy * d) div 4);
     sz := sz + ((dz * d) div 4);
     depth += d;
+    result.d := d;
   end;
 
   {color used when we ran out of samples}
-  result.init(255,0,255,255); {purple}
+  result.col := RGB(255,0,255); {purple}
+  result.didHit := false;
 
 end;
 
