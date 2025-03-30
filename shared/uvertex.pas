@@ -57,6 +57,12 @@ type
 
     end;
 
+  {Int8 vector}
+  V3D8 = packed record
+    x, y, z, w: int8;
+    procedure init(ax,ay,az: int8;aw: int8=0);
+    end;
+
   {Int16 vector, useful for MMX}
   V3D16 = packed record
     x, y, z, w: int16;
@@ -117,7 +123,7 @@ type
 
 function V2(x,y: single): V2D;
 function V2Polar(degree,r: single): V2D;
-function V3(x,y,z: single): V3D;
+function V3(x,y,z: single): V3D; inline;
 
 function sampleShell(): V3D;
 function sampleCosine(norm,tangent,bitangent: V3D): V3D;
@@ -192,7 +198,7 @@ end;
 
 {------------}
 
-function V3(x,y,z: single): V3D;
+function V3(x,y,z: single): V3D; inline;
 begin
   result := V3D.create(x,y,z);
 end;
@@ -617,6 +623,15 @@ begin
   result := a.MM(b);
 end;
 
+
+{-----------------------------------------------------}
+procedure V3D8.init(ax,ay,az: int8;aw: int8=0);
+begin
+  x := ax;
+  y := ay;
+  z := az;
+  w := aw;
+end;
 
 {-----------------------------------------------------}
 

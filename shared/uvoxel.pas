@@ -54,7 +54,10 @@ type
   tRayHit = record
     col: RGBA; {4 bytes}
     d: single; {4 bytes}
+    hitPos: V3D32; {stored in voxels as 24.8} {8 bytes}
+    hitNormal: V3D8; {stored as 0.8} {4 bytes}
     function didHit: boolean;
+    procedure clear();
   end;
 
   tSDFQuality = (sdfNone, sdfFast, sdfFull);
@@ -135,6 +138,11 @@ var
 function tRayHit.didHit: boolean;
 begin
   result := col.a <> 0;
+end;
+
+procedure tRayHit.clear();
+begin
+  fillchar(self, sizeof(self), 0);
 end;
 
 {-----------------------------------------------------}

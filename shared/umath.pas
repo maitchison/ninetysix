@@ -14,10 +14,10 @@ uses
 type
   tFloat = extended;  // floating point type to use
 
-function degToRad(x: tFloat): tFloat;
-function radToDeg(x: tFloat): tFloat;
-function ceil(x: tFloat): int64;
-function floor(x: tFloat): int64;
+function degToRad(x: tFloat): tFloat; inline;
+function radToDeg(x: tFloat): tFloat; inline;
+function ceil(x: tFloat): int64; inline;
+function floor(x: tFloat): int64; inline;
 function arccos(x: tFloat): tFloat;
 function arctan2(y,x: tFloat): tFloat;
 function tan(x: tFloat): tFloat;
@@ -42,7 +42,7 @@ begin
 end;
 
 {weird that I have to implement this...}
-function ceil(x: tFloat): int64;
+function ceil(x: tFloat): int64; inline;
 begin
   if frac(x) > 0 then
     result := trunc(x) + 1
@@ -51,7 +51,7 @@ begin
 end;
 
 {weird that I have to implement this...}
-function floor(x: tFloat): int64;
+function floor(x: tFloat): int64; inline;
 begin
   result := trunc(x);
   if (x < 0) and (frac(x) <> 0) then result -= 1;

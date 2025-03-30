@@ -473,6 +473,8 @@ var
   tmp: int32;
   p: V3D;
   stepSize: integer;
+  stepX,stepY,stepZ: integer;
+  signX,signY,signZ: integer;
 
   function safeInv(x: int32): int32;
   var
@@ -510,6 +512,10 @@ begin
   dirInv32.y := safeInv(dir32.y);
   dirInv32.z := safeInv(dir32.z);
 
+  signX := sign(dir32.x);
+  signY := sign(dir32.y);
+  signZ := sign(dir32.z);
+
   distanceTraveled := 0;
 
   result.d := 0;
@@ -525,6 +531,7 @@ begin
     {check out of bounds}
     if ((pos32.x and maskW) <> 0) or ((pos32.y and maskH) <> 0) or ((pos32.z and maskD) <> 0) then begin
       {clipping... this can be a bit slow...}
+      {todo: find a way to not have to do this...}
       result.d := clipDistanceF(distanceTraveled / 256);
       exit;
     end;
@@ -539,6 +546,9 @@ begin
     if col.a = 255 then begin
       result.col := col;
       result.d := distanceTraveled / 256;
+      result.hitPos.x := (pos32.x div 256);
+      result.hitPos.y := (pos32.y div 256);
+      result.hitPos.z := (pos32.z div 256);
       exit;
     end;
 
@@ -546,11 +556,33 @@ begin
     s := d-1;
 
     {figure out distance to travel to get to next cell}
-    stepSize := autoStep(pos32.x, dirInv32.x, s);
-    tmp := autoStep(pos32.y, dirInv32.y, s);
-    if tmp < stepSize then stepSize := tmp;
-    tmp := autoStep(pos32.z, dirInv32.z, s);
-    if tmp < stepSize then stepSize := tmp;
+    stepX := autoStep(pos32.x, dirInv32.x, s);
+    stepY := autoStep(pos32.y, dirInv32.y, s);
+    stepZ := autoStep(pos32.z, dirInv32.z, s);
+
+    if (stepX > stepY) then begin
+      {yz}
+      if (stepY < stepZ) then begin
+        stepSize := stepY;
+        result.hitNormal.init(0,signY,0);
+      end else begin
+        stepSize := stepZ;
+        result.hitNormal.init(0,0,signZ);
+      end;
+    end else begin
+      {xz}
+      if (stepX < stepZ) then begin
+        stepSize := stepX;
+        result.hitNormal.init(signX,0,0);
+      end else begin
+        stepSize := stepZ;
+        result.hitNormal.init(0,0,signZ);
+      end;
+    end;
+
+    {update hit record based on the face we just crossed}
+
+
     stepSize += 16; // move slightly into next cell
 
     prev32 := pos32;

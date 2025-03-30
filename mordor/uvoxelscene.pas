@@ -18,6 +18,12 @@ uses
 type
 
   tRenderQuality = (rqPreview, rqQuarter, rqHalf, rqFull, rqAA, rqDone);
+  tRenderQualitySpec = record
+    tag: string;
+    pixelSize: integer;
+    lightingSamples: integer;
+    aaSamples: integer;
+  end;
 
   tRenderState = record
     cameraPos: V3D;
@@ -26,6 +32,7 @@ type
     width,height: integer;
     quality: tRenderQuality;
     function nextPixel(): boolean;
+    function qualitySpec: tRenderQualitySpec;
   end;
 
   tVoxelScene = class
@@ -51,6 +58,21 @@ type
   end;
 
 implementation
+
+const
+  RENDER_QUALITY: array[tRenderQuality] of tRenderQualitySpec = (
+    (tag: 'preview';    pixelSize: 8; lightingSamples: 1;   aaSamples: 0),
+    (tag: 'quarter';    pixelSize: 4; lightingSamples: 4;   aaSamples: 0),
+    (tag: 'half';       pixelSize: 2; lightingSamples: 16;  aaSamples: 0),
+    (tag: 'full';       pixelSize: 1; lightingSamples: 128; aaSamples: 0),
+    (tag: 'msaa';       pixelSize: 1; lightingSamples: 128; aaSamples: 4),
+    (tag: 'done';       pixelSize: 0; lightingSamples: 0;   aaSamples: 0)
+  );
+
+function tRenderState.qualitySpec: tRenderQualitySpec;
+begin
+  result := RENDER_QUALITY[quality];
+end;
 
 {returns if finished}
 function tRenderState.nextPixel(): boolean;
@@ -170,12 +192,15 @@ begin
       pos += dir * (hit.d/tileSize);
       result.d += (hit.d/tileSize);
       if hit.didHit then begin
+        result.hitPos.x += curr.x*tilesize;
+        result.hitPos.y += curr.y*tilesize;
+        result.hitPos.z += curr.y*tilesize;
         result.col := hit.col;
         exit;
       end;
       {also take a small step just to make sure we move onto the next cell}
-      pos += dir * (1/64);
-      result.d += (1/64);
+      pos += dir * (0.25/tileSize);
+      result.d += (0.25/tileSize);
     end;
     if result.d > 5 then exit; // max distance
     prev := curr;
@@ -301,7 +326,7 @@ begin
 
   {calculate the face normal}
   {bias the gather point a little}
-  gi := gatherLighting(pos+(faceNormal*0.01), faceNormal, 128);
+  gi := gatherLighting(pos+(faceNormal*0.01), faceNormal, renderState.qualitySpec.lightingSamples);
 
   {gather lighting...}
 
@@ -399,12 +424,8 @@ begin
 
   while (getSec < (startTime + renderTime)) or (renderState.quality = rqPreview) do begin
 
-    pixelSize := 1;
-    case renderState.quality of
-      rqPreview: pixelSize := 8;
-      rqQuarter: pixelSize := 4;
-      rqHalf: pixelSize := 2;
-    end;
+    pixelSize := renderSTate.qualitySpec.pixelSize;
+    if pixelSize = 0 then exit;
 
     if (renderState.pixelX and (pixelSize-1) <> 0) or
        (renderState.pixelY and (pixelSize-1) <> 0) then begin
@@ -412,7 +433,7 @@ begin
        continue;
     end;
 
-    if renderState.quality = rqAA then begin
+    if renderState.qualitySpec.aaSamples > 0 then begin
       col32 := RGB(0,0,0);
       for i := 0 to 1 do for j := 0 to 1 do begin
         rayDir := getRayDir(renderState.pixelX+0.25+0.5*i,renderState.pixelY+0.25+0.5*j);
@@ -428,9 +449,10 @@ begin
     end else begin
       rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
-      if hit.didHit then
+      if hit.didHit then begin
+        {todo: check positions}
         col := calculateShading(rayPos + (rayDir * hit.d))
-      else
+      end else
         col := RGB(0,0,0); { not sure what to do here..}
       dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), col);
       renderState.nextPixel();
