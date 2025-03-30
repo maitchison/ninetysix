@@ -32,12 +32,13 @@ type V2D = packed record
     end;
 
 type
+
   V3D = packed record
     x, y, z, w: single;
 
     function  abs2: single;
     function  abs: single;
-    function  toString(): shortstring;
+    function  toString(places: integer=1): shortstring;
     function  normed(): V3D;
 
     constructor Create(x, y, z: single; w:single=0);
@@ -54,7 +55,6 @@ type
     class operator Multiply(a: V3D; b:single): V3D; inline;
     class operator Multiply(a: V3D; b:V3D): V3D; inline;
     class operator equal(a,b: V3D): boolean; inline;
-
     end;
 
   {Int8 vector}
@@ -281,9 +281,9 @@ begin
     result := sqrt(abs2);
 end;
 
-function V3D.toString(): shortstring;
+function V3D.toString(places: integer=1): shortstring;
 begin
-    result := Format('(%f, %f, %f)', [x, y, z]);
+    result := Format('(%s, %s, %s)', [fltToStr(x, places), fltToStr(y, places), fltToStr(z, places)]);
 end;
 
 function V3D.Normed(): V3D;

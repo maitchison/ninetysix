@@ -42,9 +42,9 @@ type
     cellCount: int32;
     traceTime: single;
     tileSize: integer;
-    function  traceRay(pos: V3D; dir: V3D): tRayHit;
+    function  traceRay(pos: V3D; dir: V3D;depth: integer=0): tRayHit;
     function  calculateShading(pos: V3D): RGBA;
-    function  gatherLighting(p, norm: V3D;nSamples: integer=128): single;
+    function  gatherLighting(p, norm: V3D;nSamples: integer=128; depth: integer=1): single;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
@@ -114,8 +114,11 @@ begin
   result := cellCount / traceCount;
 end;
 
-{for the moment just trace through scene and return depth}
-function tVoxelScene.traceRay(pos: V3D; dir: V3D): tRayHit;
+{trace ray thought scene
+ depth is recursion depth.
+}
+
+function tVoxelScene.traceRay(pos: V3D; dir: V3D;depth: integer=0): tRayHit;
 var
   i: integer;
   hit: tRayHit;
@@ -136,8 +139,7 @@ begin
   {ok... the super slow way for the moment...}
   {breseham is probably the way to go here}
   {although we'll be dense, so maybe it doesn't matter}
-  result.col := RGBA.Clear;
-  result.d := 0;
+  result.clear();
 
   {if ray starts too high then project it down}
   if (pos.z < 0) then begin
@@ -160,22 +162,25 @@ begin
     curr.z := floor(pos.z);
 
     {same cell detection... this shouldn't happen}
+    {
     if (curr = prev) then begin
-      {result.col := RGB(0,255,0);
-      exit;}
-    end;
-
-    {out of bounds}
-    if (dword(curr.x) >= tileSize) or (dword(curr.y) >= tileSize) then begin
-      result.col := RGB(255,0,255);
+      result.col := RGB(0,255,0);
       exit;
     end;
+    }
+
     if (curr.z < 0) then begin
       result.col := RGB(0,0,0,0); // floor
       exit;
     end;
     if (curr.z >= 1) then begin
       result.col := RGB(0,0,0,0); // sky
+      exit;
+    end;
+
+    {out of bounds}
+    if (dword(curr.x) >= tileSize) or (dword(curr.y) >= tileSize) then begin
+      result.col := RGB(255,0,255,0);
       exit;
     end;
 
@@ -192,9 +197,10 @@ begin
       pos += dir * (hit.d/tileSize);
       result.d += (hit.d/tileSize);
       if hit.didHit then begin
-        result.hitPos.x += curr.x*tilesize;
-        result.hitPos.y += curr.y*tilesize;
-        result.hitPos.z += curr.y*tilesize;
+        result.hitPos.x := hit.hitPos.x + curr.x*tileSize*256;
+        result.hitPos.y := hit.hitPos.y + curr.y*tileSize*256;
+        result.hitPos.z := hit.hitPos.z + curr.z*tileSize*256;
+        result.hitNormal := hit.hitNormal;
         result.col := hit.col;
         exit;
       end;
@@ -207,6 +213,7 @@ begin
   end;
   {out of samples!}
   result.col := RGB(255,0,255);
+  result.hitPos.z := 4096;
 end;
 
 {did the camera move since our last render?}
@@ -262,7 +269,7 @@ begin
   result := normal;
 end;
 
-function tVoxelScene.gatherLighting(p, norm: V3D;nSamples: integer=128): single;
+function tVoxelScene.gatherLighting(p, norm: V3D;nSamples: integer=128;depth: integer=1): single;
 var
   hits: integer;
   tangent, bitangent: V3D;
@@ -276,7 +283,7 @@ begin
 
   for i := 0 to nSamples-1 do begin
     d := sampleCosine(norm, tangent, bitangent);
-    hit := traceRay(p, d);
+    hit := traceRay(p, d, depth);
     if hit.didHit then inc(hits);
   end;
   result := 1-(hits/nSamples);
@@ -384,6 +391,7 @@ var
   col32: RGBA32;
   aspect: single;
   col: RGBA;
+  v1,v2: V3D;
 
   function getRayDir(px, py: single): V3D;
   begin
@@ -450,8 +458,11 @@ begin
       rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
       hit := traceRay(rayPos, rayDir);
       if hit.didHit then begin
-        {todo: check positions}
-        col := calculateShading(rayPos + (rayDir * hit.d))
+        {stub: check positions}
+        v1 := rayPos + (rayDir * hit.d);
+        v2 := hit.hitPos.toV3D * (1/(256*16));
+        //note('%s %s',[v1.tostring(3), v2.tostring(3)]);
+        col := calculateShading(v2);
       end else
         col := RGB(0,0,0); { not sure what to do here..}
       dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), col);

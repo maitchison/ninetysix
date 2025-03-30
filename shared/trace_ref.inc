@@ -546,9 +546,7 @@ begin
     if col.a = 255 then begin
       result.col := col;
       result.d := distanceTraveled / 256;
-      result.hitPos.x := (pos32.x div 256);
-      result.hitPos.y := (pos32.y div 256);
-      result.hitPos.z := (pos32.z div 256);
+      result.hitPos := pos32;
       exit;
     end;
 
