@@ -54,8 +54,8 @@ type
   tRayHit = record
     col: RGBA; {4 bytes}
     d: single; {4 bytes}
-    hitPos: V3D32; {stored in voxels as 24.8} {8 bytes}
-    hitNormal: V3D8; {stored as 0.8} {4 bytes}
+    hitPos: V3D32; {stored in voxels as 24.8} {32 bytes}
+    hitNormal: V3D; {32 bytes}
     function didHit: boolean;
     procedure clear();
   end;
@@ -660,7 +660,7 @@ function tVoxel.trace(pos: V3D; dir: V3D): tRayHit;
 begin
   VX_LAST_STEP_COUNT := 0;
   inc(VX_TRACE_COUNT);
-  result := trace_auto(self, pos, dir);
+  result := trace_autoFP(self, pos, dir);
 end;
 
 procedure tVoxel.setVoxel(x,y,z:int32;c: RGBA);
@@ -737,6 +737,7 @@ var
     s1,s2,s3,s4: tPoint;
     x1,x2,clipDelta: integer;
     traceProc: tTraceScanlineProc;
+    midPoint: V3D;
   begin
 
     {for debugging}
@@ -800,6 +801,8 @@ var
     if keyDown(key_f4) or keyDown(key_f5) or keyDown(key_f6) or keyDown(key_f7) then
       traceProc := traceScanline_REF;
 
+    midPoint.init(fWidth/2,fHeight/2,fDepth/2); {center object}
+
     for y := polyBounds.top to polyBounds.bottom-1 do begin
 
       if polyDraw.scanLine[y].xMax < polyDraw.scanLine[y].xMin then
@@ -824,7 +827,7 @@ var
       end;
 
       pos := rayOrigin + cameraDir * (t+0.50); {start half way in a voxel}
-      pos += V3D.create(fWidth/2,fHeight/2,fDepth/2); {center object}
+      pos += midPoint;
 
       {apply x clipping}
       x1 := polyDraw.scanLine[y].xMin+dc.offset.x;
@@ -885,24 +888,24 @@ begin
   mvp.translate(atPos);
   mvpInv.translate(atPos * -1);
 
-  cameraX := mvpInv.apply(V3D.create(1,0,0,0));
-  cameraY := mvpInv.apply(V3D.create(0,1,0,0));
-  cameraZ := mvpInv.apply(V3D.create(0,0,1,0));
+  cameraX := mvpInv.apply(V3(1,0,0,0));
+  cameraY := mvpInv.apply(V3(0,1,0,0));
+  cameraZ := mvpInv.apply(V3(0,0,1,0));
   cameraDir := cameraZ.normed();
 
   {get cube corners}
   {note: this would be great place to apply cropping}
-  size := V3D.create(fWidth/2,fHeight/2,fDepth/2);
+  size.init(fWidth/2,fHeight/2,fDepth/2);
 
   {object space -> world space}
-  p[1] := mvp.apply(V3D.create(-size.x, -size.y, -size.z, 1));
-  p[2] := mvp.apply(V3D.create(+size.x, -size.y, -size.z, 1));
-  p[3] := mvp.apply(V3D.create(+size.x, +size.y, -size.z, 1));
-  p[4] := mvp.apply(V3D.create(-size.x, +size.y, -size.z, 1));
-  p[5] := mvp.apply(V3D.create(-size.x, -size.y, +size.z, 1));
-  p[6] := mvp.apply(V3D.create(+size.x, -size.y, +size.z, 1));
-  p[7] := mvp.apply(V3D.create(+size.x, +size.y, +size.z, 1));
-  p[8] := mvp.apply(V3D.create(-size.x, +size.y, +size.z, 1));
+  p[1] := mvp.apply(V3(-size.x, -size.y, -size.z, 1));
+  p[2] := mvp.apply(V3(+size.x, -size.y, -size.z, 1));
+  p[3] := mvp.apply(V3(+size.x, +size.y, -size.z, 1));
+  p[4] := mvp.apply(V3(-size.x, +size.y, -size.z, 1));
+  p[5] := mvp.apply(V3(-size.x, -size.y, +size.z, 1));
+  p[6] := mvp.apply(V3(+size.x, -size.y, +size.z, 1));
+  p[7] := mvp.apply(V3(+size.x, +size.y, +size.z, 1));
+  p[8] := mvp.apply(V3(-size.x, +size.y, +size.z, 1));
 
   {trace each side of the cubeoid}
   polyDraw.backfaceCull := true;

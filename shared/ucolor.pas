@@ -51,13 +51,19 @@ type
   RGBA32 = packed record
      b,g,r,a: single;
 
+    procedure init(r,g,b: single;a: single=1.0);
+
     class operator explicit(this: RGBA32): ShortString;
-    class operator implicit(this: RGBA32): RGBA;
-    class operator implicit(other: RGBA): RGBA32;
+
+    function toGamma(): RGBA32;
+    function toLinear(): RGBA32;
 
     function toString(): ShortString;
+    procedure fromRGBA(c: RGBA);
+    function toRGBA(): RGBA;
 
     class operator add(a,b: RGBA32): RGBA32;
+    class operator multiply(a,b: RGBA32): RGBA32;
     class operator multiply(a: RGBA32; b: single): RGBA32;
 
   end;
@@ -72,6 +78,8 @@ type
 function RGB(d: dword): RGBA; inline; overload;
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline; overload;
 function RGBF(r,g,b: single;a: single=1.0): RGBA;
+function toRGBA32(c: RGBA): RGBA32;
+function toRGBA32L(c: RGBA): RGBA32;
 
 implementation
 
@@ -79,6 +87,17 @@ uses
   uUtils;
 
 {-------------------------------------------------------------}
+
+function toRGBA32(c: RGBA): RGBA32;
+begin
+  result.fromRGBA(c);
+end;
+
+function toRGBA32L(c: RGBA): RGBA32;
+begin
+  result.fromRGBA(c);
+  result := result.toLinear();
+end;
 
 function RGB(r,g,b: integer;a: integer=255): RGBA; inline;
 begin
@@ -354,32 +373,50 @@ begin
   result.a := this.a;
 end;
 
-
 {----------------------------------------------}
 
-{todo: make this a 4 vector instead?}
+procedure RGBA32.init(r,g,b: single;a: single=1.0);
+begin
+  self.r := r;
+  self.g := g;
+  self.b := b;
+  self.a := a;
+end;
 
 class operator RGBA32.explicit(this: RGBA32): ShortString;
 begin
   result := Format('(%f,%f,%f)', [this.r, this.g, this.b]);
 end;
 
-function RGBA32.ToString(): ShortString;
+function RGBA32.toLinear(): RGBA32;
+begin
+  result.r := power(self.r, 2.2);
+  result.g := power(self.g, 2.2);
+  result.b := power(self.b, 2.2);
+  result.a := a;
+end;
+
+function RGBA32.toGamma(): RGBA32;
+begin
+  result.r := power(self.r, 1/2.2);
+  result.g := power(self.g, 1/2.2);
+  result.b := power(self.b, 1/2.2);
+  result.a := a;
+end;
+
+procedure RGBA32.fromRGBA(c: RGBA);
+begin
+  init(c.r/255,c.g/255,c.b/255,c.a/255);
+end;
+
+function RGBA32.toRGBA(): RGBA;
+begin
+  result.init(round(r*255), round(g*255), round(b*255), round(a*255));
+end;
+
+function RGBA32.toString(): ShortString;
 begin
   result := Format('%d,%d,%d', [self.r, self.g, self.b]);
-end;
-
-class operator RGBA32.implicit(this: RGBA32): RGBA;
-begin
-  result.init(trunc(this.r), trunc(this.g), trunc(this.b), trunc(this.a));
-end;
-
-class operator RGBA32.implicit(other: RGBA): RGBA32;
-begin
-  result.r := other.r;
-  result.g := other.g;
-  result.b := other.b;
-  result.a := other.a;
 end;
 
 class operator RGBA32.add(a, b: RGBA32): RGBA32;
@@ -393,11 +430,19 @@ end;
 
 class operator RGBA32.multiply(a: RGBA32; b: single): RGBA32;
 begin
-  {ignore alpha for the moment}
+  {pass through alpha for the moment}
   result.r := a.r*b;
   result.g := a.g*b;
   result.b := a.b*b;
-  result.a := 255;
+  result.a := a.a;
+end;
+
+class operator RGBA32.multiply(a,b: RGBA32): RGBA32;
+begin
+  result.r := a.r*b.r;
+  result.g := a.g*b.g;
+  result.b := a.b*b.b;
+  result.a := a.a*b.a;
 end;
 
 {----------------------------------------------}

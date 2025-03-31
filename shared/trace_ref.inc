@@ -31,6 +31,7 @@ begin
   )^;
 end;
 
+{returns stepsSize}
 function autoStep(p,dInv,s: int32): int32; inline;
 begin
   if dInv > 0 then
@@ -38,7 +39,18 @@ begin
   else if dInv < 0 then
     result := (((-s*256)-(p and $ff)) * dInv) div 256
   else
-    result := 99999;
+    result := 999999;
+end;
+
+{returns stepsSize}
+function autoStepF(p,dInv,s: single): single; inline;
+begin
+  if dInv > 0 then
+    result := (1+s-frac(p)) * dInv
+  else if dInv < 0 then
+    result := (-s-frac(p)) * dInv
+  else
+    result := 999999;
 end;
 
 (*
@@ -476,6 +488,10 @@ var
   stepSize: integer;
   stepX,stepY,stepZ: integer;
   signX,signY,signZ: integer;
+  x,y,z: integer; {our integer locations}
+  dydz: int32;
+  dxdz: int32;
+  dxdy: int32;
 
   function safeInv(x: int32): int32;
   var
@@ -516,6 +532,11 @@ begin
   signX := sign(dir32.x);
   signY := sign(dir32.y);
   signZ := sign(dir32.z);
+
+  {not used, but could make things faster}
+  dydz := (dir32.y*dir32.z) div 256;
+  dxdz := (dir32.x*dir32.z) div 256;
+  dxdy := (dir32.x*dir32.y) div 256;
 
   distanceTraveled := 0;
 
@@ -579,10 +600,7 @@ begin
       end;
     end;
 
-    {update hit record based on the face we just crossed}
-
-
-    stepSize += 16; // move slightly into next cell
+    stepSize := stepSize+16;
 
     prev32 := pos32;
 
@@ -593,6 +611,141 @@ begin
     distanceTraveled += stepSize;
   end;
   result.d := distanceTraveled / 256;
+end;
+
+function trace_autoFP(vox: tVoxel; pos: V3D; dir: V3D): tRayHit;
+var
+  dirInv, prev, initialPos: V3D;
+  maxSteps: int32;
+  distanceTraveled: single;
+  col: RGBA;
+  d,s: int32;
+  i: integer;
+  stepSize: single;
+  stepX,stepY,stepZ: single;
+  signX,signY,signZ: integer;
+  x,y,z: integer;
+  abs2: single;
+
+  function safeInv(x: single): single; inline;
+  begin
+    if x = 0 then exit(99999999);
+    result := 1/x;
+  end;
+
+  {clip distance traveled to edge of cuboid}
+  function clipDistanceF(t: single): single;
+  begin
+    {todo: calculate invADir as float, then round to get invDir}
+    if dir.x > 0 then safeSet(t, (vox.width-initialPos.x) / dir.x)
+    else if dir.x < 0 then safeSet(t, -initialPos.x / dir.x);
+    if dir.y > 0 then safeSet(t, (vox.height-initialPos.y) / dir.y)
+    else if dir.y < 0 then safeSet(t, -initialPos.y / dir.y);
+    if dir.z > 0 then safeSet(t, (vox.depth-initialPos.z) / dir.z)
+    else if dir.z < 0 then safeSet(t, -initialPos.z / dir.z);
+    result := t;
+  end;
+
+begin
+  abs2 := dir.abs2;
+  if abs(abs2) < 0.01 then begin
+    {this really shouldn't happen}
+    result.col := RGB(255,0,0);
+    exit;
+  end;
+  assert(abs(abs2-1.0) < 1e-4);
+  maxSteps := ceil(vox.radius);
+
+  initialPos := pos;
+  dirInv.x := safeInv(dir.x);
+  dirInv.y := safeInv(dir.y);
+  dirInv.z := safeInv(dir.z);
+
+  signX := sign(dir.x);
+  signY := sign(dir.y);
+  signZ := sign(dir.z);
+
+  distanceTraveled := 0;
+
+  {todo: check we do not start in a voxel}
+
+  result.d := 0;
+  result.col := RGBA.Clear;
+
+  prev.x := -1;
+
+  for i := 0 to maxSteps-1 do begin
+
+    inc(VX_STEP_COUNT);
+    inc(VX_LAST_STEP_COUNT);
+
+    x := trunc(pos.x);
+    y := trunc(pos.y);
+    z := trunc(pos.z);
+
+    {check out of bounds}
+    if (x < 0) or (x >= vox.fWidth) or
+       (y < 0) or (y >= vox.fHeight) or
+       (z < 0) or (z >= vox.fDepth) then begin
+      {clipping... this can be a bit slow...}
+      {todo: find a way to not have to do this...}
+      result.d := clipDistanceF(distanceTraveled);
+      exit;
+    end;
+
+    {get voxel}
+    col := vox.vox.pixel^[
+      (x) +
+      (y shl vox.fLog2Width) +
+      (z shl (vox.fLog2Width + vox.fLog2Height))
+    ];
+
+    if col.a = 255 then begin
+      result.col := col;
+      result.d := distanceTraveled;
+      result.hitPos.x := round(pos.x*256);
+      result.hitPos.y := round(pos.y*256);
+      result.hitPos.z := round(pos.z*256);
+      exit;
+    end;
+
+    d := (255-col.a) div 4;
+    s := d-1;
+
+    {figure out distance to travel to get to next cell}
+    stepX := autoStepF(pos.x, dirInv.x, s);
+    stepY := autoStepF(pos.y, dirInv.y, s);
+    stepZ := autoStepF(pos.z, dirInv.z, s);
+
+    if (stepX > stepY) then begin
+      {yz}
+      if (stepY < stepZ) then begin
+        stepSize := stepY;
+        result.hitNormal.init(0,-signY,0);
+      end else begin
+        stepSize := stepZ;
+        result.hitNormal.init(0,0,-signZ);
+      end;
+    end else begin
+      {xz}
+      if (stepX < stepZ) then begin
+        stepSize := stepX;
+        result.hitNormal.init(-signX,0,0);
+      end else begin
+        stepSize := stepZ;
+        result.hitNormal.init(0,0,-signZ);
+      end;
+    end;
+
+    stepSize := stepSize+0.001;
+
+    pos.x += (dir.x * stepSize);
+    pos.y += (dir.y * stepSize);
+    pos.z += (dir.z * stepSize);
+
+    distanceTraveled += stepSize;
+  end;
+  result.d := distanceTraveled;
 end;
 
 {---------------------------------------------------------}

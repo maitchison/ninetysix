@@ -41,7 +41,7 @@ type
     function  toString(places: integer=1): shortstring;
     function  normed(): V3D;
 
-    constructor Create(x, y, z: single; w:single=0);
+    procedure init(x, y, z: single; w: single=0);
 
     procedure getBasis(out tangent: V3D; out biTangent: V3D);
     function  toPoint: tPoint; inline;
@@ -124,7 +124,7 @@ type
 
 function V2(x,y: single): V2D;
 function V2Polar(degree,r: single): V2D;
-function V3(x,y,z: single): V3D; inline;
+function V3(x,y,z: single;w:single=0): V3D; inline;
 
 function sampleShell(): V3D;
 function sampleCosine(norm,tangent,bitangent: V3D): V3D;
@@ -199,9 +199,9 @@ end;
 
 {------------}
 
-function V3(x,y,z: single): V3D; inline;
+function V3(x,y,z: single;w:single=0): V3D; inline;
 begin
-  result := V3D.create(x,y,z);
+  result.init(x,y,z,w);
 end;
 
 {-----------------------------------------}
@@ -259,7 +259,6 @@ begin
     self.x := x;
     self.y := y;
 end;
-
 
 // --------------------------------------------------------------------
 
@@ -366,7 +365,7 @@ begin
   nZ := tz;
   tx := nX; ty := nY; tz := nZ;
 
-  result := V3D.create(tx, ty, tz, 0);
+  result.init(tx, ty, tz, 0);
 end;
 
 function V3D.dot(other: V3D): single;
@@ -381,7 +380,7 @@ begin
   result.z := self.x*other.y - self.y * other.x;
 end;
 
-constructor V3D.Create(x, y, z: single; w: single=0);
+procedure V3D.init(x, y, z: single; w: single=0);
 begin
   self.x := x;
   self.y := y;
@@ -789,7 +788,7 @@ var
   p16: V3D16;
 begin
   {make sure low and high look right}
-  p := V3D.create(-100.123, 102.9995, 53.2);
+  p.init(-100.123, 102.9995, 53.2);
 
   p16 := V3D16.round(p*256);
   p32 := V3D32.round(p*256);
@@ -817,7 +816,7 @@ begin
 
   testV3D32();
 
-  p := V3D.create(rnd,rnd,rnd);
+  p.init(rnd,rnd,rnd);
   p := p.normed();
   pInitial := p;
   assert(abs(p.abs-1) < 0.01);

@@ -44,7 +44,7 @@ type
     tileSize: integer;
     function  traceRay(pos: V3D; dir: V3D;depth: integer=0): tRayHit;
     function  calculateShading(pos,faceNormal: V3D): RGBA;
-    function  gatherLighting(p, norm: V3D;nSamples: integer=128; depth: integer=1): single;
+    function  gatherLighting(p, norm: V3D;nSamples: integer=128; depth: integer=1): RGBA32;
   public
     cells: array[0..31, 0..31] of tVoxel;
     cameraPos: V3D;
@@ -68,6 +68,19 @@ const
     (tag: 'msaa';       pixelSize: 1; lightingSamples: 128; aaSamples: 4),
     (tag: 'done';       pixelSize: 0; lightingSamples: 0;   aaSamples: 0)
   );
+
+type
+  tRenderMode = (
+    rmShaded,   { standard lighting }
+    rmNormal,   { show normals }
+    rmAlbedo,   { get color form voxel... quite fast }
+    rmDepth,    { show depth }
+    rmEmmisive, { show emmisive}
+    rmGI        { show GI only }
+  );
+
+const
+  renderMode = rmGI;
 
 function tRenderState.qualitySpec: tRenderQualitySpec;
 begin
@@ -114,10 +127,39 @@ begin
   result := cellCount / traceCount;
 end;
 
+function pseudo(a,b,c: integer): single;
+var
+  code: dword;
+begin
+  code := (a * 73856093) xor (b * 19349663) xor (c * 83492791);
+  code := code xor ((code shr 16) * $85ebca6b);
+  code := code xor ((code shr 13) * $c2b2ae35);
+  code := code xor (code shr 16);
+  result := ((code shr 4) and $ffff)/$ffff;
+end;
+
+{add slight variation to normals}
+function perturbNormal(n: V3D; p: V3D32): V3D;
+var
+  vx,vy,vz: integer;
+  dx,dy,dz: single;
+begin
+  {we could also add 'texture' by looking at sub position}
+  {every voxel is divided into 8 subcubes, each with their own
+   distortion}
+  vx := (p.x div 128) and $ff;
+  vy := (p.y div 128) and $ff;
+  vz := (p.z div 128) and $ff;
+  dx := pseudo(vx,vy,vz);
+  dy := pseudo(vy,vz,vx);
+  dz := pseudo(vz,vx,vy);
+  n := n + (V3(dx,dy,dz)*0.5);
+  result := n.normed();
+end;
+
 {trace ray thought scene
  depth is recursion depth.
 }
-
 function tVoxelScene.traceRay(pos: V3D; dir: V3D;depth: integer=0): tRayHit;
 var
   i: integer;
@@ -126,6 +168,7 @@ var
   stepSize: single;
   curr, prev: V3D32;
   t: single;
+  tracePos: V3D;
 
   function autoStep(p,d: single): single;
   begin
@@ -193,14 +236,17 @@ begin
       result.d += stepSize;
     end else begin
       {trace through the cell}
-      hit := vox.trace(V3(frac(pos.x)*tileSize, frac(pos.y)*tileSize, frac(pos.z)*tileSize), dir);
+      tracePos := V3(frac(pos.x)*tileSize, frac(pos.y)*tileSize, frac(pos.z)*tileSize);
+      {remove bias, and take a small step back so that we do not start in a voxel}
+      tracePos := tracePos - (dir * 0.50);
+      hit := vox.trace(tracePos, dir);
       pos += dir * (hit.d/tileSize);
       result.d += (hit.d/tileSize);
       if hit.didHit then begin
         result.hitPos.x := hit.hitPos.x + curr.x*tileSize*256;
         result.hitPos.y := hit.hitPos.y + curr.y*tileSize*256;
         result.hitPos.z := hit.hitPos.z + curr.z*tileSize*256;
-        result.hitNormal := hit.hitNormal;
+        result.hitNormal := perturbNormal(hit.hitNormal, hit.hitPos);
         result.col := hit.col;
         exit;
       end;
@@ -225,14 +271,6 @@ function tVoxelScene.isDone: boolean;
 begin
   result := renderState.quality = rqDone;
 end;
-
-type
-  tRenderMode = (
-    rmNormal,   { show normals }
-    rmBaked,    { get color form voxel... quite fast }
-    rmDepth,    { show depth }
-    rmGI        { show GI only }
-  );
 
 {this is a bit noisy... better to trace toward the camera and see
  what we intersect. Also maybe the tRayHit can record exact location
@@ -268,24 +306,38 @@ begin
   result := normal;
 end;
 
-function tVoxelScene.gatherLighting(p, norm: V3D;nSamples: integer=128;depth: integer=1): single;
+{returns linear light}
+function tVoxelScene.gatherLighting(p, norm: V3D;nSamples: integer=128;depth: integer=1): RGBA32;
 var
   hits: integer;
   tangent, bitangent: V3D;
   d: V3D;
   i: integer;
   hit: tRayHit;
+  col32: RGBA32;
+  skyColor, lightColor: RGBA32;
 begin
   norm.getBasis(tangent, bitangent);
 
   hits := 0;
 
+  col32.init(0,0,0,0);
+
+  skyColor.init(0.25,0.5,1.0);
+  skyColor := skyColor.toLinear();
+  lightColor.init(1,0.9,0.1);
+
   for i := 0 to nSamples-1 do begin
     d := sampleCosine(norm, tangent, bitangent);
     hit := traceRay(p, d, depth);
-    if hit.didHit then inc(hits);
+    {hard code emmissive for the moment}
+    if not hit.didHit then
+      col32 += skyColor * (0.2/nSamples);
+    if hit.col = RGB(255,255,0) then
+      col32 += lightColor * (2/nSamples);
   end;
-  result := 1-(hits/nSamples);
+  col32.a := 1;
+  result := col32;
 end;
 
 {position is in scene space...}
@@ -297,9 +349,9 @@ var
   cameraDir: V3D;
   d: single; {distance from the camera plane}
   voxCol: RGBA;
-  gi: single;
-const
-  renderMode = rmGI;
+  gi: RGBA32;
+  emmisive: RGBA;
+  acc: RGBA32;
 begin
   result := RGB(0,0,128);
   if (pos.x < 0) or (pos.x >= 32) then exit;
@@ -319,52 +371,49 @@ begin
   subPos.z := (frac(pos.z)*16) - vz;
 
   { fetch voxel colors }
+  { todo: proper emmisive }
   voxCol := vox.getVoxel(vx, vy, vz);
+  if voxCol = RGB(255,255,0) then
+    emmisive := voxCol
+  else
+    emmisive := RGBA.Black;
 
   {calculate distance to camera}
   {todo: cache camera dir}
   cameraDir := V3(0,-1,0).rotated(cameraAngle.x, cameraAngle.y, cameraAngle.z);
   d := cameraDir.dot(pos - cameraPos);
 
-  {calculate the face normal}
-  {bias the gather point a little}
-  gi := gatherLighting(pos+(faceNormal*0.02), faceNormal, renderState.qualitySpec.lightingSamples);
-
   {gather lighting...}
+  if renderMode in [rmShaded, rmGI] then
+    {bias the gather point a little}
+    gi := gatherLighting(pos+(faceNormal*0.02), faceNormal, renderState.qualitySpec.lightingSamples)
+  else
+    gi.init(1.0,1.0,1.0);
 
   {output color}
-
   case renderMode of
-    rmBaked: begin
-      result := voxCol;
-      exit;
-    end;
-    rmNormal: begin
+    rmAlbedo: result := voxCol;
+    rmNormal:
       result := RGB(
         round(faceNormal.x*128+128),
         round(faceNormal.y*128+128),
         round(faceNormal.z*128+128)
       );
-      exit;
+    rmEmmisive: result := emmisive;
+    rmGI: result := gi.toGamma().toRGBA;
+    rmShaded: begin
+      acc := (toRGBA32L(voxCol) * gi) + toRGBA32L(emmisive);
+      acc := gi;
+      result := acc.toGamma().toRGBA;
     end;
-    rmGI: begin
+    rmDepth:
       result := RGB(
-        round(gi*64),
-        round(gi*256),
-        round(gi*1024)
+        255-clamp(round(d*64), 0, 255),
+        255-clamp(round(d*64), 0, 255),
+        255-clamp(round(d*64), 0, 255)
       );
-      exit;
-    end;
-    rmDepth: begin
-      result.r := 255-clamp(round(d*64), 0, 255);
-      result.g := 255-clamp(round(d*64), 0, 255);
-      result.b := 255-clamp(round(d*64), 0, 255);
-      result.a := 255;
-      exit;
-    end;
   end;
-
-
+  result.a := 255;
 end;
 
 {render scene. With progressive render we render approximately renderTime seconds.
@@ -401,7 +450,7 @@ var
     hit := traceRay(rayPos, rayDir);
     if not hit.didHit then col := RGB(0,0,0);
     hPos := hit.hitPos.toV3D * (1/(256*16));
-    hNorm := hit.hitNormal.toV3D;
+    hNorm := hit.hitNormal;
     result := calculateShading(hPos, hNorm);
   end;
 
@@ -448,14 +497,13 @@ begin
 
     if renderState.qualitySpec.aaSamples > 0 then begin
       assert(renderState.qualitySpec.aaSamples = 4);
-      col32 := RGB(0,0,0,0);
+      col32.init(0,0,0,0);
       for i := 0 to 1 do begin
         for j := 0 to 1 do begin
-          col32 += sample(((i*2)-1)*0.25, ((j*2)-1)*0.25) * 0.25;
+          col32 += toRGBA32(sample(((i*2)-1)*0.25, ((j*2)-1)*0.25)) * 0.25;
         end;
       end;
-      col := col32;
-      //col.r := 255;
+      col := col32.toRGBA();
     end else
       col := sample();
 
