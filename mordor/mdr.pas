@@ -60,6 +60,7 @@ type
     party : tMDRParty;
     mapGUI: tMapGUI;
     encounterGUI: tEncounterGUI;
+    procedure makeMapCool();
     procedure moveParty(turn: integer; move: integer);
     {todo: setup this up to auto hook, and then just override}
 
@@ -285,6 +286,32 @@ begin
   );
 end;
 
+procedure tGameScene.makeMapCool();
+var
+  tile: tTile;
+  i,j: integer;
+
+  procedure addLight(x,y: integer);
+  begin
+    tile := mapGUI.map.tile[x,y];
+    tile.medium := mtLight;
+    mapGUI.map.tile[x,y] := tile;
+  end;
+
+begin
+  {stub: add some light sources}
+  addLight(5,6);
+
+
+  {todo: add windows}
+  {todo: add lights}
+  {todo: add ceiling grate / hole}
+
+  mapGUI.invalidate();
+end;
+
+
+
 procedure tGameScene.run();
 var
   elapsed: single;
@@ -385,6 +412,7 @@ begin
   tMusicJob.Create().start(jpHigh);
 
   syncCameraPos(party, dvg);
+  makeMapCool();
 
   repeat
 

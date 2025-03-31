@@ -149,7 +149,7 @@ begin
   for i := 0 to 3 do begin
     for j := 0 to 3 do rotatedWalls[tDirection(j)] := walls[tDirection((i+j) mod 4)];
     rotatedKey := getTileKey(tile, rotatedWalls);
-    rotatedFilename := joinPath('tiles', rotatedKey+'_256.vox');
+    rotatedFilename := joinPath('tiles', rotatedKey+'_16.vox');
     if filesystem.exists(rotatedFilename) then begin
       {todo: size from file}
       result := tVoxel.Create(tileBuilder.tileSize, tileBuilder.tileSize, tileBuilder.tileSize);
@@ -161,12 +161,17 @@ begin
 
   if not assigned(result) then begin
     key := getTileKey(tile, walls);
-    filename := joinPath('tiles', key+'_256.vox');
+    filename := joinPath('tiles', key+'_16.vox');
     result := buildTile(tile, walls);
-    result.lightingSamples := 256;
-    result.generateLighting(lmGI, true);
-    job := tVoxelRenderJob.Create(result, filename);
-    job.start();
+    if not filename.toLower().contains('light') then
+      {stub: to not cache light tiles (as we're developing them now)}
+      saveLC96(filename, result.vox);
+    {no baked lighting}
+    //result.lightingSamples := 256;
+    //result.generateLighting(lmGI, true);
+
+    //job := tVoxelRenderJob.Create(result, filename);
+    //job.start();
   end;
   tileCache[key] := result;
 end;

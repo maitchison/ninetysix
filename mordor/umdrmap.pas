@@ -66,7 +66,7 @@ const
     (tag: 'None';       spriteIdx: -1),
     (tag: 'Fog';        spriteIdx: -1),
     (tag: 'Rock';       spriteIdx: -1),
-    (tag: 'Light';      spriteIdx: -1)
+    (tag: 'Light';      spriteIdx: 15+(3*32))
    );
 
   CEILING_SPEC: array[tCeilingType] of tCeilingSpec =
@@ -209,8 +209,7 @@ end;
 
 function tTile.toString(): string;
 begin
-  // medium set to none for the moment.
-  result := FLOOR_SPEC[floor].tag+'-None'
+  result := FLOOR_SPEC[floor].tag+'-'+MEDIUM_SPEC[medium].tag+'-'+CEILING_SPEC[ceiling].tag;
 end;
 
 {-------------------------------------------------}

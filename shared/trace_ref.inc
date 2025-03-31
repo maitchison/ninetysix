@@ -205,6 +205,7 @@ begin
   sy := trunc(256*pos.y);
   sz := trunc(256*pos.z);
 
+  {todo: optinally ignore the voxel we start in}
   c := getVoxel(vox, sx div 256, sy div 256, sz div 256);
   if c.a = 255 then begin
     result.d := 0;

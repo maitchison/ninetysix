@@ -328,7 +328,7 @@ begin
 
   {calculate the face normal}
   {bias the gather point a little}
-  gi := gatherLighting(pos+(faceNormal*0.01), faceNormal, renderState.qualitySpec.lightingSamples);
+  gi := gatherLighting(pos+(faceNormal*0.02), faceNormal, renderState.qualitySpec.lightingSamples);
 
   {gather lighting...}
 

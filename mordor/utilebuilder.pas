@@ -212,6 +212,17 @@ begin
     end;
   end;
 
+  {medium}
+  case tile.medium of
+    mtLight: begin
+      for i := 3 to tileSize-3 do begin
+        layer := i;
+        fill(RGB(255,255,0), 3);
+      end;
+    end;
+  end;
+
+
   {walls}
   for d in tDirection do begin
     if not walls[ord(d)].isSolid then continue;
