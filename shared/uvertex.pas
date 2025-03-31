@@ -61,6 +61,7 @@ type
   V3D8 = packed record
     x, y, z, w: int8;
     procedure init(ax,ay,az: int8;aw: int8=0);
+    function toV3D(): V3D; inline;
     end;
 
   {Int16 vector, useful for MMX}
@@ -632,6 +633,15 @@ begin
   z := az;
   w := aw;
 end;
+
+function V3D8.toV3D(): V3D; inline;
+begin
+  result.x := x;
+  result.y := y;
+  result.z := z;
+  result.w := w;
+end;
+
 
 {-----------------------------------------------------}
 

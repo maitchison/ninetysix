@@ -43,7 +43,7 @@ type
     traceTime: single;
     tileSize: integer;
     function  traceRay(pos: V3D; dir: V3D;depth: integer=0): tRayHit;
-    function  calculateShading(pos: V3D): RGBA;
+    function  calculateShading(pos,faceNormal: V3D): RGBA;
     function  gatherLighting(p, norm: V3D;nSamples: integer=128; depth: integer=1): single;
   public
     cells: array[0..31, 0..31] of tVoxel;
@@ -64,7 +64,7 @@ const
     (tag: 'preview';    pixelSize: 8; lightingSamples: 1;   aaSamples: 0),
     (tag: 'quarter';    pixelSize: 4; lightingSamples: 4;   aaSamples: 0),
     (tag: 'half';       pixelSize: 2; lightingSamples: 16;  aaSamples: 0),
-    (tag: 'full';       pixelSize: 1; lightingSamples: 128; aaSamples: 0),
+    (tag: 'full';       pixelSize: 1; lightingSamples: 64;  aaSamples: 0),
     (tag: 'msaa';       pixelSize: 1; lightingSamples: 128; aaSamples: 4),
     (tag: 'done';       pixelSize: 0; lightingSamples: 0;   aaSamples: 0)
   );
@@ -213,7 +213,6 @@ begin
   end;
   {out of samples!}
   result.col := RGB(255,0,255);
-  result.hitPos.z := 4096;
 end;
 
 {did the camera move since our last render?}
@@ -290,7 +289,7 @@ begin
 end;
 
 {position is in scene space...}
-function tVoxelScene.calculateShading(pos: V3D): RGBA;
+function tVoxelScene.calculateShading(pos,faceNormal: V3D): RGBA;
 var
   vx,vy,vz: integer; {position within voxel}
   subPos: V3D; {sub position within voxel}
@@ -298,7 +297,6 @@ var
   cameraDir: V3D;
   d: single; {distance from the camera plane}
   voxCol: RGBA;
-  faceNormal: V3D;
   gi: single;
 const
   renderMode = rmGI;
@@ -322,9 +320,6 @@ begin
 
   { fetch voxel colors }
   voxCol := vox.getVoxel(vx, vy, vz);
-
-  { get face }
-  faceNormal := getFaceNormal(subPos - V3(0.5, 0.5, 0.5));
 
   {calculate distance to camera}
   {todo: cache camera dir}
@@ -391,13 +386,23 @@ var
   col32: RGBA32;
   aspect: single;
   col: RGBA;
-  v1,v2: V3D;
+  hPos,hNorm: V3D;
 
   function getRayDir(px, py: single): V3D;
   begin
     result := V3((px-(viewWidth/2)) / (viewWidth*1.2), -0.5, (py-(viewHeight/2)) / (viewWidth*1.2));
     result := result.rotated(renderState.cameraAngle.x, renderState.cameraAngle.y, renderState.cameraAngle.z);
     result := result.normed();
+  end;
+
+  function sample(dx: single=0; dy: single=0): RGBA;
+  begin
+    rayDir := getRayDir(renderState.pixelX+(pixelSize/2)+dx,renderState.pixelY+(pixelSize/2)+dy);
+    hit := traceRay(rayPos, rayDir);
+    if not hit.didHit then col := RGB(0,0,0);
+    hPos := hit.hitPos.toV3D * (1/(256*16));
+    hNorm := hit.hitNormal.toV3D;
+    result := calculateShading(hPos, hNorm);
   end;
 
 begin
@@ -442,36 +447,24 @@ begin
     end;
 
     if renderState.qualitySpec.aaSamples > 0 then begin
-      col32 := RGB(0,0,0);
-      for i := 0 to 1 do for j := 0 to 1 do begin
-        rayDir := getRayDir(renderState.pixelX+0.25+0.5*i,renderState.pixelY+0.25+0.5*j);
-        hit := traceRay(rayPos, rayDir);
-        if hit.didHit then
-          col := calculateShading(rayPos + (rayDir * hit.d))
-        else
-          col := RGB(0,0,0); { not sure what to do here.}
-        col32 += col * 0.25;
+      assert(renderState.qualitySpec.aaSamples = 4);
+      col32 := RGB(0,0,0,0);
+      for i := 0 to 1 do begin
+        for j := 0 to 1 do begin
+          col32 += sample(((i*2)-1)*0.25, ((j*2)-1)*0.25) * 0.25;
+        end;
       end;
-      dc.putPixel(Point(4+renderState.pixelX, 4+renderState.pixelY), col32);
-      renderState.nextPixel();
-    end else begin
-      rayDir := getRayDir(renderState.pixelX+(pixelSize/2),renderState.pixelY+(pixelSize/2));
-      hit := traceRay(rayPos, rayDir);
-      if hit.didHit then begin
-        {stub: check positions}
-        v1 := rayPos + (rayDir * hit.d);
-        v2 := hit.hitPos.toV3D * (1/(256*16));
-        //note('%s %s',[v1.tostring(3), v2.tostring(3)]);
-        col := calculateShading(v2);
-      end else
-        col := RGB(0,0,0); { not sure what to do here..}
-      dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), col);
-      renderState.nextPixel();
-    end;
+      col := col32;
+      //col.r := 255;
+    end else
+      col := sample();
+
+    dc.fillRect(Rect(4+renderState.pixelX, 4+renderState.pixelY, pixelSize, pixelSize), col);
+    renderState.nextPixel();
+
   end;
 
-  traceTime += (getSEc - startTime);
-
+  traceTime += (getSec - startTime);
 end;
 
 begin

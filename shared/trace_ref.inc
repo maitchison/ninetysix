@@ -562,19 +562,19 @@ begin
       {yz}
       if (stepY < stepZ) then begin
         stepSize := stepY;
-        result.hitNormal.init(0,signY,0);
+        result.hitNormal.init(0,-signY,0);
       end else begin
         stepSize := stepZ;
-        result.hitNormal.init(0,0,signZ);
+        result.hitNormal.init(0,0,-signZ);
       end;
     end else begin
       {xz}
       if (stepX < stepZ) then begin
         stepSize := stepX;
-        result.hitNormal.init(signX,0,0);
+        result.hitNormal.init(-signX,0,0);
       end else begin
         stepSize := stepZ;
-        result.hitNormal.init(0,0,signZ);
+        result.hitNormal.init(0,0,-signZ);
       end;
     end;
 
