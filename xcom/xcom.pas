@@ -86,7 +86,7 @@ begin
   for x := 0 to GRID_X-1 do
     for y := 0 to GRID_Y-1 do
       for z := 0 to GRID_Z-1 do begin
-        if grid[z,y,x].cType <> CT_EMPTY then inc(tile[z div TILE_SIZE, y div TILE_SIZE, z div TILE_SIZE].count);
+        if grid[z,y,x].cType <> CT_EMPTY then inc(tile[z div TILE_SIZE, y div TILE_SIZE, x div TILE_SIZE].count);
       end;
 end;
 
@@ -100,7 +100,7 @@ begin
   tileRef := @tile[z div TILE_SIZE, y div TILE_SIZE, x div TILE_SIZE];
   if grid[z,y,x].cType = CT_EMPTY then inc(tileRef^.count);
   grid[z,y,x].cType := ctype;
-  grid[z,y,x].damage := (rnd mod 32) + round(sin(getSec) * 100)+100;
+  grid[z,y,x].damage := (rnd mod 32) + round(sin(getSec) * 10)+10+100;
   if keyDown(key_space) then grid[z,y,x].damage := 255;
   grid[z,y,x].rng := rnd;
   tileRef^.status := TS_DIRTY;
@@ -115,16 +115,33 @@ begin
   for i := 0 to GRID_X-1 do
     for j := 0 to GRID_Y-1 do
       for k := 0 to GRID_Z-1 do begin
-        if rnd > k * 8 then
+        if rnd > k * 28 then
           grid[k,j,i].cType := CT_SAND;
       end;
 
   for i := 0 to GRID_X-1 do
     for j := 0 to 20 do
-      for k := 0 to 3 do
-        addSand(i, 10+k, j, CT_ROCK);
+      for k := 0 to 3 do begin
+        addSand(i, 40+k, j, CT_ROCK);
+        addSand(40+k, i, j, CT_ROCK);
+      end;
+
 
   refreshTiles();
+end;
+
+procedure checkTile(tx,ty,tz: integer);
+var
+  i,j,k: integer;
+  count: integer;
+begin
+  count := 0;
+  for i := 0 to TILE_SIZE-1 do
+    for j := 0 to TILE_SIZE-1 do
+      for k := 0 to TILE_SIZE-1 do
+        if grid[tz*TILE_SIZE+i, ty*TILE_SIZE+j, tx*TILE_SIZE+k].cType <> CT_EMPTY then
+          inc(count);
+  assertEqual(tile[tz, ty, tx].count, count);
 end;
 
 procedure updateTile(tx,ty,tz: integer);
@@ -191,6 +208,13 @@ const
   DELTA_Y: array of integer = [0, 1, -1, 0, -1, 1,  1, -1];
 
 begin
+
+  {no need to process empty tiles (which get woken up sometimes)}
+  if tile[tz, ty, tx].count = 0 then begin
+    tile[tz, ty, tx].status := tile[tz, ty, tx].status and TS_INACTIVE;
+    exit;
+  end;
+
   fillchar(changes, sizeof(changes), 0);
   selfChanged := false;
 
@@ -242,14 +266,13 @@ begin
     for cy := -1 to 1 do begin
       for cz := -1 to 1 do begin
         delta := changes[cx,cy,cz];
+        thisTile^.count -= delta;
         if word(tx+cx) >= TILES_X then continue;
         if word(ty+cy) >= TILES_Y then continue;
         if word(tz+cz) >= TILES_Z then continue;
         otherTile := @tile[tz+cz,ty+cy,tx+cx];
         {exchange}
         otherTile^.count += delta;
-        thisTile^.count -= delta;
-
         {let other tile know to check itself, as our change might cause it
          to no longer be stable}
         otherTile.status := otherTile.status and (not TS_INACTIVE);
@@ -258,6 +281,7 @@ begin
       end;
     end;
   end;
+
 end;
 
 procedure updateGrid();
@@ -268,6 +292,7 @@ begin
   for k := 0 to TILES_Z-1 do
     for j := 0 to TILES_Y-1 do
       for i := 0 to TILES_X-1 do begin
+        //checkTile(i,j,k);
         if ((tile[k,j,i].status and TS_INACTIVE) = TS_INACTIVE) then continue;
         updateTile(i,j,k);
       end;
@@ -310,17 +335,15 @@ begin
         cType := grid[z,y,x].cType;
         if cType = CT_EMPTY then continue;
         dy := 200 - z - ((x+y) div 2);
-        if dz >= screen.canvas.getPixel(dx,dy).a then continue;
+        if dz > screen.canvas.getPixel(dx,dy).a then continue;
         case cType of
-          CT_ROCK: c := RGB(128,128,128);
+          CT_ROCK: c := RGB(128,l,128,dz);
           CT_SAND: c := RGB(l,grid[z,y,x].damage,l,dz);
         end;
         screen.canvas.setPixel(dx, dy, c);
     end;
   end;
 end;
-
-proc
 
 {render our grid, by drawing every voxel... super slow...}
 procedure renderGrid_REF();
@@ -334,6 +357,7 @@ begin
   STAT_TILE_DRAW := 0;
   screen.canvas.clear(RGB(100,200,250,255));
   for tz := 0 to TILES_Z-1 do
+    //for ty := TILES_Y-1 downto 0 do
     for ty := 0 to TILES_Y-1 do
       for tx := 0 to TILES_X-1 do
         if tile[tz, ty, tx].count > 0 then
@@ -369,7 +393,7 @@ begin
   ui := tGui.Create();
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
-  fpsLabel.setSize(120,21);
+  fpsLabel.setSize(180,21);
   ui.append(fpsLabel);
 
   timer := tTimer.Create('main');
@@ -380,7 +404,7 @@ begin
 
     elapsed := clamp(timer.elapsed, 0.001, 0.1);
     if timer.avElapsed > 0 then
-      fpsLabel.text := format('%.1f %d %d', [1/timer.avElapsed, STAT_TILE_DRAW, STAT_TILE_UPDATE]);
+      fpsLabel.text := format('FPS:%.1f D:%d U:%d', [1/timer.avElapsed, STAT_TILE_DRAW, STAT_TILE_UPDATE]);
 
     for i := 0 to 15 do
       addSand(round(sin(getSec*3.1)*4)+32-4+(rnd mod 4),round(cos(getSec*3.1)*4)+32-4+(rnd mod 4), GRID_Z-1-(rnd mod 4));
