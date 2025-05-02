@@ -36,7 +36,7 @@ const
 
 type
 
-  tCellType = (CT_EMPTY, CT_DIRT, CT_SAND);
+  tCellType = (CT_EMPTY, CT_DIRT, CT_SAND, CT_ROCK);
 
   tCell = record
     cType: tCellType;
@@ -90,6 +90,22 @@ begin
       end;
 end;
 
+procedure addSand(x,y,z: integer; ctype: tCellType=CT_SAND);
+var
+  tileRef: pTile;
+begin
+  if word(x) >= GRID_X then exit;
+  if word(y) >= GRID_Y then exit;
+  if word(z) >= GRID_Z then exit;
+  tileRef := @tile[z div TILE_SIZE, y div TILE_SIZE, x div TILE_SIZE];
+  if grid[z,y,x].cType = CT_EMPTY then inc(tileRef^.count);
+  grid[z,y,x].cType := ctype;
+  grid[z,y,x].damage := (rnd mod 32) + round(sin(getSec) * 100)+100;
+  if keyDown(key_space) then grid[z,y,x].damage := 255;
+  grid[z,y,x].rng := rnd;
+  tileRef^.status := TS_DIRTY;
+end;
+
 {initialize a semi random grid}
 procedure initGrid();
 var
@@ -99,11 +115,15 @@ begin
   for i := 0 to GRID_X-1 do
     for j := 0 to GRID_Y-1 do
       for k := 0 to GRID_Z-1 do begin
-        //if rnd > k * 8 then begin
-        //grid[k,j,i].cType := CT_SAND;
-        //grid[k,j,i].rng := rng;
-        //end;
+        if rnd > k * 8 then
+          grid[k,j,i].cType := CT_SAND;
       end;
+
+  for i := 0 to GRID_X-1 do
+    for j := 0 to 20 do
+      for k := 0 to 3 do
+        addSand(i, 10+k, j, CT_ROCK);
+
   refreshTiles();
 end;
 
@@ -124,6 +144,8 @@ var
   cx,cy,cz: integer;
   otherCell: tCell;
   thisTile, otherTile: pTile;
+  perm1, perm2: array[0..TILE_SIZE-1] of byte;
+  a,b,c: integer;
 
   procedure doMove(dx,dy,dz: integer); inline;
   begin
@@ -147,10 +169,26 @@ var
     if result then doMove(dx,dy,dz);
   end;
 
+  procedure genPerm(var perm: array of byte);
+  var
+    i: integer;
+    a,b,temp: integer;
+  begin
+    for i := 0 to TILE_SIZE-1 do
+      perm[i] := i;
+    for i := 0 to 3 do begin
+      a := rnd and (TILE_SIZE-1);
+      b := rnd and (TILE_SIZE-1);
+      temp := perm[a];
+      perm[a] := perm[b];
+      perm[b] := temp;
+    end;
+  end;
+
+
 const
   DELTA_X: array of integer = [1, 0, 0, -1, -1, -1, 1, 1];
   DELTA_Y: array of integer = [0, 1, -1, 0, -1, 1,  1, -1];
-
 
 begin
   fillchar(changes, sizeof(changes), 0);
@@ -158,25 +196,33 @@ begin
 
   inc(STAT_TILE_UPDATE);
 
-  for i := 0 to TILE_SIZE-1 do
-    for j := 0 to TILE_SIZE-1 do
-      for k := 0 to TILE_SIZE-1 do begin
+  genPerm(perm1);
+  genPerm(perm2);
+
+  for a := 0 to TILE_SIZE-1 do
+    for b := 0 to TILE_SIZE-1 do
+      for c := 0 to TILE_SIZE-1 do begin
+        {update order, do z in order, and other do random perm}
+        i := perm1[c];
+        j := perm2[b];
+        k := a;
+
         x := tx*TILE_SIZE+i;
         y := ty*TILE_SIZE+j;
         z := tz*TILE_SIZE+k;
         cell := grid[z,y,x];
         case cell.cType of
-          CT_EMPTY: ;
+          CT_EMPTY,
+          CT_ROCK
+          : ;
           CT_DIRT: begin
             checkAndMove(0,0,-1);
           end;
           CT_SAND: begin
             if checkAndMove(0,0,-1) then continue;
-            rng := cell.rng and $7;
-            for t := 0 to 7 do begin
-              if checkAndMove(DELTA_X[rng], DELTA_Y[rng], -1) then break;
-              rng := (rng + 1) and $7;
-            end;
+            rng := rnd and $7;
+            if (rng >= 4) and ((rnd and $1) = 1) then continue; {only check corerns half the time}
+            if checkAndMove(DELTA_X[rng], DELTA_Y[rng], -1) then continue;
           end;
         end;
       end;
@@ -235,6 +281,7 @@ var
   l: integer;
   c: RGBA;
   tileRef: pTile;
+  cType: tCellType;
 begin
   inc(STAT_TILE_DRAW);
 
@@ -252,20 +299,28 @@ begin
   }
 
   for i := 0 to TILE_SIZE-1 do
-    for j := 0 to TILE_SIZE-1 do
+    for j := 0 to TILE_SIZE-1 do begin
+      x := tx*TILE_SIZE+i;
+      y := ty*TILE_SIZE+j;
+      dx := 160 + x - y;
+      dz := (x + y); {z is depth}
+      l := dz;
       for k := 0 to TILE_SIZE-1 do begin
-        x := tx*TILE_SIZE+i;
-        y := ty*TILE_SIZE+j;
         z := tz*TILE_SIZE+k;
-        if grid[z,y,x].cType = CT_EMPTY then continue;
-        dx := 160 + x - y;
+        cType := grid[z,y,x].cType;
+        if cType = CT_EMPTY then continue;
         dy := 200 - z - ((x+y) div 2);
-        dz := (x + y); {z is depth}
-        l := dz;
         if dz >= screen.canvas.getPixel(dx,dy).a then continue;
-        screen.canvas.setPixel(dx, dy, RGB(l,grid[z,y,x].damage,l,dz));
+        case cType of
+          CT_ROCK: c := RGB(128,128,128);
+          CT_SAND: c := RGB(l,grid[z,y,x].damage,l,dz);
+        end;
+        screen.canvas.setPixel(dx, dy, c);
     end;
+  end;
 end;
+
+proc
 
 {render our grid, by drawing every voxel... super slow...}
 procedure renderGrid_REF();
@@ -298,21 +353,6 @@ begin
   initKeyboard();
   screen := tScreen.create();
   screen.scrollMode := SSM_COPY;
-end;
-
-procedure addSand(x,y,z: integer);
-var
-  tileRef: pTile;
-begin
-  if word(x) >= GRID_X then exit;
-  if word(y) >= GRID_Y then exit;
-  if word(z) >= GRID_Z then exit;
-  tileRef := @tile[z div TILE_SIZE, y div TILE_SIZE, x div TILE_SIZE];
-  if grid[z,y,x].cType = CT_EMPTY then inc(tileRef^.count);
-  grid[z,y,x].cType := CT_SAND;
-  grid[z,y,x].damage := (rnd mod 32) + round(sin(getSec) * 100)+100;
-  grid[z,y,x].rng := rnd;
-  tileRef^.status := TS_DIRTY;
 end;
 
 procedure main();
