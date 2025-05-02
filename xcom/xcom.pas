@@ -22,6 +22,9 @@ uses
   uMouse,
   uKeyboard,
   uScreen,
+  uGui,
+  uTimer,
+  uGuiLabel,
   uVESADriver,
   uVGADriver;
 
@@ -136,7 +139,6 @@ begin
     for i := 0 to TILES_X-1 do
       for j := 0 to TILES_Y-1 do
         updateTile(i,j,k);
-
 end;
 
 
@@ -178,13 +180,39 @@ begin
 end;
 
 procedure main();
+var
+  ui: tGui;
+  fpsLabel: tGuiLabel;
+  timer: tTimer;
+  elapsed: single;
 begin
   renderGrid_REF();
   screen.pageFlip();
+
+  ui := tGui.Create();
+
+  fpsLabel := tGuiLabel.Create(Point(10,10));
+  ui.append(fpsLabel);
+
+  timer := tTimer.Create('main');
+
   repeat
+
+    timer.start();
+
+    elapsed := clamp(timer.elapsed, 0.001, 0.1);
+    if timer.avElapsed > 0 then
+      fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
+
     updateGrid();
     renderGrid_REF();
+
+    ui.update(elapsed);
+    ui.draw(screen.getDC());
+
     screen.pageFlip();
+
+    timer.stop();
   until keyDown(key_esc);
 end;
 
@@ -194,4 +222,3 @@ begin
   main();
   videoDriver.setText();
 end.
-
