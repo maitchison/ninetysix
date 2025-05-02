@@ -47,6 +47,8 @@ type
     status: byte; {see TS_...}
   end;
 
+  pTile = ^tTile;
+
 const
 
   TILES_X = 8;
@@ -86,9 +88,11 @@ var
   cell: tCell;
   cType: tCellType;
   selfChanged: boolean;
+  delta: integer;
   {locals for subcalls, but I don't want stack frame}
   cx,cy,cz: integer;
   otherCell: tCell;
+  thisTile, otherTile: pTile;
 
   procedure doMove(dx,dy,dz: integer); inline;
   begin
@@ -115,6 +119,7 @@ var
 
 begin
   fillchar(changes, sizeof(changes), 0);
+  selfChanged := false;
   for i := 0 to 7 do
     for j := 0 to 7 do
       for k := 7 downto 0 do begin
@@ -129,18 +134,49 @@ begin
           end;
         end;
       end;
+
+  thisTile := @tile[tz, ty, tx];
+
+  {keep track of tile stats}
+  if (not selfChanged) then begin
+    {if nothing moved then we sleep the block.}
+    thisTile^.status := thisTile^.status or TS_INACTIVE;
+    exit;
+  end;
+
+  thisTile^.status := thisTile^.status or TS_DIRTY;
+
+  for cx := -1 to 1 do begin
+    for cy := -1 to 1 do begin
+      for cz := -1 to 1 do begin
+        delta := changes[cx,cy,cz];
+        if word(tx+cx) >= TILES_X then continue;
+        if word(ty+cy) >= TILES_Y then continue;
+        if word(tz+cz) >= TILES_Z then continue;
+        otherTile := @tile[tz+cz,ty+cy,tx+cx];
+        {let other tile know to check itself, as our change might cause it
+         to no longer be stable}
+        otherTile.status := otherTile.status and (not TS_INACTIVE);
+        if delta <> 0 then
+          otherTile.status := otherTile.status or TS_DIRTY;
+      end;
+    end;
+  end;
 end;
 
 procedure updateGrid();
 var
   i,j,k: integer;
+  thisTile: tTile;
 begin
   for k := TILES_Z-1 downto 0 do
-    for i := 0 to TILES_X-1 do
-      for j := 0 to TILES_Y-1 do
-        updateTile(i,j,k);
+    for j := 0 to TILES_Y-1 do
+      for i := 0 to TILES_X-1 do begin
+        thisTile := tile[k,j,i];
+        if ((thisTile.status and TS_INACTIVE) = 0) then
+          updateTile(i,j,k);
+      end;
 end;
-
 
 {render our grid, by drawing every voxel... super slow...}
 procedure renderGrid_REF();
@@ -192,6 +228,7 @@ begin
   ui := tGui.Create();
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
+  fpsLabel.setSize(40,21);
   ui.append(fpsLabel);
 
   timer := tTimer.Create('main');
