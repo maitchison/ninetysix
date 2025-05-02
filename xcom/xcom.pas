@@ -53,13 +53,15 @@ type
 
 const
 
-  TILES_X = 8;
-  TILES_Y = 8;
-  TILES_Z = 8;
+  TILES_X = 16;
+  TILES_Y = 16;
+  TILES_Z = 16;
 
-  GRID_X = TILES_X*8;
-  GRID_Y = TILES_Y*8;
-  GRID_Z = TILES_Z*8;
+  TILE_SIZE = 4;
+
+  GRID_X = TILES_X*TILE_SIZE;
+  GRID_Y = TILES_Y*TILE_SIZE;
+  GRID_Z = TILES_Z*TILE_SIZE;
 
 var
   grid: array[0..GRID_Z-1, 0..GRID_Y-1,0..GRID_X-1] of tCell;
@@ -84,7 +86,7 @@ begin
   for x := 0 to GRID_X-1 do
     for y := 0 to GRID_Y-1 do
       for z := 0 to GRID_Z-1 do begin
-        if grid[z,y,x].cType <> CT_EMPTY then inc(tile[z div 8, y div 8, z div 8].count);
+        if grid[z,y,x].cType <> CT_EMPTY then inc(tile[z div TILE_SIZE, y div TILE_SIZE, z div TILE_SIZE].count);
       end;
 end;
 
@@ -126,9 +128,9 @@ var
   procedure doMove(dx,dy,dz: integer); inline;
   begin
     selfChanged := true;
-    if (i+dx < 0) then cx := -1 else if (i+dx >= 8) then cx := +1 else cx := 0;
-    if (j+dy < 0) then cy := -1 else if (j+dy >= 8) then cy := +1 else cy := 0;
-    if (k+dz < 0) then cz := -1 else if (k+dz >= 8) then cz := +1 else cz := 0;
+    if (i+dx < 0) then cx := -1 else if (i+dx >= TILE_SIZE) then cx := +1 else cx := 0;
+    if (j+dy < 0) then cy := -1 else if (j+dy >= TILE_SIZE) then cy := +1 else cy := 0;
+    if (k+dz < 0) then cz := -1 else if (k+dz >= TILE_SIZE) then cz := +1 else cz := 0;
     inc(changes[cx,cy,cz]);
     otherCell := grid[z+dz, y+dy, x+dx];
     grid[z+dz, y+dy, x+dx] := cell;
@@ -156,12 +158,12 @@ begin
 
   inc(STAT_TILE_UPDATE);
 
-  for i := 0 to 7 do
-    for j := 0 to 7 do
-      for k := 0 to 7 do begin
-        x := tx*8+i;
-        y := ty*8+j;
-        z := tz*8+k;
+  for i := 0 to TILE_SIZE-1 do
+    for j := 0 to TILE_SIZE-1 do
+      for k := 0 to TILE_SIZE-1 do begin
+        x := tx*TILE_SIZE+i;
+        y := ty*TILE_SIZE+j;
+        z := tz*TILE_SIZE+k;
         cell := grid[z,y,x];
         case cell.cType of
           CT_EMPTY: ;
@@ -238,8 +240,8 @@ begin
 
   {draw our marker - if needed}
   {
-  dx := 160 + tx*8 - ty*8;
-  dy := 200 - tz*8 - ((tx*8+ty*8) div 2);
+  dx := 160 + tx*TILE_SIZE - ty*TILE_SIZE;
+  dy := 200 - tz*TILE_SIZE - ((tx*TILE_SIZE+ty*TILE_SIZE) div 2);
   c := RGB(0,0,0);
   tileRef := @tile[tz, ty, tx];
   if (tileRef^.status and TS_INACTIVE) = TS_INACTIVE then c.r := 128;
@@ -249,12 +251,12 @@ begin
   screen.canvas.setPixel(dx, dy, c);
   }
 
-  for i := 0 to 7 do
-    for j := 0 to 7 do
-      for k := 0 to 7 do begin
-        x := tx*8+i;
-        y := ty*8+j;
-        z := tz*8+k;
+  for i := 0 to TILE_SIZE-1 do
+    for j := 0 to TILE_SIZE-1 do
+      for k := 0 to TILE_SIZE-1 do begin
+        x := tx*TILE_SIZE+i;
+        y := ty*TILE_SIZE+j;
+        z := tz*TILE_SIZE+k;
         if grid[z,y,x].cType = CT_EMPTY then continue;
         dx := 160 + x - y;
         dy := 200 - z - ((x+y) div 2);
@@ -305,7 +307,7 @@ begin
   if word(x) >= GRID_X then exit;
   if word(y) >= GRID_Y then exit;
   if word(z) >= GRID_Z then exit;
-  tileRef := @tile[z div 8, y div 8, x div 8];
+  tileRef := @tile[z div TILE_SIZE, y div TILE_SIZE, x div TILE_SIZE];
   if grid[z,y,x].cType = CT_EMPTY then inc(tileRef^.count);
   grid[z,y,x].cType := CT_SAND;
   grid[z,y,x].damage := (rnd mod 32) + round(sin(getSec) * 100)+100;
@@ -340,7 +342,7 @@ begin
     if timer.avElapsed > 0 then
       fpsLabel.text := format('%.1f %d %d', [1/timer.avElapsed, STAT_TILE_DRAW, STAT_TILE_UPDATE]);
 
-    for i := 0 to 16 do
+    for i := 0 to 15 do
       addSand(round(sin(getSec*3.1)*4)+32-4+(rnd mod 4),round(cos(getSec*3.1)*4)+32-4+(rnd mod 4), GRID_Z-1-(rnd mod 4));
     updateGrid();
     renderGrid_REF();
