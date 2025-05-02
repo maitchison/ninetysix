@@ -32,8 +32,11 @@ const
   TS_DIRTY = 4;
 
 type
+
+  tCellType = (CT_EMPTY, CT_DIRT);
+
   tCell = record
-    cType: byte;
+    cType: tCellType;
     strength: byte
   end;
 
@@ -42,13 +45,18 @@ type
   end;
 
 const
-  GRID_X = 128;
-  GRID_Y = 128;
-  GRID_Z = 64;
+
+  TILES_X = 8;
+  TILES_Y = 8;
+  TILES_Z = 4;
+
+  GRID_X = TILES_X*8;
+  GRID_Y = TILES_Y*8;
+  GRID_Z = TILES_Z*8;
 
 var
   grid: array[0..GRID_Z-1, 0..GRID_Y-1,0..GRID_X-1] of tCell;
-  tile: array[0..(GRID_Z div 8)-1, 0..(GRID_Y div 8)-1,  0..(GRID_X div 8)-1] of tTile;
+  tile: array[0..TILES_Z-1, 0..TILES_Y-1,  0..TILES_X-1] of tTile;
   screen: tScreen;
 
 {initialize a semi random grid}
@@ -57,13 +65,80 @@ var
   i,j,k: integer;
 begin
   fillchar(grid, sizeof(grid), 0);
+  fillchar(tile, sizeof(tile), TS_DIRTY);
   for i := 0 to GRID_X-1 do
     for j := 0 to GRID_Y-1 do
       for k := 0 to GRID_Z-1 do begin
         if rnd > k*8 then
-          grid[k,j,i].cType := 1;
+          grid[k,j,i].cType := CT_DIRT;
       end;
 end;
+
+procedure updateTile(tx,ty,tz: integer);
+var
+  {number of changes applied to neighbour tiles}
+  changes: array[-1..1, -1..1, -1..1] of integer;
+  i,j,k: integer;
+  x,y,z: integer;
+  cell: tCell;
+  cType: tCellType;
+  selfChanged: boolean;
+  {locals for subcalls, but I don't want stack frame}
+  cx,cy,cz: integer;
+  otherCell: tCell;
+
+  procedure doMove(dx,dy,dz: integer); inline;
+  begin
+    selfChanged := true;
+    if (i+dx < 0) then cx := -1 else if (i+dx >= 8) then cx := +1 else cx := 0;
+    if (j+dy < 0) then cy := -1 else if (j+dy >= 8) then cy := +1 else cy := 0;
+    if (k+dz < 0) then cz := -1 else if (k+dz >= 8) then cz := +1 else cz := 0;
+    inc(changes[cx,cy,cz]);
+    otherCell := grid[z+dz, y+dy, x+dx];
+    grid[z+dz, y+dy, x+dx] := cell;
+    grid[z, y, x] := otherCell;
+  end;
+
+  function checkAndMove(dx,dy,dz: integer): boolean; inline;
+  begin
+    {bounds checking}
+    if dword(x+dx) >= GRID_X then exit(false);
+    if dword(y+dy) >= GRID_Y then exit(false);
+    if dword(z+dz) >= GRID_Z then exit(false);
+    otherCell := grid[z+dz, y+dy, x+dx];
+    result := (otherCell.cType = CT_EMPTY);
+    if result then doMove(dx,dy,dz);
+  end;
+
+begin
+  fillchar(changes, sizeof(changes), 0);
+  for i := 0 to 7 do
+    for j := 0 to 7 do
+      for k := 7 downto 0 do begin
+        x := tx*8+i;
+        y := ty*8+j;
+        z := tz*8+k;
+        cell := grid[z,y,x];
+        case cell.cType of
+          CT_EMPTY: ;
+          CT_DIRT: begin
+            checkAndMove(0,0,-1);
+          end;
+        end;
+      end;
+end;
+
+procedure updateGrid();
+var
+  i,j,k: integer;
+begin
+  for k := TILES_Z-1 downto 0 do
+    for i := 0 to TILES_X-1 do
+      for j := 0 to TILES_Y-1 do
+        updateTile(i,j,k);
+
+end;
+
 
 {render our grid, by drawing every voxel... super slow...}
 procedure renderGrid_REF();
@@ -73,16 +148,18 @@ var
   c: RGBA;
   l: byte;
 begin
+  screen.canvas.clear(RGB(100,200,250));
+  {$R-}
   for z := 0 to GRID_Z-1 do
     for x := 0 to GRID_X-1 do
       for y := 0 to GRID_Y-1 do
-      if grid[z,y,x].cType = 1 then begin
+      if grid[z,y,x].cType <> CT_EMPTY then begin
         dx := 160 + x - y;
         dy := 200 - z - ((x+y) div 2);
         l := 255-(z*4);
         screen.canvas.putPixel(dx, dy, RGB(l,l,l));
-
     end;
+  {$R+}
 end;
 
 procedure setup();
@@ -102,11 +179,12 @@ end;
 
 procedure main();
 begin
-
   renderGrid_REF();
   screen.pageFlip();
-
   repeat
+    updateGrid();
+    renderGrid_REF();
+    screen.pageFlip();
   until keyDown(key_esc);
 end;
 
