@@ -60,17 +60,29 @@ begin
   for i := 0 to GRID_X-1 do
     for j := 0 to GRID_Y-1 do
       for k := 0 to GRID_Z-1 do begin
-        if rnd > k then
+        if rnd > k*8 then
           grid[k,j,i].cType := 1;
       end;
 end;
 
-{render out grid, using a fairly slow pascal fixed-step trace with no sparsity skipping}
+{render our grid, by drawing every voxel... super slow...}
 procedure renderGrid_REF();
 var
   x,y,z: integer;
+  dx,dy: integer;
+  c: RGBA;
+  l: byte;
 begin
-  // pass
+  for z := 0 to GRID_Z-1 do
+    for x := 0 to GRID_X-1 do
+      for y := 0 to GRID_Y-1 do
+      if grid[z,y,x].cType = 1 then begin
+        dx := 160 + x - y;
+        dy := 200 - z - ((x+y) div 2);
+        l := 255-(z*4);
+        screen.canvas.putPixel(dx, dy, RGB(l,l,l));
+
+    end;
 end;
 
 procedure setup();
@@ -90,6 +102,10 @@ end;
 
 procedure main();
 begin
+
+  renderGrid_REF();
+  screen.pageFlip();
+
   repeat
   until keyDown(key_esc);
 end;
