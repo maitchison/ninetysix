@@ -45,6 +45,7 @@ type
 
   tTile = record
     status: byte; {see TS_...}
+    count: word; {number of cells in tile}
   end;
 
   pTile = ^tTile;
@@ -64,19 +65,41 @@ var
   tile: array[0..TILES_Z-1, 0..TILES_Y-1,  0..TILES_X-1] of tTile;
   screen: tScreen;
 
+const
+  STAT_TILE_DRAW: integer = 0;
+  STAT_TILE_UPDATE: integer = 0;
+
+procedure refreshTiles();
+var
+  i,j,k: integer;
+  x,y,z: integer;
+begin
+  for i := 0 to TILES_X-1 do
+    for j := 0 to TILES_Y-1 do
+      for k := 0 to TILES_Z-1 do begin
+        tile[k,j,i].count := 0;
+        tile[k,j,i].status := TS_DIRTY;
+      end;
+  for x := 0 to GRID_X-1 do
+    for y := 0 to GRID_Y-1 do
+      for z := 0 to GRID_Z-1 do begin
+        if grid[z,y,x].cType <> CT_EMPTY then inc(tile[z div 8, y div 8, z div 8].count);
+      end;
+end;
+
 {initialize a semi random grid}
 procedure initGrid();
 var
   i,j,k: integer;
 begin
   fillchar(grid, sizeof(grid), 0);
-  fillchar(tile, sizeof(tile), TS_DIRTY);
   for i := 0 to GRID_X-1 do
     for j := 0 to GRID_Y-1 do
       for k := 0 to GRID_Z-1 do begin
-        if rnd > k*8 then
+        if rnd > k*16 then
           grid[k,j,i].cType := CT_DIRT;
       end;
+  refreshTiles();
 end;
 
 procedure updateTile(tx,ty,tz: integer);
@@ -112,14 +135,16 @@ var
     if dword(x+dx) >= GRID_X then exit(false);
     if dword(y+dy) >= GRID_Y then exit(false);
     if dword(z+dz) >= GRID_Z then exit(false);
-    otherCell := grid[z+dz, y+dy, x+dx];
-    result := (otherCell.cType = CT_EMPTY);
+    result := (grid[z+dz, y+dy, x+dx].cType = CT_EMPTY);
     if result then doMove(dx,dy,dz);
   end;
 
 begin
   fillchar(changes, sizeof(changes), 0);
   selfChanged := false;
+
+  inc(STAT_TILE_UPDATE);
+
   for i := 0 to 7 do
     for j := 0 to 7 do
       for k := 7 downto 0 do begin
@@ -154,6 +179,10 @@ begin
         if word(ty+cy) >= TILES_Y then continue;
         if word(tz+cz) >= TILES_Z then continue;
         otherTile := @tile[tz+cz,ty+cy,tx+cx];
+        {exchange}
+        otherTile^.count += delta;
+        thisTile^.count -= delta;
+
         {let other tile know to check itself, as our change might cause it
          to no longer be stable}
         otherTile.status := otherTile.status and (not TS_INACTIVE);
@@ -167,14 +196,13 @@ end;
 procedure updateGrid();
 var
   i,j,k: integer;
-  thisTile: tTile;
 begin
+  STAT_TILE_UPDATE := 0;
   for k := TILES_Z-1 downto 0 do
     for j := 0 to TILES_Y-1 do
       for i := 0 to TILES_X-1 do begin
-        thisTile := tile[k,j,i];
-        if ((thisTile.status and TS_INACTIVE) = 0) then
-          updateTile(i,j,k);
+        if ((tile[k,j,i].status and TS_INACTIVE) = TS_INACTIVE) then continue;
+        updateTile(i,j,k);
       end;
 end;
 
@@ -184,7 +212,24 @@ var
   x,y,z: integer;
   dx,dy,dz: integer;
   l: integer;
+  c: RGBA;
+  tileRef: pTile;
 begin
+  inc(STAT_TILE_DRAW);
+
+  {draw our marker - if needed}
+  {
+  dx := 160 + tx*8 - ty*8;
+  dy := 200 - tz*8 - ((tx*8+ty*8) div 2);
+  c := RGB(0,0,0);
+  tileRef := @tile[tz, ty, tx];
+  if (tileRef^.status and TS_INACTIVE) = TS_INACTIVE then c.r := 128;
+  if (tileRef^.status and TS_DIRTY) = TS_DIRTY then c.r := 255;
+  c.g := tileRef^.count and $ff;
+  c.a := 0;
+  screen.canvas.setPixel(dx, dy, c);
+  }
+
   for i := 0 to 7 do
     for j := 0 to 7 do
       for k := 0 to 7 do begin
@@ -210,11 +255,13 @@ var
   c: RGBA;
   l: byte;
 begin
+  STAT_TILE_DRAW := 0;
   screen.canvas.clear(RGB(100,200,250,255));
   for tz := 0 to TILES_Z-1 do
     for ty := 0 to TILES_Y-1 do
       for tx := 0 to TILES_X-1 do
-        drawTile_REF(tx,ty,tz);
+        if tile[tz, ty, tx].count > 0 then
+          drawTile_REF(tx,ty,tz);
 end;
 
 procedure setup();
@@ -245,7 +292,7 @@ begin
   ui := tGui.Create();
 
   fpsLabel := tGuiLabel.Create(Point(10,10));
-  fpsLabel.setSize(40,21);
+  fpsLabel.setSize(120,21);
   ui.append(fpsLabel);
 
   timer := tTimer.Create('main');
@@ -256,7 +303,7 @@ begin
 
     elapsed := clamp(timer.elapsed, 0.001, 0.1);
     if timer.avElapsed > 0 then
-      fpsLabel.text := format('%.1f', [1/timer.avElapsed]);
+      fpsLabel.text := format('%.1f %d %d', [1/timer.avElapsed, STAT_TILE_DRAW, STAT_TILE_UPDATE]);
 
     updateGrid();
     renderGrid_REF();
