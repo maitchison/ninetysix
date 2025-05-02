@@ -178,26 +178,43 @@ begin
       end;
 end;
 
+procedure drawTile_REF(tx,ty,tz: integer);
+var
+  i,j,k: integer;
+  x,y,z: integer;
+  dx,dy,dz: integer;
+  l: integer;
+begin
+  for i := 0 to 7 do
+    for j := 0 to 7 do
+      for k := 0 to 7 do begin
+        x := tx*8+i;
+        y := ty*8+j;
+        z := tz*8+k;
+        if grid[z,y,x].cType = CT_EMPTY then continue;
+        dx := 160 + x - y;
+        dy := 200 - z - ((x+y) div 2);
+        dz := (x + y) div 2; {z is depth}
+        l := 255-(z*4)-(dz*2);
+        if dz > screen.canvas.getPixel(dx,dy).a then continue;
+        screen.canvas.setPixel(dx, dy, RGB(l,l,l,dz));
+    end;
+end;
+
 {render our grid, by drawing every voxel... super slow...}
 procedure renderGrid_REF();
 var
+  tx,ty,tz: integer;
   x,y,z: integer;
   dx,dy: integer;
   c: RGBA;
   l: byte;
 begin
-  screen.canvas.clear(RGB(100,200,250));
-  {$R-}
-  for z := 0 to GRID_Z-1 do
-    for x := 0 to GRID_X-1 do
-      for y := 0 to GRID_Y-1 do
-      if grid[z,y,x].cType <> CT_EMPTY then begin
-        dx := 160 + x - y;
-        dy := 200 - z - ((x+y) div 2);
-        l := 255-(z*4);
-        screen.canvas.putPixel(dx, dy, RGB(l,l,l));
-    end;
-  {$R+}
+  screen.canvas.clear(RGB(100,200,250,255));
+  for tz := 0 to TILES_Z-1 do
+    for ty := 0 to TILES_Y-1 do
+      for tx := 0 to TILES_X-1 do
+        drawTile_REF(tx,ty,tz);
 end;
 
 procedure setup();
