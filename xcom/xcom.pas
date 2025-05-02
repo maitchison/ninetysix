@@ -36,11 +36,12 @@ const
 
 type
 
-  tCellType = (CT_EMPTY, CT_DIRT);
+  tCellType = (CT_EMPTY, CT_DIRT, CT_SAND);
 
   tCell = record
     cType: tCellType;
-    strength: byte
+    damage: byte;
+    rng: byte;
   end;
 
   tTile = record
@@ -54,7 +55,7 @@ const
 
   TILES_X = 8;
   TILES_Y = 8;
-  TILES_Z = 4;
+  TILES_Z = 8;
 
   GRID_X = TILES_X*8;
   GRID_Y = TILES_Y*8;
@@ -96,8 +97,10 @@ begin
   for i := 0 to GRID_X-1 do
     for j := 0 to GRID_Y-1 do
       for k := 0 to GRID_Z-1 do begin
-        if rnd > k*16 then
-          grid[k,j,i].cType := CT_DIRT;
+        //if rnd > k * 8 then begin
+        //grid[k,j,i].cType := CT_SAND;
+        //grid[k,j,i].rng := rng;
+        //end;
       end;
   refreshTiles();
 end;
@@ -106,12 +109,15 @@ procedure updateTile(tx,ty,tz: integer);
 var
   {number of changes applied to neighbour tiles}
   changes: array[-1..1, -1..1, -1..1] of integer;
+  t: integer;
   i,j,k: integer;
   x,y,z: integer;
   cell: tCell;
   cType: tCellType;
   selfChanged: boolean;
   delta: integer;
+  rng: byte;
+  dx,dy: integer;
   {locals for subcalls, but I don't want stack frame}
   cx,cy,cz: integer;
   otherCell: tCell;
@@ -139,6 +145,11 @@ var
     if result then doMove(dx,dy,dz);
   end;
 
+const
+  DELTA_X: array of integer = [1, 0, 0, -1, -1, -1, 1, 1];
+  DELTA_Y: array of integer = [0, 1, -1, 0, -1, 1,  1, -1];
+
+
 begin
   fillchar(changes, sizeof(changes), 0);
   selfChanged := false;
@@ -147,7 +158,7 @@ begin
 
   for i := 0 to 7 do
     for j := 0 to 7 do
-      for k := 7 downto 0 do begin
+      for k := 0 to 7 do begin
         x := tx*8+i;
         y := ty*8+j;
         z := tz*8+k;
@@ -156,6 +167,14 @@ begin
           CT_EMPTY: ;
           CT_DIRT: begin
             checkAndMove(0,0,-1);
+          end;
+          CT_SAND: begin
+            if checkAndMove(0,0,-1) then continue;
+            rng := cell.rng and $7;
+            for t := 0 to 7 do begin
+              if checkAndMove(DELTA_X[rng], DELTA_Y[rng], -1) then break;
+              rng := (rng + 1) and $7;
+            end;
           end;
         end;
       end;
@@ -198,7 +217,7 @@ var
   i,j,k: integer;
 begin
   STAT_TILE_UPDATE := 0;
-  for k := TILES_Z-1 downto 0 do
+  for k := 0 to TILES_Z-1 do
     for j := 0 to TILES_Y-1 do
       for i := 0 to TILES_X-1 do begin
         if ((tile[k,j,i].status and TS_INACTIVE) = TS_INACTIVE) then continue;
@@ -239,10 +258,10 @@ begin
         if grid[z,y,x].cType = CT_EMPTY then continue;
         dx := 160 + x - y;
         dy := 200 - z - ((x+y) div 2);
-        dz := (x + y) div 2; {z is depth}
-        l := 255-(z*4)-(dz*2);
-        if dz > screen.canvas.getPixel(dx,dy).a then continue;
-        screen.canvas.setPixel(dx, dy, RGB(l,l,l,dz));
+        dz := (x + y); {z is depth}
+        l := dz;
+        if dz >= screen.canvas.getPixel(dx,dy).a then continue;
+        screen.canvas.setPixel(dx, dy, RGB(l,grid[z,y,x].damage,l,dz));
     end;
 end;
 
@@ -279,12 +298,28 @@ begin
   screen.scrollMode := SSM_COPY;
 end;
 
+procedure addSand(x,y,z: integer);
+var
+  tileRef: pTile;
+begin
+  if word(x) >= GRID_X then exit;
+  if word(y) >= GRID_Y then exit;
+  if word(z) >= GRID_Z then exit;
+  tileRef := @tile[z div 8, y div 8, x div 8];
+  if grid[z,y,x].cType = CT_EMPTY then inc(tileRef^.count);
+  grid[z,y,x].cType := CT_SAND;
+  grid[z,y,x].damage := (rnd mod 32) + round(sin(getSec) * 100)+100;
+  grid[z,y,x].rng := rnd;
+  tileRef^.status := TS_DIRTY;
+end;
+
 procedure main();
 var
   ui: tGui;
   fpsLabel: tGuiLabel;
   timer: tTimer;
   elapsed: single;
+  i: integer;
 begin
   renderGrid_REF();
   screen.pageFlip();
@@ -305,6 +340,8 @@ begin
     if timer.avElapsed > 0 then
       fpsLabel.text := format('%.1f %d %d', [1/timer.avElapsed, STAT_TILE_DRAW, STAT_TILE_UPDATE]);
 
+    for i := 0 to 16 do
+      addSand(round(sin(getSec*3.1)*4)+32-4+(rnd mod 4),round(cos(getSec*3.1)*4)+32-4+(rnd mod 4), GRID_Z-1-(rnd mod 4));
     updateGrid();
     renderGrid_REF();
 

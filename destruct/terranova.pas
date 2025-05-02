@@ -610,7 +610,7 @@ begin
         end;
         DT_WATER: begin
           if checkAndMove(0,1) then continue;
-          coin := (rnd and $2) * 2 - 1;
+          coin := (rnd and $2) * 2 - 1; // and $2?? why? should be and $1?
           if checkAndMove(coin,1) then continue;
           if checkAndMove(-coin,1) then continue;
           if checkAndMove(coin,0) then continue;
