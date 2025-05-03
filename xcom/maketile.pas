@@ -68,7 +68,7 @@ var
 
 constructor tTile3D.Create();
 begin
-	inherited Create(16, 16, 32);
+	inherited Create(16, 32, 16);
 end;
 
 procedure tTile3D.setSolid(height: integer);
@@ -79,7 +79,7 @@ begin
 	for z := 0 to 31 do begin
   	for x := 0 to 15 do begin
     	for y := 0 to 15 do begin
-      	if z < height then col := RGB(255,0,0,255) else col := RGB(0,0,255,255);
+      	if z < height then col := RGB(0,0,0,255) else col := RGB(0,0,0,0);
         setVoxel(x,y,31-z,col);
       end;
     end;
@@ -91,13 +91,17 @@ var
 	dz: integer;
   p: tP3D;
 begin
-	for dz := 0 to 32 do begin
+	for dz := 0 to 31 do begin
+  	if odd(dx+dz) then continue;
   	p.x := (dz + dx) div 2;
     p.y := (dz - dx) div 2;
-    p.z := dy + (dz div 2);
-    if getVoxel(p.x,p.y,p.z).a <> 0 then exit(p);
+    p.z := 31-(dy - (dz div 2));
+    p.w := 1;
+    //note(' - %d %d %d [%d] %d', [p.x, p.y, p.z, byte(inBounds(p.x,p.y,p.z)), getVoxel(p.x,p.y,p.z).a]);
+    if not inBounds(p.x,p.y,p.z) then continue;
+    if getVoxel(p.x,p.y,p.z).a > 0 then exit(p);
   end;
-  result.x := -1;
+	fillchar(result, sizeof(result), 0);
 end;
 
 procedure tTile3D.paint(s: tSprite);
@@ -106,12 +110,13 @@ var
   col: RGBA;
   p: tP3D;
 begin
-	for x := 0 to 31 do begin
-  	for y := 0 to 39 do begin
+	for y := 0 to 39 do begin
+		for x := 0 to 31 do begin
     	col := s.getPixel(x,y);
       if col = RGB(255,0,255) then continue;
-      p := reproject(x,y);
-      if p.x >= 0 then setVoxel(p.x, p.y, p.z, col);
+      p := reproject(x-16,39-y);
+      //note('(%d %d) %d %d %d', [x, y, p.x, p.y, p.z]);
+      if p.w > 0 then setVoxel(p.x, p.y, p.z, col);
     end;
   end;
 end;
@@ -121,6 +126,7 @@ var
   tile: tTile3D;
   sprite: tSprite;
   dc: tDrawContext;
+  i,j: integer;
 
 begin
 
@@ -144,17 +150,18 @@ begin
 
   tile := tTile3D.Create();
   sprite := tSprite.Create(page, Rect(0, 464, 32, 40));
-  tile.setSolid(10);
-//  tile.paint(sprite);
 
+  tile.setSolid(1);
+  tile.paint(sprite);
   tile.generateSDF();
 
   {show it}
   repeat
   	dc := screen.canvas.getDC();
-    dc.clear(RGB(255,0,255));
+    dc.clear(RGB(0,0,100));
     sprite.draw(dc, 10, 10);
-    tile.draw(dc, V3(320/2, 240/2,0), V3(0,0,getSec()), 1.0);
+
+    tile.draw(dc, V3(320/2, 240/2,0), V3(0,0,getSec()), 4.0);
 
     screen.pageFlip();
 
