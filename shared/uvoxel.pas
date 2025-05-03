@@ -517,12 +517,12 @@ var
   function countNeighbours(): integer;
   begin
     result := 0;
-    if vox.getPixel((x-1),(y)+(z)*fWidth).a = 255 then inc(result);
-    if vox.getPixel((x+1),(y)+(z)*fWidth).a = 255 then inc(result);
-    if vox.getPixel((x),(y-1)+(z)*fWidth).a = 255 then inc(result);
-    if vox.getPixel((x),(y+1)+(z)*fWidth).a = 255 then inc(result);
-    if vox.getPixel((x),(y)+(z-1)*fWidth).a = 255 then inc(result);
-    if vox.getPixel((x),(y)+(z+1)*fWidth).a = 255 then inc(result);
+    if vox.getPixel((x-1),(y)+(z)*fHeight).a = 255 then inc(result);
+    if vox.getPixel((x+1),(y)+(z)*fHeight).a = 255 then inc(result);
+    if vox.getPixel((x),(y-1)+(z)*fHeight).a = 255 then inc(result);
+    if vox.getPixel((x),(y+1)+(z)*fHeight).a = 255 then inc(result);
+    if vox.getPixel((x),(y)+(z-1)*fHeight).a = 255 then inc(result);
+    if vox.getPixel((x),(y)+(z+1)*fHeight).a = 255 then inc(result);
   end;
 
   function isOccluded(): boolean;
@@ -611,9 +611,9 @@ begin
   fWidth := page.width;
   fHeight := height;
   fDepth := page.height div height;
-  if not fWidth in [1,2,4,8,16,32,64,128] then
+  if not (fWidth in [1,2,4,8,16,32,64,128]) then
     fatal(format('Invalid voxel width %d, must be power of 2, and < 256', [fWidth]));
-  if not fHeight in [1,2,4,8,16,32,64,128] then
+  if not (fHeight in [1,2,4,8,16,32,64,128]) then
     fatal(format('Invalid voxel height %d, must be power of 2, and < 256', [fHeight]));
   fLog2Width := round(log2(fWidth));
   fLog2Height := round(log2(fHeight));

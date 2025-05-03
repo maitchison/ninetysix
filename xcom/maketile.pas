@@ -37,6 +37,7 @@ uses
   uVoxel,
   uGraph32,
 	uTest,
+  uVertex,
   uDebug,
   uKeyboard,
 	uUtils,
@@ -52,12 +53,10 @@ type
   end;
 
 type
-  tTile3D = class
-  	vox: array[0..23, 0..15, 0..15] of RGBA;
+  tTile3D = class(tVoxel)
+  	constructor Create();
     procedure setSolid(height: integer);
-    function reproject(dx,dy: integer): tP3D;
-    function getVox(x,y,z: integer): RGBA;
-    procedure setVox(x,y,z: integer;v: RGBA);
+    function  reproject(dx,dy: integer): tP3D;
     procedure paint(s: tSprite);
   end;
 
@@ -67,36 +66,24 @@ var
 
 {------------------------------------------------}
 
+constructor tTile3D.Create();
+begin
+	inherited Create(16, 16, 32);
+end;
+
 procedure tTile3D.setSolid(height: integer);
 var
 	x,y,z: integer;
   col: RGBA;
 begin
-	for z := 0 to 23 do begin
+	for z := 0 to 31 do begin
   	for x := 0 to 15 do begin
     	for y := 0 to 15 do begin
-      	if z < height then col := RGB(0,0,0,255) else col := RGB(0,0,0,0);
-        setVox(x,y,z,col);
+      	if z < height then col := RGB(255,0,0,255) else col := RGB(0,0,255,255);
+        setVoxel(x,y,31-z,col);
       end;
     end;
   end;
-end;
-
-function tTile3D.getVox(x,y,z: integer): RGBA;
-begin
-	result := RGB(0,0,0,0);
-  if dword(x) >= 16 then exit;
-  if dword(y) >= 16 then exit;
-  if dword(z) >= 24 then exit;
-  result := vox[z,y,x];
-end;
-
-procedure tTile3D.setVox(x,y,z: integer;v: RGBA);
-begin
-  if dword(x) >= 16 then exit;
-  if dword(y) >= 16 then exit;
-  if dword(z) >= 24 then exit;
-  vox[z,y,x] := v;
 end;
 
 function tTile3D.reproject(dx,dy: integer): tP3D;
@@ -108,7 +95,7 @@ begin
   	p.x := (dz + dx) div 2;
     p.y := (dz - dx) div 2;
     p.z := dy + (dz div 2);
-    if getVox(p.x,p.y,p.z).a <> 0 then exit(p);
+    if getVoxel(p.x,p.y,p.z).a <> 0 then exit(p);
   end;
   result.x := -1;
 end;
@@ -124,7 +111,7 @@ begin
     	col := s.getPixel(x,y);
       if col = RGB(255,0,255) then continue;
       p := reproject(x,y);
-      if p.x >= 0 then setVox(p.x, p.y, p.z, col);
+      if p.x >= 0 then setVoxel(p.x, p.y, p.z, col);
     end;
   end;
 end;
@@ -133,8 +120,12 @@ var
 	page: tPage;
   tile: tTile3D;
   sprite: tSprite;
+  dc: tDrawContext;
 
 begin
+
+	uVoxel.VX_USE_SDF := false;
+
   {set video}
   enableVideoDriver(tVesaDriver.create());
   if (tVesaDriver(videoDriver).vesaVersion) < 2.0 then
@@ -153,12 +144,17 @@ begin
 
   tile := tTile3D.Create();
   sprite := tSprite.Create(page, Rect(0, 464, 32, 40));
-  tile.setSolid(1);
-  tile.paint(sprite);
+  tile.setSolid(10);
+//  tile.paint(sprite);
+
+  tile.generateSDF();
 
   {show it}
   repeat
-  	sprite.draw(screen.canvas.getDC, 10, 10);
+  	dc := screen.canvas.getDC();
+    dc.clear(RGB(255,0,255));
+    sprite.draw(dc, 10, 10);
+    tile.draw(dc, V3(320/2, 240/2,0), V3(0,0,getSec()), 1.0);
 
     screen.pageFlip();
 
