@@ -98,7 +98,7 @@ end;
 procedure tFileSystem.copyFile(srcFile, dstFile: string);
 begin
   {not sure this is the best way to do this?}
-  dos.exec(getEnv('COMSPEC'), format('/C copy "%s" "%s" > nul', [srcFile, dstFile]));
+  dos.exec(getEnv('COMSPEC'), format('/C copy %s %s > nul', [srcFile, dstFile]));
 end;
 
 {return filesize of file or 0 if not found.}
