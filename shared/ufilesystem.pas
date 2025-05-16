@@ -35,6 +35,7 @@ type
     procedure delFile(path: string);
 
     function  mkDir(path: string): boolean;
+    procedure mkDirs(path: string);
     function  listFiles(path: string): tStringList;
     function  listFolders(path: string): tStringList;
 
@@ -97,7 +98,7 @@ end;
 procedure tFileSystem.copyFile(srcFile, dstFile: string);
 begin
   {not sure this is the best way to do this?}
-  dos.exec(getEnv('COMSPEC'), format('/C copy %s %s > nul', [srcFile, dstFile]));
+  dos.exec(getEnv('COMSPEC'), format('/C copy "%s" "%s" > nul', [srcFile, dstFile]));
 end;
 
 {return filesize of file or 0 if not found.}
@@ -162,6 +163,30 @@ begin
   system.mkDir(path);
   {$I+}
   result := (IoResult = 0);
+end;
+
+{create fold and any required subfolders}
+procedure tFileSystem.mkDirs(path: string);
+var
+  dir: string;
+  lhs,rhs: string;
+begin
+
+
+  dir := '';
+
+  if not split(path, '\', lhs, rhs) then exit;
+
+  repeat
+    dir := dir + lhs + '\';
+    path := rhs;
+    // silly ..why does c:\ come up as not exists?
+    if (not fileSystem.folderExists(dir)) and (dir <> 'c:\') then begin
+      note('>>'+dir);
+      system.mkDir(dir);
+    end;
+    if not split(path, '\', lhs, rhs) then exit;
+  until false;
 end;
 
 {returns a list of all files in filesystem matching path

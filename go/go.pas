@@ -735,7 +735,7 @@ begin
 
   {check checkpoints}
   for checkpointName in repo.getCheckpointNames() do begin
-    checkpoint.load(joinPath(REPO_PATH, checkpointName)+'.txt');
+    checkpoint.load(joinPath(REPO_PATH, '$REPO', checkpointName+'.txt'));
     textAttr := LIGHTGRAY;
     output(pad(checkpointName, 40));
     if repo.verify(checkpoint, false) then begin
@@ -929,6 +929,36 @@ begin
   textattr := oldTextAttr;
 end;
 
+{
+Export *every* checkpoint within the repo into a history folder.
+Used to import into github.
+}
+procedure doExport();
+var
+  checkpointName: string;
+  checkpoint: tCheckpoint;
+  repo: tCheckpointRepo;
+  checkpointDateCode: string;
+const
+  EXPORT_PATH: string = 'c:\dev\history';
+begin
+  repo := tCheckpointRepo.create(REPO_PATH);
+  checkpoint := tCheckpoint.Create(repo);
+
+  {check object store}
+  outputLn('Exporting Repo to '+EXPORT_PATH);
+  fileSystem.mkDir(EXPORT_PATH);
+
+  for checkpointName in repo.getCheckpointNames() do begin
+    checkpoint.load(joinPath(REPO_PATH, '$REPO', checkpointName+'.txt'));
+    textAttr := LIGHTGRAY;
+    output(pad(checkpointName, 40));
+    checkpoint.exportToFolder(joinPath(EXPORT_PATH, checkpointName));
+    break;
+  end;
+  checkpoint.free;
+end;
+
 {--------------------------------------------------}
 
 var
@@ -969,6 +999,8 @@ begin
     runTests()
   else if command = 'verify' then
     doVerify()
+  else if command = 'export' then
+    doExport()
   else
     fatal('Invalid command "'+command+'"');
 

@@ -205,7 +205,10 @@ begin
   for fileRef in fileList do begin
     dstFile := joinPath(path, fileRef.path);
     srcFile := joinPath(fileRef.root, fileRef.hash);
-    {todo: support subfolders}
+    // not sure why I include '*' before the root folder for stuff stored in the object store.
+    if srcFile.startsWith('*') then
+      srcFile := copy(srcFile, 2, length(srcFile)-1);
+    fileSystem.mkDirs(dstFile);
     fileSystem.copyFile(srcFile, dstFile);
     fileSystem.setModified(dstFile, fileRef.modified);
   end;
