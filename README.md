@@ -1,3 +1,3 @@
-Ninety Six
+# Ninety Six
 
-A repo containing the games found at [www.ninetysix.io](www.ninetysix.io)
+A repo containing the games found at [www.ninetysix.io](http://www.ninetysix.io)
